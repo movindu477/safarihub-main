@@ -1,24 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 
-// Import video from src/assets
-import aboutVideo from "../assets/about.mp4";
+// Import image from src/assets
+import aboutImage from "../assets/about.avif";
 
 export default function Section2() {
   const [isVisible, setIsVisible] = useState(false);
-  const videoRef = useRef(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 100);
     return () => clearTimeout(timer);
-  }, []);
-
-  // Auto-play and loop the video
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.play().catch(error => {
-        console.log("Video autoplay failed:", error);
-      });
-    }
   }, []);
 
   const stats = [
@@ -30,20 +20,14 @@ export default function Section2() {
 
   return (
     <section className="relative w-full min-h-screen flex items-center justify-center text-white overflow-hidden">
-      {/* Background Video */}
+      {/* Background Image */}
       <div className="absolute inset-0 w-full h-full overflow-hidden">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          loop
-          playsInline
+        <img
+          src={aboutImage}
+          alt="SafariHub background"
           className="w-full h-full object-cover scale-105"
           style={{ filter: "brightness(0.7)" }}
-        >
-          <source src={aboutVideo} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+        />
       </div>
 
       {/* Gradient overlays */}
