@@ -21,7 +21,7 @@ import { getFirestore, doc, getDoc } from "firebase/firestore";
 import logo from "../assets/logo.png";
 import userImage from "../assets/user.png";
 
-export default function Navbar({ user, onLogout }) {
+export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [userData, setUserData] = useState(null);
@@ -75,6 +75,18 @@ export default function Navbar({ user, onLogout }) {
       }
     } catch (error) {
       console.error("Logout error:", error);
+    }
+  };
+
+  const handleLoginClick = () => {
+    if (onLogin) {
+      onLogin();
+    }
+  };
+
+  const handleRegisterClick = () => {
+    if (onRegister) {
+      onRegister();
     }
   };
 
@@ -148,12 +160,20 @@ export default function Navbar({ user, onLogout }) {
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
             </div>
           ) : (
-            <button
-              onClick={() => window.location.href = '/login'}
-              className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              Login
-            </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleLoginClick}
+                className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                Login
+              </button>
+              <button
+                onClick={handleRegisterClick}
+                className="border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                Register
+              </button>
+            </div>
           )}
         </div>
 
@@ -171,12 +191,14 @@ export default function Navbar({ user, onLogout }) {
               <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-2 border-gray-900"></div>
             </div>
           ) : (
-            <button
-              onClick={() => window.location.href = '/login'}
-              className="bg-yellow-500 hover:bg-yellow-600 text-black px-3 py-1 rounded-lg font-medium transition-colors text-sm"
-            >
-              Login
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleLoginClick}
+                className="bg-yellow-500 hover:bg-yellow-600 text-black px-3 py-1 rounded-lg font-medium transition-colors text-sm"
+              >
+                Login
+              </button>
+            </div>
           )}
           <Menu
             className="h-8 w-8 text-white cursor-pointer hover:text-yellow-400 transition-colors duration-300"
@@ -227,6 +249,31 @@ export default function Navbar({ user, onLogout }) {
                   )
                 )}
               </div>
+
+              {/* Auth Buttons - Show when user is NOT logged in */}
+              {!user && (
+                <div className="space-y-3 py-4 border-t border-gray-700 pt-6 animate-fadeInUp"
+                     style={{ animationDelay: "400ms" }}>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      handleLoginClick();
+                    }}
+                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-black py-3 rounded-lg font-medium transition-colors text-lg"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      handleRegisterClick();
+                    }}
+                    className="w-full border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black py-3 rounded-lg font-medium transition-colors text-lg"
+                  >
+                    Register
+                  </button>
+                </div>
+              )}
 
               {/* User section - Only show if user is logged in */}
               {user && (

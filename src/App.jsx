@@ -297,6 +297,16 @@ export default function App() {
     }
   };
 
+  // Handle login button click - navigate to login screen
+  const handleLoginClick = () => {
+    setScreen("login");
+  };
+
+  // Handle register button click - navigate to register screen
+  const handleRegisterClick = () => {
+    setScreen("register");
+  };
+
   // DEVELOPMENT: Quick navigation buttons
   const DevNavigation = () => (
     <div className="fixed top-4 right-4 z-50 flex gap-2 bg-black/80 p-2 rounded-lg">
@@ -499,7 +509,12 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white">
       <DevNavigation />
-      <Navbar user={user} onLogout={handleLogout} onLogin={() => setScreen("login")} />
+      <Navbar 
+        user={user} 
+        onLogout={handleLogout} 
+        onLogin={handleLoginClick}
+        onRegister={handleRegisterClick}
+      />
       <Section1 />
       <div className="h-1 bg-black"></div>
       <Section2 />
