@@ -20,7 +20,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, LogOut } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, LogOut, Menu, X } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
@@ -50,7 +50,7 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 export default function App() {
-  const [screen, setScreen] = useState("home"); // CHANGED: Start with home for testing
+  const [screen, setScreen] = useState("home");
   const [role, setRole] = useState(null);
   const [msg, setMsg] = useState("");
   const [user, setUser] = useState(null);
@@ -80,7 +80,6 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       console.log("Auth state changed:", user);
-      // Auto-redirect to home if user is logged in
       if (user && screen === "login") {
         setScreen("home");
       }
@@ -93,7 +92,6 @@ export default function App() {
     console.log("App component mounted - DEVELOPMENT MODE");
     console.log("Current screen:", screen);
     
-    // Bypass authentication for development - remove this in production
     const developmentBypass = () => {
       console.log("Development bypass active - showing home page");
       setScreen("home");
@@ -139,7 +137,6 @@ export default function App() {
   const handleProfileImageSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         setMsg("❌ Image size should be less than 2MB");
         return;
@@ -155,7 +152,6 @@ export default function App() {
   const handleRegister = async (e) => {
     e.preventDefault();
     
-    // Quick validation
     if (password !== confirm) {
       setMsg("❌ Passwords do not match!");
       return;
@@ -169,24 +165,21 @@ export default function App() {
     setMsg("⏳ Creating your account...");
     
     try {
-      // 1. Create user in Firebase Authentication (FAST)
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
       
-      // 2. Prepare user data for Firestore
       const userData = {
         uid,
         email,
         fullName: fullName,
         phone: phone || "",
-        profilePicture: "", // Start with empty, update later if image exists
+        profilePicture: "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
       let collectionName = "";
       
-      // 3. Determine collection based on role
       if (role === "tourist") {
         collectionName = "tourists";
         Object.assign(userData, {
@@ -204,10 +197,8 @@ export default function App() {
         });
       }
 
-      // 4. Save to Firestore FIRST (fast operation)
       await setDoc(doc(db, collectionName, uid), userData);
       
-      // 5. Upload profile image in background (if exists)
       let photoURL = null;
       if (profileFile) {
         try {
@@ -216,33 +207,27 @@ export default function App() {
           const snap = await uploadBytes(storageRef, profileFile);
           photoURL = await getDownloadURL(snap.ref);
           
-          // Update profile picture in Firestore
           await setDoc(doc(db, collectionName, uid), {
             profilePicture: photoURL,
             updatedAt: serverTimestamp(),
           }, { merge: true });
           
-          // Update auth profile
           await updateProfile(userCredential.user, { 
             displayName: fullName, 
             photoURL: photoURL 
           });
         } catch (uploadError) {
           console.log("Profile image upload failed, but account created successfully");
-          // Continue without profile picture
         }
       } else {
-        // Update auth profile without photo
         await updateProfile(userCredential.user, { 
           displayName: fullName 
         });
       }
 
-      // 6. SUCCESS - Show immediate feedback
       setMsg("🎉 Account created successfully! Redirecting to login...");
-      setBusy(false); // Reset loading immediately
+      setBusy(false);
       
-      // 7. Quick redirect to login
       setTimeout(() => {
         signOut(auth);
         setScreen("login");
@@ -277,7 +262,6 @@ export default function App() {
     setMsg("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      const userName = user?.displayName || email.split('@')[0];
       setMsg(`✅ Welcome back! Redirecting...`);
       setTimeout(() => {
         setScreen("home");
@@ -469,7 +453,6 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
         <DevNavigation />
         <div className="relative w-full max-w-2xl">
-          {/* Back Button */}
           <div className="flex justify-between items-center mb-4">
             <button
               onClick={() => {
@@ -511,12 +494,12 @@ export default function App() {
       </div>
     );
 
-  // ✅ Home Page - THIS IS WHERE YOUR SECTIONS ARE RENDERED
+  // ✅ Home Page
   console.log("Rendering Home Page with all sections");
   return (
     <div className="min-h-screen bg-white">
       <DevNavigation />
-      <Navbar user={user} onLogout={handleLogout} />
+      <Navbar user={user} onLogout={handleLogout} onLogin={() => setScreen("login")} />
       <Section1 />
       <div className="h-1 bg-black"></div>
       <Section2 />
@@ -594,7 +577,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
       </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
-        {/* Full Name & Email */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -627,7 +609,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         </div>
 
-        {/* Password & Confirm Password */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -678,7 +659,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         </div>
 
-        {/* Phone & Location */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -711,7 +691,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         </div>
 
-        {/* Language/Experience & Service Type */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -742,7 +721,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
             )}
           </div>
 
-          {/* Service Type (Provider only) */}
           {!isTourist && (
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -763,7 +741,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           )}
         </div>
 
-        {/* Languages Spoken (Provider only) */}
         {!isTourist && (
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -782,7 +759,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         )}
 
-        {/* Profile Picture */}
         <div className="space-y-1">
           <label className="flex items-center gap-2 text-white font-medium text-xs">
             <Camera className="h-3 w-3 text-yellow-400" />
@@ -801,7 +777,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         </div>
 
-        {/* Register Button */}
         <div className="pt-2">
           <button
             type="submit"
