@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 
 // Import images from src/assets
 import back1 from "../assets/back1.jpg";
-import back2 from "../assets/back2.avif";
-import back3 from "../assets/back3.avif";
+import back2 from "../assets/back2ori.jpg";
+import back3 from "../assets/back3ori.jpg";
 import back4 from "../assets/back4.avif";
 
 export default function Section1() {

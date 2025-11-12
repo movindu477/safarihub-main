@@ -54,13 +54,10 @@ export default function Section5() {
               </span>
             </div>
             
-            <h2 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6">
+            {/* Single line title with smaller size */}
+            <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6">
               <span className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 bg-clip-text text-transparent">
-                Rental
-              </span>
-              <br />
-              <span className="bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent">
-                Locations
+                Rental Locations
               </span>
             </h2>
             

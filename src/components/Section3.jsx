@@ -204,24 +204,24 @@ export default function Section3() {
 
   const locations = {
     nationalParks: [
-      { label: "YALA", position: { left: "71%", top: "84%" } },
-      { label: "WILPATTU", position: { left: "25%", top: "38%" } }
+      { label: "Yala", position: { left: "71%", top: "84%" } },
+      { label: "Wilpattu", position: { left: "25%", top: "38%" } }
     ],
     beaches: [
-      { label: "Arugam Bay", position: { left: "48%", top: "25%" } },
-      { label: "Mirissa", position: { left: "75%", top: "50%" } }
+      { label: "Unawatuna Beach", position: { left: "35%", top: "97%" } },
+      { label: "Mirissa Beach", position: { left: "40%", top: "98%" } }
     ],
     wildlifeSanctuaries: [
-      { label: "Kumana", position: { left: "72%", top: "78%" } },
-      { label: "Bundala", position: { left: "65%", top: "88%" } },
+      { label: "Kumana National Park", position: { left: "79%", top: "81%" } },
+      { label: "Lunugamvehera National Park", position: { left: "61%", top: "86%" } },
     ],
     forestReserves: [
-      { label: "Sinharaja", position: { left: "58%", top: "75%" } },
-      { label: "Knuckles", position: { left: "45%", top: "50%" } },
+      { label: "Sinharaja Forest Reserve", position: { left: "40%", top: "87%" } },
+      { label: "Knuckles Forest Reserve", position: { left: "46%", top: "69%" } },
     ],
     campingSites: [
-      { label: "Ella Rock", position: { left: "55%", top: "70%" } },
-      { label: "Adam's Peak", position: { left: "50%", top: "65%" } },
+      { label: "Horton Plains National Park", position: { left: "50%", top: "77%" } },
+      { label: "Knuckles Mountain Range", position: { left: "46%", top: "65%" } },
     ]
   };
 

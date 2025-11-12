@@ -125,7 +125,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   return (
     <>
       {/* Navbar */}
-      <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl bg-gradient-to-r from-black via-gray-900 to-black text-white flex items-center justify-between px-6 md:px-12 py-3 shadow-2xl z-50 h-16 rounded-2xl border border-gray-700">
+      <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl bg-gradient-to-r from-safari-dark via-safari-medium to-safari-dark text-white flex items-center justify-between px-6 md:px-12 py-3 shadow-safari z-50 h-16 rounded-2xl border border-safari-border backdrop-blur-sm">
         {/* Left side - Logo */}
         <div className="flex items-center space-x-3">
           <img
@@ -141,9 +141,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             <a
               key={link}
               href="#"
-              className="hover:text-yellow-400 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform"
+              className="hover:text-safari-gold transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group"
             >
               {link}
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-safari-gold transition-all duration-300 group-hover:w-full"></span>
             </a>
           ))}
 
@@ -153,23 +154,23 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               <img
                 src={currentUser.avatar}
                 alt="User"
-                className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-400 hover:border-yellow-400"
+                className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-safari-light hover:border-safari-gold"
                 onClick={() => setProfileOpen(true)}
               />
               {/* Online indicator */}
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-safari-dark"></div>
             </div>
           ) : (
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleLoginClick}
-                className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded-lg font-medium transition-colors"
+                className="bg-safari-gold hover:bg-safari-gold-dark text-safari-dark px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105"
               >
                 Login
               </button>
               <button
                 onClick={handleRegisterClick}
-                className="border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black px-4 py-2 rounded-lg font-medium transition-colors"
+                className="border-2 border-safari-gold text-safari-gold hover:bg-safari-gold hover:text-safari-dark px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105"
               >
                 Register
               </button>
@@ -184,24 +185,24 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               <img
                 src={currentUser.avatar}
                 alt="User"
-                className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-400 hover:border-yellow-400"
+                className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-safari-light hover:border-safari-gold"
                 onClick={() => setProfileOpen(true)}
               />
               {/* Online indicator */}
-              <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-2 border-gray-900"></div>
+              <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-2 border-safari-dark"></div>
             </div>
           ) : (
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleLoginClick}
-                className="bg-yellow-500 hover:bg-yellow-600 text-black px-3 py-1 rounded-lg font-medium transition-colors text-sm"
+                className="bg-safari-gold hover:bg-safari-gold-dark text-safari-dark px-3 py-1.5 rounded-lg font-medium transition-colors text-sm"
               >
                 Login
               </button>
             </div>
           )}
           <Menu
-            className="h-8 w-8 text-white cursor-pointer hover:text-yellow-400 transition-colors duration-300"
+            className="h-8 w-8 text-white cursor-pointer hover:text-safari-gold transition-colors duration-300"
             onClick={() => setMenuOpen(true)}
           />
         </div>
@@ -217,16 +218,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           />
 
           {/* Side panel */}
-          <div className="fixed top-0 left-0 h-full w-full bg-gradient-to-b from-black via-gray-900 to-black text-white z-50 md:hidden animate-slideInLeft">
+          <div className="fixed top-0 left-0 h-full w-full bg-gradient-to-br from-safari-dark via-safari-medium to-safari-dark text-white z-50 md:hidden animate-slideInLeft">
             {/* Close header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-safari-border bg-safari-dark/80 backdrop-blur-sm">
               <img
                 src={logo}
                 alt="SafariHub Logo"
                 className="h-8 w-auto object-contain"
               />
               <X
-                className="h-8 w-8 text-white cursor-pointer hover:text-yellow-400 transition-colors duration-300"
+                className="h-8 w-8 text-white cursor-pointer hover:text-safari-gold transition-colors duration-300"
                 onClick={() => setMenuOpen(false)}
               />
             </div>
@@ -241,10 +242,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       key={link}
                       href="#"
                       onClick={() => setMenuOpen(false)}
-                      className="block text-white hover:text-yellow-400 transition-all duration-300 py-5 border-b border-gray-700 hover:border-yellow-400 font-medium text-xl w-full text-left animate-fadeInUp"
+                      className="block text-white hover:text-safari-gold transition-all duration-300 py-5 border-b border-safari-border hover:border-safari-gold font-medium text-xl w-full text-left animate-fadeInUp group"
                       style={{ animationDelay: `${index * 100}ms` }}
                     >
-                      {link}
+                      <span className="flex items-center">
+                        {link}
+                        <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+                      </span>
                     </a>
                   )
                 )}
@@ -252,14 +256,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
               {/* Auth Buttons - Show when user is NOT logged in */}
               {!user && (
-                <div className="space-y-3 py-4 border-t border-gray-700 pt-6 animate-fadeInUp"
+                <div className="space-y-3 py-4 border-t border-safari-border pt-6 animate-fadeInUp"
                      style={{ animationDelay: "400ms" }}>
                   <button
                     onClick={() => {
                       setMenuOpen(false);
                       handleLoginClick();
                     }}
-                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-black py-3 rounded-lg font-medium transition-colors text-lg"
+                    className="w-full bg-safari-gold hover:bg-safari-gold-dark text-safari-dark py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg"
                   >
                     Login
                   </button>
@@ -268,7 +272,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       setMenuOpen(false);
                       handleRegisterClick();
                     }}
-                    className="w-full border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black py-3 rounded-lg font-medium transition-colors text-lg"
+                    className="w-full border-2 border-safari-gold text-safari-gold hover:bg-safari-gold hover:text-safari-dark py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg"
                   >
                     Register
                   </button>
@@ -278,7 +282,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* User section - Only show if user is logged in */}
               {user && (
                 <div
-                  className="flex items-center space-x-3 py-4 border-t border-gray-700 pt-6 animate-fadeInUp cursor-pointer"
+                  className="flex items-center space-x-3 py-4 border-t border-safari-border pt-6 animate-fadeInUp cursor-pointer group"
                   style={{ animationDelay: "400ms" }}
                   onClick={() => {
                     setMenuOpen(false);
@@ -289,15 +293,15 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <img
                       src={currentUser.avatar}
                       alt="User"
-                      className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-400 hover:border-yellow-400"
+                      className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-safari-light group-hover:border-safari-gold"
                     />
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-safari-dark"></div>
                   </div>
                   <div>
-                    <span className="text-white hover:text-yellow-400 transition-colors duration-300 font-medium text-lg block">
+                    <span className="text-white group-hover:text-safari-gold transition-colors duration-300 font-medium text-lg block">
                       {currentUser.name}
                     </span>
-                    <span className="text-gray-400 text-sm">{currentUser.membership}</span>
+                    <span className="text-safari-light text-sm">{currentUser.membership}</span>
                   </div>
                 </div>
               )}
@@ -306,7 +310,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         </>
       )}
 
-      {/* Profile Side Panel - Fixed to open from left */}
+      {/* Profile Side Panel - Fixed to open from RIGHT side */}
       {profileOpen && user && (
         <>
           {/* Full screen overlay */}
@@ -315,12 +319,12 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             onClick={() => setProfileOpen(false)}
           />
 
-          {/* Profile Panel - Fixed to left side */}
-          <div className="fixed top-0 left-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-gray-900 to-black text-white shadow-2xl border-r border-gray-700 overflow-hidden z-50 animate-slideInLeft">
+          {/* Profile Panel - Fixed to RIGHT side */}
+          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-safari-dark to-safari-medium text-white shadow-2xl border-l border-safari-border overflow-hidden z-50 animate-slideInRight">
             {/* Close button */}
-            <div className="absolute top-4 right-4 z-10">
+            <div className="absolute top-4 left-4 z-10">
               <X
-                className="h-6 w-6 text-white cursor-pointer hover:text-yellow-400 transition-colors duration-300 bg-black/50 rounded-full p-1"
+                className="h-6 w-6 text-white cursor-pointer hover:text-safari-gold transition-colors duration-300 bg-safari-dark/50 rounded-full p-1 backdrop-blur-sm"
                 onClick={() => setProfileOpen(false)}
               />
             </div>
@@ -330,7 +334,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* Profile Header */}
               <div className="relative">
                 {/* Background Banner */}
-                <div className="h-32 bg-gradient-to-r from-yellow-600 to-yellow-400"></div>
+                <div className="h-32 bg-gradient-to-r from-safari-gold to-safari-gold-light"></div>
                 
                 {/* Profile Info */}
                 <div className="px-6 pb-6 -mt-16">
@@ -339,20 +343,20 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <img
                       src={currentUser.avatar}
                       alt="User"
-                      className="h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900"
+                      className="h-24 w-24 rounded-full border-4 border-safari-dark bg-safari-dark"
                     />
-                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900"></div>
+                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-500 rounded-full border-2 border-safari-dark"></div>
                   </div>
 
                   {/* User Details */}
                   <div className="mt-4">
                     <h2 className="text-2xl font-bold text-white">{currentUser.name}</h2>
-                    <p className="text-gray-300 text-sm mt-1">{currentUser.email}</p>
+                    <p className="text-safari-light text-sm mt-1">{currentUser.email}</p>
                     <div className="flex flex-col gap-2 mt-3">
-                      <span className="bg-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold w-fit">
+                      <span className="bg-safari-gold text-safari-dark px-3 py-1 rounded-full text-xs font-bold w-fit">
                         {currentUser.membership}
                       </span>
-                      <span className="text-gray-400 text-sm">
+                      <span className="text-safari-light text-sm">
                         Member since {currentUser.joinDate}
                       </span>
                     </div>
@@ -362,17 +366,17 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
               {/* Additional User Information */}
               {!loading && userData && (
-                <div className="px-6 py-4 border-y border-gray-700 bg-black/20">
+                <div className="px-6 py-4 border-y border-safari-border bg-safari-dark/20 backdrop-blur-sm">
                   <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                    <User className="h-5 w-5 text-yellow-400" />
+                    <User className="h-5 w-5 text-safari-gold" />
                     Profile Information
                   </h3>
                   <div className="space-y-3">
                     {/* Phone Number */}
                     {currentUser.phone !== "Not provided" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Phone className="h-4 w-4 text-yellow-400" />
-                        <span className="text-gray-300">Phone: </span>
+                        <Phone className="h-4 w-4 text-safari-gold" />
+                        <span className="text-safari-light">Phone: </span>
                         <span className="text-white">{currentUser.phone}</span>
                       </div>
                     )}
@@ -380,8 +384,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Location/Country */}
                     {currentUser.location !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <MapPin className="h-4 w-4 text-yellow-400" />
-                        <span className="text-gray-300">
+                        <MapPin className="h-4 w-4 text-safari-gold" />
+                        <span className="text-safari-light">
                           {currentUser.role === "Service Provider" ? "Location: " : "Country: "}
                         </span>
                         <span className="text-white">{currentUser.location}</span>
@@ -391,8 +395,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Languages */}
                     {currentUser.languages !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Globe className="h-4 w-4 text-yellow-400" />
-                        <span className="text-gray-300">
+                        <Globe className="h-4 w-4 text-safari-gold" />
+                        <span className="text-safari-light">
                           {currentUser.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
                         </span>
                         <span className="text-white">{currentUser.languages}</span>
@@ -402,16 +406,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Experience Years (for providers) */}
                     {currentUser.experience && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Award className="h-4 w-4 text-yellow-400" />
-                        <span className="text-gray-300">Experience: </span>
+                        <Award className="h-4 w-4 text-safari-gold" />
+                        <span className="text-safari-light">Experience: </span>
                         <span className="text-white">{currentUser.experience} years</span>
                       </div>
                     )}
                     
                     {/* Role Badge */}
                     <div className="flex items-center gap-3 text-sm">
-                      <User className="h-4 w-4 text-yellow-400" />
-                      <span className="text-gray-300">Role: </span>
+                      <User className="h-4 w-4 text-safari-gold" />
+                      <span className="text-safari-light">Role: </span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                         currentUser.role === "Service Provider" 
                           ? "bg-blue-500 text-white" 
@@ -427,24 +431,24 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* Loading State */}
               {loading && (
                 <div className="px-6 py-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400 mx-auto"></div>
-                  <p className="text-gray-400 mt-2">Loading profile...</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-safari-gold mx-auto"></div>
+                  <p className="text-safari-light mt-2">Loading profile...</p>
                 </div>
               )}
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-gray-700 bg-black/20">
+              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-safari-border bg-safari-dark/20 backdrop-blur-sm">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-400">12</div>
-                  <div className="text-xs text-gray-400">Trips</div>
+                  <div className="text-lg font-bold text-safari-gold">12</div>
+                  <div className="text-xs text-safari-light">Trips</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-400">8</div>
-                  <div className="text-xs text-gray-400">Favorites</div>
+                  <div className="text-lg font-bold text-safari-gold">8</div>
+                  <div className="text-xs text-safari-light">Favorites</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-400">2</div>
-                  <div className="text-xs text-gray-400">Upcoming</div>
+                  <div className="text-lg font-bold text-safari-gold">2</div>
+                  <div className="text-xs text-safari-light">Upcoming</div>
                 </div>
               </div>
 
@@ -456,14 +460,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <a
                       key={item.label}
                       href={item.href}
-                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-800 transition-all duration-300 group cursor-pointer animate-fadeInUp"
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-safari-dark/50 transition-all duration-300 group cursor-pointer animate-fadeInUp backdrop-blur-sm"
                       style={{ animationDelay: `${index * 50 + 200}ms` }}
                       onClick={() => setProfileOpen(false)}
                     >
-                      <div className="p-2 bg-gray-800 rounded-lg group-hover:bg-yellow-500 group-hover:text-black transition-all duration-300">
+                      <div className="p-2 bg-safari-dark rounded-lg group-hover:bg-safari-gold group-hover:text-safari-dark transition-all duration-300">
                         <IconComponent className="h-5 w-5" />
                       </div>
-                      <span className="font-medium text-gray-200 group-hover:text-white">
+                      <span className="font-medium text-safari-light group-hover:text-white">
                         {item.label}
                       </span>
                     </a>
@@ -472,7 +476,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               </div>
 
               {/* Logout Section */}
-              <div className="px-6 py-4 border-t border-gray-700 bg-black/30 mt-auto">
+              <div className="px-6 py-4 border-t border-safari-border bg-safari-dark/30 mt-auto backdrop-blur-sm">
                 <button 
                   onClick={handleLogout}
                   className="flex items-center gap-4 p-3 rounded-xl hover:bg-red-900/30 text-red-400 hover:text-red-300 transition-all duration-300 w-full group"
@@ -488,8 +492,17 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         </>
       )}
 
-      {/* Custom animations */}
+      {/* Custom animations and safari theme colors */}
       <style jsx>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+
         @keyframes slideInLeft {
           from {
             transform: translateX(-100%);
@@ -519,6 +532,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           }
         }
 
+        .animate-slideInRight {
+          animation: slideInRight 0.3s ease-out forwards;
+        }
+
         .animate-slideInLeft {
           animation: slideInLeft 0.3s ease-out forwards;
         }
@@ -530,6 +547,65 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         .animate-fadeInUp {
           animation: fadeInUp 0.4s ease-out forwards;
           opacity: 0;
+        }
+
+        /* Safari Theme Colors */
+        .bg-safari-dark {
+          background-color: #1a2f1a;
+        }
+        
+        .bg-safari-medium {
+          background-color: #2d4a2d;
+        }
+        
+        .border-safari-border {
+          border-color: #3a5c3a;
+        }
+        
+        .text-safari-gold {
+          color: #d4af37;
+        }
+        
+        .bg-safari-gold {
+          background-color: #d4af37;
+        }
+        
+        .bg-safari-gold-dark {
+          background-color: #b8941f;
+        }
+        
+        .bg-safari-gold-light {
+          background-color: #e5c158;
+        }
+        
+        .text-safari-light {
+          color: #a8c6a8;
+        }
+        
+        .bg-safari-light {
+          background-color: #a8c6a8;
+        }
+        
+        .text-safari-dark {
+          color: #1a2f1a;
+        }
+        
+        .shadow-safari {
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(212, 175, 55, 0.1);
+        }
+
+        /* Gradient backgrounds */
+        .from-safari-dark {
+          --tw-gradient-from: #1a2f1a;
+          --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(26, 47, 26, 0));
+        }
+        
+        .via-safari-medium {
+          --tw-gradient-stops: var(--tw-gradient-from), #2d4a2d, var(--tw-gradient-to, rgba(45, 74, 45, 0));
+        }
+        
+        .to-safari-dark {
+          --tw-gradient-to: #1a2f1a;
         }
       `}</style>
     </>
