@@ -5,11 +5,11 @@ import lankamap from "../assets/lankamapori.png";
 
 const LocationDot = ({ type, position, label, isHovered, onHover, onClick }) => {
   const dotColors = {
-    darkGreen: "bg-green-700 shadow-green-700/50",
-    brown: "bg-amber-800 shadow-amber-800/50",
-    lightGreen: "bg-green-400 shadow-green-400/50",
-    lightBrown: "bg-amber-500 shadow-amber-500/50",
-    blue: "bg-blue-500 shadow-blue-500/50",
+    darkGreen: "bg-green-500 shadow-green-500/70",
+    brown: "bg-amber-600 shadow-amber-600/70",
+    lightGreen: "bg-green-300 shadow-green-300/70",
+    lightBrown: "bg-amber-400 shadow-amber-400/70",
+    blue: "bg-blue-400 shadow-blue-400/70",
   };
 
   const pulseAnimation = isHovered ? "animate-pulse" : "";
@@ -30,7 +30,7 @@ const LocationDot = ({ type, position, label, isHovered, onHover, onClick }) => 
         onClick(label, position);
       }}
     >
-      <div className="absolute inset-0 rounded-full bg-white/30 animate-ping"></div>
+      <div className="absolute inset-0 rounded-full bg-white/40 animate-ping"></div>
       
       <span
         className={`absolute -top-8 left-1/2 -translate-x-1/2 
@@ -51,16 +51,16 @@ const LocationPopup = ({ location, position, onClose }) => {
   if (!location) return null;
 
   const locationDescriptions = {
-    "YALA": "Famous for leopards and diverse wildlife in Sri Lanka's most visited national park.",
-    "WILPATTU": "Largest national park known for natural lakes and leopard sightings.",
-    "Arugam Bay": "World-class surfing destination with pristine beaches and laid-back vibe.",
-    "Mirissa": "Beautiful beach famous for whale watching and stunning sunsets.",
-    "Kumana": "Bird watcher's paradise with numerous migratory bird species.",
-    "Bundala": "Ramsar wetland site hosting flocks of migratory birds.",
-    "Sinharaja": "UNESCO World Heritage Site with endemic rainforest biodiversity.",
-    "Knuckles": "Mountain range offering challenging hikes and misty landscapes.",
-    "Ella Rock": "Popular hiking destination with panoramic views of hill country.",
-    "Adam's Peak": "Sacred mountain with iconic sunrise pilgrimage experience."
+    "Yala": "Famous for leopards and diverse wildlife in Sri Lanka's most visited national park.",
+    "Wilpattu": "Largest national park known for natural lakes and leopard sightings.",
+    "Unawatuna Beach": "World-class surfing destination with pristine beaches and laid-back vibe.",
+    "Mirissa Beach": "Beautiful beach famous for whale watching and stunning sunsets.",
+    "Kumana National Park": "Bird watcher's paradise with numerous migratory bird species.",
+    "Lunugamvehera National Park": "Ramsar wetland site hosting flocks of migratory birds.",
+    "Sinharaja Forest Reserve": "UNESCO World Heritage Site with endemic rainforest biodiversity.",
+    "Knuckles Forest Reserve": "Mountain range offering challenging hikes and misty landscapes.",
+    "Horton Plains National Park": "Popular hiking destination with panoramic views of hill country.",
+    "Knuckles Mountain Range": "Sacred mountain with iconic sunrise pilgrimage experience."
   };
 
   // Calculate optimal popup position relative to the dot
@@ -166,14 +166,17 @@ const LocationPopup = ({ location, position, onClose }) => {
           {locationDescriptions[location] || "Discover this amazing destination in Sri Lanka."}
         </p>
         
-        <button className="w-full bg-white text-green-700 font-semibold py-1.5 px-3 rounded-xl 
-          hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 
-          flex items-center justify-center gap-1 text-xs">
+        <a 
+          href="#destinations" 
+          className="w-full bg-white text-green-700 font-semibold py-1.5 px-3 rounded-xl 
+            hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 
+            flex items-center justify-center gap-1 text-xs cursor-pointer no-underline"
+        >
           <span>Explore</span>
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
           </svg>
-        </button>
+        </a>
         
         {/* Arrow pointing to dot */}
         <div className={`absolute w-3 h-3 bg-green-600 ${getArrowPosition()}`}></div>
@@ -226,11 +229,11 @@ export default function Section3() {
   };
 
   const legendItems = [
-    { color: "bg-green-700", label: "National Parks", key: "nationalParks", count: locations.nationalParks.length },
-    { color: "bg-amber-800", label: "Wildlife Sanctuaries", key: "wildlifeSanctuaries", count: locations.wildlifeSanctuaries.length },
-    { color: "bg-blue-500", label: "Famous Beaches", key: "beaches", count: locations.beaches.length },
-    { color: "bg-green-400", label: "Forest Reserves", key: "forestReserves", count: locations.forestReserves.length },
-    { color: "bg-amber-500", label: "Camping Sites", key: "campingSites", count: locations.campingSites.length },
+    { color: "bg-green-500", label: "National Parks", key: "nationalParks", count: locations.nationalParks.length },
+    { color: "bg-amber-600", label: "Wildlife Sanctuaries", key: "wildlifeSanctuaries", count: locations.wildlifeSanctuaries.length },
+    { color: "bg-blue-400", label: "Famous Beaches", key: "beaches", count: locations.beaches.length },
+    { color: "bg-green-300", label: "Forest Reserves", key: "forestReserves", count: locations.forestReserves.length },
+    { color: "bg-amber-400", label: "Camping Sites", key: "campingSites", count: locations.campingSites.length },
   ];
 
   const getFilteredLocations = () => {
@@ -391,28 +394,18 @@ export default function Section3() {
         </div>
 
         {/* CTA Button */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4">
-          <button
+        <div className="pt-2 sm:pt-4">
+          <a
+            href="#destinations"
             className="group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 
             text-white font-semibold py-3 sm:py-4 px-6 sm:px-8 rounded-xl transition-all duration-300 
-            transform hover:scale-105 hover:shadow-xl sm:hover:shadow-2xl shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base"
+            transform hover:scale-105 hover:shadow-xl sm:hover:shadow-2xl shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base cursor-pointer no-underline w-full sm:w-auto inline-block"
           >
             <span>Explore All Destinations</span>
             <svg className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>
-          </button>
-          
-          <button
-            className="group border-2 border-gray-300 hover:border-green-500 text-gray-700 hover:text-green-700
-            font-semibold py-3 sm:py-4 px-6 sm:px-8 rounded-xl transition-all duration-300 
-            transform hover:scale-105 flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base"
-          >
-            <span>Download Map</span>
-            <svg className="w-4 h-4 sm:w-5 sm:h-5 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </button>
+          </a>
         </div>
       </div>
 

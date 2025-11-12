@@ -34,22 +34,6 @@ export default function Section2() {
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-transparent to-green-900/30"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/80"></div>
       <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/60"></div>
-      
-      {/* Background particles */}
-      <div className="absolute inset-0 opacity-30">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full animate-float"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${5 + Math.random() * 10}s`
-            }}
-          ></div>
-        ))}
-      </div>
 
       {/* Main Content */}
       <div className="relative z-10 w-full max-w-4xl mx-auto px-6">

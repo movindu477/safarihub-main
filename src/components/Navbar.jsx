@@ -12,7 +12,12 @@ import {
   MapPin,
   Globe,
   Phone,
-  Award
+  Award,
+  ChevronDown,
+  Map,
+  Compass,
+  Car,
+  ShoppingBag
 } from "lucide-react";
 import { getAuth, signOut } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -26,9 +31,21 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
+  const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
 
   const auth = getAuth();
   const db = getFirestore();
+
+  // Add scroll effect for navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Fetch user data from Firestore when profile opens or user changes
   useEffect(() => {
@@ -99,6 +116,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     { icon: HelpCircle, label: "Help & Support", href: "#" },
   ];
 
+  const servicesItems = [
+    { icon: Map, label: "Find a Guide", href: "#guides" },
+    { icon: Compass, label: "Explore Destinations", href: "#destinations" },
+    { icon: Car, label: "Find a Jeep Driver", href: "#jeep-drivers" },
+    { icon: ShoppingBag, label: "Rent Equipment", href: "#equipment" },
+  ];
+
   // Default user data if no user is logged in
   const defaultUserData = {
     name: "Guest User",
@@ -125,7 +149,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   return (
     <>
       {/* Navbar */}
-      <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl bg-gradient-to-r from-safari-dark via-safari-medium to-safari-dark text-white flex items-center justify-between px-6 md:px-12 py-3 shadow-safari z-50 h-16 rounded-2xl border border-safari-border backdrop-blur-sm">
+      <nav className={`fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-white/20 transition-all duration-300 ${
+        isScrolled 
+          ? 'bg-white/10 backdrop-blur-xl shadow-2xl shadow-black/20' 
+          : 'bg-white/5 backdrop-blur-md shadow-lg shadow-black/10'
+      }`}>
         {/* Left side - Logo */}
         <div className="flex items-center space-x-3">
           <img
@@ -137,16 +165,67 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
         {/* Right side - Desktop Links */}
         <div className="hidden md:flex items-center space-x-10">
-          {["HOME", "ABOUT US", "OUR SERVICES", "RENTS"].map((link) => (
+          {["HOME", "ABOUT US"].map((link) => (
             <a
               key={link}
               href="#"
-              className="hover:text-safari-gold transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group"
+              className="hover:text-emerald-300 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group"
             >
               {link}
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-safari-gold transition-all duration-300 group-hover:w-full"></span>
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-300 transition-all duration-300 group-hover:w-full"></span>
             </a>
           ))}
+
+          {/* Services Dropdown - Fixed with connecting bridge */}
+          <div 
+            className="relative"
+            onMouseEnter={() => setServicesDropdownOpen(true)}
+            onMouseLeave={(e) => {
+              // Check if mouse is moving to dropdown
+              const relatedTarget = e.relatedTarget;
+              if (relatedTarget && !e.currentTarget.contains(relatedTarget)) {
+                setServicesDropdownOpen(false);
+              }
+            }}
+          >
+            <button className="hover:text-emerald-300 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group flex items-center gap-1">
+              OUR SERVICES
+              <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-300 transition-all duration-300 group-hover:w-full"></span>
+            </button>
+
+            {/* Invisible connecting bridge to prevent gap */}
+            <div 
+              className="absolute top-full left-0 w-full h-2 bg-transparent"
+              onMouseEnter={() => setServicesDropdownOpen(true)}
+            ></div>
+
+            {/* Dropdown Menu - Positioned closer to the button */}
+            {servicesDropdownOpen && (
+              <div 
+                className="absolute top-full left-0 w-64 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 overflow-hidden animate-fadeIn mt-2"
+                onMouseEnter={() => setServicesDropdownOpen(true)}
+                onMouseLeave={() => setServicesDropdownOpen(false)}
+              >
+                <div className="py-2">
+                  {servicesItems.map((item, index) => {
+                    const IconComponent = item.icon;
+                    return (
+                      <a
+                        key={item.label}
+                        href={item.href}
+                        className="flex items-center gap-3 px-4 py-3 text-gray-800 hover:bg-emerald-400 hover:text-gray-900 transition-all duration-300 group"
+                        style={{ animationDelay: `${index * 50}ms` }}
+                      >
+                        <IconComponent className="h-4 w-4 text-gray-600 group-hover:text-gray-900" />
+                        <span className="font-medium text-sm">{item.label}</span>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User Icon - Only show if user is logged in */}
           {user ? (
@@ -154,23 +233,23 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               <img
                 src={currentUser.avatar}
                 alt="User"
-                className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-safari-light hover:border-safari-gold"
+                className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-white/40 hover:border-emerald-300"
                 onClick={() => setProfileOpen(true)}
               />
               {/* Online indicator */}
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-safari-dark"></div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></div>
             </div>
           ) : (
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleLoginClick}
-                className="bg-safari-gold hover:bg-safari-gold-dark text-safari-dark px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105"
+                className="bg-emerald-400 hover:bg-emerald-500 text-gray-900 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm"
               >
                 Login
               </button>
               <button
                 onClick={handleRegisterClick}
-                className="border-2 border-safari-gold text-safari-gold hover:bg-safari-gold hover:text-safari-dark px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105"
+                className="border-2 border-emerald-400 text-emerald-400 hover:bg-emerald-400 hover:text-gray-900 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm"
               >
                 Register
               </button>
@@ -185,24 +264,24 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               <img
                 src={currentUser.avatar}
                 alt="User"
-                className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-safari-light hover:border-safari-gold"
+                className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-white/40 hover:border-emerald-300"
                 onClick={() => setProfileOpen(true)}
               />
               {/* Online indicator */}
-              <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-2 border-safari-dark"></div>
+              <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white"></div>
             </div>
           ) : (
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleLoginClick}
-                className="bg-safari-gold hover:bg-safari-gold-dark text-safari-dark px-3 py-1.5 rounded-lg font-medium transition-colors text-sm"
+                className="bg-emerald-400 hover:bg-emerald-500 text-gray-900 px-3 py-1.5 rounded-lg font-medium transition-colors text-sm backdrop-blur-sm"
               >
                 Login
               </button>
             </div>
           )}
           <Menu
-            className="h-8 w-8 text-white cursor-pointer hover:text-safari-gold transition-colors duration-300"
+            className="h-8 w-8 text-white cursor-pointer hover:text-emerald-300 transition-colors duration-300"
             onClick={() => setMenuOpen(true)}
           />
         </div>
@@ -218,16 +297,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           />
 
           {/* Side panel */}
-          <div className="fixed top-0 left-0 h-full w-full bg-gradient-to-br from-safari-dark via-safari-medium to-safari-dark text-white z-50 md:hidden animate-slideInLeft">
+          <div className="fixed top-0 left-0 h-full w-full bg-gradient-to-br from-gray-900/95 via-gray-800/95 to-gray-900/95 text-white z-50 md:hidden animate-slideInLeft backdrop-blur-xl">
             {/* Close header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-safari-border bg-safari-dark/80 backdrop-blur-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/20 bg-black/30 backdrop-blur-sm">
               <img
                 src={logo}
                 alt="SafariHub Logo"
                 className="h-8 w-auto object-contain"
               />
               <X
-                className="h-8 w-8 text-white cursor-pointer hover:text-safari-gold transition-colors duration-300"
+                className="h-8 w-8 text-white cursor-pointer hover:text-emerald-300 transition-colors duration-300"
                 onClick={() => setMenuOpen(false)}
               />
             </div>
@@ -236,13 +315,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             <div className="h-full flex flex-col justify-between px-6 py-6">
               {/* Navigation Links */}
               <div className="space-y-0">
-                {["HOME", "ABOUT US", "OUR SERVICES", "RENTS"].map(
+                {["HOME", "ABOUT US"].map(
                   (link, index) => (
                     <a
                       key={link}
                       href="#"
                       onClick={() => setMenuOpen(false)}
-                      className="block text-white hover:text-safari-gold transition-all duration-300 py-5 border-b border-safari-border hover:border-safari-gold font-medium text-xl w-full text-left animate-fadeInUp group"
+                      className="block text-white hover:text-emerald-300 transition-all duration-300 py-5 border-b border-white/20 hover:border-emerald-300 font-medium text-xl w-full text-left animate-fadeInUp group"
                       style={{ animationDelay: `${index * 100}ms` }}
                     >
                       <span className="flex items-center">
@@ -252,18 +331,54 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     </a>
                   )
                 )}
+
+                {/* Mobile Services Dropdown */}
+                <div className="border-b border-white/20">
+                  <button
+                    onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
+                    className="flex items-center justify-between w-full text-white hover:text-emerald-300 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group"
+                    style={{ animationDelay: "200ms" }}
+                  >
+                    <span className="flex items-center">
+                      OUR SERVICES
+                      <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+                    </span>
+                    <ChevronDown className={`h-5 w-5 transition-transform duration-300 ${mobileServicesOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Mobile Services Submenu */}
+                  {mobileServicesOpen && (
+                    <div className="pl-4 pb-2 space-y-0 animate-fadeIn">
+                      {servicesItems.map((item, index) => {
+                        const IconComponent = item.icon;
+                        return (
+                          <a
+                            key={item.label}
+                            href={item.href}
+                            onClick={() => setMenuOpen(false)}
+                            className="flex items-center gap-3 text-white hover:text-emerald-300 transition-all duration-300 py-4 border-b border-white/10 hover:border-emerald-300 font-medium text-lg w-full text-left animate-fadeInUp"
+                            style={{ animationDelay: `${index * 50 + 300}ms` }}
+                          >
+                            <IconComponent className="h-4 w-4" />
+                            {item.label}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Auth Buttons - Show when user is NOT logged in */}
               {!user && (
-                <div className="space-y-3 py-4 border-t border-safari-border pt-6 animate-fadeInUp"
+                <div className="space-y-3 py-4 border-t border-white/20 pt-6 animate-fadeInUp"
                      style={{ animationDelay: "400ms" }}>
                   <button
                     onClick={() => {
                       setMenuOpen(false);
                       handleLoginClick();
                     }}
-                    className="w-full bg-safari-gold hover:bg-safari-gold-dark text-safari-dark py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg"
+                    className="w-full bg-emerald-400 hover:bg-emerald-500 text-gray-900 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm"
                   >
                     Login
                   </button>
@@ -272,7 +387,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       setMenuOpen(false);
                       handleRegisterClick();
                     }}
-                    className="w-full border-2 border-safari-gold text-safari-gold hover:bg-safari-gold hover:text-safari-dark py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg"
+                    className="w-full border-2 border-emerald-400 text-emerald-400 hover:bg-emerald-400 hover:text-gray-900 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm"
                   >
                     Register
                   </button>
@@ -282,7 +397,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* User section - Only show if user is logged in */}
               {user && (
                 <div
-                  className="flex items-center space-x-3 py-4 border-t border-safari-border pt-6 animate-fadeInUp cursor-pointer group"
+                  className="flex items-center space-x-3 py-4 border-t border-white/20 pt-6 animate-fadeInUp cursor-pointer group"
                   style={{ animationDelay: "400ms" }}
                   onClick={() => {
                     setMenuOpen(false);
@@ -293,15 +408,15 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <img
                       src={currentUser.avatar}
                       alt="User"
-                      className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-safari-light group-hover:border-safari-gold"
+                      className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-white/40 group-hover:border-emerald-300"
                     />
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-safari-dark"></div>
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></div>
                   </div>
                   <div>
-                    <span className="text-white group-hover:text-safari-gold transition-colors duration-300 font-medium text-lg block">
+                    <span className="text-white group-hover:text-emerald-300 transition-colors duration-300 font-medium text-lg block">
                       {currentUser.name}
                     </span>
-                    <span className="text-safari-light text-sm">{currentUser.membership}</span>
+                    <span className="text-gray-300 text-sm">{currentUser.membership}</span>
                   </div>
                 </div>
               )}
@@ -320,11 +435,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           />
 
           {/* Profile Panel - Fixed to RIGHT side */}
-          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-safari-dark to-safari-medium text-white shadow-2xl border-l border-safari-border overflow-hidden z-50 animate-slideInRight">
+          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-gray-900/95 to-gray-800/95 text-white shadow-2xl border-l border-white/20 overflow-hidden z-50 animate-slideInRight backdrop-blur-xl">
             {/* Close button */}
             <div className="absolute top-4 left-4 z-10">
               <X
-                className="h-6 w-6 text-white cursor-pointer hover:text-safari-gold transition-colors duration-300 bg-safari-dark/50 rounded-full p-1 backdrop-blur-sm"
+                className="h-6 w-6 text-white cursor-pointer hover:text-emerald-300 transition-colors duration-300 bg-black/50 rounded-full p-1 backdrop-blur-sm"
                 onClick={() => setProfileOpen(false)}
               />
             </div>
@@ -334,7 +449,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* Profile Header */}
               <div className="relative">
                 {/* Background Banner */}
-                <div className="h-32 bg-gradient-to-r from-safari-gold to-safari-gold-light"></div>
+                <div className="h-32 bg-gradient-to-r from-emerald-400 to-emerald-500"></div>
                 
                 {/* Profile Info */}
                 <div className="px-6 pb-6 -mt-16">
@@ -343,20 +458,20 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <img
                       src={currentUser.avatar}
                       alt="User"
-                      className="h-24 w-24 rounded-full border-4 border-safari-dark bg-safari-dark"
+                      className="h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900"
                     />
-                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-500 rounded-full border-2 border-safari-dark"></div>
+                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-emerald-500 rounded-full border-2 border-gray-900"></div>
                   </div>
 
                   {/* User Details */}
                   <div className="mt-4">
                     <h2 className="text-2xl font-bold text-white">{currentUser.name}</h2>
-                    <p className="text-safari-light text-sm mt-1">{currentUser.email}</p>
+                    <p className="text-gray-300 text-sm mt-1">{currentUser.email}</p>
                     <div className="flex flex-col gap-2 mt-3">
-                      <span className="bg-safari-gold text-safari-dark px-3 py-1 rounded-full text-xs font-bold w-fit">
+                      <span className="bg-emerald-400 text-gray-900 px-3 py-1 rounded-full text-xs font-bold w-fit">
                         {currentUser.membership}
                       </span>
-                      <span className="text-safari-light text-sm">
+                      <span className="text-gray-300 text-sm">
                         Member since {currentUser.joinDate}
                       </span>
                     </div>
@@ -366,17 +481,17 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
               {/* Additional User Information */}
               {!loading && userData && (
-                <div className="px-6 py-4 border-y border-safari-border bg-safari-dark/20 backdrop-blur-sm">
+                <div className="px-6 py-4 border-y border-white/20 bg-black/20 backdrop-blur-sm">
                   <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                    <User className="h-5 w-5 text-safari-gold" />
+                    <User className="h-5 w-5 text-emerald-400" />
                     Profile Information
                   </h3>
                   <div className="space-y-3">
                     {/* Phone Number */}
                     {currentUser.phone !== "Not provided" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Phone className="h-4 w-4 text-safari-gold" />
-                        <span className="text-safari-light">Phone: </span>
+                        <Phone className="h-4 w-4 text-emerald-400" />
+                        <span className="text-gray-300">Phone: </span>
                         <span className="text-white">{currentUser.phone}</span>
                       </div>
                     )}
@@ -384,8 +499,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Location/Country */}
                     {currentUser.location !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <MapPin className="h-4 w-4 text-safari-gold" />
-                        <span className="text-safari-light">
+                        <MapPin className="h-4 w-4 text-emerald-400" />
+                        <span className="text-gray-300">
                           {currentUser.role === "Service Provider" ? "Location: " : "Country: "}
                         </span>
                         <span className="text-white">{currentUser.location}</span>
@@ -395,8 +510,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Languages */}
                     {currentUser.languages !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Globe className="h-4 w-4 text-safari-gold" />
-                        <span className="text-safari-light">
+                        <Globe className="h-4 w-4 text-emerald-400" />
+                        <span className="text-gray-300">
                           {currentUser.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
                         </span>
                         <span className="text-white">{currentUser.languages}</span>
@@ -406,20 +521,20 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Experience Years (for providers) */}
                     {currentUser.experience && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Award className="h-4 w-4 text-safari-gold" />
-                        <span className="text-safari-light">Experience: </span>
+                        <Award className="h-4 w-4 text-emerald-400" />
+                        <span className="text-gray-300">Experience: </span>
                         <span className="text-white">{currentUser.experience} years</span>
                       </div>
                     )}
                     
                     {/* Role Badge */}
                     <div className="flex items-center gap-3 text-sm">
-                      <User className="h-4 w-4 text-safari-gold" />
-                      <span className="text-safari-light">Role: </span>
+                      <User className="h-4 w-4 text-emerald-400" />
+                      <span className="text-gray-300">Role: </span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                         currentUser.role === "Service Provider" 
                           ? "bg-blue-500 text-white" 
-                          : "bg-green-500 text-white"
+                          : "bg-emerald-500 text-white"
                       }`}>
                         {currentUser.role}
                       </span>
@@ -431,24 +546,24 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* Loading State */}
               {loading && (
                 <div className="px-6 py-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-safari-gold mx-auto"></div>
-                  <p className="text-safari-light mt-2">Loading profile...</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-400 mx-auto"></div>
+                  <p className="text-gray-300 mt-2">Loading profile...</p>
                 </div>
               )}
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-safari-border bg-safari-dark/20 backdrop-blur-sm">
+              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-white/20 bg-black/20 backdrop-blur-sm">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-safari-gold">12</div>
-                  <div className="text-xs text-safari-light">Trips</div>
+                  <div className="text-lg font-bold text-emerald-400">12</div>
+                  <div className="text-xs text-gray-300">Trips</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-safari-gold">8</div>
-                  <div className="text-xs text-safari-light">Favorites</div>
+                  <div className="text-lg font-bold text-emerald-400">8</div>
+                  <div className="text-xs text-gray-300">Favorites</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-safari-gold">2</div>
-                  <div className="text-xs text-safari-light">Upcoming</div>
+                  <div className="text-lg font-bold text-emerald-400">2</div>
+                  <div className="text-xs text-gray-300">Upcoming</div>
                 </div>
               </div>
 
@@ -460,14 +575,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <a
                       key={item.label}
                       href={item.href}
-                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-safari-dark/50 transition-all duration-300 group cursor-pointer animate-fadeInUp backdrop-blur-sm"
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 group cursor-pointer animate-fadeInUp backdrop-blur-sm"
                       style={{ animationDelay: `${index * 50 + 200}ms` }}
                       onClick={() => setProfileOpen(false)}
                     >
-                      <div className="p-2 bg-safari-dark rounded-lg group-hover:bg-safari-gold group-hover:text-safari-dark transition-all duration-300">
+                      <div className="p-2 bg-white/10 rounded-lg group-hover:bg-emerald-400 group-hover:text-gray-900 transition-all duration-300">
                         <IconComponent className="h-5 w-5" />
                       </div>
-                      <span className="font-medium text-safari-light group-hover:text-white">
+                      <span className="font-medium text-gray-300 group-hover:text-white">
                         {item.label}
                       </span>
                     </a>
@@ -476,7 +591,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               </div>
 
               {/* Logout Section */}
-              <div className="px-6 py-4 border-t border-safari-border bg-safari-dark/30 mt-auto backdrop-blur-sm">
+              <div className="px-6 py-4 border-t border-white/20 bg-black/30 mt-auto backdrop-blur-sm">
                 <button 
                   onClick={handleLogout}
                   className="flex items-center gap-4 p-3 rounded-xl hover:bg-red-900/30 text-red-400 hover:text-red-300 transition-all duration-300 w-full group"
@@ -492,7 +607,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         </>
       )}
 
-      {/* Custom animations and safari theme colors */}
+      {/* Custom animations */}
       <style jsx>{`
         @keyframes slideInRight {
           from {
@@ -547,65 +662,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         .animate-fadeInUp {
           animation: fadeInUp 0.4s ease-out forwards;
           opacity: 0;
-        }
-
-        /* Safari Theme Colors */
-        .bg-safari-dark {
-          background-color: #1a2f1a;
-        }
-        
-        .bg-safari-medium {
-          background-color: #2d4a2d;
-        }
-        
-        .border-safari-border {
-          border-color: #3a5c3a;
-        }
-        
-        .text-safari-gold {
-          color: #d4af37;
-        }
-        
-        .bg-safari-gold {
-          background-color: #d4af37;
-        }
-        
-        .bg-safari-gold-dark {
-          background-color: #b8941f;
-        }
-        
-        .bg-safari-gold-light {
-          background-color: #e5c158;
-        }
-        
-        .text-safari-light {
-          color: #a8c6a8;
-        }
-        
-        .bg-safari-light {
-          background-color: #a8c6a8;
-        }
-        
-        .text-safari-dark {
-          color: #1a2f1a;
-        }
-        
-        .shadow-safari {
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(212, 175, 55, 0.1);
-        }
-
-        /* Gradient backgrounds */
-        .from-safari-dark {
-          --tw-gradient-from: #1a2f1a;
-          --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(26, 47, 26, 0));
-        }
-        
-        .via-safari-medium {
-          --tw-gradient-stops: var(--tw-gradient-from), #2d4a2d, var(--tw-gradient-to, rgba(45, 74, 45, 0));
-        }
-        
-        .to-safari-dark {
-          --tw-gradient-to: #1a2f1a;
         }
       `}</style>
     </>
