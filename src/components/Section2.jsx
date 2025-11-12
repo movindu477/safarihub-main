@@ -60,20 +60,20 @@ export default function Section2() {
           {/* Centered Header Section */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-3 mb-6">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-green-300 font-medium text-sm tracking-wider">
+              <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
+              <span className="text-green-400 font-medium text-sm tracking-wider">
                 OUR JOURNEY BEGINS
               </span>
             </div>
             
             {/* Centered Title - Smaller Size */}
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-black mb-6 leading-tight">
-              <span className="bg-gradient-to-r from-white via-green-200 to-cyan-200 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 bg-clip-text text-transparent">
                 Our Story
               </span>
             </h1>
             
-            <div className="w-24 h-1 bg-gradient-to-r from-green-400 to-cyan-400 rounded-full mx-auto mb-8"></div>
+            <div className="w-24 h-1 bg-gradient-to-r from-green-500 to-green-600 rounded-full mx-auto mb-8"></div>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8 items-start">
@@ -81,7 +81,7 @@ export default function Section2() {
             <div className="space-y-6">
               {/* Clean Paragraph */}
               <p className="text-lg md:text-xl text-white leading-relaxed font-light">
-                At <span className="text-green-300 font-semibold">SafariHub</span>, our journey began with a simple passion — connecting
+                At <span className="text-green-400 font-semibold">SafariHub</span>, our journey began with a simple passion connecting
                 people to the wonders of nature. From breathtaking landscapes to
                 thrilling adventures, we strive to create unforgettable memories for
                 every explorer. Our story is one of discovery, dedication, and
@@ -90,13 +90,13 @@ export default function Section2() {
 
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-3">
-                <button className="group bg-gradient-to-r from-green-500 to-cyan-600 hover:from-green-600 hover:to-cyan-700 
-                  text-white font-semibold text-base py-3 px-6 rounded-xl 
-                  transition-all duration-300 transform hover:scale-105 
-                  flex items-center gap-2">
-                  <span>Discover More</span>
-                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" 
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button
+                  className="group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 
+                  text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 
+                  transform hover:scale-105 hover:shadow-2xl shadow-lg flex items-center justify-center gap-3"
+                >
+                  <span>About Us</span>
+                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
                 </button>
@@ -114,7 +114,7 @@ export default function Section2() {
                       ${isVisible ? 'animate-fade-in' : 'opacity-0'}`}
                     style={{ animationDelay: `${index * 200}ms` }}
                   >
-                    <div className="text-2xl font-bold text-green-400 mb-1">{stat.number}</div>
+                    <div className="text-2xl font-bold text-green-500 mb-1">{stat.number}</div>
                     <div className="text-gray-300 text-sm">{stat.label}</div>
                   </div>
                 ))}
@@ -123,7 +123,7 @@ export default function Section2() {
               {/* Features List - Clean */}
               <div className="pt-4">
                 <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   Why Choose SafariHub?
@@ -137,7 +137,7 @@ export default function Section2() {
                     "Custom adventure packages"
                   ].map((feature, index) => (
                     <li key={index} className="flex items-center gap-2 text-gray-200 text-sm">
-                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
                       {feature}
                     </li>
                   ))}

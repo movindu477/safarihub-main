@@ -34,8 +34,8 @@ export default function Section5() {
         {/* Animated background elements */}
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-white rounded-full animate-pulse"></div>
-          <div className="absolute top-3/4 right-1/3 w-1 h-1 bg-green-400 rounded-full animate-ping"></div>
-          <div className="absolute bottom-1/3 left-1/2 w-3 h-3 bg-blue-400 rounded-full opacity-60 animate-bounce"></div>
+          <div className="absolute top-3/4 right-1/3 w-1 h-1 bg-green-500 rounded-full animate-ping"></div>
+          <div className="absolute bottom-1/3 left-1/2 w-3 h-3 bg-green-400 rounded-full opacity-60 animate-bounce"></div>
         </div>
       </div>
 
@@ -48,23 +48,23 @@ export default function Section5() {
           {/* Header Section */}
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm border border-white/20 px-6 py-3 rounded-full mb-6">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-green-300 font-medium text-sm tracking-wider">
+              <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
+              <span className="text-green-400 font-medium text-sm tracking-wider">
                 NATIONWIDE COVERAGE
               </span>
             </div>
             
             <h2 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6">
-              <span className="bg-gradient-to-r from-white via-green-200 to-cyan-200 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 bg-clip-text text-transparent">
                 Rental
               </span>
               <br />
-              <span className="bg-gradient-to-r from-green-300 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent">
                 Locations
               </span>
             </h2>
             
-            <div className="w-24 h-1.5 bg-gradient-to-r from-green-400 to-cyan-400 rounded-full mx-auto mb-8"></div>
+            <div className="w-24 h-1.5 bg-gradient-to-r from-green-500 to-green-600 rounded-full mx-auto mb-8"></div>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-12 items-start">
@@ -79,17 +79,17 @@ export default function Section5() {
               {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center hover:bg-white/15 transition-all duration-300">
-                  <div className="text-3xl font-bold text-green-400 mb-2">38+</div>
+                  <div className="text-3xl font-bold text-green-500 mb-2">38+</div>
                   <div className="text-gray-300 text-sm">Rental Locations</div>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center hover:bg-white/15 transition-all duration-300">
-                  <div className="text-3xl font-bold text-cyan-400 mb-2">200+</div>
+                  <div className="text-3xl font-bold text-green-500 mb-2">200+</div>
                   <div className="text-gray-300 text-sm">Equipment Types</div>
                 </div>
               </div>
 
               {/* CTA Button */}
-              <button className="group relative bg-gradient-to-r from-green-500 to-cyan-600 hover:from-green-600 hover:to-cyan-700 
+              <button className="group relative bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 
                 text-white font-semibold text-lg py-4 px-8 rounded-2xl 
                 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl 
                 flex items-center gap-3 overflow-hidden">
@@ -98,14 +98,14 @@ export default function Section5() {
                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                 </svg>
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-green-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </button>
             </div>
 
             {/* Right Column - Locations Grid */}
             <div className="bg-black/40 backdrop-blur-lg border border-white/20 rounded-3xl p-8 hover:border-white/30 transition-all duration-500">
               <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -123,11 +123,11 @@ export default function Section5() {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-semibold text-white">{location.city}</h4>
-                      <span className="text-green-400 text-sm font-bold">{location.spots}</span>
+                      <span className="text-green-500 text-sm font-bold">{location.spots}</span>
                     </div>
                     <div className="w-full bg-white/20 rounded-full h-1">
                       <div 
-                        className="bg-gradient-to-r from-green-400 to-cyan-400 h-1 rounded-full transition-all duration-500"
+                        className="bg-gradient-to-r from-green-500 to-green-600 h-1 rounded-full transition-all duration-500"
                         style={{ width: `${(location.spots / 12) * 100}%` }}
                       ></div>
                     </div>
@@ -139,7 +139,7 @@ export default function Section5() {
               <div className="mt-6 pt-6 border-t border-white/10">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">Total locations nationwide</span>
-                  <span className="text-green-400 font-bold">38</span>
+                  <span className="text-green-500 font-bold">38</span>
                 </div>
               </div>
             </div>
