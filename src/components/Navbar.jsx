@@ -149,10 +149,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   return (
     <>
       {/* Navbar */}
-      <nav className={`fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-white/20 transition-all duration-300 ${
+      <nav className={`fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-emerald-300/30 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-white/10 backdrop-blur-xl shadow-2xl shadow-black/20' 
-          : 'bg-white/5 backdrop-blur-md shadow-lg shadow-black/10'
+          ? 'bg-emerald-600/40 backdrop-blur-xl shadow-2xl shadow-emerald-900/40' 
+          : 'bg-emerald-500/30 backdrop-blur-md shadow-2xl shadow-emerald-800/30'
       }`}>
         {/* Left side - Logo */}
         <div className="flex items-center space-x-3">
@@ -169,10 +169,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             <a
               key={link}
               href="#"
-              className="hover:text-emerald-300 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group"
+              className="hover:text-emerald-200 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group"
             >
               {link}
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-300 transition-all duration-300 group-hover:w-full"></span>
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-200 transition-all duration-300 group-hover:w-full"></span>
             </a>
           ))}
 
@@ -188,10 +188,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               }
             }}
           >
-            <button className="hover:text-emerald-300 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group flex items-center gap-1">
+            <button className="hover:text-emerald-200 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group flex items-center gap-1">
               OUR SERVICES
               <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-300 transition-all duration-300 group-hover:w-full"></span>
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-200 transition-all duration-300 group-hover:w-full"></span>
             </button>
 
             {/* Invisible connecting bridge to prevent gap */}
@@ -203,7 +203,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             {/* Dropdown Menu - Positioned closer to the button */}
             {servicesDropdownOpen && (
               <div 
-                className="absolute top-full left-0 w-64 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 overflow-hidden animate-fadeIn mt-2"
+                className="absolute top-full left-0 w-64 bg-emerald-600/95 backdrop-blur-xl rounded-xl shadow-2xl border border-emerald-400/30 overflow-hidden animate-fadeIn mt-2"
                 onMouseEnter={() => setServicesDropdownOpen(true)}
                 onMouseLeave={() => setServicesDropdownOpen(false)}
               >
@@ -214,10 +214,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       <a
                         key={item.label}
                         href={item.href}
-                        className="flex items-center gap-3 px-4 py-3 text-gray-800 hover:bg-emerald-400 hover:text-gray-900 transition-all duration-300 group"
+                        className="flex items-center gap-3 px-4 py-3 text-white hover:bg-emerald-500 hover:text-white transition-all duration-300 group"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
-                        <IconComponent className="h-4 w-4 text-gray-600 group-hover:text-gray-900" />
+                        <IconComponent className="h-4 w-4 text-emerald-200 group-hover:text-white" />
                         <span className="font-medium text-sm">{item.label}</span>
                       </a>
                     );
@@ -233,23 +233,23 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               <img
                 src={currentUser.avatar}
                 alt="User"
-                className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-white/40 hover:border-emerald-300"
+                className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
                 onClick={() => setProfileOpen(true)}
               />
               {/* Online indicator */}
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-700 shadow-sm"></div>
             </div>
           ) : (
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleLoginClick}
-                className="bg-emerald-400 hover:bg-emerald-500 text-gray-900 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm"
+                className="bg-emerald-400 hover:bg-emerald-300 text-emerald-900 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
               >
                 Login
               </button>
               <button
                 onClick={handleRegisterClick}
-                className="border-2 border-emerald-400 text-emerald-400 hover:bg-emerald-400 hover:text-gray-900 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm"
+                className="border-2 border-emerald-300 text-emerald-200 hover:bg-emerald-400 hover:text-emerald-900 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm shadow-lg shadow-emerald-400/20"
               >
                 Register
               </button>
@@ -264,24 +264,24 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               <img
                 src={currentUser.avatar}
                 alt="User"
-                className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-white/40 hover:border-emerald-300"
+                className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
                 onClick={() => setProfileOpen(true)}
               />
               {/* Online indicator */}
-              <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white"></div>
+              <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full border-2 border-emerald-700"></div>
             </div>
           ) : (
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleLoginClick}
-                className="bg-emerald-400 hover:bg-emerald-500 text-gray-900 px-3 py-1.5 rounded-lg font-medium transition-colors text-sm backdrop-blur-sm"
+                className="bg-emerald-400 hover:bg-emerald-300 text-emerald-900 px-3 py-1.5 rounded-lg font-medium transition-colors text-sm backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/20"
               >
                 Login
               </button>
             </div>
           )}
           <Menu
-            className="h-8 w-8 text-white cursor-pointer hover:text-emerald-300 transition-colors duration-300"
+            className="h-8 w-8 text-white cursor-pointer hover:text-emerald-200 transition-colors duration-300"
             onClick={() => setMenuOpen(true)}
           />
         </div>
@@ -297,16 +297,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           />
 
           {/* Side panel */}
-          <div className="fixed top-0 left-0 h-full w-full bg-gradient-to-br from-gray-900/95 via-gray-800/95 to-gray-900/95 text-white z-50 md:hidden animate-slideInLeft backdrop-blur-xl">
+          <div className="fixed top-0 left-0 h-full w-full bg-gradient-to-br from-emerald-700/95 via-emerald-600/95 to-emerald-700/95 text-white z-50 md:hidden animate-slideInLeft backdrop-blur-xl border-r border-emerald-400/30">
             {/* Close header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/20 bg-black/30 backdrop-blur-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-400/30 bg-emerald-600/40 backdrop-blur-sm">
               <img
                 src={logo}
                 alt="SafariHub Logo"
                 className="h-8 w-auto object-contain"
               />
               <X
-                className="h-8 w-8 text-white cursor-pointer hover:text-emerald-300 transition-colors duration-300"
+                className="h-8 w-8 text-white cursor-pointer hover:text-emerald-200 transition-colors duration-300 bg-emerald-500/30 rounded-lg p-1"
                 onClick={() => setMenuOpen(false)}
               />
             </div>
@@ -321,7 +321,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       key={link}
                       href="#"
                       onClick={() => setMenuOpen(false)}
-                      className="block text-white hover:text-emerald-300 transition-all duration-300 py-5 border-b border-white/20 hover:border-emerald-300 font-medium text-xl w-full text-left animate-fadeInUp group"
+                      className="block text-white hover:text-emerald-200 transition-all duration-300 py-5 border-b border-emerald-400/20 hover:border-emerald-300 font-medium text-xl w-full text-left animate-fadeInUp group"
                       style={{ animationDelay: `${index * 100}ms` }}
                     >
                       <span className="flex items-center">
@@ -333,10 +333,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 )}
 
                 {/* Mobile Services Dropdown */}
-                <div className="border-b border-white/20">
+                <div className="border-b border-emerald-400/20">
                   <button
                     onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
-                    className="flex items-center justify-between w-full text-white hover:text-emerald-300 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group"
+                    className="flex items-center justify-between w-full text-white hover:text-emerald-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group"
                     style={{ animationDelay: "200ms" }}
                   >
                     <span className="flex items-center">
@@ -348,7 +348,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
                   {/* Mobile Services Submenu */}
                   {mobileServicesOpen && (
-                    <div className="pl-4 pb-2 space-y-0 animate-fadeIn">
+                    <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-emerald-400/20 ml-2">
                       {servicesItems.map((item, index) => {
                         const IconComponent = item.icon;
                         return (
@@ -356,10 +356,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                             key={item.label}
                             href={item.href}
                             onClick={() => setMenuOpen(false)}
-                            className="flex items-center gap-3 text-white hover:text-emerald-300 transition-all duration-300 py-4 border-b border-white/10 hover:border-emerald-300 font-medium text-lg w-full text-left animate-fadeInUp"
+                            className="flex items-center gap-3 text-white hover:text-emerald-200 transition-all duration-300 py-4 border-b border-emerald-400/10 hover:border-emerald-300 font-medium text-lg w-full text-left animate-fadeInUp"
                             style={{ animationDelay: `${index * 50 + 300}ms` }}
                           >
-                            <IconComponent className="h-4 w-4" />
+                            <IconComponent className="h-4 w-4 text-emerald-300" />
                             {item.label}
                           </a>
                         );
@@ -371,14 +371,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
               {/* Auth Buttons - Show when user is NOT logged in */}
               {!user && (
-                <div className="space-y-3 py-4 border-t border-white/20 pt-6 animate-fadeInUp"
+                <div className="space-y-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp"
                      style={{ animationDelay: "400ms" }}>
                   <button
                     onClick={() => {
                       setMenuOpen(false);
                       handleLoginClick();
                     }}
-                    className="w-full bg-emerald-400 hover:bg-emerald-500 text-gray-900 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm"
+                    className="w-full bg-emerald-400 hover:bg-emerald-300 text-emerald-900 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
                   >
                     Login
                   </button>
@@ -387,7 +387,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       setMenuOpen(false);
                       handleRegisterClick();
                     }}
-                    className="w-full border-2 border-emerald-400 text-emerald-400 hover:bg-emerald-400 hover:text-gray-900 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm"
+                    className="w-full border-2 border-emerald-300 text-emerald-200 hover:bg-emerald-400 hover:text-emerald-900 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-emerald-400/20"
                   >
                     Register
                   </button>
@@ -397,7 +397,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* User section - Only show if user is logged in */}
               {user && (
                 <div
-                  className="flex items-center space-x-3 py-4 border-t border-white/20 pt-6 animate-fadeInUp cursor-pointer group"
+                  className="flex items-center space-x-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp cursor-pointer group"
                   style={{ animationDelay: "400ms" }}
                   onClick={() => {
                     setMenuOpen(false);
@@ -408,15 +408,15 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <img
                       src={currentUser.avatar}
                       alt="User"
-                      className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-white/40 group-hover:border-emerald-300"
+                      className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 group-hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
                     />
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></div>
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-800"></div>
                   </div>
                   <div>
-                    <span className="text-white group-hover:text-emerald-300 transition-colors duration-300 font-medium text-lg block">
+                    <span className="text-white group-hover:text-emerald-200 transition-colors duration-300 font-medium text-lg block">
                       {currentUser.name}
                     </span>
-                    <span className="text-gray-300 text-sm">{currentUser.membership}</span>
+                    <span className="text-emerald-200 text-sm">{currentUser.membership}</span>
                   </div>
                 </div>
               )}
@@ -435,11 +435,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           />
 
           {/* Profile Panel - Fixed to RIGHT side */}
-          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-gray-900/95 to-gray-800/95 text-white shadow-2xl border-l border-white/20 overflow-hidden z-50 animate-slideInRight backdrop-blur-xl">
+          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-emerald-700/95 to-emerald-600/95 text-white shadow-2xl border-l border-emerald-400/30 overflow-hidden z-50 animate-slideInRight backdrop-blur-xl">
             {/* Close button */}
             <div className="absolute top-4 left-4 z-10">
               <X
-                className="h-6 w-6 text-white cursor-pointer hover:text-emerald-300 transition-colors duration-300 bg-black/50 rounded-full p-1 backdrop-blur-sm"
+                className="h-6 w-6 text-white cursor-pointer hover:text-emerald-200 transition-colors duration-300 bg-emerald-500/50 rounded-full p-1 backdrop-blur-sm border border-emerald-400/30"
                 onClick={() => setProfileOpen(false)}
               />
             </div>
@@ -449,7 +449,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* Profile Header */}
               <div className="relative">
                 {/* Background Banner */}
-                <div className="h-32 bg-gradient-to-r from-emerald-400 to-emerald-500"></div>
+                <div className="h-32 bg-gradient-to-r from-emerald-500 to-emerald-400"></div>
                 
                 {/* Profile Info */}
                 <div className="px-6 pb-6 -mt-16">
@@ -458,20 +458,20 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <img
                       src={currentUser.avatar}
                       alt="User"
-                      className="h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900"
+                      className="h-24 w-24 rounded-full border-4 border-emerald-600 bg-emerald-600 shadow-lg shadow-emerald-500/30"
                     />
-                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-emerald-500 rounded-full border-2 border-gray-900"></div>
+                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-emerald-400 rounded-full border-2 border-emerald-600 shadow-sm"></div>
                   </div>
 
                   {/* User Details */}
                   <div className="mt-4">
                     <h2 className="text-2xl font-bold text-white">{currentUser.name}</h2>
-                    <p className="text-gray-300 text-sm mt-1">{currentUser.email}</p>
+                    <p className="text-emerald-200 text-sm mt-1">{currentUser.email}</p>
                     <div className="flex flex-col gap-2 mt-3">
-                      <span className="bg-emerald-400 text-gray-900 px-3 py-1 rounded-full text-xs font-bold w-fit">
+                      <span className="bg-emerald-400 text-emerald-900 px-3 py-1 rounded-full text-xs font-bold w-fit shadow-lg shadow-emerald-400/30">
                         {currentUser.membership}
                       </span>
-                      <span className="text-gray-300 text-sm">
+                      <span className="text-emerald-200 text-sm">
                         Member since {currentUser.joinDate}
                       </span>
                     </div>
@@ -481,17 +481,17 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
               {/* Additional User Information */}
               {!loading && userData && (
-                <div className="px-6 py-4 border-y border-white/20 bg-black/20 backdrop-blur-sm">
+                <div className="px-6 py-4 border-y border-emerald-400/20 bg-emerald-600/30 backdrop-blur-sm">
                   <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                    <User className="h-5 w-5 text-emerald-400" />
+                    <User className="h-5 w-5 text-emerald-300" />
                     Profile Information
                   </h3>
                   <div className="space-y-3">
                     {/* Phone Number */}
                     {currentUser.phone !== "Not provided" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Phone className="h-4 w-4 text-emerald-400" />
-                        <span className="text-gray-300">Phone: </span>
+                        <Phone className="h-4 w-4 text-emerald-300" />
+                        <span className="text-emerald-200">Phone: </span>
                         <span className="text-white">{currentUser.phone}</span>
                       </div>
                     )}
@@ -499,8 +499,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Location/Country */}
                     {currentUser.location !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <MapPin className="h-4 w-4 text-emerald-400" />
-                        <span className="text-gray-300">
+                        <MapPin className="h-4 w-4 text-emerald-300" />
+                        <span className="text-emerald-200">
                           {currentUser.role === "Service Provider" ? "Location: " : "Country: "}
                         </span>
                         <span className="text-white">{currentUser.location}</span>
@@ -510,8 +510,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Languages */}
                     {currentUser.languages !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Globe className="h-4 w-4 text-emerald-400" />
-                        <span className="text-gray-300">
+                        <Globe className="h-4 w-4 text-emerald-300" />
+                        <span className="text-emerald-200">
                           {currentUser.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
                         </span>
                         <span className="text-white">{currentUser.languages}</span>
@@ -521,20 +521,20 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     {/* Experience Years (for providers) */}
                     {currentUser.experience && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Award className="h-4 w-4 text-emerald-400" />
-                        <span className="text-gray-300">Experience: </span>
+                        <Award className="h-4 w-4 text-emerald-300" />
+                        <span className="text-emerald-200">Experience: </span>
                         <span className="text-white">{currentUser.experience} years</span>
                       </div>
                     )}
                     
                     {/* Role Badge */}
                     <div className="flex items-center gap-3 text-sm">
-                      <User className="h-4 w-4 text-emerald-400" />
-                      <span className="text-gray-300">Role: </span>
+                      <User className="h-4 w-4 text-emerald-300" />
+                      <span className="text-emerald-200">Role: </span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                         currentUser.role === "Service Provider" 
-                          ? "bg-blue-500 text-white" 
-                          : "bg-emerald-500 text-white"
+                          ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30" 
+                          : "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
                       }`}>
                         {currentUser.role}
                       </span>
@@ -546,24 +546,24 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               {/* Loading State */}
               {loading && (
                 <div className="px-6 py-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-400 mx-auto"></div>
-                  <p className="text-gray-300 mt-2">Loading profile...</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-300 mx-auto"></div>
+                  <p className="text-emerald-200 mt-2">Loading profile...</p>
                 </div>
               )}
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-white/20 bg-black/20 backdrop-blur-sm">
+              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-emerald-400/20 bg-emerald-600/30 backdrop-blur-sm">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-emerald-400">12</div>
-                  <div className="text-xs text-gray-300">Trips</div>
+                  <div className="text-lg font-bold text-emerald-300">12</div>
+                  <div className="text-xs text-emerald-200">Trips</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-emerald-400">8</div>
-                  <div className="text-xs text-gray-300">Favorites</div>
+                  <div className="text-lg font-bold text-emerald-300">8</div>
+                  <div className="text-xs text-emerald-200">Favorites</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-emerald-400">2</div>
-                  <div className="text-xs text-gray-300">Upcoming</div>
+                  <div className="text-lg font-bold text-emerald-300">2</div>
+                  <div className="text-xs text-emerald-200">Upcoming</div>
                 </div>
               </div>
 
@@ -575,14 +575,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <a
                       key={item.label}
                       href={item.href}
-                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 group cursor-pointer animate-fadeInUp backdrop-blur-sm"
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-emerald-500/50 transition-all duration-300 group cursor-pointer animate-fadeInUp backdrop-blur-sm border border-emerald-400/20 hover:border-emerald-300/50"
                       style={{ animationDelay: `${index * 50 + 200}ms` }}
                       onClick={() => setProfileOpen(false)}
                     >
-                      <div className="p-2 bg-white/10 rounded-lg group-hover:bg-emerald-400 group-hover:text-gray-900 transition-all duration-300">
+                      <div className="p-2 bg-emerald-500/30 rounded-lg group-hover:bg-emerald-300 group-hover:text-emerald-900 transition-all duration-300 border border-emerald-400/30">
                         <IconComponent className="h-5 w-5" />
                       </div>
-                      <span className="font-medium text-gray-300 group-hover:text-white">
+                      <span className="font-medium text-emerald-200 group-hover:text-white">
                         {item.label}
                       </span>
                     </a>
@@ -591,12 +591,12 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               </div>
 
               {/* Logout Section */}
-              <div className="px-6 py-4 border-t border-white/20 bg-black/30 mt-auto backdrop-blur-sm">
+              <div className="px-6 py-4 border-t border-emerald-400/20 bg-emerald-600/40 mt-auto backdrop-blur-sm">
                 <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-red-900/30 text-red-400 hover:text-red-300 transition-all duration-300 w-full group"
+                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-red-600/40 text-red-300 hover:text-red-200 transition-all duration-300 w-full group border border-red-500/30 hover:border-red-400/50"
                 >
-                  <div className="p-2 bg-red-900/20 rounded-lg group-hover:bg-red-500 group-hover:text-white transition-all duration-300">
+                  <div className="p-2 bg-red-600/20 rounded-lg group-hover:bg-red-500 group-hover:text-white transition-all duration-300 border border-red-500/30">
                     <LogOut className="h-5 w-5" />
                   </div>
                   <span className="font-medium">Log Out</span>
