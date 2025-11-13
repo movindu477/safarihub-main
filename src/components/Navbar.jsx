@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getAuth, signOut } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 
 // Import images from src/assets
 import logo from "../assets/logo.png";
@@ -37,6 +38,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
   const auth = getAuth();
   const db = getFirestore();
+  const navigate = useNavigate();
 
   // Add scroll effect for navbar
   useEffect(() => {
@@ -53,7 +55,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       if (user && profileOpen) {
         setLoading(true);
         try {
-          // Determine which collection to query based on user role
           let userDocRef;
           
           // Try tourists collection first
@@ -107,6 +108,22 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     }
   };
 
+  // Function to handle Home navigation
+  const handleHomeClick = () => {
+    navigate('/');
+    setServicesDropdownOpen(false);
+    setMobileServicesOpen(false);
+    setMenuOpen(false);
+  };
+
+  // Function to handle Jeep Driver navigation
+  const handleJeepDriverClick = () => {
+    navigate('/driver');
+    setServicesDropdownOpen(false);
+    setMobileServicesOpen(false);
+    setMenuOpen(false);
+  };
+
   const profileMenuItems = [
     { icon: User, label: "My Profile", href: "#" },
     { icon: Heart, label: "My Favorites", href: "#" },
@@ -119,8 +136,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const servicesItems = [
     { icon: Map, label: "Find a Guide", href: "#guides" },
     { icon: Compass, label: "Explore Destinations", href: "#destinations" },
-    { icon: Car, label: "Find a Jeep Driver", href: "#jeep-drivers" },
+    { icon: Car, label: "Find a Jeep Driver", onClick: handleJeepDriverClick },
     { icon: ShoppingBag, label: "Rent Equipment", href: "#equipment" },
+  ];
+
+  // Navigation items
+  const navItems = [
+    { label: "HOME", onClick: handleHomeClick },
+    { label: "ABOUT US", href: "#" },
   ];
 
   // Default user data if no user is logged in
@@ -132,7 +155,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     avatar: userImage
   };
 
-  // In Navbar.jsx, update the currentUser object:
   const currentUser = user ? {
     name: user.displayName || userData?.fullName || userData?.fullname || "User",
     email: user.email || "No email",
@@ -148,11 +170,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
   return (
     <>
-      {/* Navbar */}
+      {/* Navbar - Bright Green */}
       <nav className={`fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-emerald-300/30 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-emerald-600/40 backdrop-blur-xl shadow-2xl shadow-emerald-900/40' 
-          : 'bg-emerald-500/30 backdrop-blur-md shadow-2xl shadow-emerald-800/30'
+          ? 'bg-emerald-500 shadow-2xl shadow-emerald-900/40' 
+          : 'bg-emerald-500 shadow-2xl shadow-emerald-800/30'
       }`}>
         {/* Left side - Logo */}
         <div className="flex items-center space-x-3">
@@ -165,28 +187,22 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
         {/* Right side - Desktop Links */}
         <div className="hidden md:flex items-center space-x-10">
-          {["HOME", "ABOUT US"].map((link) => (
-            <a
-              key={link}
-              href="#"
+          {navItems.map((item) => (
+            <button
+              key={item.label}
+              onClick={item.onClick}
               className="hover:text-emerald-200 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group"
             >
-              {link}
+              {item.label}
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-200 transition-all duration-300 group-hover:w-full"></span>
-            </a>
+            </button>
           ))}
 
-          {/* Services Dropdown - Fixed with connecting bridge */}
+          {/* Services Dropdown - FIXED: Proper hover handling */}
           <div 
             className="relative"
             onMouseEnter={() => setServicesDropdownOpen(true)}
-            onMouseLeave={(e) => {
-              // Check if mouse is moving to dropdown
-              const relatedTarget = e.relatedTarget;
-              if (relatedTarget && !e.currentTarget.contains(relatedTarget)) {
-                setServicesDropdownOpen(false);
-              }
-            }}
+            onMouseLeave={() => setServicesDropdownOpen(false)}
           >
             <button className="hover:text-emerald-200 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group flex items-center gap-1">
               OUR SERVICES
@@ -200,7 +216,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               onMouseEnter={() => setServicesDropdownOpen(true)}
             ></div>
 
-            {/* Dropdown Menu - Positioned closer to the button */}
+            {/* Dropdown Menu - FIXED: Proper hover handling */}
             {servicesDropdownOpen && (
               <div 
                 className="absolute top-full left-0 w-64 bg-emerald-600/95 backdrop-blur-xl rounded-xl shadow-2xl border border-emerald-400/30 overflow-hidden animate-fadeIn mt-2"
@@ -211,15 +227,15 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                   {servicesItems.map((item, index) => {
                     const IconComponent = item.icon;
                     return (
-                      <a
+                      <button
                         key={item.label}
-                        href={item.href}
-                        className="flex items-center gap-3 px-4 py-3 text-white hover:bg-emerald-500 hover:text-white transition-all duration-300 group"
+                        onClick={item.onClick}
+                        className="flex items-center gap-3 px-4 py-3 text-white hover:bg-emerald-500 hover:text-white transition-all duration-300 group cursor-pointer w-full text-left"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <IconComponent className="h-4 w-4 text-emerald-200 group-hover:text-white" />
                         <span className="font-medium text-sm">{item.label}</span>
-                      </a>
+                      </button>
                     );
                   })}
                 </div>
@@ -243,13 +259,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleLoginClick}
-                className="bg-emerald-400 hover:bg-emerald-300 text-emerald-900 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
+                className="bg-white hover:bg-emerald-100 text-emerald-700 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
               >
                 Login
               </button>
               <button
                 onClick={handleRegisterClick}
-                className="border-2 border-emerald-300 text-emerald-200 hover:bg-emerald-400 hover:text-emerald-900 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm shadow-lg shadow-emerald-400/20"
+                className="border-2 border-white text-white hover:bg-white hover:text-emerald-700 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm shadow-lg shadow-emerald-400/20"
               >
                 Register
               </button>
@@ -267,14 +283,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
                 onClick={() => setProfileOpen(true)}
               />
-              {/* Online indicator */}
               <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full border-2 border-emerald-700"></div>
             </div>
           ) : (
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleLoginClick}
-                className="bg-emerald-400 hover:bg-emerald-300 text-emerald-900 px-3 py-1.5 rounded-lg font-medium transition-colors text-sm backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/20"
+                className="bg-white hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-medium transition-colors text-sm backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/20"
               >
                 Login
               </button>
@@ -290,15 +305,12 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       {/* Mobile Navigation Side Panel */}
       {menuOpen && (
         <>
-          {/* Full screen overlay */}
           <div
             className="fixed inset-0 bg-black bg-opacity-70 z-40 backdrop-blur-sm md:hidden animate-fadeIn"
             onClick={() => setMenuOpen(false)}
           />
 
-          {/* Side panel */}
-          <div className="fixed top-0 left-0 h-full w-full bg-gradient-to-br from-emerald-700/95 via-emerald-600/95 to-emerald-700/95 text-white z-50 md:hidden animate-slideInLeft backdrop-blur-xl border-r border-emerald-400/30">
-            {/* Close header */}
+          <div className="fixed top-0 left-0 h-full w-full bg-emerald-500 text-white z-50 md:hidden animate-slideInLeft backdrop-blur-xl border-r border-emerald-400/30">
             <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-400/30 bg-emerald-600/40 backdrop-blur-sm">
               <img
                 src={logo}
@@ -311,28 +323,25 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               />
             </div>
 
-            {/* Navigation content */}
             <div className="h-full flex flex-col justify-between px-6 py-6">
-              {/* Navigation Links */}
               <div className="space-y-0">
-                {["HOME", "ABOUT US"].map(
-                  (link, index) => (
-                    <a
-                      key={link}
-                      href="#"
-                      onClick={() => setMenuOpen(false)}
-                      className="block text-white hover:text-emerald-200 transition-all duration-300 py-5 border-b border-emerald-400/20 hover:border-emerald-300 font-medium text-xl w-full text-left animate-fadeInUp group"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      <span className="flex items-center">
-                        {link}
-                        <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
-                      </span>
-                    </a>
-                  )
-                )}
+                {navItems.map((item, index) => (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      if (item.onClick) item.onClick();
+                      setMenuOpen(false);
+                    }}
+                    className="block text-white hover:text-emerald-200 transition-all duration-300 py-5 border-b border-emerald-400/20 hover:border-emerald-300 font-medium text-xl w-full text-left animate-fadeInUp group"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <span className="flex items-center">
+                      {item.label}
+                      <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+                    </span>
+                  </button>
+                ))}
 
-                {/* Mobile Services Dropdown */}
                 <div className="border-b border-emerald-400/20">
                   <button
                     onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
@@ -346,22 +355,23 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <ChevronDown className={`h-5 w-5 transition-transform duration-300 ${mobileServicesOpen ? 'rotate-180' : ''}`} />
                   </button>
 
-                  {/* Mobile Services Submenu */}
                   {mobileServicesOpen && (
                     <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-emerald-400/20 ml-2">
                       {servicesItems.map((item, index) => {
                         const IconComponent = item.icon;
                         return (
-                          <a
+                          <button
                             key={item.label}
-                            href={item.href}
-                            onClick={() => setMenuOpen(false)}
-                            className="flex items-center gap-3 text-white hover:text-emerald-200 transition-all duration-300 py-4 border-b border-emerald-400/10 hover:border-emerald-300 font-medium text-lg w-full text-left animate-fadeInUp"
+                            onClick={() => {
+                              if (item.onClick) item.onClick();
+                              setMenuOpen(false);
+                            }}
+                            className="flex items-center gap-3 text-white hover:text-emerald-200 transition-all duration-300 py-4 border-b border-emerald-400/10 hover:border-emerald-300 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer"
                             style={{ animationDelay: `${index * 50 + 300}ms` }}
                           >
                             <IconComponent className="h-4 w-4 text-emerald-300" />
                             {item.label}
-                          </a>
+                          </button>
                         );
                       })}
                     </div>
@@ -369,7 +379,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 </div>
               </div>
 
-              {/* Auth Buttons - Show when user is NOT logged in */}
               {!user && (
                 <div className="space-y-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp"
                      style={{ animationDelay: "400ms" }}>
@@ -378,7 +387,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       setMenuOpen(false);
                       handleLoginClick();
                     }}
-                    className="w-full bg-emerald-400 hover:bg-emerald-300 text-emerald-900 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
+                    className="w-full bg-white hover:bg-emerald-100 text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
                   >
                     Login
                   </button>
@@ -387,14 +396,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       setMenuOpen(false);
                       handleRegisterClick();
                     }}
-                    className="w-full border-2 border-emerald-300 text-emerald-200 hover:bg-emerald-400 hover:text-emerald-900 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-emerald-400/20"
+                    className="w-full border-2 border-white text-white hover:bg-white hover:text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-emerald-400/20"
                   >
                     Register
                   </button>
                 </div>
               )}
 
-              {/* User section - Only show if user is logged in */}
               {user && (
                 <div
                   className="flex items-center space-x-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp cursor-pointer group"
@@ -425,53 +433,44 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         </>
       )}
 
-      {/* Profile Side Panel - Fixed to open from RIGHT side */}
+      {/* Profile Side Panel */}
       {profileOpen && user && (
         <>
-          {/* Full screen overlay */}
           <div
             className="fixed inset-0 bg-black bg-opacity-70 z-40 backdrop-blur-sm animate-fadeIn"
             onClick={() => setProfileOpen(false)}
           />
 
-          {/* Profile Panel - Fixed to RIGHT side */}
-          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-emerald-700/95 to-emerald-600/95 text-white shadow-2xl border-l border-emerald-400/30 overflow-hidden z-50 animate-slideInRight backdrop-blur-xl">
-            {/* Close button */}
+          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-black text-white shadow-2xl border-l border-yellow-500/30 overflow-hidden z-50 animate-slideInRight">
             <div className="absolute top-4 left-4 z-10">
               <X
-                className="h-6 w-6 text-white cursor-pointer hover:text-emerald-200 transition-colors duration-300 bg-emerald-500/50 rounded-full p-1 backdrop-blur-sm border border-emerald-400/30"
+                className="h-6 w-6 text-yellow-400 cursor-pointer hover:text-yellow-300 transition-colors duration-300 bg-yellow-500/20 rounded-full p-1 border border-yellow-500/30"
                 onClick={() => setProfileOpen(false)}
               />
             </div>
 
-            {/* Profile Content */}
             <div className="h-full overflow-y-auto">
-              {/* Profile Header */}
               <div className="relative">
-                {/* Background Banner */}
-                <div className="h-32 bg-gradient-to-r from-emerald-500 to-emerald-400"></div>
+                <div className="h-32 bg-gradient-to-r from-yellow-500 to-yellow-400"></div>
                 
-                {/* Profile Info */}
                 <div className="px-6 pb-6 -mt-16">
-                  {/* Avatar */}
                   <div className="relative inline-block">
                     <img
                       src={currentUser.avatar}
                       alt="User"
-                      className="h-24 w-24 rounded-full border-4 border-emerald-600 bg-emerald-600 shadow-lg shadow-emerald-500/30"
+                      className="h-24 w-24 rounded-full border-4 border-black bg-black shadow-lg shadow-yellow-500/30"
                     />
-                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-emerald-400 rounded-full border-2 border-emerald-600 shadow-sm"></div>
+                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-yellow-400 rounded-full border-2 border-black shadow-sm"></div>
                   </div>
 
-                  {/* User Details */}
                   <div className="mt-4">
                     <h2 className="text-2xl font-bold text-white">{currentUser.name}</h2>
-                    <p className="text-emerald-200 text-sm mt-1">{currentUser.email}</p>
+                    <p className="text-yellow-200 text-sm mt-1">{currentUser.email}</p>
                     <div className="flex flex-col gap-2 mt-3">
-                      <span className="bg-emerald-400 text-emerald-900 px-3 py-1 rounded-full text-xs font-bold w-fit shadow-lg shadow-emerald-400/30">
+                      <span className="bg-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold w-fit shadow-lg shadow-yellow-500/30">
                         {currentUser.membership}
                       </span>
-                      <span className="text-emerald-200 text-sm">
+                      <span className="text-yellow-300 text-sm">
                         Member since {currentUser.joinDate}
                       </span>
                     </div>
@@ -479,62 +478,56 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 </div>
               </div>
 
-              {/* Additional User Information */}
               {!loading && userData && (
-                <div className="px-6 py-4 border-y border-emerald-400/20 bg-emerald-600/30 backdrop-blur-sm">
-                  <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                    <User className="h-5 w-5 text-emerald-300" />
+                <div className="px-6 py-4 border-y border-yellow-500/20 bg-gray-900">
+                  <h3 className="text-lg font-bold text-yellow-400 mb-3 flex items-center gap-2">
+                    <User className="h-5 w-5 text-yellow-400" />
                     Profile Information
                   </h3>
                   <div className="space-y-3">
-                    {/* Phone Number */}
                     {currentUser.phone !== "Not provided" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Phone className="h-4 w-4 text-emerald-300" />
-                        <span className="text-emerald-200">Phone: </span>
+                        <Phone className="h-4 w-4 text-yellow-400" />
+                        <span className="text-yellow-300">Phone: </span>
                         <span className="text-white">{currentUser.phone}</span>
                       </div>
                     )}
                     
-                    {/* Location/Country */}
                     {currentUser.location !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <MapPin className="h-4 w-4 text-emerald-300" />
-                        <span className="text-emerald-200">
+                        <MapPin className="h-4 w-4 text-yellow-400" />
+                        <span className="text-yellow-300">
                           {currentUser.role === "Service Provider" ? "Location: " : "Country: "}
                         </span>
                         <span className="text-white">{currentUser.location}</span>
                       </div>
                     )}
                     
-                    {/* Languages */}
                     {currentUser.languages !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Globe className="h-4 w-4 text-emerald-300" />
-                        <span className="text-emerald-200">
+                        <Globe className="h-4 w-4 text-yellow-400" />
+                        <span className="text-yellow-300">
                           {currentUser.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
                         </span>
                         <span className="text-white">{currentUser.languages}</span>
                       </div>
                     )}
                     
-                    {/* Experience Years (for providers) */}
                     {currentUser.experience && (
                       <div className="flex items-center gap-3 text-sm">
-                        <Award className="h-4 w-4 text-emerald-300" />
-                        <span className="text-emerald-200">Experience: </span>
+                        <Award className="h-4 w-4 text-yellow-400" />
+                        <span className="text-yellow-300">Experience: </span>
                         <span className="text-white">{currentUser.experience} years</span>
                       </div>
                     )}
                     
-                    {/* Role Badge */}
                     <div className="flex items-center gap-3 text-sm">
-                      <User className="h-4 w-4 text-emerald-300" />
-                      <span className="text-emerald-200">Role: </span>
+                      <User className="h-4 w-4 text-yellow-400" />
+                      <span className="text-yellow-300">Role: </span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                         currentUser.role === "Service Provider" 
-                          ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30" 
-                          : "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                          ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/30" 
+                          : "bg-yellow-600 text-black shadow-lg shadow-yellow-600/30"
                       }`}>
                         {currentUser.role}
                       </span>
@@ -543,46 +536,43 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 </div>
               )}
 
-              {/* Loading State */}
               {loading && (
                 <div className="px-6 py-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-300 mx-auto"></div>
-                  <p className="text-emerald-200 mt-2">Loading profile...</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto"></div>
+                  <p className="text-yellow-300 mt-2">Loading profile...</p>
                 </div>
               )}
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-emerald-400/20 bg-emerald-600/30 backdrop-blur-sm">
+              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-yellow-500/20 bg-gray-900">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-emerald-300">12</div>
-                  <div className="text-xs text-emerald-200">Trips</div>
+                  <div className="text-lg font-bold text-yellow-400">12</div>
+                  <div className="text-xs text-yellow-300">Trips</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-emerald-300">8</div>
-                  <div className="text-xs text-emerald-200">Favorites</div>
+                  <div className="text-lg font-bold text-yellow-400">8</div>
+                  <div className="text-xs text-yellow-300">Favorites</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-emerald-300">2</div>
-                  <div className="text-xs text-emerald-200">Upcoming</div>
+                  <div className="text-lg font-bold text-yellow-400">2</div>
+                  <div className="text-xs text-yellow-300">Upcoming</div>
                 </div>
               </div>
 
-              {/* Profile Menu */}
-              <div className="p-6 space-y-2">
+              <div className="p-6 space-y-2 bg-black">
                 {profileMenuItems.map((item, index) => {
                   const IconComponent = item.icon;
                   return (
                     <a
                       key={item.label}
                       href={item.href}
-                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-emerald-500/50 transition-all duration-300 group cursor-pointer animate-fadeInUp backdrop-blur-sm border border-emerald-400/20 hover:border-emerald-300/50"
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-yellow-500/20 transition-all duration-300 group cursor-pointer animate-fadeInUp border border-yellow-500/20 hover:border-yellow-400/50"
                       style={{ animationDelay: `${index * 50 + 200}ms` }}
                       onClick={() => setProfileOpen(false)}
                     >
-                      <div className="p-2 bg-emerald-500/30 rounded-lg group-hover:bg-emerald-300 group-hover:text-emerald-900 transition-all duration-300 border border-emerald-400/30">
-                        <IconComponent className="h-5 w-5" />
+                      <div className="p-2 bg-yellow-500/20 rounded-lg group-hover:bg-yellow-500 group-hover:text-black transition-all duration-300 border border-yellow-500/30">
+                        <IconComponent className="h-5 w-5 text-yellow-400 group-hover:text-black" />
                       </div>
-                      <span className="font-medium text-emerald-200 group-hover:text-white">
+                      <span className="font-medium text-yellow-300 group-hover:text-yellow-200">
                         {item.label}
                       </span>
                     </a>
@@ -590,11 +580,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 })}
               </div>
 
-              {/* Logout Section */}
-              <div className="px-6 py-4 border-t border-emerald-400/20 bg-emerald-600/40 mt-auto backdrop-blur-sm">
+              <div className="px-6 py-4 border-t border-yellow-500/20 bg-gray-900 mt-auto">
                 <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-red-600/40 text-red-300 hover:text-red-200 transition-all duration-300 w-full group border border-red-500/30 hover:border-red-400/50"
+                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-red-600/40 text-red-400 hover:text-red-300 transition-all duration-300 w-full group border border-red-500/30 hover:border-red-400/50"
                 >
                   <div className="p-2 bg-red-600/20 rounded-lg group-hover:bg-red-500 group-hover:text-white transition-all duration-300 border border-red-500/30">
                     <LogOut className="h-5 w-5" />
@@ -607,62 +596,27 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         </>
       )}
 
-      {/* Custom animations */}
       <style jsx>{`
         @keyframes slideInRight {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
         }
-
         @keyframes slideInLeft {
-          from {
-            transform: translateX(-100%);
-          }
-          to {
-            transform: translateX(0);
-          }
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
         }
-
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-
         @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-
-        .animate-slideInRight {
-          animation: slideInRight 0.3s ease-out forwards;
-        }
-
-        .animate-slideInLeft {
-          animation: slideInLeft 0.3s ease-out forwards;
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out forwards;
-        }
-
-        .animate-fadeInUp {
-          animation: fadeInUp 0.4s ease-out forwards;
-          opacity: 0;
-        }
+        .animate-slideInRight { animation: slideInRight 0.3s ease-out forwards; }
+        .animate-slideInLeft { animation: slideInLeft 0.3s ease-out forwards; }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+        .animate-fadeInUp { animation: fadeInUp 0.4s ease-out forwards; opacity: 0; }
       `}</style>
     </>
   );

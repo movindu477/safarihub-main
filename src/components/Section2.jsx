@@ -26,14 +26,14 @@ export default function Section2() {
           src={aboutImage}
           alt="SafariHub background"
           className="w-full h-full object-cover scale-105"
-          style={{ filter: "brightness(0.7)" }}
+          style={{ filter: "brightness(0.8)" }}
         />
       </div>
 
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-transparent to-green-900/30"></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/80"></div>
-      <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/60"></div>
+      {/* Gradient overlays with reduced opacity */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-transparent to-green-900/20"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/70"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/50"></div>
 
       {/* Main Content */}
       <div className="relative z-10 w-full max-w-4xl mx-auto px-6">
@@ -141,6 +141,24 @@ export default function Section2() {
           </svg>
         </div>
       </div>
+
+      {/* Custom animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+          opacity: 0;
+        }
+      `}</style>
     </section>
   );
 }

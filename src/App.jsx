@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -32,6 +33,7 @@ import Section3 from "./components/Section3";
 import Section4 from "./components/Section4";
 import Section5 from "./components/Section5";
 import Footer from "./components/Footer";
+import JeepDriversPage from "./components/JeepMain.jsx";
 
 // 🔥 Firebase Config
 const firebaseConfig = {
@@ -49,11 +51,11 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-export default function App() {
+// Main App Component with Authentication
+function MainApp({ user, onLogin, onRegister, onLogout }) {
   const [screen, setScreen] = useState("home");
   const [role, setRole] = useState(null);
   const [msg, setMsg] = useState("");
-  const [user, setUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
 
   // Common Fields
@@ -71,21 +73,9 @@ export default function App() {
   const [locationBase, setLocationBase] = useState("");
   const [experience, setExperience] = useState("");
   const [languagesSpoken, setLanguagesSpoken] = useState("");
-  const [serviceType, setServiceType] = useState("Driver");
+  const [serviceType, setServiceType] = useState("Jeep Driver");
 
   const [busy, setBusy] = useState(false);
-
-  // Check auth state
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      console.log("Auth state changed:", user);
-      if (user && screen === "login") {
-        setScreen("home");
-      }
-    });
-    return () => unsubscribe();
-  }, [screen]);
 
   // DEVELOPMENT BYPASS: Auto-login for testing
   useEffect(() => {
@@ -128,7 +118,7 @@ export default function App() {
     setLocationBase("");
     setExperience("");
     setLanguagesSpoken("");
-    setServiceType("Driver");
+    setServiceType("Jeep Driver");
     setMsg("");
     setBusy(false);
   };
@@ -192,7 +182,7 @@ export default function App() {
           location: locationBase || "",
           experienceYears: parseInt(experience) || 0,
           languagesSpoken: languagesSpoken ? languagesSpoken.split(",").map(lang => lang.trim()) : [],
-          serviceType: serviceType || "Driver",
+          serviceType: serviceType || "Jeep Driver",
           availability: [],
         });
       }
@@ -283,17 +273,6 @@ export default function App() {
       setMsg(errorMessage);
     } finally {
       setBusy(false);
-    }
-  };
-
-  // ✅ Logout
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setScreen("login");
-      resetForm();
-    } catch (error) {
-      console.error("Logout error:", error);
     }
   };
 
@@ -511,9 +490,9 @@ export default function App() {
       <DevNavigation />
       <Navbar 
         user={user} 
-        onLogout={handleLogout} 
-        onLogin={handleLoginClick}
-        onRegister={handleRegisterClick}
+        onLogout={onLogout} 
+        onLogin={onLogin}
+        onRegister={onRegister}
       />
       <Section1 />
       <div className="h-1 bg-black"></div>
@@ -564,7 +543,7 @@ const UserTypeSelection = ({ onSelect, logo }) => (
         <div className="w-12 h-12 bg-yellow-400/20 rounded-full flex items-center justify-center mx-auto mb-3">
           <span className="text-xl">🚙</span>
         </div>
-        <h3 className="text-lg font-bold text-white mb-1">Driver / Guide</h3>
+        <h3 className="text-lg font-bold text-white mb-1">Service Provider</h3>
         <p className="text-gray-300 text-xs">
           Offer your services
         </p>
@@ -584,10 +563,10 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl">
       <div className="text-center mb-4">
         <h2 className="text-xl font-bold text-white">
-          {isTourist ? 'Tourist Registration' : 'Driver / Guide Registration'}
+          {isTourist ? 'Tourist Registration' : 'Service Provider Registration'}
         </h2>
         <p className="text-gray-300 text-xs mt-1">
-          {isTourist ? 'Create your adventure account' : 'Join our network of adventure providers'}
+          {isTourist ? 'Create your adventure account' : 'Join our network of service providers'}
         </p>
       </div>
 
@@ -746,11 +725,15 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                 value={formData.serviceType}
                 onChange={(e) => handlers.setServiceType(e.target.value)}
                 required
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                className="w-full px-3 py-2 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                style={{ 
+                  backgroundColor: '#1f2937',
+                  color: 'white'
+                }}
               >
-                <option value="Driver">Driver</option>
-                <option value="Jeep Owner">Jeep Owner</option>
+                <option value="Jeep Driver">Jeep Driver</option>
                 <option value="Tour Guide">Tour Guide</option>
+                <option value="Renting">Renting</option>
               </select>
             </div>
           )}
@@ -824,3 +807,66 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     </div>
   );
 };
+
+// Main Router Component
+function App() {
+  const [user, setUser] = useState(null);
+
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = () => {
+    // This will be handled by the individual components
+    console.log("Login requested");
+  };
+
+  const handleRegister = () => {
+    // This will be handled by the individual components
+    console.log("Register requested");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  return (
+    <Router>
+      <Routes>
+        <Route 
+          path="/" 
+          element={
+            <MainApp 
+              user={user}
+              onLogin={handleLogin}
+              onRegister={handleRegister}
+              onLogout={handleLogout}
+            />
+          } 
+        />
+        <Route 
+          path="/driver" 
+          element={
+            <JeepDriversPage 
+              user={user}
+              onLogin={handleLogin}
+              onRegister={handleRegister}
+              onLogout={handleLogout}
+            />
+          } 
+        />
+        {/* Add more routes as needed */}
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
