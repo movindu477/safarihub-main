@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 
 const JeepSection2 = () => {
   const [jeeps, setJeeps] = useState([]);
   const [filteredJeeps, setFilteredJeeps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -250,6 +252,11 @@ const JeepSection2 = () => {
         ? prev[filterType].filter(item => item !== value)
         : [...prev[filterType], value]
     }));
+  };
+
+  // ✅ NEW: Handle profile box click
+  const handleProfileClick = (jeep) => {
+    navigate('/jeepprofile', { state: { jeep } });
   };
 
   // ✅ UPDATED: Clear filters completely
@@ -509,7 +516,8 @@ const JeepSection2 = () => {
             {filteredJeeps.slice(0, 12).map((jeep, index) => (
               <div 
                 key={jeep.id} 
-                className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200"
+                className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer"
+                onClick={() => handleProfileClick(jeep)}
               >
                 {/* Profile Image */}
                 <div className="h-48 bg-gradient-to-br from-yellow-100 to-yellow-200 relative overflow-hidden">
@@ -611,10 +619,26 @@ const JeepSection2 = () => {
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 mt-4">
-                    <button className="flex-1 bg-yellow-500 text-white py-2.5 px-4 rounded-lg hover:bg-yellow-600 transition-colors font-semibold text-sm">
-                      Book Now
+                    <button 
+                      className="flex-1 bg-yellow-500 text-white py-2.5 px-4 rounded-lg hover:bg-yellow-600 transition-colors font-semibold text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleProfileClick(jeep);
+                      }}
+                    >
+                      View Profile
                     </button>
-                    <button className="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                    <button 
+                      className="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (jeep.contactPhone && jeep.contactPhone !== 'Not provided') {
+                          const phoneNumber = jeep.contactPhone.replace(/\D/g, '');
+                          const whatsappUrl = `https://wa.me/${phoneNumber}`;
+                          window.open(whatsappUrl, '_blank');
+                        }
+                      }}
+                    >
                       📞 Call
                     </button>
                   </div>

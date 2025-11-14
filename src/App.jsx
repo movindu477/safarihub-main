@@ -21,7 +21,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, LogOut, Menu, X } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, LogOut, Menu, X, Calendar } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
@@ -34,6 +34,7 @@ import Section4 from "./components/Section4";
 import Section5 from "./components/Section5";
 import Footer from "./components/Footer";
 import JeepDriversPage from "./components/JeepMain.jsx";
+import JeepProfile from "./components/JeepProfile";
 
 // 🔥 Firebase Config
 const firebaseConfig = {
@@ -83,6 +84,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [specialSkills, setSpecialSkills] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [description, setDescription] = useState("");
+  const [availableDates, setAvailableDates] = useState([]); // ✅ NEW: Calendar dates
 
   const [busy, setBusy] = useState(false);
 
@@ -109,6 +111,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     setSpecialSkills([]);
     setCertifications([]);
     setDescription("");
+    setAvailableDates([]); // ✅ NEW: Reset calendar dates
     setMsg("");
     setBusy(false);
   };
@@ -154,6 +157,18 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
       reader.onload = (e) => setProfilePreview(e.target.result);
       reader.readAsDataURL(file);
     }
+  };
+
+  // ✅ NEW: Handle date selection for calendar
+  const handleDateSelect = (date) => {
+    const dateString = date.toISOString().split('T')[0];
+    setAvailableDates(prev => {
+      if (prev.includes(dateString)) {
+        return prev.filter(d => d !== dateString);
+      } else {
+        return [...prev, dateString];
+      }
+    });
   };
 
   // ✅ Enhanced Register Function
@@ -214,9 +229,12 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
           specialSkills: specialSkills || [],
           certifications: certifications || [],
           
+          // ✅ NEW: Calendar availability
+          availableDates: availableDates || [],
+          availability: availableDates.length > 0, // Auto-set availability based on dates
+          
           // Additional Info
           description: description || "",
-          availability: true, // Default available
           featured: false, // Default not featured
           
           // Contact
@@ -507,14 +525,17 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
                 locationBase, experience, languagesSpoken, serviceType,
                 // ✅ ADD THESE NEW FIELDS:
                 vehicleType, pricePerDay, destinations, languages, 
-                specialSkills, certifications, description
+                specialSkills, certifications, description,
+                availableDates // ✅ NEW: Calendar dates
               }}
               handlers={{ 
                 setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone, setLanguage,
                 setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
                 // ✅ ADD THESE NEW HANDLERS:
                 setVehicleType, setPricePerDay, setDestinations, setLanguages,
-                setSpecialSkills, setCertifications, setDescription
+                setSpecialSkills, setCertifications, setDescription,
+                setAvailableDates, // ✅ NEW: Calendar handler
+                handleDateSelect // ✅ NEW: Date selection handler
               }}
               profilePreview={profilePreview}
               onProfileImageSelect={handleProfileImageSelect}
@@ -596,10 +617,11 @@ const UserTypeSelection = ({ onSelect, logo }) => (
   </div>
 );
 
-// Enhanced RegistrationForm Component
+// Enhanced RegistrationForm Component with Calendar
 const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileImageSelect, onSubmit, busy, msg }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const isTourist = role === 'tourist';
 
@@ -646,6 +668,72 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     "First Aid Certified",
     "Eco Tourism Certified"
   ];
+
+  // ✅ NEW: Calendar functions
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const navigateMonth = (direction) => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
+  const isDateSelected = (date) => {
+    const dateString = date.toISOString().split('T')[0];
+    return formData.availableDates?.includes(dateString);
+  };
+
+  const isDateInPast = (date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+  };
+
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(currentMonth);
+    const firstDay = getFirstDayOfMonth(currentMonth);
+    const days = [];
+
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-8"></div>);
+    }
+
+    // Add cells for each day of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const isSelected = isDateSelected(date);
+      const isPast = isDateInPast(date);
+
+      days.push(
+        <button
+          key={day}
+          type="button"
+          onClick={() => !isPast && handlers.handleDateSelect(date)}
+          disabled={isPast}
+          className={`h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
+            isSelected
+              ? 'bg-yellow-500 text-white'
+              : isPast
+              ? 'text-gray-400 cursor-not-allowed'
+              : 'text-gray-700 hover:bg-yellow-100'
+          }`}
+        >
+          {day}
+        </button>
+      );
+    }
+
+    return days;
+  };
 
   return (
     <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl max-h-[80vh] overflow-y-auto">
@@ -852,6 +940,70 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                   />
                 </div>
               )}
+            </div>
+
+            {/* ✅ NEW: Calendar for Available Dates */}
+            <div className="md:col-span-2 space-y-1">
+              <label className="flex items-center gap-2 text-white font-medium text-xs">
+                <Calendar className="h-3 w-3 text-yellow-400" />
+                Available Dates (Select your available days)
+              </label>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                {/* Calendar Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    type="button"
+                    onClick={() => navigateMonth(-1)}
+                    className="p-1 text-gray-400 hover:text-yellow-400"
+                  >
+                    ‹
+                  </button>
+                  <h3 className="text-white text-sm font-medium">
+                    {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => navigateMonth(1)}
+                    className="p-1 text-gray-400 hover:text-yellow-400"
+                  >
+                    ›
+                  </button>
+                </div>
+
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="text-center text-gray-400 text-xs font-medium">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-1">
+                  {renderCalendar()}
+                </div>
+
+                {/* Selected Dates Summary */}
+                {formData.availableDates && formData.availableDates.length > 0 && (
+                  <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+                    <p className="text-yellow-300 text-xs font-medium mb-2">
+                      Selected Dates ({formData.availableDates.length}):
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {formData.availableDates.slice(0, 5).map(date => (
+                        <span key={date} className="bg-yellow-500 text-white px-2 py-1 rounded text-xs">
+                          {new Date(date).toLocaleDateString()}
+                        </span>
+                      ))}
+                      {formData.availableDates.length > 5 && (
+                        <span className="text-yellow-300 text-xs">
+                          +{formData.availableDates.length - 5} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Destinations (Multi-select) */}
@@ -1103,6 +1255,11 @@ function App() {
               onLogout={handleLogout}
             />
           } 
+        />
+        {/* ✅ NEW: Jeep Profile Route */}
+        <Route 
+          path="/jeepprofile" 
+          element={<JeepProfile />} 
         />
         {/* ✅ FIXED: Added closing bracket for the catch-all route */}
         <Route path="*" element={<Navigate to="/" replace />} />
