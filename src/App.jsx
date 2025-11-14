@@ -52,7 +52,7 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 // Main App Component with Authentication
-function MainApp({ user, onLogin, onRegister, onLogout }) {
+function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [screen, setScreen] = useState("home");
   const [role, setRole] = useState(null);
   const [msg, setMsg] = useState("");
@@ -74,6 +74,15 @@ function MainApp({ user, onLogin, onRegister, onLogout }) {
   const [experience, setExperience] = useState("");
   const [languagesSpoken, setLanguagesSpoken] = useState("");
   const [serviceType, setServiceType] = useState("Jeep Driver");
+
+   // ✅ ADD THESE NEW STATE VARIABLES HERE:
+  const [vehicleType, setVehicleType] = useState("");
+  const [pricePerDay, setPricePerDay] = useState("");
+  const [destinations, setDestinations] = useState([]);
+  const [languages, setLanguages] = useState([]);
+  const [specialSkills, setSpecialSkills] = useState([]);
+  const [certifications, setCertifications] = useState([]);
+  const [description, setDescription] = useState("");
 
   const [busy, setBusy] = useState(false);
 
@@ -138,113 +147,132 @@ function MainApp({ user, onLogin, onRegister, onLogout }) {
     }
   };
 
-  // ✅ FAST Register (Tourist or Provider)
-  const handleRegister = async (e) => {
-    e.preventDefault();
+// ✅ Enhanced Register Function
+const handleRegister = async (e) => {
+  e.preventDefault();
+  
+  if (password !== confirm) {
+    setMsg("❌ Passwords do not match!");
+    return;
+  }
+  if (password.length < 6) {
+    setMsg("❌ Password must be at least 6 characters!");
+    return;
+  }
+  
+  setBusy(true);
+  setMsg("⏳ Creating your account...");
+  
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const uid = userCredential.user.uid;
     
-    if (password !== confirm) {
-      setMsg("❌ Passwords do not match!");
-      return;
-    }
-    if (password.length < 6) {
-      setMsg("❌ Password must be at least 6 characters!");
-      return;
-    }
-    
-    setBusy(true);
-    setMsg("⏳ Creating your account...");
-    
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
-      
-      const userData = {
-        uid,
-        email,
-        fullName: fullName,
-        phone: phone || "",
-        profilePicture: "",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
+    const userData = {
+      uid,
+      email,
+      fullName: fullName,
+      phone: phone || "",
+      profilePicture: "",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
 
-      let collectionName = "";
-      
-      if (role === "tourist") {
-        collectionName = "tourists";
-        Object.assign(userData, {
-          country: country || "",
-          preferredLanguage: language || "",
-        });
-      } else {
-        collectionName = "serviceProviders";
-        Object.assign(userData, {
-          location: locationBase || "",
-          experienceYears: parseInt(experience) || 0,
-          languagesSpoken: languagesSpoken ? languagesSpoken.split(",").map(lang => lang.trim()) : [],
-          serviceType: serviceType || "Jeep Driver",
-          availability: [],
-        });
-      }
+    let collectionName = "";
+    
+    if (role === "tourist") {
+      collectionName = "tourists";
+      Object.assign(userData, {
+        country: country || "",
+        preferredLanguage: language || "",
+      });
+    } else {
+      collectionName = "serviceProviders";
+      Object.assign(userData, {
+        // Basic Info
+        location: locationBase || "",
+        experienceYears: parseInt(experience) || 0,
+        serviceType: serviceType || "Jeep Driver",
+        
+        // Filtering Fields
+        vehicleType: vehicleType || "",
+        pricePerDay: parseInt(pricePerDay) || 0,
+        rating: 0, // Default rating
+        totalRatings: 0,
+        
+        // Arrays for filtering
+        destinations: destinations || [],
+        languages: languages || [],
+        specialSkills: specialSkills || [],
+        certifications: certifications || [],
+        
+        // Additional Info
+        description: description || "",
+        availability: true, // Default available
+        featured: false, // Default not featured
+        
+        // Contact
+        contactEmail: email,
+        contactPhone: phone || "",
+      });
+    }
 
-      await setDoc(doc(db, collectionName, uid), userData);
-      
-      let photoURL = null;
-      if (profileFile) {
-        try {
-          const ext = profileFile.name.split(".").pop();
-          const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
-          const snap = await uploadBytes(storageRef, profileFile);
-          photoURL = await getDownloadURL(snap.ref);
-          
-          await setDoc(doc(db, collectionName, uid), {
-            profilePicture: photoURL,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-          
-          await updateProfile(userCredential.user, { 
-            displayName: fullName, 
-            photoURL: photoURL 
-          });
-        } catch (uploadError) {
-          console.log("Profile image upload failed, but account created successfully");
-        }
-      } else {
+    await setDoc(doc(db, collectionName, uid), userData);
+    
+    let photoURL = null;
+    if (profileFile) {
+      try {
+        const ext = profileFile.name.split(".").pop();
+        const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
+        const snap = await uploadBytes(storageRef, profileFile);
+        photoURL = await getDownloadURL(snap.ref);
+        
+        await setDoc(doc(db, collectionName, uid), {
+          profilePicture: photoURL,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+        
         await updateProfile(userCredential.user, { 
-          displayName: fullName 
+          displayName: fullName, 
+          photoURL: photoURL 
         });
+      } catch (uploadError) {
+        console.log("Profile image upload failed, but account created successfully");
       }
-
-      setMsg("🎉 Account created successfully! Redirecting to login...");
-      setBusy(false);
-      
-      setTimeout(() => {
-        signOut(auth);
-        setScreen("login");
-        resetForm();
-      }, 1500);
-      
-    } catch (error) {
-      console.error("Registration error:", error);
-      let errorMessage = "❌ Registration failed! ";
-      
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage += "Email is already registered.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage += "Invalid email address.";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage += "Password is too weak.";
-      } else if (error.code === 'auth/network-request-failed') {
-        errorMessage += "Network error. Please check your connection.";
-      } else {
-        errorMessage += "Please try again.";
-      }
-      
-      setMsg(errorMessage);
-      setBusy(false);
+    } else {
+      await updateProfile(userCredential.user, { 
+        displayName: fullName 
+      });
     }
-  };
 
+    setMsg("🎉 Account created successfully! Redirecting to login...");
+    setBusy(false);
+    
+    setTimeout(() => {
+      signOut(auth);
+      setScreen("login");
+      resetForm();
+    }, 1500);
+    
+  } catch (error) {
+    console.error("Registration error:", error);
+    let errorMessage = "❌ Registration failed! ";
+    
+    if (error.code === 'auth/email-already-in-use') {
+      errorMessage += "Email is already registered.";
+    } else if (error.code === 'auth/invalid-email') {
+      errorMessage += "Invalid email address.";
+    } else if (error.code === 'auth/weak-password') {
+      errorMessage += "Password is too weak.";
+    } else if (error.code === 'auth/network-request-failed') {
+      errorMessage += "Network error. Please check your connection.";
+    } else {
+      errorMessage += "Please try again.";
+    }
+    
+    setMsg(errorMessage);
+    setBusy(false);
+  }
+};
   // ✅ Login
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -462,22 +490,29 @@ function MainApp({ user, onLogin, onRegister, onLogout }) {
           {!role ? (
             <UserTypeSelection onSelect={setRole} logo={logo} />
           ) : (
-            <RegistrationForm 
-              role={role}
-              formData={{ 
-                email, fullName, password, confirm, country, phone, language,
-                locationBase, experience, languagesSpoken, serviceType 
-              }}
-              handlers={{ 
-                setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone, setLanguage,
-                setLocationBase, setExperience, setLanguagesSpoken, setServiceType 
-              }}
-              profilePreview={profilePreview}
-              onProfileImageSelect={handleProfileImageSelect}
-              onSubmit={handleRegister}
-              busy={busy}
-              msg={msg}
-            />
+// In your MainApp component, find where you render RegistrationForm:
+<RegistrationForm 
+  role={role}
+  formData={{ 
+    email, fullName, password, confirm, country, phone, language,
+    locationBase, experience, languagesSpoken, serviceType,
+    // ✅ ADD THESE NEW FIELDS:
+    vehicleType, pricePerDay, destinations, languages, 
+    specialSkills, certifications, description
+  }}
+  handlers={{ 
+    setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone, setLanguage,
+    setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
+    // ✅ ADD THESE NEW HANDLERS:
+    setVehicleType, setPricePerDay, setDestinations, setLanguages,
+    setSpecialSkills, setCertifications, setDescription
+  }}
+  profilePreview={profilePreview}
+  onProfileImageSelect={handleProfileImageSelect}
+  onSubmit={handleRegister}
+  busy={busy}
+  msg={msg}
+/>
           )}
         </div>
       </div>
@@ -491,8 +526,8 @@ function MainApp({ user, onLogin, onRegister, onLogout }) {
       <Navbar 
         user={user} 
         onLogout={onLogout} 
-        onLogin={onLogin}
-        onRegister={onRegister}
+        onLogin={handleLoginClick}
+        onRegister={handleRegisterClick}
       />
       <Section1 />
       <div className="h-1 bg-black"></div>
@@ -552,15 +587,62 @@ const UserTypeSelection = ({ onSelect, logo }) => (
   </div>
 );
 
-// Unified Registration Form Component
+// Enhanced RegistrationForm Component
 const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileImageSelect, onSubmit, busy, msg }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const isTourist = role === 'tourist';
 
+  // Service Type specific fields
+  const serviceTypes = [
+    "Jeep Driver",
+    "Tour Guide", 
+    "Hotel Provider",
+    "Restaurant",
+    "Transport Service",
+    "Adventure Activity"
+  ];
+
+  const vehicleTypes = [
+    "Standard Safari Jeep",
+    "Luxury Safari Jeep", 
+    "Open Roof Jeep",
+    "4x4 Modified Jeep"
+  ];
+
+  const destinations = [
+    "Yala National Park",
+    "Wilpattu National Park",
+    "Udawalawe National Park",
+    "Minneriya National Park",
+    "Horton Plains",
+    "Sinharaja Forest"
+  ];
+
+  const languages = [
+    "English", "Sinhala", "Tamil", "Hindi",
+    "French", "German", "Chinese", "Japanese"
+  ];
+
+  const specialSkills = [
+    "Wildlife photography knowledge",
+    "Birdwatching expertise", 
+    "Family-friendly tours",
+    "Private tours",
+    "Full-day safari",
+    "Half-day safari"
+  ];
+
+  const certifications = [
+    "Wildlife Department Certified",
+    "Tourism Board Licensed",
+    "First Aid Certified",
+    "Eco Tourism Certified"
+  ];
+
   return (
-    <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl">
+    <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl max-h-[80vh] overflow-y-auto">
       <div className="text-center mb-4">
         <h2 className="text-xl font-bold text-white">
           {isTourist ? 'Tourist Registration' : 'Service Provider Registration'}
@@ -571,6 +653,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
       </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
+        {/* Basic Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -603,6 +686,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         </div>
 
+        {/* Password Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -653,6 +737,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         </div>
 
+        {/* Contact Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -672,7 +757,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <MapPin className="h-3 w-3 text-yellow-400" />
-              {isTourist ? 'Country' : 'Base City'}
+              {isTourist ? 'Country' : 'Base Location'}
             </label>
             <input
               type="text"
@@ -680,83 +765,246 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               onChange={(e) => isTourist ? handlers.setCountry(e.target.value) : handlers.setLocationBase(e.target.value)}
               required
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder={isTourist ? 'Your country' : 'Your base city'}
+              placeholder={isTourist ? 'Your country' : 'Your base city/location'}
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <Globe className="h-3 w-3 text-yellow-400" />
-              {isTourist ? 'Preferred Language' : 'Experience (Years)'}
-            </label>
-            {isTourist ? (
-              <select
-                value={formData.language}
-                onChange={(e) => handlers.setLanguage(e.target.value)}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-              >
-                <option value="">Select language</option>
-                <option value="english">English</option>
-                <option value="sinhala">Sinhala</option>
-                <option value="tamil">Tamil</option>
-              </select>
-            ) : (
-              <input
-                type="number"
-                value={formData.experience}
-                onChange={(e) => handlers.setExperience(e.target.value)}
-                required
-                min="0"
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                placeholder="Years of experience"
-              />
-            )}
-          </div>
+        {/* Service Provider Specific Fields */}
+        {!isTourist && (
+          <>
+            {/* Service Type and Vehicle Type */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <User className="h-3 w-3 text-yellow-400" />
+                  Service Type
+                </label>
+                <select
+                  value={formData.serviceType}
+                  onChange={(e) => handlers.setServiceType(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                >
+                  <option value="">Select Service Type</option>
+                  {serviceTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
 
-          {!isTourist && (
+              {/* Vehicle Type (only show for Jeep Driver) */}
+              {formData.serviceType === "Jeep Driver" && (
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    🚙 Vehicle Type
+                  </label>
+                  <select
+                    value={formData.vehicleType}
+                    onChange={(e) => handlers.setVehicleType(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                  >
+                    <option value="">Select Vehicle Type</option>
+                    {vehicleTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Experience and Price */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  📅 Experience (Years)
+                </label>
+                <input
+                  type="number"
+                  value={formData.experience}
+                  onChange={(e) => handlers.setExperience(e.target.value)}
+                  required
+                  min="0"
+                  max="50"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                  placeholder="Years of experience"
+                />
+              </div>
+
+              {/* Price per Day (for Jeep Drivers) */}
+              {(formData.serviceType === "Jeep Driver" || formData.serviceType === "Tour Guide") && (
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    💰 Price per Day (LKR)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.pricePerDay}
+                    onChange={(e) => handlers.setPricePerDay(e.target.value)}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                    placeholder="e.g., 12000"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Destinations (Multi-select) */}
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
-                <User className="h-3 w-3 text-yellow-400" />
-                Service Type
+                🗺️ Destinations Covered
               </label>
-              <select
-                value={formData.serviceType}
-                onChange={(e) => handlers.setServiceType(e.target.value)}
-                required
-                className="w-full px-3 py-2 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-                style={{ 
-                  backgroundColor: '#1f2937',
-                  color: 'white'
-                }}
-              >
-                <option value="Jeep Driver">Jeep Driver</option>
-                <option value="Tour Guide">Tour Guide</option>
-                <option value="Renting">Renting</option>
-              </select>
+              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                {destinations.map(destination => (
+                  <div key={destination} className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      id={`dest-${destination}`}
+                      checked={formData.destinations?.includes(destination) || false}
+                      onChange={(e) => {
+                        const updatedDestinations = formData.destinations || [];
+                        if (e.target.checked) {
+                          handlers.setDestinations([...updatedDestinations, destination]);
+                        } else {
+                          handlers.setDestinations(updatedDestinations.filter(d => d !== destination));
+                        }
+                      }}
+                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                    />
+                    <label htmlFor={`dest-${destination}`} className="text-white text-xs">
+                      {destination}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
 
-        {!isTourist && (
+            {/* Languages Spoken (Multi-select) */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-white font-medium text-xs">
+                🌐 Languages Spoken
+              </label>
+              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                {languages.map(language => (
+                  <div key={language} className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      id={`lang-${language}`}
+                      checked={formData.languages?.includes(language) || false}
+                      onChange={(e) => {
+                        const updatedLanguages = formData.languages || [];
+                        if (e.target.checked) {
+                          handlers.setLanguages([...updatedLanguages, language]);
+                        } else {
+                          handlers.setLanguages(updatedLanguages.filter(l => l !== language));
+                        }
+                      }}
+                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                    />
+                    <label htmlFor={`lang-${language}`} className="text-white text-xs">
+                      {language}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Special Skills (Multi-select) */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-white font-medium text-xs">
+                🎯 Special Skills & Services
+              </label>
+              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                {specialSkills.map(skill => (
+                  <div key={skill} className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      id={`skill-${skill}`}
+                      checked={formData.specialSkills?.includes(skill) || false}
+                      onChange={(e) => {
+                        const updatedSkills = formData.specialSkills || [];
+                        if (e.target.checked) {
+                          handlers.setSpecialSkills([...updatedSkills, skill]);
+                        } else {
+                          handlers.setSpecialSkills(updatedSkills.filter(s => s !== skill));
+                        }
+                      }}
+                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                    />
+                    <label htmlFor={`skill-${skill}`} className="text-white text-xs">
+                      {skill}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Certifications (Multi-select) */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-white font-medium text-xs">
+                📜 Certifications
+              </label>
+              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                {certifications.map(cert => (
+                  <div key={cert} className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      id={`cert-${cert}`}
+                      checked={formData.certifications?.includes(cert) || false}
+                      onChange={(e) => {
+                        const updatedCerts = formData.certifications || [];
+                        if (e.target.checked) {
+                          handlers.setCertifications([...updatedCerts, cert]);
+                        } else {
+                          handlers.setCertifications(updatedCerts.filter(c => c !== cert));
+                        }
+                      }}
+                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                    />
+                    <label htmlFor={`cert-${cert}`} className="text-white text-xs">
+                      {cert}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-white font-medium text-xs">
+                📝 Service Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => handlers.setDescription(e.target.value)}
+                rows="2"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                placeholder="Describe your services, expertise, and what makes you unique..."
+              />
+            </div>
+          </>
+        )}
+
+        {/* Tourist Specific Fields */}
+        {isTourist && (
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <Globe className="h-3 w-3 text-yellow-400" />
-              Languages Spoken
+              Preferred Language
             </label>
-            <input
-              type="text"
-              value={formData.languagesSpoken}
-              onChange={(e) => handlers.setLanguagesSpoken(e.target.value)}
-              required
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder="e.g., English, Sinhala, Tamil"
-            />
-            <p className="text-gray-400 text-xs mt-1">Separate languages with commas</p>
+            <select
+              value={formData.language}
+              onChange={(e) => handlers.setLanguage(e.target.value)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+            >
+              <option value="">Select language</option>
+              <option value="english">English</option>
+              <option value="sinhala">Sinhala</option>
+              <option value="tamil">Tamil</option>
+            </select>
           </div>
         )}
 
+        {/* Profile Picture */}
         <div className="space-y-1">
           <label className="flex items-center gap-2 text-white font-medium text-xs">
             <Camera className="h-3 w-3 text-yellow-400" />
@@ -775,6 +1023,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         </div>
 
+        {/* Submit Button */}
         <div className="pt-2">
           <button
             type="submit"
@@ -820,16 +1069,6 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = () => {
-    // This will be handled by the individual components
-    console.log("Login requested");
-  };
-
-  const handleRegister = () => {
-    // This will be handled by the individual components
-    console.log("Register requested");
-  };
-
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -846,8 +1085,6 @@ function App() {
           element={
             <MainApp 
               user={user}
-              onLogin={handleLogin}
-              onRegister={handleRegister}
               onLogout={handleLogout}
             />
           } 
@@ -857,8 +1094,6 @@ function App() {
           element={
             <JeepDriversPage 
               user={user}
-              onLogin={handleLogin}
-              onRegister={handleRegister}
               onLogout={handleLogout}
             />
           } 

@@ -1,8 +1,9 @@
 import React from "react";
 import Navbar from "./Navbar";
 import JeepHero from "./JeepHero";
+import JeepSection2 from "./JeepSection2";
 
-export default function JeepDriversPage({ user, onLogin, onRegister, onLogout }) {
+export default function JeepMain({ user, onLogin, onRegister, onLogout }) {
   return (
     <div className="min-h-screen bg-white">
       <Navbar 
@@ -12,6 +13,8 @@ export default function JeepDriversPage({ user, onLogin, onRegister, onLogout })
         onLogout={onLogout} 
       />
       <JeepHero />
+      <div className="h-1 bg-black"></div>
+      <JeepSection2 />
     </div>
   );
 }

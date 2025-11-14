@@ -1,4 +1,5 @@
 import React from "react";
+import jeepImage from "../assets/jeepori.jpg"; // Import from assets
 
 export default function DriverHero() {
   return (
@@ -6,7 +7,7 @@ export default function DriverHero() {
       {/* Background Image */}
       <div className="absolute inset-0 w-full h-full">
         <img
-          src="/jeep.avif" // Make sure to add jeep.avif to your assets folder
+          src={jeepImage} // Use imported image
           alt="Jeep Safari Adventure"
           className="w-full h-full object-cover"
         />
@@ -73,30 +74,30 @@ export default function DriverHero() {
             line-height: 1.2;
           }
           .text-lg {
-            font-size: 1.125rem;
-            line-height: 1.6;
+            fontSize: 1.125rem;
+            lineHeight: 1.6;
           }
         }
         
         @media (max-width: 480px) {
           .text-4xl {
-            font-size: 2rem;
-            line-height: 1.2;
+            fontSize: 2rem;
+            lineHeight: 1.2;
           }
           .text-lg {
-            font-size: 1rem;
-            line-height: 1.5;
+            fontSize: 1rem;
+            lineHeight: 1.5;
           }
         }
         
         @media (max-width: 380px) {
           .text-4xl {
-            font-size: 1.75rem;
-            line-height: 1.2;
+            fontSize: 1.75rem;
+            lineHeight: 1.2;
           }
           .text-lg {
-            font-size: 0.9rem;
-            line-height: 1.4;
+            fontSize: 0.9rem;
+            lineHeight: 1.4;
           }
         }
       `}</style>

@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { getAuth, signOut } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 // Import images from src/assets
 import logo from "../assets/logo.png";
@@ -39,6 +39,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const auth = getAuth();
   const db = getFirestore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Add scroll effect for navbar
   useEffect(() => {
@@ -96,15 +97,25 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     }
   };
 
+  // Handle login navigation - only navigate if we're not already on auth pages
   const handleLoginClick = () => {
     if (onLogin) {
       onLogin();
+    } else {
+      // If no onLogin prop provided (like on JeepDriver page), navigate to home for auth
+      navigate('/');
+      // You might want to add a state to indicate login should open
     }
   };
 
+  // Handle register navigation - only navigate if we're not already on auth pages
   const handleRegisterClick = () => {
     if (onRegister) {
       onRegister();
+    } else {
+      // If no onRegister prop provided (like on JeepDriver page), navigate to home for auth
+      navigate('/');
+      // You might want to add a state to indicate register should open
     }
   };
 
@@ -123,6 +134,12 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     setMobileServicesOpen(false);
     setMenuOpen(false);
   };
+
+  // Check if we're on the auth screen (login/register)
+  const isOnAuthScreen = location.pathname === '/' && (window.location.hash === '#login' || window.location.hash === '#register');
+
+  // Check if we're on the JeepDriver page
+  const isOnJeepDriverPage = location.pathname === '/driver';
 
   const profileMenuItems = [
     { icon: User, label: "My Profile", href: "#" },
@@ -181,7 +198,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           <img
             src={logo}
             alt="SafariHub Logo"
-            className="h-12 md:h-40 w-auto object-contain"
+            className="h-12 md:h-40 w-auto object-contain cursor-pointer"
+            onClick={handleHomeClick}
           />
         </div>
 
@@ -198,7 +216,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             </button>
           ))}
 
-          {/* Services Dropdown - FIXED: Proper hover handling */}
+          {/* Services Dropdown */}
           <div 
             className="relative"
             onMouseEnter={() => setServicesDropdownOpen(true)}
@@ -216,7 +234,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               onMouseEnter={() => setServicesDropdownOpen(true)}
             ></div>
 
-            {/* Dropdown Menu - FIXED: Proper hover handling */}
+            {/* Dropdown Menu */}
             {servicesDropdownOpen && (
               <div 
                 className="absolute top-full left-0 w-64 bg-emerald-600/95 backdrop-blur-xl rounded-xl shadow-2xl border border-emerald-400/30 overflow-hidden animate-fadeIn mt-2"
@@ -315,7 +333,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               <img
                 src={logo}
                 alt="SafariHub Logo"
-                className="h-8 w-auto object-contain"
+                className="h-8 w-auto object-contain cursor-pointer"
+                onClick={handleHomeClick}
               />
               <X
                 className="h-8 w-8 text-white cursor-pointer hover:text-emerald-200 transition-colors duration-300 bg-emerald-500/30 rounded-lg p-1"
