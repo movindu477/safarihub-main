@@ -201,7 +201,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     }
   };
 
-  // NEW: Handle date selection for calendar
+  // NEW: Handle date selection for calendar - FIXED VERSION
   const handleDateSelect = (date) => {
     const dateString = date.toISOString().split('T')[0];
     setAvailableDates(prev => {
@@ -280,7 +280,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
           specialSkills: specialSkills || [],
           certifications: certifications || [],
           
-          // NEW: Calendar availability
+          // NEW: Calendar availability - FIXED: Store as array of date strings
           availableDates: availableDates || [],
           availability: availableDates.length > 0, // Auto-set availability based on dates
           
@@ -734,7 +734,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     }
   };
 
-  // NEW: Calendar functions
+  // NEW: Calendar functions - FIXED VERSION
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
@@ -772,7 +772,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
       days.push(<div key={`empty-${i}`} className="h-8"></div>);
     }
 
-    // Add cells for each day of the month
+    // Add cells for each day of the month - FIXED: All dates are clickable except past dates
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
       const isSelected = isDateSelected(date);
@@ -786,10 +786,10 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           disabled={isPast}
           className={`h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
             isSelected
-              ? 'bg-yellow-500 text-white'
+              ? 'bg-green-500 text-white hover:bg-green-600'
               : isPast
-              ? 'text-gray-400 cursor-not-allowed'
-              : 'text-gray-700 hover:bg-yellow-100'
+              ? 'text-gray-400 cursor-not-allowed bg-gray-200'
+              : 'text-gray-700 hover:bg-green-100 border border-gray-200'
           }`}
         >
           {day}
@@ -1010,11 +1010,11 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               )}
             </div>
 
-            {/* NEW: Calendar for Available Dates */}
+            {/* NEW: Calendar for Available Dates - FIXED VERSION */}
             <div className="md:col-span-2 space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
                 <Calendar className="h-3 w-3 text-yellow-400" />
-                Available Dates (Select your available days)
+                Available Dates (Click to select/deselect your available days)
               </label>
               <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                 {/* Calendar Header */}
@@ -1051,20 +1051,36 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                   {renderCalendar()}
                 </div>
 
+                {/* Calendar Legend */}
+                <div className="flex items-center justify-center gap-4 mt-3 text-xs">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-green-500 rounded"></div>
+                    <span className="text-gray-300">Selected</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-gray-200 rounded"></div>
+                    <span className="text-gray-300">Available</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-gray-400 rounded"></div>
+                    <span className="text-gray-300">Past</span>
+                  </div>
+                </div>
+
                 {/* Selected Dates Summary */}
                 {formData.availableDates && formData.availableDates.length > 0 && (
-                  <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
-                    <p className="text-yellow-300 text-xs font-medium mb-2">
-                      Selected Dates ({formData.availableDates.length}):
+                  <div className="mt-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
+                    <p className="text-green-300 text-xs font-medium mb-2">
+                      ✅ Selected Dates ({formData.availableDates.length}):
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {formData.availableDates.slice(0, 5).map(date => (
-                        <span key={date} className="bg-yellow-500 text-white px-2 py-1 rounded text-xs">
+                        <span key={date} className="bg-green-500 text-white px-2 py-1 rounded text-xs">
                           {new Date(date).toLocaleDateString()}
                         </span>
                       ))}
                       {formData.availableDates.length > 5 && (
-                        <span className="text-yellow-300 text-xs">
+                        <span className="text-green-300 text-xs">
                           +{formData.availableDates.length - 5} more
                         </span>
                       )}
