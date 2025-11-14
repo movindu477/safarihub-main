@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -75,7 +75,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [languagesSpoken, setLanguagesSpoken] = useState("");
   const [serviceType, setServiceType] = useState("Jeep Driver");
 
-   // ✅ ADD THESE NEW STATE VARIABLES HERE:
+  // ✅ ADD THESE NEW STATE VARIABLES HERE:
   const [vehicleType, setVehicleType] = useState("");
   const [pricePerDay, setPricePerDay] = useState("");
   const [destinations, setDestinations] = useState([]);
@@ -85,6 +85,33 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [description, setDescription] = useState("");
 
   const [busy, setBusy] = useState(false);
+
+  // Reset form function - UPDATED to include new fields
+  const resetForm = () => {
+    setEmail("");
+    setFullName("");
+    setPassword("");
+    setConfirm("");
+    setCountry("");
+    setPhone("");
+    setLanguage("");
+    setProfileFile(null);
+    setProfilePreview(null);
+    setLocationBase("");
+    setExperience("");
+    setLanguagesSpoken("");
+    setServiceType("Jeep Driver");
+    // Reset new fields
+    setVehicleType("");
+    setPricePerDay("");
+    setDestinations([]);
+    setLanguages([]);
+    setSpecialSkills([]);
+    setCertifications([]);
+    setDescription("");
+    setMsg("");
+    setBusy(false);
+  };
 
   // DEVELOPMENT BYPASS: Auto-login for testing
   useEffect(() => {
@@ -114,24 +141,6 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     }
   }, [screen]);
 
-  const resetForm = () => {
-    setEmail("");
-    setFullName("");
-    setPassword("");
-    setConfirm("");
-    setCountry("");
-    setPhone("");
-    setLanguage("");
-    setProfileFile(null);
-    setProfilePreview(null);
-    setLocationBase("");
-    setExperience("");
-    setLanguagesSpoken("");
-    setServiceType("Jeep Driver");
-    setMsg("");
-    setBusy(false);
-  };
-
   // Handle profile image selection
   const handleProfileImageSelect = (e) => {
     const file = e.target.files?.[0];
@@ -147,132 +156,133 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     }
   };
 
-// ✅ Enhanced Register Function
-const handleRegister = async (e) => {
-  e.preventDefault();
-  
-  if (password !== confirm) {
-    setMsg("❌ Passwords do not match!");
-    return;
-  }
-  if (password.length < 6) {
-    setMsg("❌ Password must be at least 6 characters!");
-    return;
-  }
-  
-  setBusy(true);
-  setMsg("⏳ Creating your account...");
-  
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const uid = userCredential.user.uid;
+  // ✅ Enhanced Register Function
+  const handleRegister = async (e) => {
+    e.preventDefault();
     
-    const userData = {
-      uid,
-      email,
-      fullName: fullName,
-      phone: phone || "",
-      profilePicture: "",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-
-    let collectionName = "";
-    
-    if (role === "tourist") {
-      collectionName = "tourists";
-      Object.assign(userData, {
-        country: country || "",
-        preferredLanguage: language || "",
-      });
-    } else {
-      collectionName = "serviceProviders";
-      Object.assign(userData, {
-        // Basic Info
-        location: locationBase || "",
-        experienceYears: parseInt(experience) || 0,
-        serviceType: serviceType || "Jeep Driver",
-        
-        // Filtering Fields
-        vehicleType: vehicleType || "",
-        pricePerDay: parseInt(pricePerDay) || 0,
-        rating: 0, // Default rating
-        totalRatings: 0,
-        
-        // Arrays for filtering
-        destinations: destinations || [],
-        languages: languages || [],
-        specialSkills: specialSkills || [],
-        certifications: certifications || [],
-        
-        // Additional Info
-        description: description || "",
-        availability: true, // Default available
-        featured: false, // Default not featured
-        
-        // Contact
-        contactEmail: email,
-        contactPhone: phone || "",
-      });
+    if (password !== confirm) {
+      setMsg("❌ Passwords do not match!");
+      return;
     }
-
-    await setDoc(doc(db, collectionName, uid), userData);
+    if (password.length < 6) {
+      setMsg("❌ Password must be at least 6 characters!");
+      return;
+    }
     
-    let photoURL = null;
-    if (profileFile) {
-      try {
-        const ext = profileFile.name.split(".").pop();
-        const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
-        const snap = await uploadBytes(storageRef, profileFile);
-        photoURL = await getDownloadURL(snap.ref);
-        
-        await setDoc(doc(db, collectionName, uid), {
-          profilePicture: photoURL,
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-        
-        await updateProfile(userCredential.user, { 
-          displayName: fullName, 
-          photoURL: photoURL 
+    setBusy(true);
+    setMsg("⏳ Creating your account...");
+    
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = userCredential.user.uid;
+      
+      const userData = {
+        uid,
+        email,
+        fullName: fullName,
+        phone: phone || "",
+        profilePicture: "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      let collectionName = "";
+      
+      if (role === "tourist") {
+        collectionName = "tourists";
+        Object.assign(userData, {
+          country: country || "",
+          preferredLanguage: language || "",
         });
-      } catch (uploadError) {
-        console.log("Profile image upload failed, but account created successfully");
+      } else {
+        collectionName = "serviceProviders";
+        Object.assign(userData, {
+          // Basic Info
+          location: locationBase || "",
+          experienceYears: parseInt(experience) || 0,
+          serviceType: serviceType || "Jeep Driver",
+          
+          // Filtering Fields
+          vehicleType: vehicleType || "",
+          pricePerDay: parseInt(pricePerDay) || 0,
+          rating: 0, // Default rating
+          totalRatings: 0,
+          
+          // Arrays for filtering
+          destinations: destinations || [],
+          languages: languages || [],
+          specialSkills: specialSkills || [],
+          certifications: certifications || [],
+          
+          // Additional Info
+          description: description || "",
+          availability: true, // Default available
+          featured: false, // Default not featured
+          
+          // Contact
+          contactEmail: email,
+          contactPhone: phone || "",
+        });
       }
-    } else {
-      await updateProfile(userCredential.user, { 
-        displayName: fullName 
-      });
-    }
 
-    setMsg("🎉 Account created successfully! Redirecting to login...");
-    setBusy(false);
-    
-    setTimeout(() => {
-      signOut(auth);
-      setScreen("login");
-      resetForm();
-    }, 1500);
-    
-  } catch (error) {
-    console.error("Registration error:", error);
-    let errorMessage = "❌ Registration failed! ";
-    
-    if (error.code === 'auth/email-already-in-use') {
-      errorMessage += "Email is already registered.";
-    } else if (error.code === 'auth/invalid-email') {
-      errorMessage += "Invalid email address.";
-    } else if (error.code === 'auth/weak-password') {
-      errorMessage += "Password is too weak.";
-    } else if (error.code === 'auth/network-request-failed') {
-      errorMessage += "Network error. Please check your connection.";
-    } else {
-      errorMessage += "Please try again.";
+      await setDoc(doc(db, collectionName, uid), userData);
+      
+      let photoURL = null;
+      if (profileFile) {
+        try {
+          const ext = profileFile.name.split(".").pop();
+          const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
+          const snap = await uploadBytes(storageRef, profileFile);
+          photoURL = await getDownloadURL(snap.ref);
+          
+          await setDoc(doc(db, collectionName, uid), {
+            profilePicture: photoURL,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+          
+          await updateProfile(userCredential.user, { 
+            displayName: fullName, 
+            photoURL: photoURL 
+          });
+        } catch (uploadError) {
+          console.log("Profile image upload failed, but account created successfully");
+        }
+      } else {
+        await updateProfile(userCredential.user, { 
+          displayName: fullName 
+        });
+      }
+
+      setMsg("🎉 Account created successfully! Redirecting to login...");
+      setBusy(false);
+      
+      setTimeout(() => {
+        signOut(auth);
+        setScreen("login");
+        resetForm();
+      }, 1500);
+      
+    } catch (error) {
+      console.error("Registration error:", error);
+      let errorMessage = "❌ Registration failed! ";
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage += "Email is already registered.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage += "Invalid email address.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage += "Password is too weak.";
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage += "Network error. Please check your connection.";
+      } else {
+        errorMessage += "Please try again.";
+      }
+      
+      setMsg(errorMessage);
+      setBusy(false);
     }
-    
-    setMsg(errorMessage);
-    setBusy(false);
-  }
-};
+  };
+
   // ✅ Login
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -490,29 +500,28 @@ const handleRegister = async (e) => {
           {!role ? (
             <UserTypeSelection onSelect={setRole} logo={logo} />
           ) : (
-// In your MainApp component, find where you render RegistrationForm:
-<RegistrationForm 
-  role={role}
-  formData={{ 
-    email, fullName, password, confirm, country, phone, language,
-    locationBase, experience, languagesSpoken, serviceType,
-    // ✅ ADD THESE NEW FIELDS:
-    vehicleType, pricePerDay, destinations, languages, 
-    specialSkills, certifications, description
-  }}
-  handlers={{ 
-    setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone, setLanguage,
-    setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
-    // ✅ ADD THESE NEW HANDLERS:
-    setVehicleType, setPricePerDay, setDestinations, setLanguages,
-    setSpecialSkills, setCertifications, setDescription
-  }}
-  profilePreview={profilePreview}
-  onProfileImageSelect={handleProfileImageSelect}
-  onSubmit={handleRegister}
-  busy={busy}
-  msg={msg}
-/>
+            <RegistrationForm 
+              role={role}
+              formData={{ 
+                email, fullName, password, confirm, country, phone, language,
+                locationBase, experience, languagesSpoken, serviceType,
+                // ✅ ADD THESE NEW FIELDS:
+                vehicleType, pricePerDay, destinations, languages, 
+                specialSkills, certifications, description
+              }}
+              handlers={{ 
+                setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone, setLanguage,
+                setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
+                // ✅ ADD THESE NEW HANDLERS:
+                setVehicleType, setPricePerDay, setDestinations, setLanguages,
+                setSpecialSkills, setCertifications, setDescription
+              }}
+              profilePreview={profilePreview}
+              onProfileImageSelect={handleProfileImageSelect}
+              onSubmit={handleRegister}
+              busy={busy}
+              msg={msg}
+            />
           )}
         </div>
       </div>
@@ -594,14 +603,11 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
 
   const isTourist = role === 'tourist';
 
-  // Service Type specific fields
+  // ✅ UPDATED: Only 3 Service Types
   const serviceTypes = [
     "Jeep Driver",
     "Tour Guide", 
-    "Hotel Provider",
-    "Restaurant",
-    "Transport Service",
-    "Adventure Activity"
+    "Renting"
   ];
 
   const vehicleTypes = [
@@ -831,7 +837,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                 />
               </div>
 
-              {/* Price per Day (for Jeep Drivers) */}
+              {/* Price per Day (for Jeep Drivers and Tour Guides) */}
               {(formData.serviceType === "Jeep Driver" || formData.serviceType === "Tour Guide") && (
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -1098,7 +1104,8 @@ function App() {
             />
           } 
         />
-        {/* Add more routes as needed */}
+        {/* ✅ FIXED: Added closing bracket for the catch-all route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
