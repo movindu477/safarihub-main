@@ -21,36 +21,64 @@ const JeepProfile = () => {
     return new Intl.NumberFormat('en-LK').format(price);
   };
 
-  // Handle WhatsApp redirect
+  // Enhanced WhatsApp function with proper formatting
   const handleWhatsAppClick = () => {
     if (jeep.contactPhone && jeep.contactPhone !== 'Not provided') {
-      const phoneNumber = jeep.contactPhone.replace(/\D/g, '');
-      const message = `Hello ${jeep.driverName}, I'm interested in booking your safari jeep service. Could you please provide more details?`;
+      // Clean the phone number - remove all non-digit characters except +
+      let phoneNumber = jeep.contactPhone.replace(/[^\d+]/g, '');
+      
+      // Ensure it starts with +94
+      if (phoneNumber.startsWith('94')) {
+        phoneNumber = `+${phoneNumber}`;
+      } else if (phoneNumber.startsWith('0')) {
+        phoneNumber = `+94${phoneNumber.substring(1)}`;
+      } else if (!phoneNumber.startsWith('+')) {
+        phoneNumber = `+94${phoneNumber}`;
+      }
+      
+      // Create WhatsApp message
+      const message = `Hello ${jeep.driverName || jeep.fullName || 'there'}! I found your profile on SafariHub and I'm interested in booking your ${jeep.serviceType || 'safari jeep'} service. Could you please provide more details about availability and pricing?`;
+      
+      // Create WhatsApp URL
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+      
+      // Open in new tab
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
   // Handle phone call
   const handleCallClick = () => {
     if (jeep.contactPhone && jeep.contactPhone !== 'Not provided') {
-      const phoneNumber = jeep.contactPhone.replace(/\D/g, '');
-      window.open(`tel:${phoneNumber}`, '_self');
+      let phoneNumber = jeep.contactPhone.replace(/[^\d+]/g, '');
+      
+      // Format for tel: protocol (remove + for some devices)
+      const telNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+      window.open(`tel:${telNumber}`, '_self');
     }
   };
 
   // Handle email
   const handleEmailClick = () => {
     if (jeep.contactEmail) {
-      const subject = `Safari Jeep Booking Inquiry - ${jeep.driverName}`;
-      const body = `Hello ${jeep.driverName},\n\nI'm interested in booking your safari jeep service. Could you please provide more information about availability and pricing?\n\nThank you!`;
+      const subject = `Safari Jeep Booking Inquiry - ${jeep.driverName || jeep.fullName}`;
+      const body = `Hello ${jeep.driverName || jeep.fullName},\n\nI'm interested in booking your ${jeep.serviceType || 'safari jeep'} service. Could you please provide more information about availability and pricing?\n\nThank you!`;
       window.open(`mailto:${jeep.contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_self');
     }
   };
 
+  // Check if phone number is valid for WhatsApp
+  const isValidPhoneForWhatsApp = () => {
+    if (!jeep.contactPhone || jeep.contactPhone === 'Not provided') return false;
+    
+    const phoneNumber = jeep.contactPhone.replace(/[^\d+]/g, '');
+    // Basic validation for Sri Lankan numbers
+    return phoneNumber.length >= 9;
+  };
+
   // Sample gallery images (in real app, this would come from the driver's data)
   const galleryImages = [
-    jeep.imageUrl,
+    jeep.imageUrl || jeep.profilePicture,
     'https://images.unsplash.com/photo-1583121274602-3e2820c69888?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
     'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
     'https://images.unsplash.com/photo-1552083375-1447ce886485?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80'
@@ -80,10 +108,10 @@ const JeepProfile = () => {
             {/* Main Profile Image */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
               <div className="h-48 w-full relative">
-                {jeep.imageUrl ? (
+                {jeep.imageUrl || jeep.profilePicture ? (
                   <img
-                    src={jeep.imageUrl}
-                    alt={jeep.driverName}
+                    src={jeep.imageUrl || jeep.profilePicture}
+                    alt={jeep.driverName || jeep.fullName}
                     className="w-full h-full object-cover rounded-t-xl"
                   />
                 ) : (
@@ -98,9 +126,9 @@ const JeepProfile = () => {
                 )}
                 
                 {/* Experience Badge */}
-                {jeep.experience > 0 && (
+                {(jeep.experience > 0 || jeep.experienceYears > 0) && (
                   <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg">
-                    {jeep.experience}+ years
+                    {(jeep.experience || jeep.experienceYears)}+ years
                   </div>
                 )}
               </div>
@@ -176,7 +204,7 @@ const JeepProfile = () => {
             <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
                 <div className="flex-1">
-                  <h1 className="text-xl font-bold text-gray-900 mb-1">{jeep.driverName}</h1>
+                  <h1 className="text-xl font-bold text-gray-900 mb-1">{jeep.driverName || jeep.fullName}</h1>
                   <div className="flex items-center gap-3 text-gray-600 mb-3">
                     <div className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
@@ -205,7 +233,7 @@ const JeepProfile = () => {
               {/* Vehicle Type */}
               <div className="mb-4">
                 <div className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
-                  {jeep.vehicleType}
+                  {jeep.vehicleType || jeep.serviceType || 'Safari Jeep'}
                 </div>
               </div>
 
@@ -213,7 +241,7 @@ const JeepProfile = () => {
               <div className="mb-4">
                 <h3 className="text-sm font-semibold text-gray-800 mb-2">About</h3>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  {jeep.description}
+                  {jeep.description || `Professional ${jeep.serviceType || 'safari jeep'} service with ${jeep.experience || jeep.experienceYears || 'several'} years of experience. Specializing in wildlife safaris and tourist transportation.`}
                 </p>
               </div>
 
@@ -226,16 +254,22 @@ const JeepProfile = () => {
                     Destinations
                   </h4>
                   <div className="space-y-1">
-                    {jeep.destinations?.slice(0, 3).map((destination, index) => (
-                      <div key={index} className="flex items-center gap-1 text-gray-600 text-xs">
-                        <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
-                        <span className="truncate">{destination}</span>
-                      </div>
-                    ))}
-                    {jeep.destinations?.length > 3 && (
-                      <div className="text-xs text-gray-500">
-                        +{jeep.destinations.length - 3} more destinations
-                      </div>
+                    {(jeep.destinations && jeep.destinations.length > 0) ? (
+                      <>
+                        {jeep.destinations.slice(0, 3).map((destination, index) => (
+                          <div key={index} className="flex items-center gap-1 text-gray-600 text-xs">
+                            <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+                            <span className="truncate">{destination}</span>
+                          </div>
+                        ))}
+                        {jeep.destinations.length > 3 && (
+                          <div className="text-xs text-gray-500">
+                            +{jeep.destinations.length - 3} more destinations
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-gray-500 text-xs">Various safari destinations</div>
                     )}
                   </div>
                 </div>
@@ -247,18 +281,24 @@ const JeepProfile = () => {
                     Languages
                   </h4>
                   <div className="flex flex-wrap gap-1">
-                    {jeep.languages?.slice(0, 3).map((language, index) => (
-                      <span
-                        key={index}
-                        className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs"
-                      >
-                        {language}
-                      </span>
-                    ))}
-                    {jeep.languages?.length > 3 && (
-                      <span className="text-xs text-gray-500">
-                        +{jeep.languages.length - 3}
-                      </span>
+                    {(jeep.languages && jeep.languages.length > 0) ? (
+                      <>
+                        {jeep.languages.slice(0, 3).map((language, index) => (
+                          <span
+                            key={index}
+                            className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs"
+                          >
+                            {language}
+                          </span>
+                        ))}
+                        {jeep.languages.length > 3 && (
+                          <span className="text-xs text-gray-500">
+                            +{jeep.languages.length - 3}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-gray-500 text-xs">English, Sinhala</span>
                     )}
                   </div>
                 </div>
@@ -358,7 +398,7 @@ const JeepProfile = () => {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={handleWhatsAppClick}
-                  disabled={!jeep.contactPhone || jeep.contactPhone === 'Not provided'}
+                  disabled={!isValidPhoneForWhatsApp()}
                   className="flex-1 bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <span>💬</span>
@@ -392,7 +432,7 @@ const JeepProfile = () => {
                   </div>
                   <div>
                     <div className="font-medium text-gray-800 text-sm">Experienced</div>
-                    <div className="text-xs text-gray-500">{jeep.experience}+ years</div>
+                    <div className="text-xs text-gray-500">{(jeep.experience || jeep.experienceYears) || '0'}+ years</div>
                   </div>
                 </div>
                 
@@ -402,7 +442,7 @@ const JeepProfile = () => {
                   </div>
                   <div>
                     <div className="font-medium text-gray-800 text-sm">Multi-lingual</div>
-                    <div className="text-xs text-gray-500">{jeep.languages?.length || 0} languages</div>
+                    <div className="text-xs text-gray-500">{(jeep.languages && jeep.languages.length) || 1} languages</div>
                   </div>
                 </div>
               </div>

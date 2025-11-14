@@ -52,6 +52,41 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// Phone number formatting utility
+const formatPhoneNumber = (phone) => {
+  if (!phone) return "";
+  
+  // Remove all non-digit characters
+  let cleaned = phone.replace(/\D/g, '');
+  
+  // If it starts with 94, add + prefix
+  if (cleaned.startsWith('94')) {
+    return `+${cleaned}`;
+  }
+  
+  // If it starts with 0, replace with +94
+  if (cleaned.startsWith('0')) {
+    return `+94${cleaned.substring(1)}`;
+  }
+  
+  // If it doesn't start with +, add it
+  if (!cleaned.startsWith('+')) {
+    return `+94${cleaned}`;
+  }
+  
+  return phone;
+};
+
+// Phone number validation
+const isValidSriLankanPhone = (phone) => {
+  if (!phone) return false;
+  
+  const formatted = formatPhoneNumber(phone);
+  // Sri Lankan phone number regex: +94 followed by 7, 6, or 0 and 9 digits total
+  const sriLankanRegex = /^\+94[0-9]{9}$/;
+  return sriLankanRegex.test(formatted);
+};
+
 // Main App Component with Authentication
 function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [screen, setScreen] = useState("home");
@@ -76,7 +111,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [languagesSpoken, setLanguagesSpoken] = useState("");
   const [serviceType, setServiceType] = useState("Jeep Driver");
 
-  // ✅ ADD THESE NEW STATE VARIABLES HERE:
+  // ADD THESE NEW STATE VARIABLES HERE:
   const [vehicleType, setVehicleType] = useState("");
   const [pricePerDay, setPricePerDay] = useState("");
   const [destinations, setDestinations] = useState([]);
@@ -84,9 +119,16 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [specialSkills, setSpecialSkills] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [description, setDescription] = useState("");
-  const [availableDates, setAvailableDates] = useState([]); // ✅ NEW: Calendar dates
+  const [availableDates, setAvailableDates] = useState([]); // NEW: Calendar dates
 
   const [busy, setBusy] = useState(false);
+
+  // Handle phone number input with formatting
+  const handlePhoneChange = (value) => {
+    // Allow only numbers and + sign
+    const cleaned = value.replace(/[^\d+]/g, '');
+    setPhone(cleaned);
+  };
 
   // Reset form function - UPDATED to include new fields
   const resetForm = () => {
@@ -111,7 +153,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     setSpecialSkills([]);
     setCertifications([]);
     setDescription("");
-    setAvailableDates([]); // ✅ NEW: Reset calendar dates
+    setAvailableDates([]); // NEW: Reset calendar dates
     setMsg("");
     setBusy(false);
   };
@@ -159,7 +201,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     }
   };
 
-  // ✅ NEW: Handle date selection for calendar
+  // NEW: Handle date selection for calendar
   const handleDateSelect = (date) => {
     const dateString = date.toISOString().split('T')[0];
     setAvailableDates(prev => {
@@ -171,9 +213,15 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     });
   };
 
-  // ✅ Enhanced Register Function
+  // Enhanced Register Function with phone validation
   const handleRegister = async (e) => {
     e.preventDefault();
+    
+    // Phone validation for service providers
+    if (role === 'provider' && phone && !isValidSriLankanPhone(phone)) {
+      setMsg("❌ Please enter a valid Sri Lankan phone number (e.g., +94701234567)");
+      return;
+    }
     
     if (password !== confirm) {
       setMsg("❌ Passwords do not match!");
@@ -191,11 +239,14 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
       
+      // Format phone number for storage
+      const formattedPhone = phone ? formatPhoneNumber(phone) : "";
+
       const userData = {
         uid,
         email,
         fullName: fullName,
-        phone: phone || "",
+        phone: formattedPhone,
         profilePicture: "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -229,7 +280,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
           specialSkills: specialSkills || [],
           certifications: certifications || [],
           
-          // ✅ NEW: Calendar availability
+          // NEW: Calendar availability
           availableDates: availableDates || [],
           availability: availableDates.length > 0, // Auto-set availability based on dates
           
@@ -239,7 +290,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
           
           // Contact
           contactEmail: email,
-          contactPhone: phone || "",
+          contactPhone: formattedPhone,
         });
       }
 
@@ -523,19 +574,19 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
               formData={{ 
                 email, fullName, password, confirm, country, phone, language,
                 locationBase, experience, languagesSpoken, serviceType,
-                // ✅ ADD THESE NEW FIELDS:
+                // ADD THESE NEW FIELDS:
                 vehicleType, pricePerDay, destinations, languages, 
                 specialSkills, certifications, description,
-                availableDates // ✅ NEW: Calendar dates
+                availableDates // NEW: Calendar dates
               }}
               handlers={{ 
-                setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone, setLanguage,
+                setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone: handlePhoneChange, setLanguage,
                 setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
-                // ✅ ADD THESE NEW HANDLERS:
+                // ADD THESE NEW HANDLERS:
                 setVehicleType, setPricePerDay, setDestinations, setLanguages,
                 setSpecialSkills, setCertifications, setDescription,
-                setAvailableDates, // ✅ NEW: Calendar handler
-                handleDateSelect // ✅ NEW: Date selection handler
+                setAvailableDates, // NEW: Calendar handler
+                handleDateSelect // NEW: Date selection handler
               }}
               profilePreview={profilePreview}
               onProfileImageSelect={handleProfileImageSelect}
@@ -617,7 +668,7 @@ const UserTypeSelection = ({ onSelect, logo }) => (
   </div>
 );
 
-// Enhanced RegistrationForm Component with Calendar
+// Enhanced RegistrationForm Component with Calendar and Phone Validation
 const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileImageSelect, onSubmit, busy, msg }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -625,7 +676,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
 
   const isTourist = role === 'tourist';
 
-  // ✅ UPDATED: Only 3 Service Types
+  // UPDATED: Only 3 Service Types
   const serviceTypes = [
     "Jeep Driver",
     "Tour Guide", 
@@ -669,7 +720,21 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     "Eco Tourism Certified"
   ];
 
-  // ✅ NEW: Calendar functions
+  // Phone input helper text
+  const getPhoneHelperText = () => {
+    if (!formData.phone) return "Enter your Sri Lankan phone number";
+    
+    const formatted = formData.phone.startsWith('+') ? formData.phone : `+94${formData.phone.replace(/^0/, '')}`;
+    const isValid = /^\+94[0-9]{9}$/.test(formatted);
+    
+    if (isValid) {
+      return "✓ Valid Sri Lankan number";
+    } else {
+      return "Enter a valid Sri Lankan number (e.g., +94701234567)";
+    }
+  };
+
+  // NEW: Calendar functions
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
@@ -836,7 +901,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <Phone className="h-3 w-3 text-yellow-400" />
-              Phone Number
+              Phone Number {!isTourist && <span className="text-red-400">*</span>}
             </label>
             <input
               type="tel"
@@ -844,8 +909,11 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               onChange={(e) => handlers.setPhone(e.target.value)}
               required={!isTourist}
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder="Your phone number"
+              placeholder="+94701234567"
             />
+            <p className="text-xs text-gray-400 mt-1">
+              {getPhoneHelperText()}
+            </p>
           </div>
 
           <div className="space-y-1">
@@ -942,7 +1010,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               )}
             </div>
 
-            {/* ✅ NEW: Calendar for Available Dates */}
+            {/* NEW: Calendar for Available Dates */}
             <div className="md:col-span-2 space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
                 <Calendar className="h-3 w-3 text-yellow-400" />
@@ -1256,12 +1324,12 @@ function App() {
             />
           } 
         />
-        {/* ✅ NEW: Jeep Profile Route */}
+        {/* NEW: Jeep Profile Route */}
         <Route 
           path="/jeepprofile" 
           element={<JeepProfile />} 
         />
-        {/* ✅ FIXED: Added closing bracket for the catch-all route */}
+        {/* FIXED: Added closing bracket for the catch-all route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
