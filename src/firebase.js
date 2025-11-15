@@ -21,3 +21,102 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// ✅ Firestore functions for messaging
+import { 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  where, 
+  serverTimestamp 
+} from 'firebase/firestore';
+
+export const sendMessage = async (messageData) => {
+  try {
+    const docRef = await addDoc(collection(db, 'messages'), {
+      ...messageData,
+      timestamp: serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error sending message:', error);
+    throw error;
+  }
+};
+
+export const getMessages = (driverId, userId, callback) => {
+  const conversationId = `conv_${driverId}_${userId}`;
+  const q = query(
+    collection(db, 'messages'),
+    where('conversationId', '==', conversationId),
+    orderBy('timestamp', 'asc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const messages = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    callback(messages);
+  });
+};
+
+export const addReview = async (reviewData) => {
+  try {
+    const docRef = await addDoc(collection(db, 'reviews'), {
+      ...reviewData,
+      timestamp: serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error adding review:', error);
+    throw error;
+  }
+};
+
+export const getReviews = (jeepId, callback) => {
+  const q = query(
+    collection(db, 'reviews'),
+    where('jeepId', '==', jeepId),
+    orderBy('timestamp', 'desc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const reviews = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    callback(reviews);
+  });
+};
+
+export const addBooking = async (bookingData) => {
+  try {
+    const docRef = await addDoc(collection(db, 'bookings'), {
+      ...bookingData,
+      timestamp: serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error adding booking:', error);
+    throw error;
+  }
+};
+
+export const getBookings = (jeepId, callback) => {
+  const q = query(
+    collection(db, 'bookings'),
+    where('jeepId', '==', jeepId),
+    orderBy('timestamp', 'desc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const bookings = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    callback(bookings);
+  });
+};

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Phone, Mail, MapPin, Star, Calendar, Clock, Users, Shield, Award, Globe, Sparkles, Check, MessageCircle, X, Send, Bell } from 'lucide-react';
-import io from 'socket.io-client';
+import { db, sendMessage, getMessages, addReview, getReviews, addBooking, getBookings } from '../firebase';
 import './JeepProfile.css';
 
 const JeepProfile = () => {
@@ -18,8 +18,7 @@ const JeepProfile = () => {
   const [reviews, setReviews] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [socket, setSocket] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [bookings, setBookings] = useState([]);
   const messagesEndRef = useRef(null);
 
   // User management
@@ -35,76 +34,38 @@ const JeepProfile = () => {
     }
   }, [userId, userName]);
 
-  // Initialize socket connection
+  // Load messages from Firebase
   useEffect(() => {
-    const newSocket = io('http://localhost:5000');
-    setSocket(newSocket);
-
-    newSocket.on('connect', () => {
-      setIsConnected(true);
-      console.log('Connected to messaging server');
-    });
-
-    newSocket.on('disconnect', () => {
-      setIsConnected(false);
-    });
-
-    return () => {
-      newSocket.close();
-    };
-  }, []);
-
-  // Join conversation when jeep data is available
-  useEffect(() => {
-    if (socket && isConnected && jeep) {
-      socket.emit('user_join', {
-        userId: userId,
-        driverId: jeep.id,
-        userName: userName
+    if (jeep) {
+      const unsubscribe = getMessages(jeep.id, userId, (messages) => {
+        setMessages(messages);
       });
+      
+      return () => unsubscribe();
     }
-  }, [socket, isConnected, jeep, userId, userName]);
+  }, [jeep, userId]);
 
-  // Socket event listeners
+  // Load reviews from Firebase
   useEffect(() => {
-    if (socket) {
-      socket.on('new_message', (messageData) => {
-        setMessages(prev => [...prev, messageData]);
-        
-        if (messageData.senderType === 'driver') {
-          addNotification({
-            id: Date.now(),
-            type: 'message',
-            message: `New message from ${jeep.driverName}`,
-            timestamp: new Date().toISOString(),
-            read: false
-          });
-        }
+    if (jeep) {
+      const unsubscribe = getReviews(jeep.id, (reviews) => {
+        setReviews(reviews);
       });
-
-      socket.on('conversation_history', (history) => {
-        setMessages(history);
-      });
-
-      socket.on('new_message_notification', (notification) => {
-        addNotification({
-          id: Date.now(),
-          type: 'message',
-          message: `New message from ${notification.senderType === 'user' ? 'user' : jeep.driverName}`,
-          timestamp: new Date().toISOString(),
-          read: false
-        });
-      });
+      
+      return () => unsubscribe();
     }
+  }, [jeep]);
 
-    return () => {
-      if (socket) {
-        socket.off('new_message');
-        socket.off('conversation_history');
-        socket.off('new_message_notification');
-      }
-    };
-  }, [socket, jeep]);
+  // Load bookings from Firebase
+  useEffect(() => {
+    if (jeep) {
+      const unsubscribe = getBookings(jeep.id, (bookings) => {
+        setBookings(bookings);
+      });
+      
+      return () => unsubscribe();
+    }
+  }, [jeep]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -115,20 +76,12 @@ const JeepProfile = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Load initial data
+  // Load notifications from localStorage
   useEffect(() => {
     if (jeep) {
-      loadReviews();
       loadNotifications();
     }
   }, [jeep]);
-
-  const loadReviews = async () => {
-    const savedReviews = localStorage.getItem(`jeep_reviews_${jeep.id}`);
-    if (savedReviews) {
-      setReviews(JSON.parse(savedReviews));
-    }
-  };
 
   const loadNotifications = async () => {
     const savedNotifications = localStorage.getItem('user_notifications');
@@ -154,9 +107,9 @@ const JeepProfile = () => {
     return new Intl.NumberFormat('en-LK').format(price);
   };
 
-  // Send message function
-  const sendMessage = () => {
-    if (!newMessage.trim() || !socket || !isConnected || !jeep) return;
+  // Send message function using Firebase
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !jeep) return;
 
     const messageData = {
       userId: userId,
@@ -164,49 +117,69 @@ const JeepProfile = () => {
       message: newMessage,
       senderType: 'user',
       userName: userName,
-      driverName: jeep.driverName
+      driverName: jeep.driverName,
+      conversationId: `conv_${jeep.id}_${userId}`,
+      read: false
     };
 
-    socket.emit('send_message', messageData);
-    setNewMessage('');
+    try {
+      await sendMessage(messageData);
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      addNotification({
+        id: Date.now(),
+        type: 'error',
+        message: 'Failed to send message',
+        timestamp: new Date().toISOString(),
+        read: false
+      });
+    }
   };
 
   // Handle Enter key press
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      handleSendMessage();
     }
   };
 
-  // Review functions
-  const submitReview = () => {
+  // Review functions using Firebase
+  const submitReview = async () => {
     if (userReview.rating === 0 || !userReview.message.trim()) return;
 
     const review = {
-      id: Date.now(),
       userId: userId,
       userName: userName,
       rating: userReview.rating,
       message: userReview.message,
-      timestamp: new Date().toISOString(),
       jeepId: jeep.id
     };
 
-    const updatedReviews = [...reviews, review];
-    setReviews(updatedReviews);
-    localStorage.setItem(`jeep_reviews_${jeep.id}`, JSON.stringify(updatedReviews));
-    
-    addNotification({
-      id: Date.now(),
-      type: 'review',
-      message: `You submitted a ${userReview.rating}-star review for ${jeep.driverName}`,
-      timestamp: new Date().toISOString(),
-      read: false
-    });
+    try {
+      await addReview(review);
+      
+      addNotification({
+        id: Date.now(),
+        type: 'review',
+        message: `You submitted a ${userReview.rating}-star review for ${jeep.driverName}`,
+        timestamp: new Date().toISOString(),
+        read: false
+      });
 
-    setUserReview({ rating: 0, message: '' });
-    setShowReviewModal(false);
+      setUserReview({ rating: 0, message: '' });
+      setShowReviewModal(false);
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      addNotification({
+        id: Date.now(),
+        type: 'error',
+        message: 'Failed to submit review',
+        timestamp: new Date().toISOString(),
+        read: false
+      });
+    }
   };
 
   // Calendar functions
@@ -233,24 +206,25 @@ const JeepProfile = () => {
   };
 
   const isDateBooked = (date) => {
-    const bookedDates = JSON.parse(localStorage.getItem('booked_dates') || '{}');
     const dateString = date.toISOString().split('T')[0];
-    return bookedDates[dateString] && bookedDates[dateString].includes(jeep.id);
+    return bookings.some(booking => booking.date === dateString);
   };
 
-  const bookDate = (date) => {
+  const bookDate = async (date) => {
     if (isDateInPast(date) || !isDateAvailable(date) || isDateBooked(date)) return;
 
     const dateString = date.toISOString().split('T')[0];
-    const bookedDates = JSON.parse(localStorage.getItem('booked_dates') || '{}');
-    
-    if (!bookedDates[dateString]) {
-      bookedDates[dateString] = [];
-    }
-    
-    if (!bookedDates[dateString].includes(jeep.id)) {
-      bookedDates[dateString].push(jeep.id);
-      localStorage.setItem('booked_dates', JSON.stringify(bookedDates));
+    const bookingData = {
+      userId: userId,
+      userName: userName,
+      jeepId: jeep.id,
+      driverName: jeep.driverName,
+      date: dateString,
+      status: 'confirmed'
+    };
+
+    try {
+      await addBooking(bookingData);
       
       addNotification({
         id: Date.now(),
@@ -259,8 +233,15 @@ const JeepProfile = () => {
         timestamp: new Date().toISOString(),
         read: false
       });
-      
-      setCurrentMonth(new Date(currentMonth));
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      addNotification({
+        id: Date.now(),
+        type: 'error',
+        message: 'Failed to create booking',
+        timestamp: new Date().toISOString(),
+        read: false
+      });
     }
   };
 
@@ -660,7 +641,7 @@ const JeepProfile = () => {
                           {'☆'.repeat(5 - review.rating)}
                         </div>
                         <span className="text-xs text-gray-500">
-                          {new Date(review.timestamp).toLocaleDateString()}
+                          {review.timestamp ? new Date(review.timestamp.toDate()).toLocaleDateString() : 'Recent'}
                         </span>
                       </div>
                       <p className="text-sm text-gray-700">{review.message}</p>
@@ -890,9 +871,7 @@ const JeepProfile = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-800">{jeep.driverName}</h3>
-                  <p className="text-xs text-gray-500">
-                    {isConnected ? 'Online' : 'Connecting...'}
-                  </p>
+                  <p className="text-xs text-gray-500">Online</p>
                 </div>
               </div>
               <button
@@ -925,10 +904,10 @@ const JeepProfile = () => {
                     >
                       <p className="text-sm">{message.message}</p>
                       <p className="text-xs opacity-70 mt-1">
-                        {new Date(message.timestamp).toLocaleTimeString([], { 
+                        {message.timestamp ? new Date(message.timestamp.toDate()).toLocaleTimeString([], { 
                           hour: '2-digit', 
                           minute: '2-digit' 
-                        })}
+                        }) : 'Just now'}
                       </p>
                     </div>
                   </div>
@@ -949,8 +928,8 @@ const JeepProfile = () => {
                   className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
                 <button
-                  onClick={sendMessage}
-                  disabled={!newMessage.trim() || !isConnected}
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim()}
                   className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-2 rounded-full hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 transition-colors"
                 >
                   <Send className="h-5 w-5" />

@@ -1,13 +1,18 @@
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const socketIo = require('socket.io');
+import express from 'express';
+import cors from 'cors';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
-const server = http.createServer(app);
+const server = createServer(app);
 
 // Socket.io configuration
-const io = socketIo(server, {
+const io = new Server(server, {
   cors: {
     origin: "http://localhost:3000",
     methods: ["GET", "POST"],
@@ -17,6 +22,9 @@ const io = socketIo(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from React build
+app.use(express.static(join(__dirname, 'dist')));
 
 // Database simulation
 const conversations = new Map();
@@ -161,6 +169,11 @@ app.get('/api/driver/conversations/:driverId', (req, res) => {
   });
   
   res.json(driverConversations);
+});
+
+// Serve React app for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
 const PORT = process.env.PORT || 5000;
