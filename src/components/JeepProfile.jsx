@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Phone, Mail, MapPin, Star, Calendar, Clock, Users, Shield, Award, Globe, MessageCircle, X, Send, Wifi, WifiOff } from 'lucide-react';
-import { db, sendMessage, getMessages, addReview, getReviews, addBooking, getBookings, getUserOnlineStatus, setUserOnline, setUserOffline } from '../firebase';
+import { db, sendMessage, getMessages, addReview, getReviews, addBooking, getBookings, getUserOnlineStatus, setUserOnline, setUserOffline, markNotificationAsRead } from '../firebase';
+import { getAuth } from 'firebase/auth';
 
 const JeepProfile = () => {
   const location = useLocation();
@@ -21,15 +22,18 @@ const JeepProfile = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const messagesEndRef = useRef(null);
 
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
+
   // User management
-  const userId = localStorage.getItem('userId') || `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const userName = localStorage.getItem('userName') || 'Safari Traveler';
+  const userId = currentUser?.uid || localStorage.getItem('userId') || `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const userName = currentUser?.displayName || localStorage.getItem('userName') || 'Safari Traveler';
 
   useEffect(() => {
-    if (!localStorage.getItem('userId')) {
+    if (!localStorage.getItem('userId') && userId) {
       localStorage.setItem('userId', userId);
     }
-    if (!localStorage.getItem('userName')) {
+    if (!localStorage.getItem('userName') && userName) {
       localStorage.setItem('userName', userName);
     }
   }, [userId, userName]);
@@ -39,11 +43,17 @@ const JeepProfile = () => {
     if (jeep && showChat) {
       const unsubscribe = getMessages(jeep.id, userId, (messages) => {
         setMessages(messages);
+        
+        // Mark any message notifications as read when chat is opened
+        if (currentUser && jeep) {
+          const conversationId = `conv_${jeep.id}_${userId}`;
+          // You would need to fetch and mark related notifications as read
+        }
       });
       
       return () => unsubscribe();
     }
-  }, [jeep, userId, showChat]);
+  }, [jeep, userId, showChat, currentUser]);
 
   // Load reviews from Firebase
   useEffect(() => {
@@ -78,17 +88,21 @@ const JeepProfile = () => {
     }
   }, [jeep]);
 
-  // Set user online when component mounts
+  // Set user online when component mounts (if logged in)
   useEffect(() => {
-    setUserOnline(userId, 'tourist', {
-      userName: userName,
-      lastSeen: new Date()
-    });
+    if (currentUser) {
+      setUserOnline(currentUser.uid, 'tourist', {
+        userName: currentUser.displayName || userName,
+        email: currentUser.email
+      });
+    }
 
     return () => {
-      setUserOffline(userId);
+      if (currentUser) {
+        setUserOffline(currentUser.uid);
+      }
     };
-  }, [userId, userName]);
+  }, [currentUser, userName]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

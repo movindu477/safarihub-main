@@ -11,7 +11,9 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
-  getDocs 
+  getDocs,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -26,7 +28,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ✅ FIXED: Chat Functions
+// ✅ ENHANCED: Chat Functions with Notifications
 export const sendMessage = async (messageData) => {
   try {
     const messageWithTimestamp = {
@@ -36,6 +38,20 @@ export const sendMessage = async (messageData) => {
     };
     
     const docRef = await addDoc(collection(db, 'messages'), messageWithTimestamp);
+    
+    // ✅ Create notification for the driver
+    await createNotification({
+      userId: messageData.driverId,
+      type: 'message',
+      title: 'New Message',
+      message: `New message from ${messageData.userName}`,
+      relatedId: messageData.conversationId,
+      senderId: messageData.userId,
+      senderName: messageData.userName,
+      timestamp: serverTimestamp(),
+      read: false
+    });
+    
     console.log('✅ Message sent with ID:', docRef.id);
     return docRef.id;
   } catch (error) {
@@ -62,13 +78,14 @@ export const getMessages = (driverId, userId, callback) => {
   });
 };
 
-// ✅ FIXED: Online Status Functions
+// ✅ ENHANCED: Online Status Functions
 export const setUserOnline = async (userId, userType, userData) => {
   try {
     await setDoc(doc(db, 'onlineStatus', userId), {
       isOnline: true,
       userType: userType,
       userName: userData.userName,
+      email: userData.email,
       lastSeen: serverTimestamp(),
       ...userData
     });
@@ -100,6 +117,73 @@ export const getUserOnlineStatus = (userId, callback) => {
       callback({ isOnline: false, lastSeen: null });
     }
   });
+};
+
+// ✅ NEW: Notification Functions
+export const createNotification = async (notificationData) => {
+  try {
+    const notificationWithTimestamp = {
+      ...notificationData,
+      timestamp: serverTimestamp(),
+      read: false
+    };
+    
+    const docRef = await addDoc(collection(db, 'notifications'), notificationWithTimestamp);
+    console.log('✅ Notification created:', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Error creating notification:', error);
+    throw error;
+  }
+};
+
+export const getUserNotifications = (userId, callback) => {
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    orderBy('timestamp', 'desc')
+  );
+
+  return onSnapshot(q, (querySnapshot) => {
+    const notifications = [];
+    querySnapshot.forEach((doc) => {
+      notifications.push({ id: doc.id, ...doc.data() });
+    });
+    callback(notifications);
+  });
+};
+
+export const markNotificationAsRead = async (notificationId) => {
+  try {
+    await updateDoc(doc(db, 'notifications', notificationId), {
+      read: true
+    });
+    console.log('✅ Notification marked as read:', notificationId);
+  } catch (error) {
+    console.error('❌ Error marking notification as read:', error);
+    throw error;
+  }
+};
+
+export const markAllNotificationsAsRead = async (userId) => {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('read', '==', false)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const updatePromises = querySnapshot.docs.map(doc => 
+      updateDoc(doc.ref, { read: true })
+    );
+    
+    await Promise.all(updatePromises);
+    console.log('✅ All notifications marked as read for user:', userId);
+  } catch (error) {
+    console.error('❌ Error marking all notifications as read:', error);
+    throw error;
+  }
 };
 
 // Review Functions

@@ -14,6 +14,7 @@ import {
   setDoc,
   doc,
   serverTimestamp,
+  getDoc,
 } from "firebase/firestore";
 import {
   getStorage,
@@ -53,6 +54,22 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// Mock functions for notifications and online status (you'll need to implement these)
+const getUserNotifications = (userId, callback) => {
+  console.log("Getting notifications for user:", userId);
+  // Return mock empty notifications
+  callback([]);
+  return () => {}; // Return unsubscribe function
+};
+
+const setUserOnline = async (userId, userRole, userData) => {
+  console.log("Setting user online:", userId, userRole, userData);
+};
+
+const setUserOffline = async (userId) => {
+  console.log("Setting user offline:", userId);
+};
+
 // Phone number formatting utility
 const formatPhoneNumber = (phone) => {
   if (!phone) return "";
@@ -88,14 +105,13 @@ const isValidSriLankanPhone = (phone) => {
   return sriLankanRegex.test(formatted);
 };
 
-// Main App Component with Authentication
-function MainApp({ user, onLogout, onLogin, onRegister }) {
-  const [screen, setScreen] = useState("home");
+// Authentication Component
+function Authentication({ onAuthSuccess }) {
+  const [screen, setScreen] = useState("login");
   const [role, setRole] = useState(null);
   const [msg, setMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [busy, setBusy] = useState(false);
 
   // Common Fields
   const [email, setEmail] = useState("");
@@ -123,8 +139,6 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [certifications, setCertifications] = useState([]);
   const [description, setDescription] = useState("");
   const [availableDates, setAvailableDates] = useState([]);
-
-  const [busy, setBusy] = useState(false);
 
   // Handle phone number input with formatting
   const handlePhoneChange = (value) => {
@@ -161,34 +175,6 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     setBusy(false);
   };
 
-  // DEVELOPMENT BYPASS: Auto-login for testing
-  useEffect(() => {
-    console.log("App component mounted - DEVELOPMENT MODE");
-    console.log("Current screen:", screen);
-    
-    const developmentBypass = () => {
-      console.log("Development bypass active - showing home page");
-      setScreen("home");
-    };
-    
-    developmentBypass();
-  }, []);
-
-  // Splash timer
-  useEffect(() => {
-    if (screen === "splash") {
-      const t = setTimeout(() => setScreen("login"), 2000);
-      return () => clearTimeout(t);
-    }
-  }, [screen]);
-
-  // Reset form when changing screens
-  useEffect(() => {
-    if (screen === "login" || screen === "register") {
-      resetForm();
-    }
-  }, [screen]);
-
   // Handle profile image selection
   const handleProfileImageSelect = (e) => {
     const file = e.target.files?.[0];
@@ -216,7 +202,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     });
   };
 
-  // ✅ FIXED: Enhanced Register Function with proper tourist data saving
+  // Enhanced Register Function
   const handleRegister = async (e) => {
     e.preventDefault();
     
@@ -251,7 +237,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
       // Format phone number for storage
       const formattedPhone = phone ? formatPhoneNumber(phone) : "";
 
-      // ✅ FIXED: Proper user data structure for both tourist and provider
+      // Proper user data structure for both tourist and provider
       let userData = {
         uid,
         email,
@@ -267,7 +253,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
       
       if (role === "tourist") {
         collectionName = "tourists";
-        // ✅ FIXED: Tourist-specific data
+        // Tourist-specific data
         userData = {
           ...userData,
           country: country?.trim() || "",
@@ -315,7 +301,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
         console.log("📝 Provider data to save:", userData);
       }
 
-      // ✅ FIXED: Save to Firestore with proper error handling
+      // Save to Firestore with proper error handling
       console.log(`💾 Saving to collection: ${collectionName}, document: ${uid}`);
       
       await setDoc(doc(db, collectionName, uid), userData);
@@ -388,17 +374,16 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     }
   };
 
-  // ✅ Login
+  // Login Function
   const handleLogin = async (e) => {
     e.preventDefault();
     setBusy(true);
     setMsg("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      setMsg(`✅ Welcome back! Redirecting...`);
+      setMsg("✅ Welcome back! Redirecting...");
       setTimeout(() => {
-        setScreen("home");
-        resetForm();
+        onAuthSuccess();
       }, 1000);
     } catch (error) {
       let errorMessage = "❌ Login failed! ";
@@ -419,107 +404,17 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     }
   };
 
-  // Handle login button click - navigate to login screen
-  const handleLoginClick = () => {
-    setScreen("login");
-  };
-
-  // Handle register button click - navigate to register screen
-  const handleRegisterClick = () => {
-    setScreen("register");
-  };
-
-  // Notification functions
-  const handleNotificationClick = () => {
-    setShowNotifications(!showNotifications);
-  };
-
-  // DEVELOPMENT: Quick navigation buttons
-  const DevNavigation = () => (
-    <div className="fixed top-4 right-20 z-50 flex gap-2 bg-black/80 p-2 rounded-lg">
-      <button 
-        onClick={() => setScreen("home")}
-        className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-      >
-        Home
-      </button>
-      <button 
-        onClick={() => setScreen("login")}
-        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-      >
-        Login
-      </button>
-      <button 
-        onClick={() => setScreen("register")}
-        className="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
-      >
-        Register
-      </button>
-    </div>
-  );
-
-  // ✅ FIXED: Notification Bell Component - Bottom Right Corner
-  const NotificationBell = () => (
-    <div className="fixed bottom-6 right-6 z-50">
-      <button
-        onClick={handleNotificationClick}
-        className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
-      >
-        <Bell className="h-6 w-6 text-white" />
-        {notifications.filter(n => !n.read).length > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-            {notifications.filter(n => !n.read).length}
-          </span>
-        )}
-      </button>
-
-      {/* Notifications Panel */}
-      {showNotifications && (
-        <NotificationPanel 
-          notifications={notifications}
-          onClose={() => setShowNotifications(false)}
-          onNotificationClick={(notification) => {
-            // Handle notification click based on type
-            console.log('Notification clicked:', notification);
-          }}
-        />
-      )}
-    </div>
-  );
-
-  // ✅ Modern Splash Screen
-  if (screen === "splash")
-    return (
-      <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800 flex flex-col items-center justify-center z-50">
-        <DevNavigation />
-        <NotificationBell />
-        <div className="mb-8 transform scale-110">
-          <img
-            src={logo}
-            alt="SafariHub Logo"
-            className="h-32 w-auto object-contain mb-4"
-          />
-        </div>
-        
-        <div className="text-center">
-          <p className="text-yellow-400 font-bold text-xl mb-3">
-            WELCOME TO SAFARIHUB
-          </p>
-          <div className="flex gap-2 mt-4">
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-100"></div>
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-200"></div>
-          </div>
-        </div>
-      </div>
-    );
+  // Reset form when changing screens
+  useEffect(() => {
+    if (screen === "login" || screen === "register") {
+      resetForm();
+    }
+  }, [screen]);
 
   // ✅ Login Page
   if (screen === "login")
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
-        <DevNavigation />
-        <NotificationBell />
         <div className="relative w-full max-w-md">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
             <div className="text-center mb-8">
@@ -619,8 +514,6 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   if (screen === "register")
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
-        <DevNavigation />
-        <NotificationBell />
         <div className="relative w-full max-w-2xl">
           <div className="flex justify-between items-center mb-4">
             <button
@@ -670,31 +563,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
       </div>
     );
 
-  // ✅ Home Page
-  console.log("Rendering Home Page with all sections");
-  return (
-    <div className="min-h-screen bg-white">
-      <DevNavigation />
-      <NotificationBell />
-      <Navbar 
-        user={user} 
-        onLogout={onLogout} 
-        onLogin={handleLoginClick}
-        onRegister={handleRegisterClick}
-      />
-      <Section1 />
-      <div className="h-1 bg-black"></div>
-      <Section2 />
-      <div className="h-1 bg-black"></div>
-      <Section3 />
-      <div className="h-1 bg-black"></div>
-      <Section4 />
-      <div className="h-1 bg-black"></div>
-      <Section5 />
-      <div className="h-1 bg-black"></div>
-      <Footer />
-    </div>
-  );
+  return null;
 }
 
 // User Type Selection Component
@@ -1371,35 +1240,195 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
   );
 };
 
-// Main Router Component
+// Main Home Component
+function HomePage({ user, onLogout, onShowAuth }) {
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  // Notification functions
+  const handleNotificationClick = () => {
+    setShowNotifications(!showNotifications);
+  };
+
+  // Close notifications when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications && !event.target.closest('.notification-container')) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  // Load notifications when user is logged in
+  useEffect(() => {
+    if (user) {
+      const unsubscribe = getUserNotifications(user.uid, (notifications) => {
+        setNotifications(notifications);
+      });
+      
+      return () => unsubscribe();
+    }
+  }, [user]);
+
+  // ✅ Notification Bell Component - Bottom Right Corner with Panel Above
+  const NotificationBell = () => (
+    <div className="fixed bottom-6 right-6 z-50 notification-container">
+      <div className="relative">
+        {/* Notification Panel - Positioned ABOVE the button */}
+        {showNotifications && (
+          <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
+            <NotificationPanel 
+              notifications={notifications}
+              onClose={() => setShowNotifications(false)}
+              onNotificationClick={(notification) => {
+                // Handle notification click based on type
+                console.log('Notification clicked:', notification);
+                setShowNotifications(false);
+                
+                // If it's a message notification, navigate to chat
+                if (notification.type === 'message' && notification.relatedId) {
+                  // Extract driver ID and user ID from conversationId
+                  const [_, driverId, userId] = notification.relatedId.split('_');
+                  // Navigate to jeep profile with chat open
+                  window.location.href = `/jeepprofile?driverId=${driverId}&openChat=true`;
+                }
+              }}
+            />
+          </div>
+        )}
+
+        {/* Notification Bell Button */}
+        <button
+          onClick={handleNotificationClick}
+          className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
+        >
+          <Bell className="h-6 w-6 text-white" />
+          {notifications.filter(n => !n.read).length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+              {notifications.filter(n => !n.read).length}
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-white">
+      <NotificationBell />
+      <Navbar 
+        user={user} 
+        onLogout={onLogout} 
+        onLogin={onShowAuth}
+        onRegister={onShowAuth}
+      />
+      <Section1 />
+      <div className="h-1 bg-black"></div>
+      <Section2 />
+      <div className="h-1 bg-black"></div>
+      <Section3 />
+      <div className="h-1 bg-black"></div>
+      <Section4 />
+      <div className="h-1 bg-black"></div>
+      <Section5 />
+      <div className="h-1 bg-black"></div>
+      <Footer />
+    </div>
+  );
+}
+
+// Main App Component
 function App() {
   const [user, setUser] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
 
   // Listen for auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      
+      if (user) {
+        // Set user online status when logged in
+        try {
+          // Get user role from Firestore
+          let userRole = 'tourist';
+          let userName = user.displayName || 'User';
+          
+          // Check if user is a tourist
+          const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
+          if (touristDoc.exists()) {
+            userRole = 'tourist';
+            userName = touristDoc.data().fullName || userName;
+          } else {
+            // Check if user is a service provider
+            const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+            if (providerDoc.exists()) {
+              userRole = 'provider';
+              userName = providerDoc.data().fullName || userName;
+            }
+          }
+          
+          await setUserOnline(user.uid, userRole, {
+            userName: userName,
+            email: user.email
+          });
+        } catch (error) {
+          console.log('Error setting user online status:', error);
+        }
+      }
     });
     return () => unsubscribe();
   }, []);
 
   const handleLogout = async () => {
     try {
+      if (user) {
+        await setUserOffline(user.uid);
+      }
       await signOut(auth);
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
+  const handleAuthSuccess = () => {
+    setShowAuth(false);
+  };
+
+  const handleShowAuth = () => {
+    setShowAuth(true);
+  };
+
+  // Set user offline when component unmounts
+  useEffect(() => {
+    return () => {
+      if (user) {
+        setUserOffline(user.uid);
+      }
+    };
+  }, [user]);
+
+  // Show authentication screen if not logged in and showAuth is true
+  if (showAuth) {
+    return <Authentication onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  // Show home page
   return (
     <Router>
       <Routes>
         <Route 
           path="/" 
           element={
-            <MainApp 
+            <HomePage 
               user={user}
               onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
             />
           } 
         />
