@@ -60,7 +60,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// Online/Offline Status Management - UPDATED
+// Online/Offline Status Management
 const setUserOnline = async (userId, userRole, userData) => {
   try {
     const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
@@ -97,34 +97,6 @@ const setUserOffline = async (userId) => {
   } catch (error) {
     console.error('Error setting user offline:', error);
   }
-};
-
-// Real-time Online Status Listener for Service Providers
-const useOnlineStatusListener = (callback) => {
-  useEffect(() => {
-    if (!callback) return;
-
-    const serviceProvidersRef = collection(db, 'serviceProviders');
-    const onlineProvidersQuery = query(
-      serviceProvidersRef,
-      where('online', '==', true)
-    );
-
-    const unsubscribe = onSnapshot(onlineProvidersQuery, (snapshot) => {
-      const onlineProviders = {};
-      snapshot.forEach((doc) => {
-        const providerData = doc.data();
-        onlineProviders[doc.id] = {
-          isOnline: true,
-          lastSeen: providerData.lastSeen,
-          ...providerData
-        };
-      });
-      callback(onlineProviders);
-    });
-
-    return () => unsubscribe();
-  }, [callback]);
 };
 
 // Notification Management
@@ -1355,15 +1327,9 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
   );
 };
 
-// Main Home Component
-function HomePage({ user, onLogout, onShowAuth }) {
+// Global Notification Bell Component
+const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-
-  // Notification functions
-  const handleNotificationClick = () => {
-    setShowNotifications(!showNotifications);
-  };
 
   // Close notifications when clicking outside
   useEffect(() => {
@@ -1379,19 +1345,18 @@ function HomePage({ user, onLogout, onShowAuth }) {
     };
   }, [showNotifications]);
 
-  // Load notifications when user is logged in
-  useEffect(() => {
-    if (user) {
-      const unsubscribe = getUserNotifications(user.uid, (notifications) => {
-        setNotifications(notifications);
-      });
-      
-      return () => unsubscribe();
-    }
-  }, [user]);
+  const handleBellClick = () => {
+    setShowNotifications(!showNotifications);
+  };
 
-  // ✅ Notification Bell Component - Bottom Right Corner with Panel Above
-  const NotificationBell = () => (
+  const handleNotificationItemClick = (notification) => {
+    onNotificationClick(notification);
+    setShowNotifications(false);
+  };
+
+  if (!user) return null;
+
+  return (
     <div className="fixed bottom-6 right-6 z-50 notification-container">
       <div className="relative">
         {/* Notification Panel - Positioned ABOVE the button */}
@@ -1400,26 +1365,15 @@ function HomePage({ user, onLogout, onShowAuth }) {
             <NotificationPanel 
               notifications={notifications}
               onClose={() => setShowNotifications(false)}
-              onNotificationClick={(notification) => {
-                // Handle notification click based on type
-                console.log('Notification clicked:', notification);
-                setShowNotifications(false);
-                
-                // If it's a message notification, navigate to chat
-                if (notification.type === 'message' && notification.relatedId) {
-                  // Extract driver ID and user ID from conversationId
-                  const [_, driverId, userId] = notification.relatedId.split('_');
-                  // Navigate to jeep profile with chat open
-                  window.location.href = `/jeepprofile?driverId=${driverId}&openChat=true`;
-                }
-              }}
+              onNotificationClick={handleNotificationItemClick}
+              onMarkAsRead={onMarkAsRead}
             />
           </div>
         )}
 
         {/* Notification Bell Button */}
         <button
-          onClick={handleNotificationClick}
+          onClick={handleBellClick}
           className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
         >
           <Bell className="h-6 w-6 text-white" />
@@ -1432,10 +1386,61 @@ function HomePage({ user, onLogout, onShowAuth }) {
       </div>
     </div>
   );
+};
+
+// Main Home Component
+function HomePage({ user, onLogout, onShowAuth }) {
+  const [notifications, setNotifications] = useState([]);
+
+  // Load notifications when user is logged in
+  useEffect(() => {
+    if (user) {
+      const unsubscribe = getUserNotifications(user.uid, (notifications) => {
+        setNotifications(notifications);
+      });
+      
+      return () => unsubscribe();
+    } else {
+      setNotifications([]);
+    }
+  }, [user]);
+
+  const handleNotificationClick = (notification) => {
+    console.log('Notification clicked:', notification);
+    
+    // If it's a message notification, navigate to chat
+    if (notification.type === 'message' && notification.relatedId) {
+      // Extract participant IDs from conversationId
+      const participantIds = notification.relatedId.split('_');
+      const otherParticipantId = participantIds.find(id => id !== user.uid);
+      
+      if (otherParticipantId) {
+        // Navigate to jeep profile with chat open
+        window.location.href = `/jeepprofile?driverId=${otherParticipantId}&openChat=true`;
+      }
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const notificationRef = doc(db, 'notifications', notificationId);
+      await updateDoc(notificationRef, {
+        read: true,
+        readAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
-      <NotificationBell />
+      <GlobalNotificationBell 
+        user={user}
+        notifications={notifications}
+        onNotificationClick={handleNotificationClick}
+        onMarkAsRead={handleMarkAsRead}
+      />
       <Navbar 
         user={user} 
         onLogout={onLogout} 
@@ -1553,6 +1558,7 @@ function App() {
             <JeepDriversPage 
               user={user}
               onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
             />
           } 
         />
@@ -1566,5 +1572,5 @@ function App() {
   );
 }
 
-export { db, auth, setUserOnline, setUserOffline, useOnlineStatusListener };
+export { db, auth, setUserOnline, setUserOffline, getUserNotifications };
 export default App;

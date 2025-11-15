@@ -12,8 +12,7 @@ import {
   onSnapshot, 
   updateDoc,
   serverTimestamp,
-  setDoc,
-  getDocs
+  setDoc
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { 
@@ -31,13 +30,99 @@ import {
   Send,
   Check,
   CheckCheck,
-  Wifi,
-  WifiOff
+  Bell
 } from "lucide-react";
 
 // Initialize Firebase
 const db = getFirestore();
 const auth = getAuth();
+
+// Notification Bell Component for JeepProfile
+const NotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications && !event.target.closest('.notification-container')) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  const handleBellClick = () => {
+    setShowNotifications(!showNotifications);
+  };
+
+  const handleNotificationItemClick = async (notification) => {
+    if (!notification.read && onMarkAsRead) {
+      await onMarkAsRead(notification.id);
+    }
+    onNotificationClick(notification);
+    setShowNotifications(false);
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="relative notification-container">
+      <button
+        onClick={handleBellClick}
+        className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
+      >
+        <Bell size={24} />
+        {notifications.filter(n => !n.read).length > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+            {notifications.filter(n => !n.read).length}
+          </span>
+        )}
+      </button>
+
+      {showNotifications && (
+        <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
+          <div className="p-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
+          </div>
+          
+          <div className="divide-y divide-gray-100">
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                No notifications
+              </div>
+            ) : (
+              notifications.slice(0, 10).map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                    !notification.read ? 'bg-blue-50' : ''
+                  }`}
+                  onClick={() => handleNotificationItemClick(notification)}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="font-medium text-gray-900 text-sm">
+                      {notification.title}
+                    </h4>
+                    {!notification.read && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    )}
+                  </div>
+                  <p className="text-gray-600 text-xs mb-2">{notification.message}</p>
+                  <p className="text-gray-400 text-xs">
+                    {notification.timestamp?.toDate?.()?.toLocaleDateString() || 'Recently'}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const JeepProfile = () => {
   const location = useLocation();
@@ -54,6 +139,8 @@ const JeepProfile = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState("");
   const [onlineStatus, setOnlineStatus] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [sendError, setSendError] = useState("");
 
   // Get driver ID from URL parameters
   const searchParams = new URLSearchParams(location.search);
@@ -76,9 +163,9 @@ const JeepProfile = () => {
     }
   }, [openChat]);
 
-  // Get current user
+  // Get current user and notifications
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
         
@@ -96,13 +183,32 @@ const JeepProfile = () => {
         } catch (error) {
           console.error('Error getting user role:', error);
         }
+
+        // Load notifications
+        const notificationsRef = collection(db, 'notifications');
+        const notificationsQuery = query(
+          notificationsRef,
+          where('recipientId', '==', user.uid),
+          orderBy('timestamp', 'desc')
+        );
+
+        const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+          const notificationsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setNotifications(notificationsData);
+        });
+
+        return () => unsubscribeNotifications();
       } else {
         setCurrentUser(null);
         setUserRole('');
+        setNotifications([]);
       }
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
   }, []);
 
   // Fetch driver data
@@ -177,10 +283,14 @@ const JeepProfile = () => {
       messagesData.forEach(async (msg) => {
         if (msg.senderId === driverId && !msg.read) {
           const messageRef = doc(db, 'conversations', conversationId, 'messages', msg.id);
-          await updateDoc(messageRef, {
-            read: true,
-            readAt: serverTimestamp()
-          });
+          try {
+            await updateDoc(messageRef, {
+              read: true,
+              readAt: serverTimestamp()
+            });
+          } catch (error) {
+            console.error("Error marking message as read:", error);
+          }
         }
       });
     });
@@ -188,74 +298,158 @@ const JeepProfile = () => {
     return () => unsubscribe();
   }, [currentUser, driverId]);
 
-  // Send message function
+  // Send message function - FIXED VERSION
   const sendMessage = async (e) => {
     e.preventDefault();
     
-    if (!message.trim() || !currentUser || !driverId) return;
+    if (!message.trim() || !currentUser || !driverId) {
+      setSendError("Message cannot be empty");
+      return;
+    }
 
     setSending(true);
+    setSendError("");
     
     try {
       const conversationId = [currentUser.uid, driverId].sort().join('_');
+      console.log("🔄 Starting to send message...");
+      console.log("Conversation ID:", conversationId);
+      console.log("Current User:", currentUser.uid);
+      console.log("Driver ID:", driverId);
       
       // Create conversation document if it doesn't exist
       const conversationRef = doc(db, 'conversations', conversationId);
       const conversationDoc = await getDoc(conversationRef);
       
       if (!conversationDoc.exists()) {
+        console.log("📝 Creating new conversation document...");
         await setDoc(conversationRef, {
           participantIds: [currentUser.uid, driverId],
           participantNames: {
             [currentUser.uid]: currentUser.displayName || 'User',
             [driverId]: driver?.fullName || 'Driver'
           },
-          lastMessage: message,
+          lastMessage: message.trim(),
           lastMessageTime: serverTimestamp(),
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          lastUpdated: serverTimestamp()
         });
+        console.log("✅ Conversation document created");
       } else {
+        console.log("📝 Updating existing conversation...");
         // Update last message
         await updateDoc(conversationRef, {
-          lastMessage: message,
-          lastMessageTime: serverTimestamp()
+          lastMessage: message.trim(),
+          lastMessageTime: serverTimestamp(),
+          lastUpdated: serverTimestamp()
         });
+        console.log("✅ Conversation document updated");
       }
 
       // Add message to subcollection
       const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-      await addDoc(messagesRef, {
+      console.log("📨 Adding message to collection...");
+      
+      const messageData = {
         text: message.trim(),
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         receiverId: driverId,
         receiverName: driver?.fullName || 'Driver',
         timestamp: serverTimestamp(),
-        read: false
-      });
+        read: false,
+        messageType: 'text'
+      };
+
+      console.log("Message data:", messageData);
+      
+      const messageDoc = await addDoc(messagesRef, messageData);
+      console.log("✅ Message sent with ID:", messageDoc.id);
 
       // Create notification for the driver
-      if (driverId) {
-        const notificationRef = collection(db, 'notifications');
-        await addDoc(notificationRef, {
-          type: 'message',
-          title: 'New Message',
-          message: `You have a new message from ${currentUser.displayName || 'a user'}`,
-          recipientId: driverId,
-          senderId: currentUser.uid,
-          senderName: currentUser.displayName || 'User',
-          relatedId: conversationId,
-          read: false,
-          timestamp: serverTimestamp()
-        });
-      }
+      console.log("🔔 Creating notification for driver...");
+      const notificationRef = collection(db, 'notifications');
+      const notificationData = {
+        type: 'message',
+        title: 'New Message',
+        message: `You have a new message from ${currentUser.displayName || 'a tourist'}`,
+        recipientId: driverId,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || 'User',
+        relatedId: conversationId,
+        read: false,
+        timestamp: serverTimestamp(),
+        notificationType: 'message'
+      };
+
+      console.log("Notification data:", notificationData);
+      
+      await addDoc(notificationRef, notificationData);
+      console.log("✅ Notification created for driver");
 
       setMessage("");
+      console.log("🎉 Message sent successfully!");
+
     } catch (error) {
-      console.error("Error sending message:", error);
-      alert("Failed to send message. Please try again.");
+      console.error("❌ Error sending message:", error);
+      console.error("Error details:", {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      
+      let errorMessage = "Failed to send message. Please try again.";
+      
+      // Provide more specific error messages
+      if (error.code === 'permission-denied') {
+        errorMessage = "Permission denied. Please check if you're logged in and have proper permissions.";
+      } else if (error.code === 'unavailable') {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (error.code === 'invalid-argument') {
+        errorMessage = "Invalid data. Please try again.";
+      }
+      
+      setSendError(errorMessage);
     } finally {
       setSending(false);
+    }
+  };
+
+  // Handle notification click
+  const handleNotificationClick = async (notification) => {
+    console.log('Notification clicked:', notification);
+    
+    if (notification.type === 'message' && notification.relatedId) {
+      const participantIds = notification.relatedId.split('_');
+      const otherParticipantId = participantIds.find(id => id !== currentUser.uid);
+      
+      if (otherParticipantId) {
+        // Mark notification as read
+        try {
+          await updateDoc(doc(db, 'notifications', notification.id), {
+            read: true,
+            readAt: serverTimestamp()
+          });
+        } catch (error) {
+          console.error('Error marking notification as read:', error);
+        }
+        
+        // Navigate to the conversation
+        navigate(`/jeepprofile?driverId=${otherParticipantId}&openChat=true`);
+      }
+    }
+  };
+
+  // Handle mark as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const notificationRef = doc(db, 'notifications', notificationId);
+      await updateDoc(notificationRef, {
+        read: true,
+        readAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -263,15 +457,19 @@ const JeepProfile = () => {
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     
-    const date = timestamp.toDate();
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    
-    return date.toLocaleDateString();
+    try {
+      const date = timestamp.toDate();
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      
+      if (diff < 60000) return 'Just now';
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+      
+      return date.toLocaleDateString();
+    } catch (error) {
+      return 'Recently';
+    }
   };
 
   // Render star ratings
@@ -280,7 +478,7 @@ const JeepProfile = () => {
       <Star
         key={i}
         size={16}
-        className={i < rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
+        className={i < Math.round(rating || 0) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
       />
     ));
   };
@@ -331,12 +529,22 @@ const JeepProfile = () => {
               <h1 className="text-2xl font-bold text-gray-900">Driver Profile</h1>
             </div>
             
-            {/* Online Status */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${onlineStatus ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-              <span className="text-sm text-gray-600">
-                {onlineStatus ? 'Online' : 'Offline'}
-              </span>
+            <div className="flex items-center space-x-4">
+              {/* Online Status */}
+              <div className="flex items-center space-x-2">
+                <div className={`w-3 h-3 rounded-full ${onlineStatus ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                <span className="text-sm text-gray-600">
+                  {onlineStatus ? 'Online' : 'Offline'}
+                </span>
+              </div>
+
+              {/* Notification Bell */}
+              <NotificationBell 
+                user={currentUser}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
             </div>
           </div>
         </div>
@@ -365,9 +573,9 @@ const JeepProfile = () => {
                 {/* Rating */}
                 <div className="flex items-center justify-center mt-2">
                   <div className="flex items-center">
-                    {renderStars(Math.round(driver.rating || 0))}
+                    {renderStars(driver.rating || 0)}
                     <span className="ml-2 text-sm text-gray-600">
-                      ({driver.rating || 0}/5)
+                      ({driver.rating?.toFixed(1) || '0.0'}/5)
                     </span>
                   </div>
                 </div>
@@ -690,6 +898,13 @@ const JeepProfile = () => {
                           )}
                           <div ref={messagesEndRef} />
                         </div>
+
+                        {/* Error Message */}
+                        {sendError && (
+                          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-red-600 text-sm">{sendError}</p>
+                          </div>
+                        )}
 
                         {/* Message Input */}
                         <form onSubmit={sendMessage} className="flex space-x-2">
