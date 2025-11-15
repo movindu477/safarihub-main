@@ -1205,7 +1205,7 @@ const HomePage = ({ user, onLogout, onShowAuth }) => {
       />
       
       {/* Home Content with All Sections */}
-      <div className="pt--1">
+      <div className="pt--1ChatSlidePanel.jsx">
         <Section1 />
         <Section2 />
         <Section3 />
