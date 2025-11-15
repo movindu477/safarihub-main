@@ -111,7 +111,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [languagesSpoken, setLanguagesSpoken] = useState("");
   const [serviceType, setServiceType] = useState("Jeep Driver");
 
-  // ADD THESE NEW STATE VARIABLES HERE:
+  // Provider specific fields
   const [vehicleType, setVehicleType] = useState("");
   const [pricePerDay, setPricePerDay] = useState("");
   const [destinations, setDestinations] = useState([]);
@@ -119,7 +119,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [specialSkills, setSpecialSkills] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [description, setDescription] = useState("");
-  const [availableDates, setAvailableDates] = useState([]); // NEW: Calendar dates
+  const [availableDates, setAvailableDates] = useState([]);
 
   const [busy, setBusy] = useState(false);
 
@@ -130,7 +130,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     setPhone(cleaned);
   };
 
-  // Reset form function - UPDATED to include new fields
+  // Reset form function
   const resetForm = () => {
     setEmail("");
     setFullName("");
@@ -145,7 +145,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     setExperience("");
     setLanguagesSpoken("");
     setServiceType("Jeep Driver");
-    // Reset new fields
+    // Reset provider fields
     setVehicleType("");
     setPricePerDay("");
     setDestinations([]);
@@ -153,7 +153,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     setSpecialSkills([]);
     setCertifications([]);
     setDescription("");
-    setAvailableDates([]); // NEW: Reset calendar dates
+    setAvailableDates([]);
     setMsg("");
     setBusy(false);
   };
@@ -201,7 +201,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     }
   };
 
-  // NEW: Handle date selection for calendar - FIXED VERSION
+  // Handle date selection for calendar
   const handleDateSelect = (date) => {
     const dateString = date.toISOString().split('T')[0];
     setAvailableDates(prev => {
@@ -213,9 +213,13 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     });
   };
 
-  // Enhanced Register Function with phone validation
+  // ✅ FIXED: Enhanced Register Function with proper tourist data saving
   const handleRegister = async (e) => {
     e.preventDefault();
+    
+    console.log("🔄 Starting registration process...");
+    console.log("Role:", role);
+    console.log("Form data:", { email, fullName, country, phone, language });
     
     // Phone validation for service providers
     if (role === 'provider' && phone && !isValidSriLankanPhone(phone)) {
@@ -239,32 +243,44 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
       
+      console.log("✅ User created with UID:", uid);
+      
       // Format phone number for storage
       const formattedPhone = phone ? formatPhoneNumber(phone) : "";
 
-      const userData = {
+      // ✅ FIXED: Proper user data structure for both tourist and provider
+      let userData = {
         uid,
         email,
-        fullName: fullName,
+        fullName: fullName.trim(),
         phone: formattedPhone,
         profilePicture: "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        role: role, // Add role to document for easy querying
       };
 
       let collectionName = "";
       
       if (role === "tourist") {
         collectionName = "tourists";
-        Object.assign(userData, {
-          country: country || "",
-          preferredLanguage: language || "",
-        });
+        // ✅ FIXED: Tourist-specific data
+        userData = {
+          ...userData,
+          country: country?.trim() || "",
+          preferredLanguage: language || "english",
+          bookings: [], // Initialize empty bookings array
+          favorites: [], // Initialize empty favorites array
+          createdAt: serverTimestamp(),
+        };
+        
+        console.log("📝 Tourist data to save:", userData);
       } else {
         collectionName = "serviceProviders";
-        Object.assign(userData, {
+        userData = {
+          ...userData,
           // Basic Info
-          location: locationBase || "",
+          location: locationBase?.trim() || "",
           experienceYears: parseInt(experience) || 0,
           serviceType: serviceType || "Jeep Driver",
           
@@ -280,46 +296,63 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
           specialSkills: specialSkills || [],
           certifications: certifications || [],
           
-          // NEW: Calendar availability - FIXED: Store as array of date strings
+          // Calendar availability
           availableDates: availableDates || [],
-          availability: availableDates.length > 0, // Auto-set availability based on dates
+          availability: availableDates.length > 0,
           
           // Additional Info
-          description: description || "",
-          featured: false, // Default not featured
+          description: description?.trim() || "",
+          featured: false,
           
           // Contact
           contactEmail: email,
           contactPhone: formattedPhone,
-        });
+        };
+        
+        console.log("📝 Provider data to save:", userData);
       }
 
-      await setDoc(doc(db, collectionName, uid), userData);
+      // ✅ FIXED: Save to Firestore with proper error handling
+      console.log(`💾 Saving to collection: ${collectionName}, document: ${uid}`);
       
+      await setDoc(doc(db, collectionName, uid), userData);
+      console.log("✅ User data saved to Firestore successfully!");
+
+      // Handle profile picture upload
       let photoURL = null;
       if (profileFile) {
         try {
+          console.log("📸 Uploading profile picture...");
           const ext = profileFile.name.split(".").pop();
           const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
           const snap = await uploadBytes(storageRef, profileFile);
           photoURL = await getDownloadURL(snap.ref);
           
+          console.log("✅ Profile picture uploaded, URL:", photoURL);
+          
+          // Update user document with profile picture URL
           await setDoc(doc(db, collectionName, uid), {
             profilePicture: photoURL,
             updatedAt: serverTimestamp(),
           }, { merge: true });
           
+          // Update auth profile
           await updateProfile(userCredential.user, { 
             displayName: fullName, 
             photoURL: photoURL 
           });
+          
+          console.log("✅ Profile picture updated in auth and Firestore");
         } catch (uploadError) {
-          console.log("Profile image upload failed, but account created successfully");
+          console.error("❌ Profile image upload failed:", uploadError);
+          console.log("⚠️ Account created but profile picture upload failed");
         }
       } else {
+        // Update auth profile without photo
         await updateProfile(userCredential.user, { 
           displayName: fullName 
         });
+        console.log("✅ Auth profile updated (no picture)");
       }
 
       setMsg("🎉 Account created successfully! Redirecting to login...");
@@ -332,7 +365,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
       }, 1500);
       
     } catch (error) {
-      console.error("Registration error:", error);
+      console.error("❌ Registration error:", error);
       let errorMessage = "❌ Registration failed! ";
       
       if (error.code === 'auth/email-already-in-use') {
@@ -344,7 +377,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
       } else if (error.code === 'auth/network-request-failed') {
         errorMessage += "Network error. Please check your connection.";
       } else {
-        errorMessage += "Please try again.";
+        errorMessage += `Error: ${error.message}`;
       }
       
       setMsg(errorMessage);
@@ -574,19 +607,17 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
               formData={{ 
                 email, fullName, password, confirm, country, phone, language,
                 locationBase, experience, languagesSpoken, serviceType,
-                // ADD THESE NEW FIELDS:
                 vehicleType, pricePerDay, destinations, languages, 
                 specialSkills, certifications, description,
-                availableDates // NEW: Calendar dates
+                availableDates
               }}
               handlers={{ 
                 setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone: handlePhoneChange, setLanguage,
                 setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
-                // ADD THESE NEW HANDLERS:
                 setVehicleType, setPricePerDay, setDestinations, setLanguages,
                 setSpecialSkills, setCertifications, setDescription,
-                setAvailableDates, // NEW: Calendar handler
-                handleDateSelect // NEW: Date selection handler
+                setAvailableDates,
+                handleDateSelect
               }}
               profilePreview={profilePreview}
               onProfileImageSelect={handleProfileImageSelect}
@@ -668,7 +699,7 @@ const UserTypeSelection = ({ onSelect, logo }) => (
   </div>
 );
 
-// Enhanced RegistrationForm Component with Calendar and Phone Validation
+// Enhanced RegistrationForm Component
 const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileImageSelect, onSubmit, busy, msg }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -676,7 +707,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
 
   const isTourist = role === 'tourist';
 
-  // UPDATED: Only 3 Service Types
   const serviceTypes = [
     "Jeep Driver",
     "Tour Guide", 
@@ -734,7 +764,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     }
   };
 
-  // NEW: Calendar functions - FIXED VERSION
+  // Calendar functions
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
@@ -772,7 +802,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
       days.push(<div key={`empty-${i}`} className="h-8"></div>);
     }
 
-    // Add cells for each day of the month - FIXED: All dates are clickable except past dates
+    // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
       const isSelected = isDateSelected(date);
@@ -817,7 +847,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <User className="h-3 w-3 text-yellow-400" />
-              Full Name
+              Full Name *
             </label>
             <input
               type="text"
@@ -832,7 +862,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <Mail className="h-3 w-3 text-yellow-400" />
-              Email Address
+              Email Address *
             </label>
             <input
               type="email"
@@ -850,7 +880,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <Lock className="h-3 w-3 text-yellow-400" />
-              Password
+              Password *
             </label>
             <div className="relative">
               <input
@@ -874,7 +904,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <Lock className="h-3 w-3 text-yellow-400" />
-              Confirm Password
+              Confirm Password *
             </label>
             <div className="relative">
               <input
@@ -919,7 +949,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <MapPin className="h-3 w-3 text-yellow-400" />
-              {isTourist ? 'Country' : 'Base Location'}
+              {isTourist ? 'Country' : 'Base Location'} *
             </label>
             <input
               type="text"
@@ -932,6 +962,27 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </div>
         </div>
 
+        {/* Tourist Specific Fields */}
+        {isTourist && (
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-white font-medium text-xs">
+              <Globe className="h-3 w-3 text-yellow-400" />
+              Preferred Language
+            </label>
+            <select
+              value={formData.language}
+              onChange={(e) => handlers.setLanguage(e.target.value)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+            >
+              <option value="english">English</option>
+              <option value="sinhala">Sinhala</option>
+              <option value="tamil">Tamil</option>
+              <option value="hindi">Hindi</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        )}
+
         {/* Service Provider Specific Fields */}
         {!isTourist && (
           <>
@@ -940,7 +991,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-white font-medium text-xs">
                   <User className="h-3 w-3 text-yellow-400" />
-                  Service Type
+                  Service Type *
                 </label>
                 <select
                   value={formData.serviceType}
@@ -979,7 +1030,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-white font-medium text-xs">
-                  📅 Experience (Years)
+                  📅 Experience (Years) *
                 </label>
                 <input
                   type="number"
@@ -1010,7 +1061,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               )}
             </div>
 
-            {/* NEW: Calendar for Available Dates - FIXED VERSION */}
+            {/* Calendar for Available Dates */}
             <div className="md:col-span-2 space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
                 <Calendar className="h-3 w-3 text-yellow-400" />
@@ -1226,26 +1277,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
           </>
         )}
 
-        {/* Tourist Specific Fields */}
-        {isTourist && (
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <Globe className="h-3 w-3 text-yellow-400" />
-              Preferred Language
-            </label>
-            <select
-              value={formData.language}
-              onChange={(e) => handlers.setLanguage(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-            >
-              <option value="">Select language</option>
-              <option value="english">English</option>
-              <option value="sinhala">Sinhala</option>
-              <option value="tamil">Tamil</option>
-            </select>
-          </div>
-        )}
-
         {/* Profile Picture */}
         <div className="space-y-1">
           <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -1340,12 +1371,10 @@ function App() {
             />
           } 
         />
-        {/* NEW: Jeep Profile Route */}
         <Route 
           path="/jeepprofile" 
           element={<JeepProfile />} 
         />
-        {/* FIXED: Added closing bracket for the catch-all route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
