@@ -17,7 +17,8 @@ import {
   Map,
   Compass,
   Car,
-  ShoppingBag
+  ShoppingBag,
+  MessageCircle
 } from "lucide-react";
 import { getAuth, signOut } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -27,7 +28,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/logo.png";
 import userImage from "../assets/user.png";
 
-export default function Navbar({ user, onLogout, onLogin, onRegister }) {
+export default function Navbar({ user, onLogout, onLogin, onRegister, onStartChat }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [userData, setUserData] = useState(null);
@@ -263,15 +264,31 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
           {/* User Icon - Only show if user is logged in */}
           {user ? (
-            <div className="relative">
-              <img
-                src={currentUser.avatar}
-                alt="User"
-                className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
-                onClick={() => setProfileOpen(true)}
-              />
-              {/* Online indicator */}
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-700 shadow-sm"></div>
+            <div className="flex items-center space-x-4">
+              {/* Messages Button */}
+              <button
+                onClick={() => onStartChat && onStartChat('messages', 'Messages')}
+                className="relative p-2 text-white hover:text-emerald-200 transition-colors duration-300 hover:bg-emerald-600 rounded-lg"
+                title="Messages"
+              >
+                <MessageCircle className="h-5 w-5" />
+                {/* You can add notification badge here if needed */}
+                {/* <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  3
+                </span> */}
+              </button>
+              
+              {/* User Profile */}
+              <div className="relative">
+                <img
+                  src={currentUser.avatar}
+                  alt="User"
+                  className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
+                  onClick={() => setProfileOpen(true)}
+                />
+                {/* Online indicator */}
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-700 shadow-sm"></div>
+              </div>
             </div>
           ) : (
             <div className="flex items-center space-x-4">
@@ -294,14 +311,26 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         {/* Hamburger Menu (Mobile) */}
         <div className="md:hidden flex items-center space-x-4">
           {user ? (
-            <div className="relative">
-              <img
-                src={currentUser.avatar}
-                alt="User"
-                className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
-                onClick={() => setProfileOpen(true)}
-              />
-              <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full border-2 border-emerald-700"></div>
+            <div className="flex items-center space-x-2">
+              {/* Messages Button for Mobile */}
+              <button
+                onClick={() => onStartChat && onStartChat('messages', 'Messages')}
+                className="relative p-2 text-white hover:text-emerald-200 transition-colors duration-300"
+                title="Messages"
+              >
+                <MessageCircle className="h-5 w-5" />
+              </button>
+              
+              {/* User Profile for Mobile */}
+              <div className="relative">
+                <img
+                  src={currentUser.avatar}
+                  alt="User"
+                  className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
+                  onClick={() => setProfileOpen(true)}
+                />
+                <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full border-2 border-emerald-700"></div>
+              </div>
             </div>
           ) : (
             <div className="flex items-center space-x-2">
@@ -423,27 +452,43 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               )}
 
               {user && (
-                <div
-                  className="flex items-center space-x-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp cursor-pointer group"
-                  style={{ animationDelay: "400ms" }}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setProfileOpen(true);
-                  }}
-                >
-                  <div className="relative">
-                    <img
-                      src={currentUser.avatar}
-                      alt="User"
-                      className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 group-hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
-                    />
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-800"></div>
-                  </div>
-                  <div>
-                    <span className="text-white group-hover:text-emerald-200 transition-colors duration-300 font-medium text-lg block">
-                      {currentUser.name}
-                    </span>
-                    <span className="text-emerald-200 text-sm">{currentUser.membership}</span>
+                <div className="space-y-3 pt-6 border-t border-emerald-400/20">
+                  {/* Messages Button in Mobile Menu */}
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onStartChat && onStartChat('messages', 'Messages');
+                    }}
+                    className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-emerald-600 transition-all duration-300 text-left animate-fadeInUp group"
+                    style={{ animationDelay: "400ms" }}
+                  >
+                    <MessageCircle className="h-5 w-5 text-emerald-200 group-hover:text-white" />
+                    <span className="font-medium text-lg text-white">Messages</span>
+                  </button>
+
+                  {/* User Profile in Mobile Menu */}
+                  <div
+                    className="flex items-center space-x-3 py-4 animate-fadeInUp cursor-pointer group"
+                    style={{ animationDelay: "450ms" }}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setProfileOpen(true);
+                    }}
+                  >
+                    <div className="relative">
+                      <img
+                        src={currentUser.avatar}
+                        alt="User"
+                        className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 group-hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
+                      />
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-800"></div>
+                    </div>
+                    <div>
+                      <span className="text-white group-hover:text-emerald-200 transition-colors duration-300 font-medium text-lg block">
+                        {currentUser.name}
+                      </span>
+                      <span className="text-emerald-200 text-sm">{currentUser.membership}</span>
+                    </div>
                   </div>
                 </div>
               )}

@@ -21,6 +21,7 @@ import {
   where,
   orderBy,
   onSnapshot,
+  addDoc,
 } from "firebase/firestore";
 import {
   getStorage,
@@ -33,6 +34,7 @@ import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLef
 // Import images from src/assets
 import logo from "./assets/logo.png";
 
+// Import components
 import Navbar from "./components/Navbar";
 import Section1 from "./components/Section1";
 import Section2 from "./components/Section2";
@@ -40,7 +42,7 @@ import Section3 from "./components/Section3";
 import Section4 from "./components/Section4";
 import Section5 from "./components/Section5";
 import Footer from "./components/Footer";
-import JeepDriversPage from "./components/JeepMain.jsx";
+import JeepDriversPage from "./components/JeepMain";
 import JeepProfile from "./components/JeepProfile";
 import NotificationPanel from "./components/NotificationPanel";
 
@@ -56,12 +58,12 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
-// Online/Offline Status Management
-const setUserOnline = async (userId, userRole, userData) => {
+// Firebase functions
+export const setUserOnline = async (userId, userRole, userData) => {
   try {
     const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
     await updateDoc(userRef, {
@@ -75,9 +77,8 @@ const setUserOnline = async (userId, userRole, userData) => {
   }
 };
 
-const setUserOffline = async (userId) => {
+export const setUserOffline = async (userId) => {
   try {
-    // Check if user is tourist or provider
     const touristDoc = await getDoc(doc(db, 'tourists', userId));
     if (touristDoc.exists()) {
       await updateDoc(doc(db, 'tourists', userId), {
@@ -99,8 +100,7 @@ const setUserOffline = async (userId) => {
   }
 };
 
-// Notification Management
-const getUserNotifications = (userId, callback) => {
+export const getUserNotifications = (userId, callback) => {
   try {
     const notificationsRef = collection(db, 'notifications');
     const notificationsQuery = query(
@@ -125,24 +125,74 @@ const getUserNotifications = (userId, callback) => {
   }
 };
 
+export const getMessages = (conversationId, callback) => {
+  try {
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const messagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
+
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+      const messages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      callback(messages);
+    });
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error getting messages:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+export const sendMessage = async (conversationId, messageData) => {
+  try {
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const messageDoc = await addDoc(messagesRef, {
+      ...messageData,
+      timestamp: serverTimestamp()
+    });
+
+    // Update conversation last message
+    await updateDoc(doc(db, 'conversations', conversationId), {
+      lastMessage: messageData.content,
+      lastMessageAt: serverTimestamp(),
+      lastMessageSender: messageData.senderId
+    });
+
+    return messageDoc.id;
+  } catch (error) {
+    console.error('Error sending message:', error);
+    throw error;
+  }
+};
+
+export const markNotificationAsRead = async (notificationId) => {
+  try {
+    await updateDoc(doc(db, 'notifications', notificationId), {
+      read: true,
+      readAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+  }
+};
+
 // Phone number formatting utility
 const formatPhoneNumber = (phone) => {
   if (!phone) return "";
   
-  // Remove all non-digit characters
   let cleaned = phone.replace(/\D/g, '');
   
-  // If it starts with 94, add + prefix
   if (cleaned.startsWith('94')) {
     return `+${cleaned}`;
   }
   
-  // If it starts with 0, replace with +94
   if (cleaned.startsWith('0')) {
     return `+94${cleaned.substring(1)}`;
   }
   
-  // If it doesn't start with +, add it
   if (!cleaned.startsWith('+')) {
     return `+94${cleaned}`;
   }
@@ -155,7 +205,6 @@ const isValidSriLankanPhone = (phone) => {
   if (!phone) return false;
   
   const formatted = formatPhoneNumber(phone);
-  // Sri Lankan phone number regex: +94 followed by 7, 6, or 0 and 9 digits total
   const sriLankanRegex = /^\+94[0-9]{9}$/;
   return sriLankanRegex.test(formatted);
 };
@@ -184,8 +233,6 @@ function Authentication({ onAuthSuccess }) {
   const [experience, setExperience] = useState("");
   const [languagesSpoken, setLanguagesSpoken] = useState("");
   const [serviceType, setServiceType] = useState("Jeep Driver");
-
-  // Provider specific fields
   const [vehicleType, setVehicleType] = useState("");
   const [pricePerDay, setPricePerDay] = useState("");
   const [destinations, setDestinations] = useState([]);
@@ -197,7 +244,6 @@ function Authentication({ onAuthSuccess }) {
 
   // Handle phone number input with formatting
   const handlePhoneChange = (value) => {
-    // Allow only numbers and + sign
     const cleaned = value.replace(/[^\d+]/g, '');
     setPhone(cleaned);
   };
@@ -217,7 +263,6 @@ function Authentication({ onAuthSuccess }) {
     setExperience("");
     setLanguagesSpoken("");
     setServiceType("Jeep Driver");
-    // Reset provider fields
     setVehicleType("");
     setPricePerDay("");
     setDestinations([]);
@@ -262,8 +307,6 @@ function Authentication({ onAuthSuccess }) {
     e.preventDefault();
     
     console.log("🔄 Starting registration process...");
-    console.log("Role:", role);
-    console.log("Form data:", { email, fullName, country, phone, language });
     
     // Phone validation for service providers
     if (role === 'provider' && phone && !isValidSriLankanPhone(phone)) {
@@ -292,7 +335,6 @@ function Authentication({ onAuthSuccess }) {
       // Format phone number for storage
       const formattedPhone = phone ? formatPhoneNumber(phone) : "";
 
-      // Proper user data structure for both tourist and provider
       let userData = {
         uid,
         email,
@@ -302,15 +344,12 @@ function Authentication({ onAuthSuccess }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         role: role,
-        online: true, // Set user as online when they register
-        lastSeen: serverTimestamp()
       };
 
       let collectionName = "";
       
       if (role === "tourist") {
         collectionName = "tourists";
-        // Tourist-specific data
         userData = {
           ...userData,
           country: country?.trim() || "",
@@ -318,48 +357,30 @@ function Authentication({ onAuthSuccess }) {
           bookings: [],
           favorites: [],
         };
-        
-        console.log("📝 Tourist data to save:", userData);
       } else {
         collectionName = "serviceProviders";
         userData = {
           ...userData,
-          // Basic Info
           location: locationBase?.trim() || "",
           experienceYears: parseInt(experience) || 0,
           serviceType: serviceType || "Jeep Driver",
-          
-          // Filtering Fields
           vehicleType: vehicleType || "",
           pricePerDay: parseInt(pricePerDay) || 0,
           rating: 0,
           totalRatings: 0,
-          
-          // Arrays for filtering
           destinations: destinations || [],
           languages: languages || [],
           specialSkills: specialSkills || [],
           certifications: certifications || [],
-          
-          // Calendar availability
           availableDates: availableDates || [],
           availability: availableDates.length > 0,
-          
-          // Additional Info
           description: description?.trim() || "",
           featured: false,
-          
-          // Contact
           contactEmail: email,
           contactPhone: formattedPhone,
         };
-        
-        console.log("📝 Provider data to save:", userData);
       }
 
-      // Save to Firestore with proper error handling
-      console.log(`💾 Saving to collection: ${collectionName}, document: ${uid}`);
-      
       await setDoc(doc(db, collectionName, uid), userData);
       console.log("✅ User data saved to Firestore successfully!");
 
@@ -373,31 +394,23 @@ function Authentication({ onAuthSuccess }) {
           const snap = await uploadBytes(storageRef, profileFile);
           photoURL = await getDownloadURL(snap.ref);
           
-          console.log("✅ Profile picture uploaded, URL:", photoURL);
-          
-          // Update user document with profile picture URL
           await setDoc(doc(db, collectionName, uid), {
             profilePicture: photoURL,
             updatedAt: serverTimestamp(),
           }, { merge: true });
           
-          // Update auth profile
           await updateProfile(userCredential.user, { 
             displayName: fullName, 
             photoURL: photoURL 
           });
           
-          console.log("✅ Profile picture updated in auth and Firestore");
         } catch (uploadError) {
           console.error("❌ Profile image upload failed:", uploadError);
-          console.log("⚠️ Account created but profile picture upload failed");
         }
       } else {
-        // Update auth profile without photo
         await updateProfile(userCredential.user, { 
           displayName: fullName 
         });
-        console.log("✅ Auth profile updated (no picture)");
       }
 
       setMsg("🎉 Account created successfully! Redirecting to login...");
@@ -436,38 +449,7 @@ function Authentication({ onAuthSuccess }) {
     setBusy(true);
     setMsg("");
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      // Get user role from Firestore and set online status
-      let userRole = 'tourist';
-      let userName = user.displayName || 'User';
-      
-      try {
-        // Check if user is a tourist
-        const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
-        if (touristDoc.exists()) {
-          userRole = 'tourist';
-          userName = touristDoc.data().fullName || userName;
-        } else {
-          // Check if user is a service provider
-          const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
-          if (providerDoc.exists()) {
-            userRole = 'provider';
-            userName = providerDoc.data().fullName || userName;
-          }
-        }
-        
-        // Set user online
-        await setUserOnline(user.uid, userRole, {
-          userName: userName,
-          email: user.email
-        });
-        
-      } catch (error) {
-        console.log('Error fetching user role:', error);
-      }
-      
+      await signInWithEmailAndPassword(auth, email, password);
       setMsg("✅ Welcome back! Redirecting...");
       setTimeout(() => {
         onAuthSuccess();
@@ -700,7 +682,6 @@ const UserTypeSelection = ({ onSelect, logo }) => (
 const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileImageSelect, onSubmit, busy, msg }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const isTourist = role === 'tourist';
 
@@ -759,72 +740,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     } else {
       return "Enter a valid Sri Lankan number (e.g., +94701234567)";
     }
-  };
-
-  // Calendar functions
-  const getDaysInMonth = (date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const navigateMonth = (direction) => {
-    setCurrentMonth(prev => {
-      const newDate = new Date(prev);
-      newDate.setMonth(prev.getMonth() + direction);
-      return newDate;
-    });
-  };
-
-  const isDateSelected = (date) => {
-    const dateString = date.toISOString().split('T')[0];
-    return formData.availableDates?.includes(dateString);
-  };
-
-  const isDateInPast = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date < today;
-  };
-
-  const renderCalendar = () => {
-    const daysInMonth = getDaysInMonth(currentMonth);
-    const firstDay = getFirstDayOfMonth(currentMonth);
-    const days = [];
-
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-8"></div>);
-    }
-
-    // Add cells for each day of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-      const isSelected = isDateSelected(date);
-      const isPast = isDateInPast(date);
-
-      days.push(
-        <button
-          key={day}
-          type="button"
-          onClick={() => !isPast && handlers.handleDateSelect(date)}
-          disabled={isPast}
-          className={`h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
-            isSelected
-              ? 'bg-green-500 text-white hover:bg-green-600'
-              : isPast
-              ? 'text-gray-400 cursor-not-allowed bg-gray-200'
-              : 'text-gray-700 hover:bg-green-100 border border-gray-200'
-          }`}
-        >
-          {day}
-        </button>
-      );
-    }
-
-    return days;
   };
 
   return (
@@ -1058,86 +973,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               )}
             </div>
 
-            {/* Calendar for Available Dates */}
-            <div className="md:col-span-2 space-y-1">
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                <Calendar className="h-3 w-3 text-yellow-400" />
-                Available Dates (Click to select/deselect your available days)
-              </label>
-              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                {/* Calendar Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <button
-                    type="button"
-                    onClick={() => navigateMonth(-1)}
-                    className="p-1 text-gray-400 hover:text-yellow-400"
-                  >
-                    ‹
-                  </button>
-                  <h3 className="text-white text-sm font-medium">
-                    {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => navigateMonth(1)}
-                    className="p-1 text-gray-400 hover:text-yellow-400"
-                  >
-                    ›
-                  </button>
-                </div>
-
-                {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="text-center text-gray-400 text-xs font-medium">
-                      {day}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-7 gap-1">
-                  {renderCalendar()}
-                </div>
-
-                {/* Calendar Legend */}
-                <div className="flex items-center justify-center gap-4 mt-3 text-xs">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-500 rounded"></div>
-                    <span className="text-gray-300">Selected</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-gray-200 rounded"></div>
-                    <span className="text-gray-300">Available</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-gray-400 rounded"></div>
-                    <span className="text-gray-300">Past</span>
-                  </div>
-                </div>
-
-                {/* Selected Dates Summary */}
-                {formData.availableDates && formData.availableDates.length > 0 && (
-                  <div className="mt-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
-                    <p className="text-green-300 text-xs font-medium mb-2">
-                      ✅ Selected Dates ({formData.availableDates.length}):
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {formData.availableDates.slice(0, 5).map(date => (
-                        <span key={date} className="bg-green-500 text-white px-2 py-1 rounded text-xs">
-                          {new Date(date).toLocaleDateString()}
-                        </span>
-                      ))}
-                      {formData.availableDates.length > 5 && (
-                        <span className="text-green-300 text-xs">
-                          +{formData.availableDates.length - 5} more
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Destinations (Multi-select) */}
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -1192,66 +1027,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                     />
                     <label htmlFor={`lang-${language}`} className="text-white text-xs">
                       {language}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Special Skills (Multi-select) */}
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                🎯 Special Skills & Services
-              </label>
-              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                {specialSkills.map(skill => (
-                  <div key={skill} className="flex items-center mb-1">
-                    <input
-                      type="checkbox"
-                      id={`skill-${skill}`}
-                      checked={formData.specialSkills?.includes(skill) || false}
-                      onChange={(e) => {
-                        const updatedSkills = formData.specialSkills || [];
-                        if (e.target.checked) {
-                          handlers.setSpecialSkills([...updatedSkills, skill]);
-                        } else {
-                          handlers.setSpecialSkills(updatedSkills.filter(s => s !== skill));
-                        }
-                      }}
-                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`skill-${skill}`} className="text-white text-xs">
-                      {skill}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Certifications (Multi-select) */}
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                📜 Certifications
-              </label>
-              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                {certifications.map(cert => (
-                  <div key={cert} className="flex items-center mb-1">
-                    <input
-                      type="checkbox"
-                      id={`cert-${cert}`}
-                      checked={formData.certifications?.includes(cert) || false}
-                      onChange={(e) => {
-                        const updatedCerts = formData.certifications || [];
-                        if (e.target.checked) {
-                          handlers.setCertifications([...updatedCerts, cert]);
-                        } else {
-                          handlers.setCertifications(updatedCerts.filter(c => c !== cert));
-                        }
-                      }}
-                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`cert-${cert}`} className="text-white text-xs">
-                      {cert}
                     </label>
                   </div>
                 ))}
@@ -1331,7 +1106,6 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
 const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Close notifications when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showNotifications && !event.target.closest('.notification-container')) {
@@ -1349,7 +1123,10 @@ const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMa
     setShowNotifications(!showNotifications);
   };
 
-  const handleNotificationItemClick = (notification) => {
+  const handleNotificationItemClick = async (notification) => {
+    if (!notification.read) {
+      await onMarkAsRead(notification.id);
+    }
     onNotificationClick(notification);
     setShowNotifications(false);
   };
@@ -1359,7 +1136,6 @@ const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMa
   return (
     <div className="fixed bottom-6 right-6 z-50 notification-container">
       <div className="relative">
-        {/* Notification Panel - Positioned ABOVE the button */}
         {showNotifications && (
           <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
             <NotificationPanel 
@@ -1371,7 +1147,6 @@ const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMa
           </div>
         )}
 
-        {/* Notification Bell Button */}
         <button
           onClick={handleBellClick}
           className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
@@ -1388,8 +1163,8 @@ const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMa
   );
 };
 
-// Main Home Component
-function HomePage({ user, onLogout, onShowAuth }) {
+// Home Page Component
+const HomePage = ({ user, onLogout, onShowAuth }) => {
   const [notifications, setNotifications] = useState([]);
 
   // Load notifications when user is logged in
@@ -1405,32 +1180,12 @@ function HomePage({ user, onLogout, onShowAuth }) {
     }
   }, [user]);
 
-  const handleNotificationClick = (notification) => {
+  const handleNotificationClick = async (notification) => {
     console.log('Notification clicked:', notification);
-    
-    // If it's a message notification, navigate to chat
-    if (notification.type === 'message' && notification.relatedId) {
-      // Extract participant IDs from conversationId
-      const participantIds = notification.relatedId.split('_');
-      const otherParticipantId = participantIds.find(id => id !== user.uid);
-      
-      if (otherParticipantId) {
-        // Navigate to jeep profile with chat open
-        window.location.href = `/jeepprofile?driverId=${otherParticipantId}&openChat=true`;
-      }
-    }
   };
 
   const handleMarkAsRead = async (notificationId) => {
-    try {
-      const notificationRef = doc(db, 'notifications', notificationId);
-      await updateDoc(notificationRef, {
-        read: true,
-        readAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
+    await markNotificationAsRead(notificationId);
   };
 
   return (
@@ -1441,51 +1196,49 @@ function HomePage({ user, onLogout, onShowAuth }) {
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
+      
       <Navbar 
         user={user} 
         onLogout={onLogout} 
         onLogin={onShowAuth}
         onRegister={onShowAuth}
       />
-      <Section1 />
-      <div className="h-1 bg-black"></div>
-      <Section2 />
-      <div className="h-1 bg-black"></div>
-      <Section3 />
-      <div className="h-1 bg-black"></div>
-      <Section4 />
-      <div className="h-1 bg-black"></div>
-      <Section5 />
-      <div className="h-1 bg-black"></div>
-      <Footer />
+      
+      {/* Home Content with All Sections */}
+      <div className="pt--1">
+        <Section1 />
+        <Section2 />
+        <Section3 />
+        <Section4 />
+        <Section5 />
+        <Footer />
+      </div>
     </div>
   );
-}
+};
 
 // Main App Component
 function App() {
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      setLoading(false);
       
       if (user) {
-        // Set user online status when logged in
         try {
-          // Get user role from Firestore
           let userRole = 'tourist';
           let userName = user.displayName || 'User';
           
-          // Check if user is a tourist
           const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
           if (touristDoc.exists()) {
             userRole = 'tourist';
             userName = touristDoc.data().fullName || userName;
           } else {
-            // Check if user is a service provider
             const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
             if (providerDoc.exists()) {
               userRole = 'provider';
@@ -1524,7 +1277,6 @@ function App() {
     setShowAuth(true);
   };
 
-  // Set user offline when component unmounts
   useEffect(() => {
     return () => {
       if (user) {
@@ -1533,12 +1285,21 @@ function App() {
     };
   }, [user]);
 
-  // Show authentication screen if not logged in and showAuth is true
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (showAuth) {
     return <Authentication onAuthSuccess={handleAuthSuccess} />;
   }
 
-  // Show home page
   return (
     <Router>
       <Routes>
@@ -1558,7 +1319,6 @@ function App() {
             <JeepDriversPage 
               user={user}
               onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
             />
           } 
         />
@@ -1572,5 +1332,4 @@ function App() {
   );
 }
 
-export { db, auth, setUserOnline, setUserOffline, getUserNotifications };
 export default App;

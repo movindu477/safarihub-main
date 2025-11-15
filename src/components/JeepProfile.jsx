@@ -38,7 +38,7 @@ const db = getFirestore();
 const auth = getAuth();
 
 // Notification Bell Component for JeepProfile
-const NotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
+const NotificationBell = ({ user, notifications, onNotificationClick }) => {
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
@@ -58,10 +58,7 @@ const NotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRe
     setShowNotifications(!showNotifications);
   };
 
-  const handleNotificationItemClick = async (notification) => {
-    if (!notification.read && onMarkAsRead) {
-      await onMarkAsRead(notification.id);
-    }
+  const handleNotificationItemClick = (notification) => {
     onNotificationClick(notification);
     setShowNotifications(false);
   };
@@ -82,6 +79,7 @@ const NotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRe
         )}
       </button>
 
+      {/* Notification Panel */}
       {showNotifications && (
         <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
           <div className="p-4 border-b border-gray-200">
@@ -140,7 +138,6 @@ const JeepProfile = () => {
   const [userRole, setUserRole] = useState("");
   const [onlineStatus, setOnlineStatus] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [sendError, setSendError] = useState("");
 
   // Get driver ID from URL parameters
   const searchParams = new URLSearchParams(location.search);
@@ -283,14 +280,10 @@ const JeepProfile = () => {
       messagesData.forEach(async (msg) => {
         if (msg.senderId === driverId && !msg.read) {
           const messageRef = doc(db, 'conversations', conversationId, 'messages', msg.id);
-          try {
-            await updateDoc(messageRef, {
-              read: true,
-              readAt: serverTimestamp()
-            });
-          } catch (error) {
-            console.error("Error marking message as read:", error);
-          }
+          await updateDoc(messageRef, {
+            read: true,
+            readAt: serverTimestamp()
+          });
         }
       });
     });
@@ -298,78 +291,57 @@ const JeepProfile = () => {
     return () => unsubscribe();
   }, [currentUser, driverId]);
 
-  // Send message function - FIXED VERSION
+  // Send message function - FIXED
   const sendMessage = async (e) => {
     e.preventDefault();
     
-    if (!message.trim() || !currentUser || !driverId) {
-      setSendError("Message cannot be empty");
-      return;
-    }
+    if (!message.trim() || !currentUser || !driverId) return;
 
     setSending(true);
-    setSendError("");
     
     try {
       const conversationId = [currentUser.uid, driverId].sort().join('_');
-      console.log("🔄 Starting to send message...");
-      console.log("Conversation ID:", conversationId);
-      console.log("Current User:", currentUser.uid);
-      console.log("Driver ID:", driverId);
       
       // Create conversation document if it doesn't exist
       const conversationRef = doc(db, 'conversations', conversationId);
       const conversationDoc = await getDoc(conversationRef);
       
       if (!conversationDoc.exists()) {
-        console.log("📝 Creating new conversation document...");
         await setDoc(conversationRef, {
           participantIds: [currentUser.uid, driverId],
           participantNames: {
             [currentUser.uid]: currentUser.displayName || 'User',
             [driverId]: driver?.fullName || 'Driver'
           },
-          lastMessage: message.trim(),
+          lastMessage: message,
           lastMessageTime: serverTimestamp(),
-          createdAt: serverTimestamp(),
-          lastUpdated: serverTimestamp()
+          createdAt: serverTimestamp()
         });
-        console.log("✅ Conversation document created");
       } else {
-        console.log("📝 Updating existing conversation...");
         // Update last message
         await updateDoc(conversationRef, {
-          lastMessage: message.trim(),
-          lastMessageTime: serverTimestamp(),
-          lastUpdated: serverTimestamp()
+          lastMessage: message,
+          lastMessageTime: serverTimestamp()
         });
-        console.log("✅ Conversation document updated");
       }
 
       // Add message to subcollection
       const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-      console.log("📨 Adding message to collection...");
-      
-      const messageData = {
+      const messageDoc = await addDoc(messagesRef, {
         text: message.trim(),
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         receiverId: driverId,
         receiverName: driver?.fullName || 'Driver',
         timestamp: serverTimestamp(),
-        read: false,
-        messageType: 'text'
-      };
+        read: false
+      });
 
-      console.log("Message data:", messageData);
-      
-      const messageDoc = await addDoc(messagesRef, messageData);
       console.log("✅ Message sent with ID:", messageDoc.id);
 
-      // Create notification for the driver
-      console.log("🔔 Creating notification for driver...");
+      // Create notification for the driver - FIXED
       const notificationRef = collection(db, 'notifications');
-      const notificationData = {
+      await addDoc(notificationRef, {
         type: 'message',
         title: 'New Message',
         message: `You have a new message from ${currentUser.displayName || 'a tourist'}`,
@@ -378,45 +350,22 @@ const JeepProfile = () => {
         senderName: currentUser.displayName || 'User',
         relatedId: conversationId,
         read: false,
-        timestamp: serverTimestamp(),
-        notificationType: 'message'
-      };
+        timestamp: serverTimestamp()
+      });
 
-      console.log("Notification data:", notificationData);
-      
-      await addDoc(notificationRef, notificationData);
       console.log("✅ Notification created for driver");
 
       setMessage("");
-      console.log("🎉 Message sent successfully!");
-
     } catch (error) {
       console.error("❌ Error sending message:", error);
-      console.error("Error details:", {
-        code: error.code,
-        message: error.message,
-        stack: error.stack
-      });
-      
-      let errorMessage = "Failed to send message. Please try again.";
-      
-      // Provide more specific error messages
-      if (error.code === 'permission-denied') {
-        errorMessage = "Permission denied. Please check if you're logged in and have proper permissions.";
-      } else if (error.code === 'unavailable') {
-        errorMessage = "Network error. Please check your internet connection.";
-      } else if (error.code === 'invalid-argument') {
-        errorMessage = "Invalid data. Please try again.";
-      }
-      
-      setSendError(errorMessage);
+      alert("Failed to send message. Please try again.");
     } finally {
       setSending(false);
     }
   };
 
   // Handle notification click
-  const handleNotificationClick = async (notification) => {
+  const handleNotificationClick = (notification) => {
     console.log('Notification clicked:', notification);
     
     if (notification.type === 'message' && notification.relatedId) {
@@ -425,31 +374,14 @@ const JeepProfile = () => {
       
       if (otherParticipantId) {
         // Mark notification as read
-        try {
-          await updateDoc(doc(db, 'notifications', notification.id), {
-            read: true,
-            readAt: serverTimestamp()
-          });
-        } catch (error) {
-          console.error('Error marking notification as read:', error);
-        }
+        updateDoc(doc(db, 'notifications', notification.id), {
+          read: true,
+          readAt: serverTimestamp()
+        });
         
         // Navigate to the conversation
         navigate(`/jeepprofile?driverId=${otherParticipantId}&openChat=true`);
       }
-    }
-  };
-
-  // Handle mark as read
-  const handleMarkAsRead = async (notificationId) => {
-    try {
-      const notificationRef = doc(db, 'notifications', notificationId);
-      await updateDoc(notificationRef, {
-        read: true,
-        readAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -543,7 +475,6 @@ const JeepProfile = () => {
                 user={currentUser}
                 notifications={notifications}
                 onNotificationClick={handleNotificationClick}
-                onMarkAsRead={handleMarkAsRead}
               />
             </div>
           </div>
@@ -898,13 +829,6 @@ const JeepProfile = () => {
                           )}
                           <div ref={messagesEndRef} />
                         </div>
-
-                        {/* Error Message */}
-                        {sendError && (
-                          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <p className="text-red-600 text-sm">{sendError}</p>
-                          </div>
-                        )}
 
                         {/* Message Input */}
                         <form onSubmit={sendMessage} className="flex space-x-2">
