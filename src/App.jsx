@@ -21,7 +21,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, LogOut, Menu, X, Calendar } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, LogOut, Menu, X, Calendar, Bell } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
@@ -35,6 +35,7 @@ import Section5 from "./components/Section5";
 import Footer from "./components/Footer";
 import JeepDriversPage from "./components/JeepMain.jsx";
 import JeepProfile from "./components/JeepProfile";
+import NotificationPanel from "./components/NotificationPanel";
 
 // 🔥 Firebase Config
 const firebaseConfig = {
@@ -93,6 +94,8 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   const [role, setRole] = useState(null);
   const [msg, setMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
 
   // Common Fields
   const [email, setEmail] = useState("");
@@ -426,9 +429,14 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     setScreen("register");
   };
 
+  // Notification functions
+  const handleNotificationClick = () => {
+    setShowNotifications(!showNotifications);
+  };
+
   // DEVELOPMENT: Quick navigation buttons
   const DevNavigation = () => (
-    <div className="fixed top-4 right-4 z-50 flex gap-2 bg-black/80 p-2 rounded-lg">
+    <div className="fixed top-4 right-20 z-50 flex gap-2 bg-black/80 p-2 rounded-lg">
       <button 
         onClick={() => setScreen("home")}
         className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
@@ -450,11 +458,41 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     </div>
   );
 
+  // Notification Bell Component
+  const NotificationBell = () => (
+    <div className="fixed top-4 right-4 z-50">
+      <button
+        onClick={handleNotificationClick}
+        className="relative bg-white p-3 rounded-full shadow-lg border border-gray-200 hover:shadow-xl transition-all"
+      >
+        <Bell className="h-6 w-6 text-gray-600" />
+        {notifications.filter(n => !n.read).length > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+            {notifications.filter(n => !n.read).length}
+          </span>
+        )}
+      </button>
+
+      {/* Notifications Panel */}
+      {showNotifications && (
+        <NotificationPanel 
+          notifications={notifications}
+          onClose={() => setShowNotifications(false)}
+          onNotificationClick={(notification) => {
+            // Handle notification click based on type
+            console.log('Notification clicked:', notification);
+          }}
+        />
+      )}
+    </div>
+  );
+
   // ✅ Modern Splash Screen
   if (screen === "splash")
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800 flex flex-col items-center justify-center z-50">
         <DevNavigation />
+        <NotificationBell />
         <div className="mb-8 transform scale-110">
           <img
             src={logo}
@@ -481,6 +519,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
         <DevNavigation />
+        <NotificationBell />
         <div className="relative w-full max-w-md">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
             <div className="text-center mb-8">
@@ -581,6 +620,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
         <DevNavigation />
+        <NotificationBell />
         <div className="relative w-full max-w-2xl">
           <div className="flex justify-between items-center mb-4">
             <button
@@ -635,6 +675,7 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
   return (
     <div className="min-h-screen bg-white">
       <DevNavigation />
+      <NotificationBell />
       <Navbar 
         user={user} 
         onLogout={onLogout} 

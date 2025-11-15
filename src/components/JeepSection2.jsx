@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import { Wifi, WifiOff, MessageCircle, Star, MapPin, Clock, Users, Shield } from 'lucide-react';
 
 const JeepSection2 = () => {
   const [jeeps, setJeeps] = useState([]);
   const [filteredJeeps, setFilteredJeeps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [onlineStatus, setOnlineStatus] = useState({});
   const navigate = useNavigate();
 
   // Filter states
@@ -141,6 +143,10 @@ const JeepSection2 = () => {
           contactEmail: provider.contactEmail || provider.email || '',
           description: provider.description || provider.bio || 'Experienced safari jeep driver',
           
+          // Online status (will be updated from real-time listener)
+          isOnline: false,
+          lastSeen: null,
+          
           // Original data for debugging
           originalData: provider
         }));
@@ -161,6 +167,54 @@ const JeepSection2 = () => {
 
     fetchJeeps();
   }, []);
+
+  // Listen for online status changes
+  useEffect(() => {
+    const unsubscribeListeners = [];
+    
+    jeeps.forEach(jeep => {
+      const unsubscribe = onSnapshot(doc(db, 'onlineStatus', jeep.id), (doc) => {
+        if (doc.exists()) {
+          const statusData = doc.data();
+          setOnlineStatus(prev => ({
+            ...prev,
+            [jeep.id]: statusData
+          }));
+          
+          // Update jeep online status
+          setJeeps(prevJeeps => 
+            prevJeeps.map(j => 
+              j.id === jeep.id 
+                ? { 
+                    ...j, 
+                    isOnline: statusData.isOnline || false,
+                    lastSeen: statusData.lastSeen || null
+                  } 
+                : j
+            )
+          );
+          
+          setFilteredJeeps(prevFiltered => 
+            prevFiltered.map(j => 
+              j.id === jeep.id 
+                ? { 
+                    ...j, 
+                    isOnline: statusData.isOnline || false,
+                    lastSeen: statusData.lastSeen || null
+                  } 
+                : j
+            )
+          );
+        }
+      });
+      
+      unsubscribeListeners.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribeListeners.forEach(unsubscribe => unsubscribe());
+    };
+  }, [jeeps]);
 
   // ✅ UPDATED: Enhanced filter logic with exact matches
   useEffect(() => {
@@ -259,6 +313,12 @@ const JeepSection2 = () => {
     navigate('/jeepprofile', { state: { jeep } });
   };
 
+  // ✅ NEW: Handle chat button click
+  const handleChatClick = (jeep, e) => {
+    e.stopPropagation();
+    navigate('/jeepprofile', { state: { jeep, openChat: true } });
+  };
+
   // ✅ UPDATED: Clear filters completely
   const clearFilters = () => {
     setFilters({
@@ -281,6 +341,39 @@ const JeepSection2 = () => {
   const formatPrice = (price) => {
     if (!price || price === 0) return 'Contact for price';
     return new Intl.NumberFormat('en-LK').format(price);
+  };
+
+  // Get last seen time
+  const getLastSeenTime = (lastSeen) => {
+    if (!lastSeen) return 'Never online';
+    
+    const lastSeenDate = lastSeen.toDate ? lastSeen.toDate() : new Date(lastSeen);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - lastSeenDate) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return lastSeenDate.toLocaleDateString();
+  };
+
+  // Online status indicator component
+  const OnlineStatusIndicator = ({ jeep }) => {
+    if (jeep.isOnline) {
+      return (
+        <div className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+          <Wifi className="h-3 w-3" />
+          <span>Online</span>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="flex items-center gap-1 bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
+        <WifiOff className="h-3 w-3" />
+        <span>{jeep.lastSeen ? getLastSeenTime(jeep.lastSeen) : 'Offline'}</span>
+      </div>
+    );
   };
 
   if (loading) {
@@ -330,6 +423,22 @@ const JeepSection2 = () => {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Discover experienced safari jeep drivers for your wildlife adventures. Filter by your preferences to find the perfect match.
           </p>
+          
+          {/* Online Status Legend */}
+          <div className="flex justify-center items-center gap-6 mt-4 text-sm text-gray-600">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span>Online Now</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+              <span>Offline</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-blue-500" />
+              <span>Chat Available</span>
+            </div>
+          </div>
         </div>
 
         {/* Filter Section */}
@@ -503,11 +612,16 @@ const JeepSection2 = () => {
             Found <span className="font-bold text-yellow-600">{filteredJeeps.length}</span> jeep{filteredJeeps.length !== 1 ? 's' : ''} 
             {jeeps.length > 0 && ` out of ${jeeps.length} total`}
           </p>
-          {filteredJeeps.length > 12 && (
-            <div className="text-sm text-gray-500">
-              Showing first 12 of {filteredJeeps.length}
-            </div>
-          )}
+          <div className="flex items-center gap-4 text-sm text-gray-500">
+            <span className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              {filteredJeeps.filter(j => j.isOnline).length} online
+            </span>
+            <span className="flex items-center gap-1">
+              <MessageCircle className="h-4 w-4 text-blue-500" />
+              Chat available
+            </span>
+          </div>
         </div>
 
         {/* Jeep Grid */}
@@ -516,7 +630,7 @@ const JeepSection2 = () => {
             {filteredJeeps.slice(0, 12).map((jeep, index) => (
               <div 
                 key={jeep.id} 
-                className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer"
+                className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
                 onClick={() => handleProfileClick(jeep)}
               >
                 {/* Profile Image */}
@@ -525,7 +639,7 @@ const JeepSection2 = () => {
                     <img
                       src={jeep.imageUrl}
                       alt={jeep.driverName}
-                      className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       onError={(e) => {
                         e.target.style.display = 'none';
                         e.target.nextSibling.style.display = 'flex';
@@ -541,6 +655,11 @@ const JeepSection2 = () => {
                     </div>
                   </div>
                   
+                  {/* Online Status Badge */}
+                  <div className="absolute top-3 left-3">
+                    <OnlineStatusIndicator jeep={jeep} />
+                  </div>
+                  
                   {/* Experience Badge */}
                   {jeep.experience > 0 && (
                     <div className="absolute top-3 right-3 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
@@ -553,11 +672,21 @@ const JeepSection2 = () => {
                 <div className="p-4">
                   {/* Name and Location */}
                   <div className="mb-3">
-                    <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-1">
-                      {jeep.driverName}
-                    </h3>
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="text-xl font-bold text-gray-900 line-clamp-1 flex-1">
+                        {jeep.driverName}
+                      </h3>
+                      {/* Quick Chat Button */}
+                      <button 
+                        className="ml-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors shadow-lg"
+                        onClick={(e) => handleChatClick(jeep, e)}
+                        title="Start Chat"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </button>
+                    </div>
                     <div className="flex items-center text-gray-600 text-sm">
-                      <span className="mr-1">📍</span>
+                      <MapPin className="h-3 w-3 mr-1" />
                       <span className="line-clamp-1">{jeep.location}</span>
                     </div>
                   </div>
@@ -579,6 +708,22 @@ const JeepSection2 = () => {
                       ) : (
                         <span className="text-sm text-gray-500">Contact for price</span>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Clock className="h-3 w-3" />
+                      <span>{jeep.experience || 0}y</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Users className="h-3 w-3" />
+                      <span>6-8 seats</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Shield className="h-3 w-3" />
+                      <span>Verified</span>
                     </div>
                   </div>
 
