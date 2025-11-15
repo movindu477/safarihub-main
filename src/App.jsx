@@ -15,6 +15,12 @@ import {
   doc,
   serverTimestamp,
   getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
 } from "firebase/firestore";
 import {
   getStorage,
@@ -22,7 +28,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, LogOut, Menu, X, Calendar, Bell } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, Bell } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
@@ -54,20 +60,97 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// Mock functions for notifications and online status (you'll need to implement these)
-const getUserNotifications = (userId, callback) => {
-  console.log("Getting notifications for user:", userId);
-  // Return mock empty notifications
-  callback([]);
-  return () => {}; // Return unsubscribe function
-};
-
+// Online/Offline Status Management - UPDATED
 const setUserOnline = async (userId, userRole, userData) => {
-  console.log("Setting user online:", userId, userRole, userData);
+  try {
+    const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
+    await updateDoc(userRef, {
+      online: true,
+      lastSeen: serverTimestamp(),
+      ...userData
+    });
+    console.log(`✅ User ${userId} set online as ${userRole}`);
+  } catch (error) {
+    console.error('Error setting user online:', error);
+  }
 };
 
 const setUserOffline = async (userId) => {
-  console.log("Setting user offline:", userId);
+  try {
+    // Check if user is tourist or provider
+    const touristDoc = await getDoc(doc(db, 'tourists', userId));
+    if (touristDoc.exists()) {
+      await updateDoc(doc(db, 'tourists', userId), {
+        online: false,
+        lastSeen: serverTimestamp()
+      });
+    } else {
+      const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
+      if (providerDoc.exists()) {
+        await updateDoc(doc(db, 'serviceProviders', userId), {
+          online: false,
+          lastSeen: serverTimestamp()
+        });
+      }
+    }
+    console.log(`✅ User ${userId} set offline`);
+  } catch (error) {
+    console.error('Error setting user offline:', error);
+  }
+};
+
+// Real-time Online Status Listener for Service Providers
+const useOnlineStatusListener = (callback) => {
+  useEffect(() => {
+    if (!callback) return;
+
+    const serviceProvidersRef = collection(db, 'serviceProviders');
+    const onlineProvidersQuery = query(
+      serviceProvidersRef,
+      where('online', '==', true)
+    );
+
+    const unsubscribe = onSnapshot(onlineProvidersQuery, (snapshot) => {
+      const onlineProviders = {};
+      snapshot.forEach((doc) => {
+        const providerData = doc.data();
+        onlineProviders[doc.id] = {
+          isOnline: true,
+          lastSeen: providerData.lastSeen,
+          ...providerData
+        };
+      });
+      callback(onlineProviders);
+    });
+
+    return () => unsubscribe();
+  }, [callback]);
+};
+
+// Notification Management
+const getUserNotifications = (userId, callback) => {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const notificationsQuery = query(
+      notificationsRef,
+      where('recipientId', '==', userId),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+      const notifications = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      callback(notifications);
+    });
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error getting notifications:', error);
+    callback([]);
+    return () => {};
+  }
 };
 
 // Phone number formatting utility
@@ -246,7 +329,9 @@ function Authentication({ onAuthSuccess }) {
         profilePicture: "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        role: role, // Add role to document for easy querying
+        role: role,
+        online: true, // Set user as online when they register
+        lastSeen: serverTimestamp()
       };
 
       let collectionName = "";
@@ -258,9 +343,8 @@ function Authentication({ onAuthSuccess }) {
           ...userData,
           country: country?.trim() || "",
           preferredLanguage: language || "english",
-          bookings: [], // Initialize empty bookings array
-          favorites: [], // Initialize empty favorites array
-          createdAt: serverTimestamp(),
+          bookings: [],
+          favorites: [],
         };
         
         console.log("📝 Tourist data to save:", userData);
@@ -276,7 +360,7 @@ function Authentication({ onAuthSuccess }) {
           // Filtering Fields
           vehicleType: vehicleType || "",
           pricePerDay: parseInt(pricePerDay) || 0,
-          rating: 0, // Default rating
+          rating: 0,
           totalRatings: 0,
           
           // Arrays for filtering
@@ -380,7 +464,38 @@ function Authentication({ onAuthSuccess }) {
     setBusy(true);
     setMsg("");
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Get user role from Firestore and set online status
+      let userRole = 'tourist';
+      let userName = user.displayName || 'User';
+      
+      try {
+        // Check if user is a tourist
+        const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
+        if (touristDoc.exists()) {
+          userRole = 'tourist';
+          userName = touristDoc.data().fullName || userName;
+        } else {
+          // Check if user is a service provider
+          const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+          if (providerDoc.exists()) {
+            userRole = 'provider';
+            userName = providerDoc.data().fullName || userName;
+          }
+        }
+        
+        // Set user online
+        await setUserOnline(user.uid, userRole, {
+          userName: userName,
+          email: user.email
+        });
+        
+      } catch (error) {
+        console.log('Error fetching user role:', error);
+      }
+      
       setMsg("✅ Welcome back! Redirecting...");
       setTimeout(() => {
         onAuthSuccess();
@@ -1451,4 +1566,5 @@ function App() {
   );
 }
 
+export { db, auth, setUserOnline, setUserOffline, useOnlineStatusListener };
 export default App;

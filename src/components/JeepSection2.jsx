@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { Wifi, WifiOff, MessageCircle, Star, MapPin, Clock, Users, Shield } from 'lucide-react';
@@ -77,7 +77,7 @@ const JeepSection2 = () => {
     ]
   };
 
-  // Fetch ONLY Jeep Driver service providers from Firebase
+  // ✅ UPDATED: Fetch ONLY Jeep Driver service providers with real-time online status
   useEffect(() => {
     const fetchJeeps = async () => {
       try {
@@ -144,8 +144,8 @@ const JeepSection2 = () => {
           description: provider.description || provider.bio || 'Experienced safari jeep driver',
           
           // Online status (will be updated from real-time listener)
-          isOnline: false,
-          lastSeen: null,
+          isOnline: provider.online || false,
+          lastSeen: provider.lastSeen || null,
           
           // Original data for debugging
           originalData: provider
@@ -168,53 +168,47 @@ const JeepSection2 = () => {
     fetchJeeps();
   }, []);
 
-  // Listen for online status changes
+  // ✅ UPDATED: Real-time online status listener for ALL service providers
   useEffect(() => {
-    const unsubscribeListeners = [];
+    console.log('🔔 Setting up real-time online status listener...');
     
-    jeeps.forEach(jeep => {
-      const unsubscribe = onSnapshot(doc(db, 'onlineStatus', jeep.id), (doc) => {
-        if (doc.exists()) {
-          const statusData = doc.data();
-          setOnlineStatus(prev => ({
-            ...prev,
-            [jeep.id]: statusData
-          }));
-          
-          // Update jeep online status
-          setJeeps(prevJeeps => 
-            prevJeeps.map(j => 
-              j.id === jeep.id 
-                ? { 
-                    ...j, 
-                    isOnline: statusData.isOnline || false,
-                    lastSeen: statusData.lastSeen || null
-                  } 
-                : j
-            )
-          );
-          
-          setFilteredJeeps(prevFiltered => 
-            prevFiltered.map(j => 
-              j.id === jeep.id 
-                ? { 
-                    ...j, 
-                    isOnline: statusData.isOnline || false,
-                    lastSeen: statusData.lastSeen || null
-                  } 
-                : j
-            )
-          );
-        }
-      });
+    const serviceProvidersRef = collection(db, 'serviceProviders');
+    const unsubscribe = onSnapshot(serviceProvidersRef, (snapshot) => {
+      const onlineStatusUpdates = {};
       
-      unsubscribeListeners.push(unsubscribe);
+      snapshot.forEach((doc) => {
+        const providerData = doc.data();
+        onlineStatusUpdates[doc.id] = {
+          isOnline: providerData.online || false,
+          lastSeen: providerData.lastSeen || null
+        };
+      });
+
+      console.log('🔄 Real-time online status update:', onlineStatusUpdates);
+      
+      // Update jeeps with real-time online status
+      setJeeps(prevJeeps => 
+        prevJeeps.map(jeep => ({
+          ...jeep,
+          isOnline: onlineStatusUpdates[jeep.id]?.isOnline || false,
+          lastSeen: onlineStatusUpdates[jeep.id]?.lastSeen || jeep.lastSeen
+        }))
+      );
+      
+      setFilteredJeeps(prevFiltered => 
+        prevFiltered.map(jeep => ({
+          ...jeep,
+          isOnline: onlineStatusUpdates[jeep.id]?.isOnline || false,
+          lastSeen: onlineStatusUpdates[jeep.id]?.lastSeen || jeep.lastSeen
+        }))
+      );
     });
 
     return () => {
-      unsubscribeListeners.forEach(unsubscribe => unsubscribe());
+      console.log('🔕 Cleaning up real-time listener');
+      unsubscribe();
     };
-  }, [jeeps]);
+  }, []);
 
   // ✅ UPDATED: Enhanced filter logic with exact matches
   useEffect(() => {
@@ -308,15 +302,15 @@ const JeepSection2 = () => {
     }));
   };
 
-  // ✅ NEW: Handle profile box click
+  // ✅ UPDATED: Handle profile box click with proper navigation
   const handleProfileClick = (jeep) => {
-    navigate('/jeepprofile', { state: { jeep } });
+    navigate(`/jeepprofile?driverId=${jeep.id}`);
   };
 
-  // ✅ NEW: Handle chat button click
+  // ✅ UPDATED: Handle chat button click
   const handleChatClick = (jeep, e) => {
     e.stopPropagation();
-    navigate('/jeepprofile', { state: { jeep, openChat: true } });
+    navigate(`/jeepprofile?driverId=${jeep.id}&openChat=true`);
   };
 
   // ✅ UPDATED: Clear filters completely
@@ -347,14 +341,18 @@ const JeepSection2 = () => {
   const getLastSeenTime = (lastSeen) => {
     if (!lastSeen) return 'Never online';
     
-    const lastSeenDate = lastSeen.toDate ? lastSeen.toDate() : new Date(lastSeen);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now - lastSeenDate) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-    return lastSeenDate.toLocaleDateString();
+    try {
+      const lastSeenDate = lastSeen.toDate ? lastSeen.toDate() : new Date(lastSeen);
+      const now = new Date();
+      const diffInMinutes = Math.floor((now - lastSeenDate) / (1000 * 60));
+      
+      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+      return lastSeenDate.toLocaleDateString();
+    } catch (error) {
+      return 'Unknown';
+    }
   };
 
   // Online status indicator component
