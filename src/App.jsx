@@ -458,16 +458,16 @@ function MainApp({ user, onLogout, onLogin, onRegister }) {
     </div>
   );
 
-  // Notification Bell Component
+  // ✅ FIXED: Notification Bell Component - Bottom Right Corner
   const NotificationBell = () => (
-    <div className="fixed top-4 right-4 z-50">
+    <div className="fixed bottom-6 right-6 z-50">
       <button
         onClick={handleNotificationClick}
-        className="relative bg-white p-3 rounded-full shadow-lg border border-gray-200 hover:shadow-xl transition-all"
+        className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
       >
-        <Bell className="h-6 w-6 text-gray-600" />
+        <Bell className="h-6 w-6 text-white" />
         {notifications.filter(n => !n.read).length > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
             {notifications.filter(n => !n.read).length}
           </span>
         )}

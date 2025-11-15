@@ -17,6 +17,8 @@ const JeepProfile = () => {
   const [reviews, setReviews] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [driverOnlineStatus, setDriverOnlineStatus] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const messagesEndRef = useRef(null);
 
   // User management
@@ -34,14 +36,14 @@ const JeepProfile = () => {
 
   // Load messages from Firebase
   useEffect(() => {
-    if (jeep) {
+    if (jeep && showChat) {
       const unsubscribe = getMessages(jeep.id, userId, (messages) => {
         setMessages(messages);
       });
       
       return () => unsubscribe();
     }
-  }, [jeep, userId]);
+  }, [jeep, userId, showChat]);
 
   // Load reviews from Firebase
   useEffect(() => {
@@ -120,6 +122,7 @@ const JeepProfile = () => {
       userName: userName,
       driverName: jeep.driverName,
       conversationId: `conv_${jeep.id}_${userId}`,
+      timestamp: new Date(),
       read: false
     };
 
@@ -148,7 +151,8 @@ const JeepProfile = () => {
       userName: userName,
       rating: userReview.rating,
       message: userReview.message,
-      jeepId: jeep.id
+      jeepId: jeep.id,
+      timestamp: new Date()
     };
 
     try {
@@ -169,13 +173,32 @@ const JeepProfile = () => {
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
+  const navigateMonth = (direction) => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
   const isDateBooked = (date) => {
     const dateString = date.toISOString().split('T')[0];
     return bookings.some(booking => booking.date === dateString);
   };
 
+  const isDateInPast = (date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+  };
+
+  const isDateAvailable = (date) => {
+    const dateString = date.toISOString().split('T')[0];
+    return jeep.availableDates?.includes(dateString) || false;
+  };
+
   const bookDate = async (date) => {
-    if (isDateInPast(date) || isDateBooked(date)) return;
+    if (isDateInPast(date) || isDateBooked(date) || !isDateAvailable(date)) return;
 
     const dateString = date.toISOString().split('T')[0];
     const bookingData = {
@@ -184,7 +207,8 @@ const JeepProfile = () => {
       jeepId: jeep.id,
       driverName: jeep.driverName,
       date: dateString,
-      status: 'pending'
+      status: 'pending',
+      timestamp: new Date()
     };
 
     try {
@@ -194,10 +218,46 @@ const JeepProfile = () => {
     }
   };
 
-  const isDateInPast = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date < today;
+  // Render calendar
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(currentMonth);
+    const firstDay = getFirstDayOfMonth(currentMonth);
+    const days = [];
+
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-8"></div>);
+    }
+
+    // Add cells for each day of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const isBooked = isDateBooked(date);
+      const isPast = isDateInPast(date);
+      const isAvailable = isDateAvailable(date);
+
+      days.push(
+        <button
+          key={day}
+          type="button"
+          onClick={() => bookDate(date)}
+          disabled={isPast || isBooked || !isAvailable}
+          className={`h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
+            isBooked
+              ? 'bg-red-500 text-white cursor-not-allowed'
+              : isPast
+              ? 'text-gray-400 cursor-not-allowed bg-gray-200'
+              : isAvailable
+              ? 'bg-green-500 text-white hover:bg-green-600'
+              : 'text-gray-400 cursor-not-allowed bg-gray-100'
+          }`}
+        >
+          {day}
+        </button>
+      );
+    }
+
+    return days;
   };
 
   // Calculate average rating
@@ -258,47 +318,47 @@ const JeepProfile = () => {
         <div className="xl:col-span-5 flex flex-col gap-4">
           {/* Profile Card */}
           <div className="bg-white rounded-xl shadow-sm border border-white/20 backdrop-blur-sm overflow-hidden">
-            <div className="relative h-32 bg-gradient-to-br from-amber-400 to-orange-500">
-              {jeep.imageUrl || jeep.profilePicture ? (
-                <>
-                  <img
-                    src={jeep.imageUrl || jeep.profilePicture}
-                    alt={jeep.driverName || jeep.fullName}
-                    className={`w-full h-full object-cover transition-opacity duration-300 ${
-                      imageLoaded ? 'opacity-100' : 'opacity-0'
-                    }`}
-                    onLoad={() => setImageLoaded(true)}
-                  />
-                  {!imageLoaded && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-500 animate-pulse"></div>
-                  )}
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mx-auto mb-1">
-                      <span className="text-xl">🚙</span>
+            {/* ✅ FIXED: Rounded Profile Photo Section */}
+            <div className="relative">
+              <div className="h-48 bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                {jeep.imageUrl || jeep.profilePicture ? (
+                  <>
+                    <img
+                      src={jeep.imageUrl || jeep.profilePicture}
+                      alt={jeep.driverName || jeep.fullName}
+                      className={`w-32 h-32 object-cover rounded-full border-4 border-white shadow-lg transition-opacity duration-300 ${
+                        imageLoaded ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onLoad={() => setImageLoaded(true)}
+                    />
+                    {!imageLoaded && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-500 animate-pulse rounded-full w-32 h-32"></div>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-32 h-32 bg-white/20 rounded-full flex items-center justify-center border-4 border-white shadow-lg">
+                    <div className="text-center text-white">
+                      <span className="text-3xl">🚙</span>
                     </div>
-                    <p className="text-xs font-medium">No Photo</p>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
               
               {/* Experience Badge */}
               {(jeep.experience > 0 || jeep.experienceYears > 0) && (
-                <div className="absolute top-2 right-2 bg-white/90 text-amber-600 px-2 py-1 rounded-full text-xs font-bold shadow">
+                <div className="absolute top-4 right-4 bg-white/90 text-amber-600 px-3 py-1 rounded-full text-sm font-bold shadow">
                   ⭐ {(jeep.experience || jeep.experienceYears)}+ years
                 </div>
               )}
 
               {/* Rating Overlay */}
-              <div className="absolute bottom-2 left-2 bg-black/60 text-white px-2 py-1 rounded-lg">
+              <div className="absolute bottom-4 left-4 bg-black/60 text-white px-3 py-2 rounded-lg">
                 <div className="flex items-center gap-1">
-                  <div className="flex text-amber-300 text-xs">
+                  <div className="flex text-amber-300 text-sm">
                     {'★'.repeat(Math.floor(averageRating))}
                     {'☆'.repeat(5 - Math.floor(averageRating))}
                   </div>
-                  <span className="text-xs font-medium">
+                  <span className="text-sm font-medium">
                     ({averageRating > 0 ? averageRating.toFixed(1) : 'New'})
                   </span>
                 </div>
@@ -594,7 +654,10 @@ const JeepProfile = () => {
               </div>
               
               <div className="text-center">
-                <button className="bg-gradient-to-r from-amber-500 to-orange-600 text-white py-2 px-4 rounded-lg font-semibold text-sm w-full hover:from-amber-600 hover:to-orange-700 transition-colors">
+                <button 
+                  onClick={() => setShowCalendar(true)}
+                  className="bg-gradient-to-r from-amber-500 to-orange-600 text-white py-2 px-4 rounded-lg font-semibold text-sm w-full hover:from-amber-600 hover:to-orange-700 transition-colors"
+                >
                   Check Full Calendar
                 </button>
               </div>
@@ -602,6 +665,96 @@ const JeepProfile = () => {
           </div>
         </div>
       </div>
+
+      {/* Calendar Modal */}
+      {showCalendar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800">Select Available Dates</h3>
+              <button
+                onClick={() => setShowCalendar(false)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-4">
+              {/* Calendar Header */}
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  type="button"
+                  onClick={() => navigateMonth(-1)}
+                  className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                >
+                  ‹
+                </button>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => navigateMonth(1)}
+                  className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                >
+                  ›
+                </button>
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center text-gray-500 text-sm font-medium py-2">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {renderCalendar()}
+              </div>
+
+              {/* Calendar Legend */}
+              <div className="flex items-center justify-center gap-4 mt-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-green-500 rounded"></div>
+                  <span className="text-gray-600">Available</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-red-500 rounded"></div>
+                  <span className="text-gray-600">Booked</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-gray-400 rounded"></div>
+                  <span className="text-gray-600">Past</span>
+                </div>
+              </div>
+
+              {/* Selected Dates Summary */}
+              {bookings.length > 0 && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-blue-800 text-sm font-medium mb-2">
+                    Your Bookings ({bookings.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {bookings.slice(0, 3).map(booking => (
+                      <span key={booking.id} className="bg-blue-500 text-white px-2 py-1 rounded text-xs">
+                        {new Date(booking.date).toLocaleDateString()}
+                      </span>
+                    ))}
+                    {bookings.length > 3 && (
+                      <span className="text-blue-600 text-xs">
+                        +{bookings.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chat Modal */}
       {showChat && (
@@ -710,7 +863,7 @@ const JeepProfile = () => {
                   <button
                     key={star}
                     onClick={() => setUserReview(prev => ({ ...prev, rating: star }))}
-                    className="text-xl focus:outline-none"
+                    className="text-2xl focus:outline-none transition-transform hover:scale-110"
                   >
                     {star <= userReview.rating ? '★' : '☆'}
                   </button>
@@ -736,7 +889,7 @@ const JeepProfile = () => {
             <button
               onClick={submitReview}
               disabled={userReview.rating === 0 || !userReview.message.trim()}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 transition-colors"
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 transition-colors hover:from-amber-600 hover:to-orange-700"
             >
               Submit Review
             </button>
