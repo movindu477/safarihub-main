@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, X, Clock, CheckCircle } from 'lucide-react';
+import { MessageCircle, X, Clock, CheckCircle, MapPin, User } from 'lucide-react';
 
 const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMarkAsRead }) => {
   const formatTime = (timestamp) => {
@@ -10,7 +10,8 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
       const diffInHours = (now - date) / (1000 * 60 * 60);
       
       if (diffInHours < 1) {
-        return 'Just now';
+        const minutes = Math.floor(diffInHours * 60);
+        return minutes < 1 ? 'Just now' : `${minutes}m ago`;
       } else if (diffInHours < 24) {
         return `${Math.floor(diffInHours)}h ago`;
       } else {
@@ -35,8 +36,30 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
     }
   };
 
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case 'message':
+        return <MessageCircle className="h-4 w-4 text-blue-500" />;
+      case 'booking':
+        return <MapPin className="h-4 w-4 text-green-500" />;
+      default:
+        return <User className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getNotificationColor = (type) => {
+    switch (type) {
+      case 'message':
+        return 'bg-blue-100 text-blue-800';
+      case 'booking':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
-    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-h-96 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-h-96 overflow-hidden w-80 sm:w-96">
       {/* Header */}
       <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-4">
         <div className="flex items-center justify-between">
@@ -48,9 +71,19 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
             <X className="h-5 w-5" />
           </button>
         </div>
-        <p className="text-yellow-100 text-sm mt-1">
-          {notifications.filter(n => !n.read).length} unread
-        </p>
+        <div className="flex justify-between items-center mt-1">
+          <p className="text-yellow-100 text-sm">
+            {notifications.filter(n => !n.read).length} unread
+          </p>
+          {notifications.filter(n => !n.read).length > 0 && (
+            <button
+              onClick={handleMarkAllAsRead}
+              className="text-yellow-200 hover:text-white text-xs underline"
+            >
+              Mark all read
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Notifications List */}
@@ -59,6 +92,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
           <div className="text-center py-8 text-gray-500">
             <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
             <p>No notifications yet</p>
+            <p className="text-sm mt-1">Notifications will appear here</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
@@ -67,13 +101,13 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                 key={notification.id}
                 onClick={() => handleNotificationClick(notification)}
                 className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${
-                  notification.read ? 'bg-white' : 'bg-yellow-50'
+                  notification.read ? 'bg-white' : 'bg-blue-50'
                 }`}
               >
                 <div className="flex items-start space-x-3">
-                  <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
-                    notification.read ? 'bg-gray-300' : 'bg-yellow-500'
-                  }`} />
+                  <div className="flex-shrink-0">
+                    {getNotificationIcon(notification.type)}
+                  </div>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
@@ -88,16 +122,21 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                       </div>
                     </div>
                     
-                    <p className="text-sm text-gray-600 mb-1">
+                    <p className="text-sm text-gray-600 mb-2 line-clamp-2">
                       {notification.message || 'New notification'}
                     </p>
                     
                     <div className="flex items-center justify-between">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        <MessageCircle className="h-3 w-3 mr-1" />
-                        {notification.type || 'Notification'}
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getNotificationColor(notification.type)}`}>
+                        {getNotificationIcon(notification.type)}
+                        <span className="ml-1 capitalize">
+                          {notification.type || 'notification'}
+                        </span>
                       </span>
                       
+                      {!notification.read && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      )}
                       {notification.read && (
                         <CheckCircle className="h-4 w-4 text-green-500" />
                       )}
@@ -109,18 +148,6 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
           </div>
         )}
       </div>
-
-      {/* Footer */}
-      {notifications.length > 0 && (
-        <div className="border-t border-gray-200 p-3 bg-gray-50">
-          <button
-            onClick={handleMarkAllAsRead}
-            className="w-full text-center text-sm text-yellow-600 hover:text-yellow-700 font-medium py-2"
-          >
-            Mark all as read
-          </button>
-        </div>
-      )}
     </div>
   );
 };

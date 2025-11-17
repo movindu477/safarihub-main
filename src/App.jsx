@@ -22,6 +22,7 @@ import {
   orderBy,
   onSnapshot,
   addDoc,
+  getDocs,
 } from "firebase/firestore";
 import {
   getStorage,
@@ -62,7 +63,9 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Firebase functions
+// ==================== FIREBASE FUNCTIONS ====================
+
+// User Status Management
 export const setUserOnline = async (userId, userRole, userData) => {
   try {
     const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
@@ -100,31 +103,60 @@ export const setUserOffline = async (userId) => {
   }
 };
 
-export const getUserNotifications = (userId, callback) => {
+// Conversation Management
+export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2Name) => {
   try {
-    const notificationsRef = collection(db, 'notifications');
-    const notificationsQuery = query(
-      notificationsRef,
-      where('recipientId', '==', userId),
-      orderBy('timestamp', 'desc')
+    const conversationId = [user1Id, user2Id].sort().join('_');
+    const conversationRef = doc(db, 'conversations', conversationId);
+    const conversationDoc = await getDoc(conversationRef);
+
+    if (!conversationDoc.exists()) {
+      await setDoc(conversationRef, {
+        participantIds: [user1Id, user2Id],
+        participantNames: {
+          [user1Id]: user1Name,
+          [user2Id]: user2Name
+        },
+        lastMessage: '',
+        lastMessageTime: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    return conversationId;
+  } catch (error) {
+    console.error('Error creating conversation:', error);
+    throw error;
+  }
+};
+
+export const getUserConversations = (userId, callback) => {
+  try {
+    const conversationsRef = collection(db, 'conversations');
+    const userConversationsQuery = query(
+      conversationsRef,
+      where('participantIds', 'array-contains', userId),
+      orderBy('lastMessageTime', 'desc')
     );
 
-    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-      const notifications = snapshot.docs.map(doc => ({
+    const unsubscribe = onSnapshot(userConversationsQuery, (snapshot) => {
+      const conversations = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      callback(notifications);
+      callback(conversations);
     });
 
     return unsubscribe;
   } catch (error) {
-    console.error('Error getting notifications:', error);
+    console.error('Error getting conversations:', error);
     callback([]);
     return () => {};
   }
 };
 
+// Message Management
 export const getMessages = (conversationId, callback) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
@@ -151,19 +183,86 @@ export const sendMessage = async (conversationId, messageData) => {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
     const messageDoc = await addDoc(messagesRef, {
       ...messageData,
-      timestamp: serverTimestamp()
+      timestamp: serverTimestamp(),
+      read: false
     });
 
     // Update conversation last message
-    await updateDoc(doc(db, 'conversations', conversationId), {
+    const conversationRef = doc(db, 'conversations', conversationId);
+    await updateDoc(conversationRef, {
       lastMessage: messageData.content,
-      lastMessageAt: serverTimestamp(),
-      lastMessageSender: messageData.senderId
+      lastMessageTime: serverTimestamp(),
+      lastMessageSender: messageData.senderId,
+      updatedAt: serverTimestamp()
     });
 
     return messageDoc.id;
   } catch (error) {
     console.error('Error sending message:', error);
+    throw error;
+  }
+};
+
+export const markMessagesAsRead = async (conversationId, userId) => {
+  try {
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const unreadMessagesQuery = query(
+      messagesRef,
+      where('senderId', '!=', userId),
+      where('read', '==', false)
+    );
+
+    const snapshot = await getDocs(unreadMessagesQuery);
+    const updatePromises = snapshot.docs.map(doc =>
+      updateDoc(doc.ref, {
+        read: true,
+        readAt: serverTimestamp()
+      })
+    );
+
+    await Promise.all(updatePromises);
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+  }
+};
+
+// Notification Management
+export const getUserNotifications = (userId, callback) => {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const notificationsQuery = query(
+      notificationsRef,
+      where('recipientId', '==', userId),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+      const notifications = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      callback(notifications);
+    });
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error getting notifications:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+export const createNotification = async (notificationData) => {
+  try {
+    const notificationRef = collection(db, 'notifications');
+    const notificationDoc = await addDoc(notificationRef, {
+      ...notificationData,
+      read: false,
+      timestamp: serverTimestamp()
+    });
+    return notificationDoc.id;
+  } catch (error) {
+    console.error('Error creating notification:', error);
     throw error;
   }
 };
@@ -1205,7 +1304,7 @@ const HomePage = ({ user, onLogout, onShowAuth }) => {
       />
       
       {/* Home Content with All Sections */}
-      <div className="pt--1ChatSlidePanel.jsx">
+      <div className="pt-16">
         <Section1 />
         <Section2 />
         <Section3 />

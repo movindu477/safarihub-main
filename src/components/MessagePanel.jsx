@@ -4,18 +4,27 @@ import {
   Send, 
   User, 
   Clock,
-  MessageCircle
+  MessageCircle,
+  Check,
+  CheckCheck
 } from 'lucide-react';
-import { db, getMessages, sendMessage } from '../App';
+import { 
+  getMessages, 
+  sendMessage, 
+  createOrGetConversation, 
+  markMessagesAsRead,
+  createNotification 
+} from '../App';
 import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../App';
 
-const MessagePanel = ({ user, conversationId, onClose }) => {
+const MessagePanel = ({ user, otherUserId, otherUserName, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [conversation, setConversation] = useState(null);
   const [otherUser, setOtherUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [conversationId, setConversationId] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Scroll to bottom of messages
@@ -27,65 +36,86 @@ const MessagePanel = ({ user, conversationId, onClose }) => {
     scrollToBottom();
   }, [messages]);
 
-  // Load conversation and messages
+  // Initialize conversation and load user data
   useEffect(() => {
-    if (!conversationId || !user) return;
+    if (!user || !otherUserId) return;
 
-    const loadConversationData = async () => {
+    const initializeConversation = async () => {
       try {
         setLoading(true);
         
-        // Get conversation data
-        const conversationDoc = await getDoc(doc(db, 'conversations', conversationId));
-        if (conversationDoc.exists()) {
-          const conversationData = conversationDoc.data();
-          setConversation(conversationData);
-
-          // Find other participant
-          const otherParticipantId = conversationData.participants.find(id => id !== user.uid);
-          if (otherParticipantId) {
-            // Try to get user data from tourists collection
-            const touristDoc = await getDoc(doc(db, 'tourists', otherParticipantId));
-            if (touristDoc.exists()) {
-              setOtherUser({
-                id: otherParticipantId,
-                name: touristDoc.data().fullName,
-                photo: touristDoc.data().profilePicture,
-                role: 'tourist'
-              });
-            } else {
-              // Try service providers collection
-              const providerDoc = await getDoc(doc(db, 'serviceProviders', otherParticipantId));
-              if (providerDoc.exists()) {
-                setOtherUser({
-                  id: otherParticipantId,
-                  name: providerDoc.data().fullName,
-                  photo: providerDoc.data().profilePicture,
-                  role: 'provider'
-                });
-              } else {
-                setOtherUser({
-                  id: otherParticipantId,
-                  name: 'User',
-                  photo: '',
-                  role: 'user'
-                });
-              }
-            }
+        // Get other user data
+        let userData = null;
+        
+        // Try tourists collection
+        const touristDoc = await getDoc(doc(db, 'tourists', otherUserId));
+        if (touristDoc.exists()) {
+          userData = {
+            id: otherUserId,
+            name: touristDoc.data().fullName || otherUserName,
+            photo: touristDoc.data().profilePicture,
+            role: 'tourist'
+          };
+        } else {
+          // Try service providers collection
+          const providerDoc = await getDoc(doc(db, 'serviceProviders', otherUserId));
+          if (providerDoc.exists()) {
+            userData = {
+              id: otherUserId,
+              name: providerDoc.data().fullName || otherUserName,
+              photo: providerDoc.data().profilePicture,
+              role: 'provider'
+            };
+          } else {
+            userData = {
+              id: otherUserId,
+              name: otherUserName || 'User',
+              photo: '',
+              role: 'user'
+            };
           }
         }
+        
+        setOtherUser(userData);
+
+        // Create or get conversation
+        const convId = await createOrGetConversation(
+          user.uid,
+          otherUserId,
+          user.displayName || 'User',
+          userData.name
+        );
+        
+        setConversationId(convId);
+        
+        // Mark existing messages as read
+        await markMessagesAsRead(convId, user.uid);
+        
       } catch (error) {
-        console.error('Error loading conversation:', error);
+        console.error('Error initializing conversation:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadConversationData();
+    initializeConversation();
+  }, [user, otherUserId, otherUserName]);
 
-    // Subscribe to messages
-    const unsubscribe = getMessages(conversationId, (messages) => {
-      setMessages(messages);
+  // Load messages
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const unsubscribe = getMessages(conversationId, (messagesData) => {
+      setMessages(messagesData);
+      
+      // Mark new messages as read
+      const unreadMessages = messagesData.filter(msg => 
+        msg.senderId !== user?.uid && !msg.read
+      );
+      
+      if (unreadMessages.length > 0 && user) {
+        markMessagesAsRead(conversationId, user.uid);
+      }
     });
 
     return () => unsubscribe();
@@ -93,7 +123,7 @@ const MessagePanel = ({ user, conversationId, onClose }) => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !conversationId || sending) return;
+    if (!newMessage.trim() || !conversationId || sending || !user) return;
 
     try {
       setSending(true);
@@ -102,15 +132,30 @@ const MessagePanel = ({ user, conversationId, onClose }) => {
         content: newMessage.trim(),
         senderId: user.uid,
         senderName: user.displayName || 'User',
-        senderPhoto: user.photoURL || '',
+        receiverId: otherUserId,
         timestamp: new Date()
       };
 
+      // Send the message
       await sendMessage(conversationId, messageData);
+
+      // Create notification for the recipient
+      await createNotification({
+        type: 'message',
+        title: 'New Message',
+        message: `You have a new message from ${user.displayName || 'a user'}`,
+        recipientId: otherUserId,
+        senderId: user.uid,
+        senderName: user.displayName || 'User',
+        relatedId: conversationId,
+        conversationId: conversationId
+      });
+
       setNewMessage('');
 
     } catch (error) {
       console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -133,8 +178,9 @@ const MessagePanel = ({ user, conversationId, onClose }) => {
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-6">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+        <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500"></div>
+          <span>Loading conversation...</span>
         </div>
       </div>
     );
@@ -196,11 +242,15 @@ const MessagePanel = ({ user, conversationId, onClose }) => {
                     }`}
                   >
                     <p className="text-sm">{message.content}</p>
-                    <div className={`flex items-center space-x-1 mt-1 text-xs ${
+                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
                       message.senderId === user.uid ? 'text-yellow-100' : 'text-gray-500'
                     }`}>
-                      <Clock className="h-3 w-3" />
                       <span>{formatTime(message.timestamp)}</span>
+                      {message.senderId === user.uid && (
+                        <span>
+                          {message.read ? <CheckCheck size={12} /> : <Check size={12} />}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

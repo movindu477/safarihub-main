@@ -12,7 +12,8 @@ import {
   onSnapshot, 
   updateDoc,
   serverTimestamp,
-  setDoc
+  setDoc,
+  getDocs
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { 
@@ -37,8 +38,18 @@ import {
 const db = getFirestore();
 const auth = getAuth();
 
+// Import Firebase functions from App
+import { 
+  createOrGetConversation, 
+  sendMessage, 
+  getMessages, 
+  markMessagesAsRead, 
+  createNotification,
+  getUserNotifications 
+} from "../App";
+
 // Notification Bell Component for JeepProfile
-const NotificationBell = ({ user, notifications, onNotificationClick }) => {
+const NotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
@@ -58,9 +69,19 @@ const NotificationBell = ({ user, notifications, onNotificationClick }) => {
     setShowNotifications(!showNotifications);
   };
 
-  const handleNotificationItemClick = (notification) => {
+  const handleNotificationItemClick = async (notification) => {
+    if (!notification.read) {
+      await onMarkAsRead(notification.id);
+    }
     onNotificationClick(notification);
     setShowNotifications(false);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    const unreadNotifications = notifications.filter(n => !n.read);
+    for (const notification of unreadNotifications) {
+      await onMarkAsRead(notification.id);
+    }
   };
 
   if (!user) return null;
@@ -82,8 +103,16 @@ const NotificationBell = ({ user, notifications, onNotificationClick }) => {
       {/* Notification Panel */}
       {showNotifications && (
         <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
+            {notifications.filter(n => !n.read).length > 0 && (
+              <button
+                onClick={handleMarkAllAsRead}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Mark all read
+              </button>
+            )}
           </div>
           
           <div className="divide-y divide-gray-100">
@@ -110,7 +139,7 @@ const NotificationBell = ({ user, notifications, onNotificationClick }) => {
                   </div>
                   <p className="text-gray-600 text-xs mb-2">{notification.message}</p>
                   <p className="text-gray-400 text-xs">
-                    {notification.timestamp?.toDate?.()?.toLocaleDateString() || 'Recently'}
+                    {formatTime(notification.timestamp)}
                   </p>
                 </div>
               ))
@@ -138,6 +167,7 @@ const JeepProfile = () => {
   const [userRole, setUserRole] = useState("");
   const [onlineStatus, setOnlineStatus] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [conversationId, setConversationId] = useState(null);
 
   // Get driver ID from URL parameters
   const searchParams = new URLSearchParams(location.search);
@@ -159,6 +189,25 @@ const JeepProfile = () => {
       setActiveTab('chat');
     }
   }, [openChat]);
+
+  // Format timestamp function
+  const formatTime = (timestamp) => {
+    if (!timestamp) return '';
+    
+    try {
+      const date = timestamp.toDate();
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      
+      if (diff < 60000) return 'Just now';
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+      
+      return date.toLocaleDateString();
+    } catch (error) {
+      return 'Recently';
+    }
+  };
 
   // Get current user and notifications
   useEffect(() => {
@@ -182,19 +231,8 @@ const JeepProfile = () => {
         }
 
         // Load notifications
-        const notificationsRef = collection(db, 'notifications');
-        const notificationsQuery = query(
-          notificationsRef,
-          where('recipientId', '==', user.uid),
-          orderBy('timestamp', 'desc')
-        );
-
-        const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
-          const notificationsData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setNotifications(notificationsData);
+        const unsubscribeNotifications = getUserNotifications(user.uid, (notifications) => {
+          setNotifications(notifications);
         });
 
         return () => unsubscribeNotifications();
@@ -261,87 +299,73 @@ const JeepProfile = () => {
     return () => unsubscribe();
   }, [driverId]);
 
+  // Initialize conversation and load messages
+  useEffect(() => {
+    if (!currentUser || !driverId || !driver) return;
+
+    const initializeConversation = async () => {
+      try {
+        const conversationId = await createOrGetConversation(
+          currentUser.uid,
+          driverId,
+          currentUser.displayName || 'User',
+          driver.fullName || 'Driver'
+        );
+        
+        setConversationId(conversationId);
+        
+        // Mark existing messages as read
+        await markMessagesAsRead(conversationId, currentUser.uid);
+      } catch (error) {
+        console.error('Error initializing conversation:', error);
+      }
+    };
+
+    initializeConversation();
+  }, [currentUser, driverId, driver]);
+
   // Load messages for the conversation
   useEffect(() => {
-    if (!currentUser || !driverId) return;
+    if (!conversationId) return;
 
-    const conversationId = [currentUser.uid, driverId].sort().join('_');
-    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-    const messagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
-
-    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-      const messagesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    const unsubscribe = getMessages(conversationId, (messagesData) => {
       setMessages(messagesData);
-
-      // Mark messages as read if they are from the driver and unread
-      messagesData.forEach(async (msg) => {
-        if (msg.senderId === driverId && !msg.read) {
-          const messageRef = doc(db, 'conversations', conversationId, 'messages', msg.id);
-          await updateDoc(messageRef, {
-            read: true,
-            readAt: serverTimestamp()
-          });
-        }
-      });
+      
+      // Mark new messages as read
+      const unreadMessages = messagesData.filter(msg => 
+        msg.senderId !== currentUser?.uid && !msg.read
+      );
+      
+      if (unreadMessages.length > 0 && currentUser) {
+        markMessagesAsRead(conversationId, currentUser.uid);
+      }
     });
 
     return () => unsubscribe();
-  }, [currentUser, driverId]);
+  }, [conversationId, currentUser]);
 
-  // Send message function - FIXED
-  const sendMessage = async (e) => {
+  // Send message function - FIXED with proper notification
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     
-    if (!message.trim() || !currentUser || !driverId) return;
+    if (!message.trim() || !currentUser || !driverId || !conversationId || sending) return;
 
     setSending(true);
     
     try {
-      const conversationId = [currentUser.uid, driverId].sort().join('_');
-      
-      // Create conversation document if it doesn't exist
-      const conversationRef = doc(db, 'conversations', conversationId);
-      const conversationDoc = await getDoc(conversationRef);
-      
-      if (!conversationDoc.exists()) {
-        await setDoc(conversationRef, {
-          participantIds: [currentUser.uid, driverId],
-          participantNames: {
-            [currentUser.uid]: currentUser.displayName || 'User',
-            [driverId]: driver?.fullName || 'Driver'
-          },
-          lastMessage: message,
-          lastMessageTime: serverTimestamp(),
-          createdAt: serverTimestamp()
-        });
-      } else {
-        // Update last message
-        await updateDoc(conversationRef, {
-          lastMessage: message,
-          lastMessageTime: serverTimestamp()
-        });
-      }
-
-      // Add message to subcollection
-      const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-      const messageDoc = await addDoc(messagesRef, {
-        text: message.trim(),
+      const messageData = {
+        content: message.trim(),
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         receiverId: driverId,
-        receiverName: driver?.fullName || 'Driver',
-        timestamp: serverTimestamp(),
-        read: false
-      });
+        timestamp: new Date()
+      };
 
-      console.log("✅ Message sent with ID:", messageDoc.id);
+      // Send the message
+      await sendMessage(conversationId, messageData);
 
-      // Create notification for the driver - FIXED
-      const notificationRef = collection(db, 'notifications');
-      await addDoc(notificationRef, {
+      // Create notification for the driver
+      await createNotification({
         type: 'message',
         title: 'New Message',
         message: `You have a new message from ${currentUser.displayName || 'a tourist'}`,
@@ -349,11 +373,8 @@ const JeepProfile = () => {
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         relatedId: conversationId,
-        read: false,
-        timestamp: serverTimestamp()
+        conversationId: conversationId
       });
-
-      console.log("✅ Notification created for driver");
 
       setMessage("");
     } catch (error) {
@@ -365,42 +386,31 @@ const JeepProfile = () => {
   };
 
   // Handle notification click
-  const handleNotificationClick = (notification) => {
+  const handleNotificationClick = async (notification) => {
     console.log('Notification clicked:', notification);
     
-    if (notification.type === 'message' && notification.relatedId) {
-      const participantIds = notification.relatedId.split('_');
-      const otherParticipantId = participantIds.find(id => id !== currentUser.uid);
-      
-      if (otherParticipantId) {
-        // Mark notification as read
-        updateDoc(doc(db, 'notifications', notification.id), {
-          read: true,
-          readAt: serverTimestamp()
-        });
-        
-        // Navigate to the conversation
-        navigate(`/jeepprofile?driverId=${otherParticipantId}&openChat=true`);
-      }
+    // Mark notification as read
+    if (!notification.read) {
+      await updateDoc(doc(db, 'notifications', notification.id), {
+        read: true,
+        readAt: serverTimestamp()
+      });
+    }
+    
+    if (notification.type === 'message' && notification.conversationId) {
+      setActiveTab('chat');
     }
   };
 
-  // Format timestamp
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
     try {
-      const date = timestamp.toDate();
-      const now = new Date();
-      const diff = now.getTime() - date.getTime();
-      
-      if (diff < 60000) return 'Just now';
-      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-      
-      return date.toLocaleDateString();
+      await updateDoc(doc(db, 'notifications', notificationId), {
+        read: true,
+        readAt: serverTimestamp()
+      });
     } catch (error) {
-      return 'Recently';
+      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -475,6 +485,7 @@ const JeepProfile = () => {
                 user={currentUser}
                 notifications={notifications}
                 onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
               />
             </div>
           </div>
@@ -589,7 +600,7 @@ const JeepProfile = () => {
                   {currentUser && (
                     <button
                       onClick={() => setActiveTab('chat')}
-                      className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                      className={`py-4 px-6 text-center border-b-2 font-medium text-sm relative ${
                         activeTab === 'chat'
                           ? 'border-yellow-500 text-yellow-600'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -599,7 +610,7 @@ const JeepProfile = () => {
                       {messages.filter(msg => 
                         msg.senderId === driverId && !msg.read
                       ).length > 0 && (
-                        <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center inline-block">
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                           {messages.filter(msg => 
                             msg.senderId === driverId && !msg.read
                           ).length}
@@ -810,7 +821,7 @@ const JeepProfile = () => {
                                       : 'bg-gray-200 text-gray-800'
                                   }`}
                                 >
-                                  <p className="text-sm">{msg.text}</p>
+                                  <p className="text-sm">{msg.content}</p>
                                   <div className={`text-xs mt-1 flex items-center ${
                                     msg.senderId === currentUser.uid 
                                       ? 'text-yellow-100' 
@@ -831,7 +842,7 @@ const JeepProfile = () => {
                         </div>
 
                         {/* Message Input */}
-                        <form onSubmit={sendMessage} className="flex space-x-2">
+                        <form onSubmit={handleSendMessage} className="flex space-x-2">
                           <input
                             type="text"
                             value={message}
