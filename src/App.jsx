@@ -30,7 +30,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, Bell } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, Bell, X, Send, Check, CheckCheck, MessageCircle } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
@@ -129,6 +129,32 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
     console.error('Error creating conversation:', error);
     throw error;
   }
+};
+
+export const getConversationById = async (conversationId) => {
+  try {
+    const conversationDoc = await getDoc(doc(db, 'conversations', conversationId));
+    if (conversationDoc.exists()) {
+      return {
+        id: conversationDoc.id,
+        ...conversationDoc.data()
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting conversation:', error);
+    return null;
+  }
+};
+
+export const getOtherParticipant = (conversation, currentUserId) => {
+  if (!conversation || !conversation.participantIds) return null;
+  
+  const otherParticipantId = conversation.participantIds.find(id => id !== currentUserId);
+  return {
+    id: otherParticipantId,
+    name: conversation.participantNames?.[otherParticipantId] || 'User'
+  };
 };
 
 export const getUserConversations = (userId, callback) => {
@@ -276,6 +302,190 @@ export const markNotificationAsRead = async (notificationId) => {
   } catch (error) {
     console.error('Error marking notification as read:', error);
   }
+};
+
+// Chat Modal Component
+const ChatModal = ({ 
+  isOpen, 
+  onClose, 
+  conversationId, 
+  otherUser, 
+  currentUser 
+}) => {
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = React.useRef(null);
+
+  // Scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (!conversationId || !isOpen) return;
+
+    const unsubscribe = getMessages(conversationId, (messagesData) => {
+      setMessages(messagesData);
+      
+      // Mark messages as read
+      if (currentUser) {
+        markMessagesAsRead(conversationId, currentUser.uid);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [conversationId, isOpen, currentUser]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!message.trim() || !conversationId || sending || !currentUser) return;
+
+    try {
+      setSending(true);
+      
+      const messageData = {
+        content: message.trim(),
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || 'User',
+        receiverId: otherUser?.id,
+        timestamp: new Date()
+      };
+
+      await sendMessage(conversationId, messageData);
+
+      // Create notification for the recipient
+      await createNotification({
+        type: 'message',
+        title: 'New Message',
+        message: `You have a new message from ${currentUser.displayName || 'a user'}`,
+        recipientId: otherUser?.id,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || 'User',
+        conversationId: conversationId
+      });
+
+      setMessage('');
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const formatTime = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } catch (error) {
+      return '';
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-t-xl">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <User className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
+              <p className="text-yellow-100 text-sm">Online</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
+              <p className="text-lg font-medium">No messages yet</p>
+              <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                      msg.senderId === currentUser?.uid
+                        ? 'bg-yellow-500 text-white rounded-br-none'
+                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                    }`}
+                  >
+                    <p className="text-sm">{msg.content}</p>
+                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
+                      msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
+                    }`}>
+                      <span>{formatTime(msg.timestamp)}</span>
+                      {msg.senderId === currentUser?.uid && (
+                        <span>
+                          {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Message Input */}
+        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
+          <div className="flex space-x-3">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={!message.trim() || sending}
+              className="bg-yellow-500 text-white p-3 rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {sending ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 // Phone number formatting utility
@@ -1265,6 +1475,9 @@ const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMa
 // Home Page Component
 const HomePage = ({ user, onLogout, onShowAuth }) => {
   const [notifications, setNotifications] = useState([]);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatConversationId, setChatConversationId] = useState(null);
+  const [chatOtherUser, setChatOtherUser] = useState(null);
 
   // Load notifications when user is logged in
   useEffect(() => {
@@ -1279,8 +1492,25 @@ const HomePage = ({ user, onLogout, onShowAuth }) => {
     }
   }, [user]);
 
+  // Handle notification click - OPEN CHAT MODAL
   const handleNotificationClick = async (notification) => {
     console.log('Notification clicked:', notification);
+    
+    // Mark notification as read
+    if (!notification.read) {
+      await markNotificationAsRead(notification.id);
+    }
+    
+    if (notification.type === 'message' && notification.conversationId) {
+      // Open chat modal with the conversation
+      const conversation = await getConversationById(notification.conversationId);
+      if (conversation && user) {
+        const otherUser = getOtherParticipant(conversation, user.uid);
+        setChatConversationId(notification.conversationId);
+        setChatOtherUser(otherUser);
+        setShowChatModal(true);
+      }
+    }
   };
 
   const handleMarkAsRead = async (notificationId) => {
@@ -1289,6 +1519,15 @@ const HomePage = ({ user, onLogout, onShowAuth }) => {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Chat Modal */}
+      <ChatModal 
+        isOpen={showChatModal}
+        onClose={() => setShowChatModal(false)}
+        conversationId={chatConversationId}
+        otherUser={chatOtherUser}
+        currentUser={user}
+      />
+      
       <GlobalNotificationBell 
         user={user}
         notifications={notifications}

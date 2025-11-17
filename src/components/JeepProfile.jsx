@@ -31,7 +31,8 @@ import {
   Send,
   Check,
   CheckCheck,
-  Bell
+  Bell,
+  X
 } from "lucide-react";
 
 // Initialize Firebase
@@ -45,7 +46,9 @@ import {
   getMessages, 
   markMessagesAsRead, 
   createNotification,
-  getUserNotifications 
+  getUserNotifications,
+  getConversationById,
+  getOtherParticipant
 } from "../App";
 
 // Notification Bell Component for JeepProfile
@@ -131,7 +134,7 @@ const NotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRe
                 >
                   <div className="flex justify-between items-start mb-1">
                     <h4 className="font-medium text-gray-900 text-sm">
-                      {notification.title}
+                      {notification.senderName || 'User'}
                     </h4>
                     {!notification.read && (
                       <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -147,6 +150,179 @@ const NotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRe
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// Chat Modal Component
+const ChatModal = ({ 
+  isOpen, 
+  onClose, 
+  conversationId, 
+  otherUser, 
+  currentUser, 
+  onSendMessage 
+}) => {
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  // Scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (!conversationId || !isOpen) return;
+
+    const unsubscribe = getMessages(conversationId, (messagesData) => {
+      setMessages(messagesData);
+      
+      // Mark messages as read
+      if (currentUser) {
+        markMessagesAsRead(conversationId, currentUser.uid);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [conversationId, isOpen, currentUser]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!message.trim() || !conversationId || sending || !currentUser) return;
+
+    try {
+      setSending(true);
+      
+      const messageData = {
+        content: message.trim(),
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || 'User',
+        receiverId: otherUser?.id,
+        timestamp: new Date()
+      };
+
+      await sendMessage(conversationId, messageData);
+      setMessage('');
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const formatTime = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } catch (error) {
+      return '';
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-t-xl">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <User className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
+              <p className="text-yellow-100 text-sm">Online</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
+              <p className="text-lg font-medium">No messages yet</p>
+              <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                      msg.senderId === currentUser?.uid
+                        ? 'bg-yellow-500 text-white rounded-br-none'
+                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                    }`}
+                  >
+                    <p className="text-sm">{msg.content}</p>
+                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
+                      msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
+                    }`}>
+                      <span>{formatTime(msg.timestamp)}</span>
+                      {msg.senderId === currentUser?.uid && (
+                        <span>
+                          {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Message Input */}
+        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
+          <div className="flex space-x-3">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={!message.trim() || sending}
+              className="bg-yellow-500 text-white p-3 rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {sending ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
@@ -168,6 +344,11 @@ const JeepProfile = () => {
   const [onlineStatus, setOnlineStatus] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [conversationId, setConversationId] = useState(null);
+  
+  // Chat modal state
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatConversationId, setChatConversationId] = useState(null);
+  const [chatOtherUser, setChatOtherUser] = useState(null);
 
   // Get driver ID from URL parameters
   const searchParams = new URLSearchParams(location.search);
@@ -185,10 +366,10 @@ const JeepProfile = () => {
 
   // Check if chat should be opened
   useEffect(() => {
-    if (openChat === 'true') {
+    if (openChat === 'true' && driverId) {
       setActiveTab('chat');
     }
-  }, [openChat]);
+  }, [openChat, driverId]);
 
   // Format timestamp function
   const formatTime = (timestamp) => {
@@ -344,7 +525,58 @@ const JeepProfile = () => {
     return () => unsubscribe();
   }, [conversationId, currentUser]);
 
-  // Send message function - FIXED with proper notification
+  // Handle notification click - OPEN CHAT MODAL
+  const handleNotificationClick = async (notification) => {
+    console.log('Notification clicked:', notification);
+    
+    // Mark notification as read
+    if (!notification.read) {
+      await updateDoc(doc(db, 'notifications', notification.id), {
+        read: true,
+        readAt: serverTimestamp()
+      });
+    }
+    
+    if (notification.type === 'message' && notification.conversationId) {
+      // Open chat modal with the conversation
+      const conversation = await getConversationById(notification.conversationId);
+      if (conversation && currentUser) {
+        const otherUser = getOtherParticipant(conversation, currentUser.uid);
+        setChatConversationId(notification.conversationId);
+        setChatOtherUser(otherUser);
+        setIsChatModalOpen(true);
+      }
+    } else if (notification.type === 'message' && driverId) {
+      // If it's a message notification for this driver, open the chat tab
+      setActiveTab('chat');
+    }
+  };
+
+  // Open chat modal from button
+  const handleOpenChatModal = () => {
+    if (driver && currentUser) {
+      setChatConversationId(conversationId);
+      setChatOtherUser({
+        id: driver.id,
+        name: driver.fullName || 'Driver'
+      });
+      setIsChatModalOpen(true);
+    }
+  };
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      await updateDoc(doc(db, 'notifications', notificationId), {
+        read: true,
+        readAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Send message function
   const handleSendMessage = async (e) => {
     e.preventDefault();
     
@@ -382,35 +614,6 @@ const JeepProfile = () => {
       alert("Failed to send message. Please try again.");
     } finally {
       setSending(false);
-    }
-  };
-
-  // Handle notification click
-  const handleNotificationClick = async (notification) => {
-    console.log('Notification clicked:', notification);
-    
-    // Mark notification as read
-    if (!notification.read) {
-      await updateDoc(doc(db, 'notifications', notification.id), {
-        read: true,
-        readAt: serverTimestamp()
-      });
-    }
-    
-    if (notification.type === 'message' && notification.conversationId) {
-      setActiveTab('chat');
-    }
-  };
-
-  // Mark notification as read
-  const handleMarkAsRead = async (notificationId) => {
-    try {
-      await updateDoc(doc(db, 'notifications', notificationId), {
-        read: true,
-        readAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -456,6 +659,16 @@ const JeepProfile = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Chat Modal */}
+      <ChatModal 
+        isOpen={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+        conversationId={chatConversationId}
+        otherUser={chatOtherUser}
+        currentUser={currentUser}
+        onSendMessage={handleSendMessage}
+      />
+      
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -551,7 +764,7 @@ const JeepProfile = () => {
               <div className="mt-6 space-y-3">
                 {currentUser && userRole === 'tourist' && (
                   <button
-                    onClick={() => setActiveTab('chat')}
+                    onClick={handleOpenChatModal}
                     className="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
                   >
                     <MessageCircle size={18} className="mr-2" />
