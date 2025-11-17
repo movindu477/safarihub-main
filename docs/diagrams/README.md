@@ -35,7 +35,26 @@ Interactive diagrams in Mermaid format that render directly on GitHub. Includes:
 - VSCode with Mermaid extension
 - Markdown preview with Mermaid support
 
-### 3. Visual ASCII Flowchart
+### 3. XML Activity Diagram
+**File**: `find-jeep-driver-activity.xml`
+
+Structured XML representation of the complete activity diagram with detailed metadata and data architecture.
+
+**Features**:
+- Structured activity definitions with swimlanes
+- Complete actor flows (Tourist, System, Driver)
+- Real-time features specification
+- Data architecture and Firebase collections
+- Decision points with conditions
+- Comprehensive metadata
+
+**Viewing**:
+- Any XML viewer or text editor
+- XML parsers and processors
+- Can be imported into UML tools that support XML
+- Useful for automated processing and tool integration
+
+### 4. Visual ASCII Flowchart
 **File**: `visual-flowchart.md`
 
 Text-based flowcharts using ASCII art for quick reference without needing any rendering tools.
@@ -147,6 +166,7 @@ When updating these diagrams:
 |--------|----------|-----------|---------|
 | **PlantUML** | Detailed UML diagrams | Requires tools | Text-based |
 | **Mermaid** | GitHub documentation | Automatic on GitHub | Text-based |
+| **XML** | Tool integration, structured data | XML viewers/parsers | Any text editor |
 | **ASCII** | Quick reference | Any text viewer | Any text editor |
 
 ## License

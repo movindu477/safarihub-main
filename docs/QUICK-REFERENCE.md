@@ -10,6 +10,7 @@ The complete user journey for finding and booking a safari jeep driver in the Sa
 |--------------|------|----------|-------------|
 | **PlantUML** | [`diagrams/find-jeep-driver-activity.puml`](diagrams/find-jeep-driver-activity.puml) | Detailed UML documentation | PlantUML renderer, IDE plugins |
 | **Mermaid** | [`diagrams/find-jeep-driver-mermaid.md`](diagrams/find-jeep-driver-mermaid.md) | GitHub documentation | View directly on GitHub |
+| **XML** | [`diagrams/find-jeep-driver-activity.xml`](diagrams/find-jeep-driver-activity.xml) | Structured data, tool integration | Any XML viewer/parser |
 | **ASCII** | [`diagrams/visual-flowchart.md`](diagrams/visual-flowchart.md) | Quick reference | Any text viewer |
 | **Detailed Docs** | [`find-jeep-driver-flow.md`](find-jeep-driver-flow.md) | Complete documentation | GitHub, any markdown viewer |
 
@@ -20,6 +21,9 @@ The complete user journey for finding and booking a safari jeep driver in the Sa
 
 ### I need technical implementation details
 👉 Start here: [`find-jeep-driver-flow.md`](find-jeep-driver-flow.md)
+
+### I need structured XML data
+👉 Start here: [`diagrams/find-jeep-driver-activity.xml`](diagrams/find-jeep-driver-activity.xml)
 
 ### I need a printable diagram
 👉 Start here: [`diagrams/find-jeep-driver-activity.puml`](diagrams/find-jeep-driver-activity.puml) (render to PDF)
