@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -114,13 +114,28 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
     const conversationDoc = await getDoc(conversationRef);
 
     if (!conversationDoc.exists()) {
+      // Get user roles
+      let user1Role = 'tourist';
+      let user2Role = 'provider';
+      
+      const user1TouristDoc = await getDoc(doc(db, 'tourists', user1Id));
+      const user1ProviderDoc = await getDoc(doc(db, 'serviceProviders', user1Id));
+      const user2TouristDoc = await getDoc(doc(db, 'tourists', user2Id));
+      const user2ProviderDoc = await getDoc(doc(db, 'serviceProviders', user2Id));
+      
+      if (user1ProviderDoc.exists()) user1Role = 'provider';
+      if (user2TouristDoc.exists()) user2Role = 'tourist';
+
       await setDoc(conversationRef, {
         participantIds: [user1Id, user2Id],
         participantNames: {
           [user1Id]: user1Name,
           [user2Id]: user2Name
         },
-        participantRoles: {},
+        participantRoles: {
+          [user1Id]: user1Role,
+          [user2Id]: user2Role
+        },
         lastMessage: '',
         lastMessageTime: serverTimestamp(),
         lastMessageTimestamp: Date.now(),
@@ -128,33 +143,9 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
         updatedAt: serverTimestamp()
       });
       
-      // Initialize participant roles
-      const user1Doc = await getDoc(doc(db, 'tourists', user1Id));
-      const user2Doc = await getDoc(doc(db, 'serviceProviders', user2Id));
-      
-      let user1Role = 'tourist';
-      let user2Role = 'provider';
-      
-      if (!user1Doc.exists()) {
-        const user1ProviderDoc = await getDoc(doc(db, 'serviceProviders', user1Id));
-        if (user1ProviderDoc.exists()) {
-          user1Role = 'provider';
-        }
-      }
-      
-      if (!user2Doc.exists()) {
-        const user2TouristDoc = await getDoc(doc(db, 'tourists', user2Id));
-        if (user2TouristDoc.exists()) {
-          user2Role = 'tourist';
-        }
-      }
-      
-      await updateDoc(conversationRef, {
-        participantRoles: {
-          [user1Id]: user1Role,
-          [user2Id]: user2Role
-        }
-      });
+      console.log(`✅ New conversation created: ${conversationId}`);
+    } else {
+      console.log(`✅ Existing conversation found: ${conversationId}`);
     }
 
     return conversationId;
@@ -200,13 +191,20 @@ export const getUserConversations = (userId, callback) => {
       orderBy('lastMessageTimestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(userConversationsQuery, (snapshot) => {
-      const conversations = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      callback(conversations);
-    });
+    const unsubscribe = onSnapshot(userConversationsQuery, 
+      (snapshot) => {
+        const conversations = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`📨 Loaded ${conversations.length} conversations for user ${userId}`);
+        callback(conversations);
+      },
+      (error) => {
+        console.error('Error in conversations snapshot:', error);
+        callback([]);
+      }
+    );
 
     return unsubscribe;
   } catch (error) {
@@ -228,6 +226,7 @@ export const getMessages = (conversationId, callback) => {
           id: doc.id,
           ...doc.data()
         }));
+        console.log(`📬 Received ${messages.length} messages for conversation ${conversationId}`);
         callback(messages);
       },
       (error) => {
@@ -293,7 +292,7 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     );
 
     await Promise.all(updatePromises);
-    console.log(`✅ Marked messages as read in conversation ${conversationId}`);
+    console.log(`✅ Marked ${snapshot.docs.length} messages as read in conversation ${conversationId}`);
   } catch (error) {
     console.error('Error marking messages as read:', error);
   }
@@ -318,7 +317,7 @@ export const getUserNotifications = (userId, callback) => {
     const notificationsQuery = query(
       notificationsRef,
       where('recipientId', '==', userId),
-      orderBy('timestamp', 'desc')
+      orderBy('timestampValue', 'desc')
     );
 
     const unsubscribe = onSnapshot(notificationsQuery, 
@@ -327,6 +326,7 @@ export const getUserNotifications = (userId, callback) => {
           id: doc.id,
           ...doc.data()
         }));
+        console.log(`🔔 Received ${notifications.length} notifications for user ${userId}`);
         callback(notifications);
       },
       (error) => {
@@ -365,8 +365,10 @@ export const markNotificationAsRead = async (notificationId) => {
   try {
     await updateDoc(doc(db, 'notifications', notificationId), {
       read: true,
-      readAt: serverTimestamp()
+      readAt: serverTimestamp(),
+      readAtTimestamp: Date.now()
     });
+    console.log(`✅ Notification ${notificationId} marked as read`);
   } catch (error) {
     console.error('Error marking notification as read:', error);
   }
@@ -635,6 +637,321 @@ const ChatModal = ({
   );
 };
 
+// Global Notification Bell Component (Available on all pages)
+export const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications && !event.target.closest('.notification-container')) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  const handleBellClick = () => {
+    setShowNotifications(!showNotifications);
+  };
+
+  const handleNotificationItemClick = async (notification) => {
+    if (!notification.read) {
+      await onMarkAsRead(notification.id);
+    }
+    onNotificationClick(notification);
+    setShowNotifications(false);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    const unreadNotifications = notifications.filter(n => !n.read);
+    for (const notification of unreadNotifications) {
+      await onMarkAsRead(notification.id);
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 notification-container">
+      <div className="relative">
+        {showNotifications && (
+          <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
+            <NotificationPanel 
+              notifications={notifications}
+              onClose={() => setShowNotifications(false)}
+              onNotificationClick={handleNotificationItemClick}
+              onMarkAsRead={onMarkAsRead}
+            />
+          </div>
+        )}
+
+        <button
+          onClick={handleBellClick}
+          className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
+        >
+          <Bell className="h-6 w-6 text-white" />
+          {notifications.filter(n => !n.read).length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+              {notifications.filter(n => !n.read).length}
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Home Page Component
+const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatConversationId, setChatConversationId] = useState(null);
+  const [chatOtherUser, setChatOtherUser] = useState(null);
+
+  // Handle notification click - OPEN CHAT MODAL
+  const handleNotificationClick = async (notification) => {
+    console.log('🔘 Notification clicked:', notification);
+    
+    // Mark notification as read
+    if (!notification.read) {
+      await onMarkAsRead(notification.id);
+    }
+    
+    if (notification.type === 'message' && notification.conversationId) {
+      // Open chat modal with the conversation
+      const conversation = await getConversationById(notification.conversationId);
+      if (conversation && user) {
+        const otherUser = getOtherParticipant(conversation, user.uid);
+        if (otherUser) {
+          setChatConversationId(notification.conversationId);
+          setChatOtherUser(otherUser);
+          setShowChatModal(true);
+          console.log(`💬 Opening chat with ${otherUser.name}`);
+        }
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Chat Modal */}
+      <ChatModal 
+        isOpen={showChatModal}
+        onClose={() => setShowChatModal(false)}
+        conversationId={chatConversationId}
+        otherUser={chatOtherUser}
+        currentUser={user}
+      />
+      
+      <GlobalNotificationBell 
+        user={user}
+        notifications={notifications}
+        onNotificationClick={handleNotificationClick}
+        onMarkAsRead={onMarkAsRead}
+      />
+      
+      <Navbar 
+        user={user} 
+        onLogout={onLogout} 
+        onLogin={onShowAuth}
+        onRegister={onShowAuth}
+      />
+      
+      {/* Home Content with All Sections */}
+      <div className="pt-16">
+        <Section1 />
+        <Section2 />
+        <Section3 />
+        <Section4 />
+        <Section5 />
+        <Footer />
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Main App Component
+function App() {
+  const [user, setUser] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
+
+  // Listen for auth state changes and notifications
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
+      
+      setUser(user);
+      setLoading(false);
+      
+      if (user) {
+        try {
+          let userRole = 'tourist';
+          let userName = user.displayName || 'User';
+          let userData = {};
+          
+          const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
+          if (touristDoc.exists()) {
+            userRole = 'tourist';
+            userData = touristDoc.data();
+            userName = userData.fullName || userName;
+          } else {
+            const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+            if (providerDoc.exists()) {
+              userRole = 'provider';
+              userData = providerDoc.data();
+              userName = userData.fullName || userName;
+            }
+          }
+          
+          await setUserOnline(user.uid, userRole, {
+            userName: userName,
+            email: user.email,
+            ...userData
+          });
+          
+          console.log(`✅ User ${user.uid} set online as ${userRole}`);
+        } catch (error) {
+          console.log('Error setting user online status:', error);
+        }
+      } else {
+        setNotifications([]);
+      }
+    });
+    
+    return () => {
+      console.log('🔴 Unsubscribing from auth state changes');
+      unsubscribe();
+    };
+  }, []);
+
+  // Load notifications when user is logged in
+  useEffect(() => {
+    if (user) {
+      console.log(`🔔 Setting up notifications listener for user: ${user.uid}`);
+      
+      const unsubscribe = getUserNotifications(user.uid, (notifications) => {
+        console.log(`📢 Received ${notifications.length} notifications`);
+        setNotifications(notifications);
+      });
+      
+      return () => {
+        console.log(`🔴 Unsubscribing from notifications for user: ${user.uid}`);
+        unsubscribe();
+      };
+    } else {
+      setNotifications([]);
+    }
+  }, [user]);
+
+  const handleLogout = async () => {
+    try {
+      if (user) {
+        await setUserOffline(user.uid);
+      }
+      await signOut(auth);
+      console.log('✅ User logged out successfully');
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    setShowAuth(false);
+  };
+
+  const handleShowAuth = () => {
+    setShowAuth(true);
+  };
+
+  const handleNotificationClick = async (notification) => {
+    console.log('🔘 Global notification clicked:', notification);
+    
+    // Mark notification as read
+    if (!notification.read) {
+      await markNotificationAsRead(notification.id);
+    }
+    
+    // This will be handled by individual page components
+    console.log('Notification click handled by global system:', notification);
+  };
+
+  const handleMarkAsRead = async (notificationId) => {
+    await markNotificationAsRead(notificationId);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (user) {
+        setUserOffline(user.uid);
+      }
+    };
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading SafariHub...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (showAuth) {
+    return <Authentication onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  return (
+    <Router>
+      <Routes>
+        <Route 
+          path="/" 
+          element={
+            <HomePage 
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          } 
+        />
+        <Route 
+          path="/driver" 
+          element={
+            <JeepDriversPage 
+              user={user}
+              onLogout={handleLogout}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          } 
+        />
+        <Route 
+          path="/jeepprofile" 
+          element={
+            <JeepProfile 
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          } 
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+}
+
+// ... (Rest of the Authentication and Registration components remain the same)
 // Phone number formatting utility
 const formatPhoneNumber = (phone) => {
   if (!phone) return "";
@@ -744,18 +1061,6 @@ function Authentication({ onAuthSuccess }) {
       reader.onload = (e) => setProfilePreview(e.target.result);
       reader.readAsDataURL(file);
     }
-  };
-
-  // Handle date selection for calendar
-  const handleDateSelect = (date) => {
-    const dateString = date.toISOString().split('T')[0];
-    setAvailableDates(prev => {
-      if (prev.includes(dateString)) {
-        return prev.filter(d => d !== dateString);
-      } else {
-        return [...prev, dateString];
-      }
-    });
   };
 
   // Enhanced Register Function
@@ -1074,8 +1379,7 @@ function Authentication({ onAuthSuccess }) {
                 setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
                 setVehicleType, setPricePerDay, setDestinations, setLanguages,
                 setSpecialSkills, setCertifications, setDescription,
-                setAvailableDates,
-                handleDateSelect
+                setAvailableDates
               }}
               profilePreview={profilePreview}
               onProfileImageSelect={handleProfileImageSelect}
@@ -1557,286 +1861,5 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     </div>
   );
 };
-
-// Global Notification Bell Component
-const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showNotifications && !event.target.closest('.notification-container')) {
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showNotifications]);
-
-  const handleBellClick = () => {
-    setShowNotifications(!showNotifications);
-  };
-
-  const handleNotificationItemClick = async (notification) => {
-    if (!notification.read) {
-      await onMarkAsRead(notification.id);
-    }
-    onNotificationClick(notification);
-    setShowNotifications(false);
-  };
-
-  if (!user) return null;
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 notification-container">
-      <div className="relative">
-        {showNotifications && (
-          <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
-            <NotificationPanel 
-              notifications={notifications}
-              onClose={() => setShowNotifications(false)}
-              onNotificationClick={handleNotificationItemClick}
-              onMarkAsRead={onMarkAsRead}
-            />
-          </div>
-        )}
-
-        <button
-          onClick={handleBellClick}
-          className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
-        >
-          <Bell className="h-6 w-6 text-white" />
-          {notifications.filter(n => !n.read).length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-              {notifications.filter(n => !n.read).length}
-            </span>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// Enhanced Home Page Component
-const HomePage = ({ user, onLogout, onShowAuth }) => {
-  const [notifications, setNotifications] = useState([]);
-  const [showChatModal, setShowChatModal] = useState(false);
-  const [chatConversationId, setChatConversationId] = useState(null);
-  const [chatOtherUser, setChatOtherUser] = useState(null);
-
-  // Load notifications when user is logged in
-  useEffect(() => {
-    if (user) {
-      console.log(`🔔 Setting up notifications listener for user: ${user.uid}`);
-      
-      const unsubscribe = getUserNotifications(user.uid, (notifications) => {
-        console.log(`📢 Received ${notifications.length} notifications`);
-        setNotifications(notifications);
-      });
-      
-      return () => {
-        console.log(`🔴 Unsubscribing from notifications for user: ${user.uid}`);
-        unsubscribe();
-      };
-    } else {
-      setNotifications([]);
-    }
-  }, [user]);
-
-  // Handle notification click - OPEN CHAT MODAL
-  const handleNotificationClick = async (notification) => {
-    console.log('🔘 Notification clicked:', notification);
-    
-    // Mark notification as read
-    if (!notification.read) {
-      await markNotificationAsRead(notification.id);
-    }
-    
-    if (notification.type === 'message' && notification.conversationId) {
-      // Open chat modal with the conversation
-      const conversation = await getConversationById(notification.conversationId);
-      if (conversation && user) {
-        const otherUser = getOtherParticipant(conversation, user.uid);
-        if (otherUser) {
-          setChatConversationId(notification.conversationId);
-          setChatOtherUser(otherUser);
-          setShowChatModal(true);
-          console.log(`💬 Opening chat with ${otherUser.name}`);
-        }
-      }
-    }
-  };
-
-  const handleMarkAsRead = async (notificationId) => {
-    await markNotificationAsRead(notificationId);
-  };
-
-  return (
-    <div className="min-h-screen bg-white">
-      {/* Chat Modal */}
-      <ChatModal 
-        isOpen={showChatModal}
-        onClose={() => setShowChatModal(false)}
-        conversationId={chatConversationId}
-        otherUser={chatOtherUser}
-        currentUser={user}
-      />
-      
-      <GlobalNotificationBell 
-        user={user}
-        notifications={notifications}
-        onNotificationClick={handleNotificationClick}
-        onMarkAsRead={handleMarkAsRead}
-      />
-      
-      <Navbar 
-        user={user} 
-        onLogout={onLogout} 
-        onLogin={onShowAuth}
-        onRegister={onShowAuth}
-      />
-      
-      {/* Home Content with All Sections */}
-      <div className="pt-16">
-        <Section1 />
-        <Section2 />
-        <Section3 />
-        <Section4 />
-        <Section5 />
-        <Footer />
-      </div>
-    </div>
-  );
-};
-
-// Enhanced Main App Component
-function App() {
-  const [user, setUser] = useState(null);
-  const [showAuth, setShowAuth] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Listen for auth state changes
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
-      
-      setUser(user);
-      setLoading(false);
-      
-      if (user) {
-        try {
-          let userRole = 'tourist';
-          let userName = user.displayName || 'User';
-          let userData = {};
-          
-          const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
-          if (touristDoc.exists()) {
-            userRole = 'tourist';
-            userData = touristDoc.data();
-            userName = userData.fullName || userName;
-          } else {
-            const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
-            if (providerDoc.exists()) {
-              userRole = 'provider';
-              userData = providerDoc.data();
-              userName = userData.fullName || userName;
-            }
-          }
-          
-          await setUserOnline(user.uid, userRole, {
-            userName: userName,
-            email: user.email,
-            ...userData
-          });
-          
-          console.log(`✅ User ${user.uid} set online as ${userRole}`);
-        } catch (error) {
-          console.log('Error setting user online status:', error);
-        }
-      }
-    });
-    
-    return () => {
-      console.log('🔴 Unsubscribing from auth state changes');
-      unsubscribe();
-    };
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      if (user) {
-        await setUserOffline(user.uid);
-      }
-      await signOut(auth);
-      console.log('✅ User logged out successfully');
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
-
-  const handleAuthSuccess = () => {
-    setShowAuth(false);
-  };
-
-  const handleShowAuth = () => {
-    setShowAuth(true);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (user) {
-        setUserOffline(user.uid);
-      }
-    };
-  }, [user]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading SafariHub...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (showAuth) {
-    return <Authentication onAuthSuccess={handleAuthSuccess} />;
-  }
-
-  return (
-    <Router>
-      <Routes>
-        <Route 
-          path="/" 
-          element={
-            <HomePage 
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-            />
-          } 
-        />
-        <Route 
-          path="/driver" 
-          element={
-            <JeepDriversPage 
-              user={user}
-              onLogout={handleLogout}
-            />
-          } 
-        />
-        <Route 
-          path="/jeepprofile" 
-          element={<JeepProfile />} 
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
-  );
-}
 
 export default App;

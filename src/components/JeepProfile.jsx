@@ -32,7 +32,8 @@ import {
   Check,
   CheckCheck,
   Bell,
-  X
+  X,
+  User
 } from "lucide-react";
 
 // Initialize Firebase
@@ -48,111 +49,10 @@ import {
   createNotification,
   getUserNotifications,
   getConversationById,
-  getOtherParticipant
+  getOtherParticipant,
+  markNotificationAsRead,
+  GlobalNotificationBell
 } from "../App";
-
-// Notification Bell Component for JeepProfile
-const NotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showNotifications && !event.target.closest('.notification-container')) {
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showNotifications]);
-
-  const handleBellClick = () => {
-    setShowNotifications(!showNotifications);
-  };
-
-  const handleNotificationItemClick = async (notification) => {
-    if (!notification.read) {
-      await onMarkAsRead(notification.id);
-    }
-    onNotificationClick(notification);
-    setShowNotifications(false);
-  };
-
-  const handleMarkAllAsRead = async () => {
-    const unreadNotifications = notifications.filter(n => !n.read);
-    for (const notification of unreadNotifications) {
-      await onMarkAsRead(notification.id);
-    }
-  };
-
-  if (!user) return null;
-
-  return (
-    <div className="relative notification-container">
-      <button
-        onClick={handleBellClick}
-        className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
-      >
-        <Bell size={24} />
-        {notifications.filter(n => !n.read).length > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-            {notifications.filter(n => !n.read).length}
-          </span>
-        )}
-      </button>
-
-      {/* Notification Panel */}
-      {showNotifications && (
-        <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
-            {notifications.filter(n => !n.read).length > 0 && (
-              <button
-                onClick={handleMarkAllAsRead}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                Mark all read
-              </button>
-            )}
-          </div>
-          
-          <div className="divide-y divide-gray-100">
-            {notifications.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
-                No notifications
-              </div>
-            ) : (
-              notifications.slice(0, 10).map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                    !notification.read ? 'bg-blue-50' : ''
-                  }`}
-                  onClick={() => handleNotificationItemClick(notification)}
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <h4 className="font-medium text-gray-900 text-sm">
-                      {notification.senderName || 'User'}
-                    </h4>
-                    {!notification.read && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    )}
-                  </div>
-                  <p className="text-gray-600 text-xs mb-2">{notification.message}</p>
-                  <p className="text-gray-400 text-xs">
-                    {formatTime(notification.timestamp)}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 // Chat Modal Component
 const ChatModal = ({ 
@@ -160,12 +60,12 @@ const ChatModal = ({
   onClose, 
   conversationId, 
   otherUser, 
-  currentUser, 
-  onSendMessage 
+  currentUser 
 }) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
+  const [otherUserOnline, setOtherUserOnline] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Scroll to bottom of messages
@@ -177,25 +77,45 @@ const ChatModal = ({
     scrollToBottom();
   }, [messages]);
 
+  // Monitor other user's online status
+  useEffect(() => {
+    if (!otherUser?.id) return;
+
+    const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
+    const unsubscribe = onSnapshot(userRef, (doc) => {
+      if (doc.exists()) {
+        setOtherUserOnline(doc.data().online || false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [otherUser]);
+
   // Load messages when conversation changes
   useEffect(() => {
     if (!conversationId || !isOpen) return;
 
+    console.log(`📨 Loading messages for conversation: ${conversationId}`);
+
     const unsubscribe = getMessages(conversationId, (messagesData) => {
+      console.log(`📬 Received ${messagesData.length} messages`);
       setMessages(messagesData);
       
-      // Mark messages as read
+      // Mark messages as read and delivered
       if (currentUser) {
         markMessagesAsRead(conversationId, currentUser.uid);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log(`🔴 Unsubscribing from messages for conversation: ${conversationId}`);
+      unsubscribe();
+    };
   }, [conversationId, isOpen, currentUser]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!message.trim() || !conversationId || sending || !currentUser) return;
+    if (!message.trim() || !conversationId || sending || !currentUser || !otherUser) return;
 
     try {
       setSending(true);
@@ -204,15 +124,32 @@ const ChatModal = ({
         content: message.trim(),
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
-        receiverId: otherUser?.id,
+        receiverId: otherUser.id,
         timestamp: new Date()
       };
 
+      console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
+      
+      // Send the message
       await sendMessage(conversationId, messageData);
+
+      // Create notification for the recipient
+      await createNotification({
+        type: 'message',
+        title: 'New Message',
+        message: `You have a new message from ${currentUser.displayName || 'a user'}: "${message.trim()}"`,
+        recipientId: otherUser.id,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || 'User',
+        conversationId: conversationId,
+        relatedId: conversationId
+      });
+
+      console.log(`✅ Notification sent to ${otherUser.name}`);
       setMessage('');
 
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ Error sending message:', error);
       alert('Failed to send message. Please try again.');
     } finally {
       setSending(false);
@@ -241,12 +178,19 @@ const ChatModal = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-t-xl">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-              <User className="h-5 w-5" />
+            <div className="relative">
+              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <User className="h-5 w-5" />
+              </div>
+              <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                otherUserOnline ? 'bg-green-500' : 'bg-gray-400'
+              }`}></div>
             </div>
             <div>
               <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
-              <p className="text-yellow-100 text-sm">Online</p>
+              <p className="text-yellow-100 text-sm">
+                {otherUserOnline ? 'Online' : 'Offline'} • {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
+              </p>
             </div>
           </div>
           <button
@@ -264,6 +208,9 @@ const ChatModal = ({
               <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
               <p className="text-lg font-medium">No messages yet</p>
               <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
+              <p className="text-xs text-gray-400 mt-2">
+                {otherUserOnline ? 'User is online' : 'User is offline - they will see your message when they come online'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -285,8 +232,14 @@ const ChatModal = ({
                     }`}>
                       <span>{formatTime(msg.timestamp)}</span>
                       {msg.senderId === currentUser?.uid && (
-                        <span>
-                          {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
+                        <span className="flex items-center space-x-1">
+                          {msg.read ? (
+                            <CheckCheck size={12} className="text-blue-300" title="Read" />
+                          ) : msg.delivered ? (
+                            <CheckCheck size={12} className="text-gray-300" title="Delivered" />
+                          ) : (
+                            <Check size={12} className="text-gray-300" title="Sent" />
+                          )}
                         </span>
                       )}
                     </div>
@@ -327,7 +280,7 @@ const ChatModal = ({
   );
 };
 
-const JeepProfile = () => {
+const JeepProfile = ({ notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
@@ -342,7 +295,6 @@ const JeepProfile = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState("");
   const [onlineStatus, setOnlineStatus] = useState(false);
-  const [notifications, setNotifications] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   
   // Chat modal state
@@ -364,19 +316,21 @@ const JeepProfile = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Check if chat should be opened
+  // Check if chat should be opened from URL parameter
   useEffect(() => {
-    if (openChat === 'true' && driverId) {
+    if (openChat === 'true' && driverId && currentUser) {
       setActiveTab('chat');
+      // Initialize conversation if needed
+      initializeConversation();
     }
-  }, [openChat, driverId]);
+  }, [openChat, driverId, currentUser]);
 
   // Format timestamp function
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     
     try {
-      const date = timestamp.toDate();
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
       const now = new Date();
       const diff = now.getTime() - date.getTime();
       
@@ -390,7 +344,7 @@ const JeepProfile = () => {
     }
   };
 
-  // Get current user and notifications
+  // Get current user
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -410,17 +364,9 @@ const JeepProfile = () => {
         } catch (error) {
           console.error('Error getting user role:', error);
         }
-
-        // Load notifications
-        const unsubscribeNotifications = getUserNotifications(user.uid, (notifications) => {
-          setNotifications(notifications);
-        });
-
-        return () => unsubscribeNotifications();
       } else {
         setCurrentUser(null);
         setUserRole('');
-        setNotifications([]);
       }
     });
 
@@ -480,28 +426,29 @@ const JeepProfile = () => {
     return () => unsubscribe();
   }, [driverId]);
 
-  // Initialize conversation and load messages
-  useEffect(() => {
+  // Initialize conversation
+  const initializeConversation = async () => {
     if (!currentUser || !driverId || !driver) return;
 
-    const initializeConversation = async () => {
-      try {
-        const conversationId = await createOrGetConversation(
-          currentUser.uid,
-          driverId,
-          currentUser.displayName || 'User',
-          driver.fullName || 'Driver'
-        );
-        
-        setConversationId(conversationId);
-        
-        // Mark existing messages as read
-        await markMessagesAsRead(conversationId, currentUser.uid);
-      } catch (error) {
-        console.error('Error initializing conversation:', error);
-      }
-    };
+    try {
+      const conversationId = await createOrGetConversation(
+        currentUser.uid,
+        driverId,
+        currentUser.displayName || 'User',
+        driver.fullName || 'Driver'
+      );
+      
+      setConversationId(conversationId);
+      
+      // Mark existing messages as read
+      await markMessagesAsRead(conversationId, currentUser.uid);
+    } catch (error) {
+      console.error('Error initializing conversation:', error);
+    }
+  };
 
+  // Initialize conversation and load messages
+  useEffect(() => {
     initializeConversation();
   }, [currentUser, driverId, driver]);
 
@@ -527,28 +474,31 @@ const JeepProfile = () => {
 
   // Handle notification click - OPEN CHAT MODAL
   const handleNotificationClick = async (notification) => {
-    console.log('Notification clicked:', notification);
+    console.log('🔘 JeepProfile notification clicked:', notification);
     
     // Mark notification as read
     if (!notification.read) {
-      await updateDoc(doc(db, 'notifications', notification.id), {
-        read: true,
-        readAt: serverTimestamp()
-      });
+      await onMarkAsRead(notification.id);
     }
     
     if (notification.type === 'message' && notification.conversationId) {
-      // Open chat modal with the conversation
+      // Check if this notification is for the current driver
       const conversation = await getConversationById(notification.conversationId);
       if (conversation && currentUser) {
         const otherUser = getOtherParticipant(conversation, currentUser.uid);
-        setChatConversationId(notification.conversationId);
-        setChatOtherUser(otherUser);
-        setIsChatModalOpen(true);
+        
+        if (otherUser.id === driverId) {
+          // This notification is for the current driver profile
+          setChatConversationId(notification.conversationId);
+          setChatOtherUser(otherUser);
+          setIsChatModalOpen(true);
+          console.log(`💬 Opening chat with ${otherUser.name} from notification`);
+        } else {
+          // This notification is for a different conversation
+          // You could navigate to that driver's profile or show a different chat
+          console.log('Notification for different conversation:', otherUser);
+        }
       }
-    } else if (notification.type === 'message' && driverId) {
-      // If it's a message notification for this driver, open the chat tab
-      setActiveTab('chat');
     }
   };
 
@@ -558,21 +508,10 @@ const JeepProfile = () => {
       setChatConversationId(conversationId);
       setChatOtherUser({
         id: driver.id,
-        name: driver.fullName || 'Driver'
+        name: driver.fullName || 'Driver',
+        role: 'provider'
       });
       setIsChatModalOpen(true);
-    }
-  };
-
-  // Mark notification as read
-  const handleMarkAsRead = async (notificationId) => {
-    try {
-      await updateDoc(doc(db, 'notifications', notificationId), {
-        read: true,
-        readAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -666,7 +605,14 @@ const JeepProfile = () => {
         conversationId={chatConversationId}
         otherUser={chatOtherUser}
         currentUser={currentUser}
-        onSendMessage={handleSendMessage}
+      />
+      
+      {/* Global Notification Bell */}
+      <GlobalNotificationBell 
+        user={currentUser}
+        notifications={notifications}
+        onNotificationClick={handleNotificationClick}
+        onMarkAsRead={onMarkAsRead}
       />
       
       {/* Header */}
@@ -692,14 +638,6 @@ const JeepProfile = () => {
                   {onlineStatus ? 'Online' : 'Offline'}
                 </span>
               </div>
-
-              {/* Notification Bell */}
-              <NotificationBell 
-                user={currentUser}
-                notifications={notifications}
-                onNotificationClick={handleNotificationClick}
-                onMarkAsRead={handleMarkAsRead}
-              />
             </div>
           </div>
         </div>
