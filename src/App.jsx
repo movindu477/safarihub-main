@@ -63,7 +63,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// ==================== FIREBASE FUNCTIONS ====================
+// ==================== ENHANCED FIREBASE FUNCTIONS ====================
 
 // User Status Management
 export const setUserOnline = async (userId, userRole, userData) => {
@@ -72,6 +72,7 @@ export const setUserOnline = async (userId, userRole, userData) => {
     await updateDoc(userRef, {
       online: true,
       lastSeen: serverTimestamp(),
+      lastSeenTimestamp: Date.now(),
       ...userData
     });
     console.log(`✅ User ${userId} set online as ${userRole}`);
@@ -86,14 +87,16 @@ export const setUserOffline = async (userId) => {
     if (touristDoc.exists()) {
       await updateDoc(doc(db, 'tourists', userId), {
         online: false,
-        lastSeen: serverTimestamp()
+        lastSeen: serverTimestamp(),
+        lastSeenTimestamp: Date.now()
       });
     } else {
       const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
       if (providerDoc.exists()) {
         await updateDoc(doc(db, 'serviceProviders', userId), {
           online: false,
-          lastSeen: serverTimestamp()
+          lastSeen: serverTimestamp(),
+          lastSeenTimestamp: Date.now()
         });
       }
     }
@@ -103,7 +106,7 @@ export const setUserOffline = async (userId) => {
   }
 };
 
-// Conversation Management
+// Enhanced Conversation Management
 export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2Name) => {
   try {
     const conversationId = [user1Id, user2Id].sort().join('_');
@@ -117,10 +120,40 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
           [user1Id]: user1Name,
           [user2Id]: user2Name
         },
+        participantRoles: {},
         lastMessage: '',
         lastMessageTime: serverTimestamp(),
+        lastMessageTimestamp: Date.now(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
+      });
+      
+      // Initialize participant roles
+      const user1Doc = await getDoc(doc(db, 'tourists', user1Id));
+      const user2Doc = await getDoc(doc(db, 'serviceProviders', user2Id));
+      
+      let user1Role = 'tourist';
+      let user2Role = 'provider';
+      
+      if (!user1Doc.exists()) {
+        const user1ProviderDoc = await getDoc(doc(db, 'serviceProviders', user1Id));
+        if (user1ProviderDoc.exists()) {
+          user1Role = 'provider';
+        }
+      }
+      
+      if (!user2Doc.exists()) {
+        const user2TouristDoc = await getDoc(doc(db, 'tourists', user2Id));
+        if (user2TouristDoc.exists()) {
+          user2Role = 'tourist';
+        }
+      }
+      
+      await updateDoc(conversationRef, {
+        participantRoles: {
+          [user1Id]: user1Role,
+          [user2Id]: user2Role
+        }
       });
     }
 
@@ -153,7 +186,8 @@ export const getOtherParticipant = (conversation, currentUserId) => {
   const otherParticipantId = conversation.participantIds.find(id => id !== currentUserId);
   return {
     id: otherParticipantId,
-    name: conversation.participantNames?.[otherParticipantId] || 'User'
+    name: conversation.participantNames?.[otherParticipantId] || 'User',
+    role: conversation.participantRoles?.[otherParticipantId] || 'user'
   };
 };
 
@@ -163,7 +197,7 @@ export const getUserConversations = (userId, callback) => {
     const userConversationsQuery = query(
       conversationsRef,
       where('participantIds', 'array-contains', userId),
-      orderBy('lastMessageTime', 'desc')
+      orderBy('lastMessageTimestamp', 'desc')
     );
 
     const unsubscribe = onSnapshot(userConversationsQuery, (snapshot) => {
@@ -182,19 +216,25 @@ export const getUserConversations = (userId, callback) => {
   }
 };
 
-// Message Management
+// Enhanced Message Management
 export const getMessages = (conversationId, callback) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
     const messagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
 
-    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      callback(messages);
-    });
+    const unsubscribe = onSnapshot(messagesQuery, 
+      (snapshot) => {
+        const messages = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        callback(messages);
+      },
+      (error) => {
+        console.error('Error in messages snapshot:', error);
+        callback([]);
+      }
+    );
 
     return unsubscribe;
   } catch (error) {
@@ -207,10 +247,13 @@ export const getMessages = (conversationId, callback) => {
 export const sendMessage = async (conversationId, messageData) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    
     const messageDoc = await addDoc(messagesRef, {
       ...messageData,
       timestamp: serverTimestamp(),
-      read: false
+      timestampValue: Date.now(),
+      read: false,
+      delivered: false
     });
 
     // Update conversation last message
@@ -218,13 +261,15 @@ export const sendMessage = async (conversationId, messageData) => {
     await updateDoc(conversationRef, {
       lastMessage: messageData.content,
       lastMessageTime: serverTimestamp(),
+      lastMessageTimestamp: Date.now(),
       lastMessageSender: messageData.senderId,
       updatedAt: serverTimestamp()
     });
 
+    console.log(`✅ Message sent to conversation ${conversationId}`);
     return messageDoc.id;
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('❌ Error sending message:', error);
     throw error;
   }
 };
@@ -242,17 +287,31 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     const updatePromises = snapshot.docs.map(doc =>
       updateDoc(doc.ref, {
         read: true,
-        readAt: serverTimestamp()
+        readAt: serverTimestamp(),
+        readTimestamp: Date.now()
       })
     );
 
     await Promise.all(updatePromises);
+    console.log(`✅ Marked messages as read in conversation ${conversationId}`);
   } catch (error) {
     console.error('Error marking messages as read:', error);
   }
 };
 
-// Notification Management
+export const markMessageAsDelivered = async (conversationId, messageId) => {
+  try {
+    const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+    await updateDoc(messageRef, {
+      delivered: true,
+      deliveredAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error marking message as delivered:', error);
+  }
+};
+
+// Enhanced Notification Management
 export const getUserNotifications = (userId, callback) => {
   try {
     const notificationsRef = collection(db, 'notifications');
@@ -262,13 +321,19 @@ export const getUserNotifications = (userId, callback) => {
       orderBy('timestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-      const notifications = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      callback(notifications);
-    });
+    const unsubscribe = onSnapshot(notificationsQuery, 
+      (snapshot) => {
+        const notifications = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        callback(notifications);
+      },
+      (error) => {
+        console.error('Error in notifications snapshot:', error);
+        callback([]);
+      }
+    );
 
     return unsubscribe;
   } catch (error) {
@@ -284,8 +349,11 @@ export const createNotification = async (notificationData) => {
     const notificationDoc = await addDoc(notificationRef, {
       ...notificationData,
       read: false,
-      timestamp: serverTimestamp()
+      timestamp: serverTimestamp(),
+      timestampValue: Date.now()
     });
+    
+    console.log(`✅ Notification created for user ${notificationData.recipientId}`);
     return notificationDoc.id;
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -304,7 +372,37 @@ export const markNotificationAsRead = async (notificationId) => {
   }
 };
 
-// Chat Modal Component
+// Get user data by ID (for cross-device communication)
+export const getUserData = async (userId) => {
+  try {
+    // Try tourists collection first
+    const touristDoc = await getDoc(doc(db, 'tourists', userId));
+    if (touristDoc.exists()) {
+      return {
+        id: userId,
+        ...touristDoc.data(),
+        role: 'tourist'
+      };
+    }
+    
+    // Try service providers collection
+    const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
+    if (providerDoc.exists()) {
+      return {
+        id: userId,
+        ...providerDoc.data(),
+        role: 'provider'
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting user data:', error);
+    return null;
+  }
+};
+
+// Enhanced Chat Modal Component
 const ChatModal = ({ 
   isOpen, 
   onClose, 
@@ -315,6 +413,7 @@ const ChatModal = ({
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
+  const [otherUserOnline, setOtherUserOnline] = useState(false);
   const messagesEndRef = React.useRef(null);
 
   // Scroll to bottom of messages
@@ -326,25 +425,52 @@ const ChatModal = ({
     scrollToBottom();
   }, [messages]);
 
-  // Load messages when conversation changes
+  // Monitor other user's online status
   useEffect(() => {
-    if (!conversationId || !isOpen) return;
+    if (!otherUser?.id) return;
 
-    const unsubscribe = getMessages(conversationId, (messagesData) => {
-      setMessages(messagesData);
-      
-      // Mark messages as read
-      if (currentUser) {
-        markMessagesAsRead(conversationId, currentUser.uid);
+    const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
+    const unsubscribe = onSnapshot(userRef, (doc) => {
+      if (doc.exists()) {
+        setOtherUserOnline(doc.data().online || false);
       }
     });
 
     return () => unsubscribe();
+  }, [otherUser]);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (!conversationId || !isOpen) return;
+
+    console.log(`📨 Loading messages for conversation: ${conversationId}`);
+
+    const unsubscribe = getMessages(conversationId, (messagesData) => {
+      console.log(`📬 Received ${messagesData.length} messages`);
+      setMessages(messagesData);
+      
+      // Mark messages as read and delivered
+      if (currentUser) {
+        markMessagesAsRead(conversationId, currentUser.uid);
+        
+        // Mark own messages as delivered
+        messagesData.forEach(msg => {
+          if (msg.senderId === currentUser.uid && !msg.delivered) {
+            markMessageAsDelivered(conversationId, msg.id);
+          }
+        });
+      }
+    });
+
+    return () => {
+      console.log(`🔴 Unsubscribing from messages for conversation: ${conversationId}`);
+      unsubscribe();
+    };
   }, [conversationId, isOpen, currentUser]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!message.trim() || !conversationId || sending || !currentUser) return;
+    if (!message.trim() || !conversationId || sending || !currentUser || !otherUser) return;
 
     try {
       setSending(true);
@@ -353,27 +479,32 @@ const ChatModal = ({
         content: message.trim(),
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
-        receiverId: otherUser?.id,
+        receiverId: otherUser.id,
         timestamp: new Date()
       };
 
+      console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
+      
+      // Send the message
       await sendMessage(conversationId, messageData);
 
       // Create notification for the recipient
       await createNotification({
         type: 'message',
         title: 'New Message',
-        message: `You have a new message from ${currentUser.displayName || 'a user'}`,
-        recipientId: otherUser?.id,
+        message: `You have a new message from ${currentUser.displayName || 'a user'}: "${message.trim()}"`,
+        recipientId: otherUser.id,
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
-        conversationId: conversationId
+        conversationId: conversationId,
+        relatedId: conversationId
       });
 
+      console.log(`✅ Notification sent to ${otherUser.name}`);
       setMessage('');
 
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ Error sending message:', error);
       alert('Failed to send message. Please try again.');
     } finally {
       setSending(false);
@@ -402,12 +533,19 @@ const ChatModal = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-t-xl">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-              <User className="h-5 w-5" />
+            <div className="relative">
+              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <User className="h-5 w-5" />
+              </div>
+              <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                otherUserOnline ? 'bg-green-500' : 'bg-gray-400'
+              }`}></div>
             </div>
             <div>
               <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
-              <p className="text-yellow-100 text-sm">Online</p>
+              <p className="text-yellow-100 text-sm">
+                {otherUserOnline ? 'Online' : 'Offline'} • {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
+              </p>
             </div>
           </div>
           <button
@@ -425,6 +563,9 @@ const ChatModal = ({
               <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
               <p className="text-lg font-medium">No messages yet</p>
               <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
+              <p className="text-xs text-gray-400 mt-2">
+                {otherUserOnline ? 'User is online' : 'User is offline - they will see your message when they come online'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -446,8 +587,14 @@ const ChatModal = ({
                     }`}>
                       <span>{formatTime(msg.timestamp)}</span>
                       {msg.senderId === currentUser?.uid && (
-                        <span>
-                          {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
+                        <span className="flex items-center space-x-1">
+                          {msg.read ? (
+                            <CheckCheck size={12} className="text-blue-300" title="Read" />
+                          ) : msg.delivered ? (
+                            <CheckCheck size={12} className="text-gray-300" title="Delivered" />
+                          ) : (
+                            <Check size={12} className="text-gray-300" title="Sent" />
+                          )}
                         </span>
                       )}
                     </div>
@@ -1472,7 +1619,7 @@ const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMa
   );
 };
 
-// Home Page Component
+// Enhanced Home Page Component
 const HomePage = ({ user, onLogout, onShowAuth }) => {
   const [notifications, setNotifications] = useState([]);
   const [showChatModal, setShowChatModal] = useState(false);
@@ -1482,11 +1629,17 @@ const HomePage = ({ user, onLogout, onShowAuth }) => {
   // Load notifications when user is logged in
   useEffect(() => {
     if (user) {
+      console.log(`🔔 Setting up notifications listener for user: ${user.uid}`);
+      
       const unsubscribe = getUserNotifications(user.uid, (notifications) => {
+        console.log(`📢 Received ${notifications.length} notifications`);
         setNotifications(notifications);
       });
       
-      return () => unsubscribe();
+      return () => {
+        console.log(`🔴 Unsubscribing from notifications for user: ${user.uid}`);
+        unsubscribe();
+      };
     } else {
       setNotifications([]);
     }
@@ -1494,7 +1647,7 @@ const HomePage = ({ user, onLogout, onShowAuth }) => {
 
   // Handle notification click - OPEN CHAT MODAL
   const handleNotificationClick = async (notification) => {
-    console.log('Notification clicked:', notification);
+    console.log('🔘 Notification clicked:', notification);
     
     // Mark notification as read
     if (!notification.read) {
@@ -1506,9 +1659,12 @@ const HomePage = ({ user, onLogout, onShowAuth }) => {
       const conversation = await getConversationById(notification.conversationId);
       if (conversation && user) {
         const otherUser = getOtherParticipant(conversation, user.uid);
-        setChatConversationId(notification.conversationId);
-        setChatOtherUser(otherUser);
-        setShowChatModal(true);
+        if (otherUser) {
+          setChatConversationId(notification.conversationId);
+          setChatOtherUser(otherUser);
+          setShowChatModal(true);
+          console.log(`💬 Opening chat with ${otherUser.name}`);
+        }
       }
     }
   };
@@ -1555,7 +1711,7 @@ const HomePage = ({ user, onLogout, onShowAuth }) => {
   );
 };
 
-// Main App Component
+// Enhanced Main App Component
 function App() {
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
@@ -1564,6 +1720,8 @@ function App() {
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
+      
       setUser(user);
       setLoading(false);
       
@@ -1571,29 +1729,39 @@ function App() {
         try {
           let userRole = 'tourist';
           let userName = user.displayName || 'User';
+          let userData = {};
           
           const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
           if (touristDoc.exists()) {
             userRole = 'tourist';
-            userName = touristDoc.data().fullName || userName;
+            userData = touristDoc.data();
+            userName = userData.fullName || userName;
           } else {
             const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
             if (providerDoc.exists()) {
               userRole = 'provider';
-              userName = providerDoc.data().fullName || userName;
+              userData = providerDoc.data();
+              userName = userData.fullName || userName;
             }
           }
           
           await setUserOnline(user.uid, userRole, {
             userName: userName,
-            email: user.email
+            email: user.email,
+            ...userData
           });
+          
+          console.log(`✅ User ${user.uid} set online as ${userRole}`);
         } catch (error) {
           console.log('Error setting user online status:', error);
         }
       }
     });
-    return () => unsubscribe();
+    
+    return () => {
+      console.log('🔴 Unsubscribing from auth state changes');
+      unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -1602,6 +1770,7 @@ function App() {
         await setUserOffline(user.uid);
       }
       await signOut(auth);
+      console.log('✅ User logged out successfully');
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -1628,7 +1797,7 @@ function App() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading...</p>
+          <p className="text-white text-lg">Loading SafariHub...</p>
         </div>
       </div>
     );
