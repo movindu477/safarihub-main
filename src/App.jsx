@@ -912,7 +912,7 @@ const HomePage = ({ user, userRole, onLogout, onShowAuth, notifications, onNotif
       />
       
       {/* Home Content with All Sections */}
-      <div className="pt-16">
+      <div className="pt--1">
         <Section1 />
         <Section2 />
         <Section3 />
