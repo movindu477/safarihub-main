@@ -51,7 +51,9 @@ import {
   getConversationById,
   getOtherParticipant,
   markNotificationAsRead,
-  GlobalNotificationBell
+  GlobalNotificationBell,
+  setUserOnline,
+  setUserOffline
 } from "../App";
 
 // Chat Modal Component
@@ -280,7 +282,7 @@ const ChatModal = ({
   );
 };
 
-const JeepProfile = ({ notifications, onNotificationClick, onMarkAsRead }) => {
+const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
@@ -344,25 +346,40 @@ const JeepProfile = ({ notifications, onNotificationClick, onMarkAsRead }) => {
     }
   };
 
-  // Get current user
+  // Get current user and set online status
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
         
-        // Determine user role
+        // Determine user role and set online status
         try {
+          let userRole = 'tourist';
+          let userData = {};
+          
           const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
           if (touristDoc.exists()) {
+            userRole = 'tourist';
+            userData = touristDoc.data();
             setUserRole('tourist');
           } else {
             const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
             if (providerDoc.exists()) {
+              userRole = 'provider';
+              userData = providerDoc.data();
               setUserRole('provider');
             }
           }
+          
+          await setUserOnline(user.uid, userRole, {
+            userName: user.displayName || userData.fullName || 'User',
+            email: user.email,
+            ...userData
+          });
+          
+          console.log(`✅ User ${user.uid} set online in JeepProfile as ${userRole}`);
         } catch (error) {
-          console.error('Error getting user role:', error);
+          console.log('Error setting user online status in JeepProfile:', error);
         }
       } else {
         setCurrentUser(null);
@@ -370,7 +387,12 @@ const JeepProfile = ({ notifications, onNotificationClick, onMarkAsRead }) => {
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      if (currentUser) {
+        setUserOffline(currentUser.uid);
+      }
+      unsubscribeAuth();
+    };
   }, []);
 
   // Fetch driver data

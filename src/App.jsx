@@ -65,7 +65,7 @@ export const storage = getStorage(app);
 
 // ==================== ENHANCED FIREBASE FUNCTIONS ====================
 
-// User Status Management
+// Enhanced User Status Management
 export const setUserOnline = async (userId, userRole, userData) => {
   try {
     const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
@@ -83,23 +83,27 @@ export const setUserOnline = async (userId, userRole, userData) => {
 
 export const setUserOffline = async (userId) => {
   try {
-    const touristDoc = await getDoc(doc(db, 'tourists', userId));
-    if (touristDoc.exists()) {
-      await updateDoc(doc(db, 'tourists', userId), {
-        online: false,
-        lastSeen: serverTimestamp(),
-        lastSeenTimestamp: Date.now()
-      });
-    } else {
-      const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
-      if (providerDoc.exists()) {
-        await updateDoc(doc(db, 'serviceProviders', userId), {
-          online: false,
-          lastSeen: serverTimestamp(),
-          lastSeenTimestamp: Date.now()
-        });
-      }
-    }
+    // Try both collections to ensure we set offline status
+    const touristRef = doc(db, 'tourists', userId);
+    const providerRef = doc(db, 'serviceProviders', userId);
+    
+    const batchUpdates = [];
+    
+    // Update tourist collection if exists
+    batchUpdates.push(updateDoc(touristRef, {
+      online: false,
+      lastSeen: serverTimestamp(),
+      lastSeenTimestamp: Date.now()
+    }).catch(() => null)); // Ignore if document doesn't exist
+    
+    // Update service providers collection if exists
+    batchUpdates.push(updateDoc(providerRef, {
+      online: false,
+      lastSeen: serverTimestamp(),
+      lastSeenTimestamp: Date.now()
+    }).catch(() => null)); // Ignore if document doesn't exist
+    
+    await Promise.all(batchUpdates);
     console.log(`✅ User ${userId} set offline`);
   } catch (error) {
     console.error('Error setting user offline:', error);
@@ -780,10 +784,15 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
 
-  // Listen for auth state changes and notifications
+  // Enhanced auth state listener with proper online/offline management
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
+      
+      // Set user offline for previous user if exists
+      if (user && user.uid !== user?.uid) {
+        await setUserOffline(user.uid);
+      }
       
       setUser(user);
       setLoading(false);
@@ -884,6 +893,7 @@ function App() {
     await markNotificationAsRead(notificationId);
   };
 
+  // Set user offline when component unmounts or user changes
   useEffect(() => {
     return () => {
       if (user) {
@@ -939,6 +949,8 @@ function App() {
           path="/jeepprofile" 
           element={
             <JeepProfile 
+              user={user}
+              onLogout={handleLogout}
               notifications={notifications}
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
@@ -951,7 +963,6 @@ function App() {
   );
 }
 
-// ... (Rest of the Authentication and Registration components remain the same)
 // Phone number formatting utility
 const formatPhoneNumber = (phone) => {
   if (!phone) return "";
@@ -1105,6 +1116,9 @@ function Authentication({ onAuthSuccess }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         role: role,
+        online: true, // Set online immediately after registration
+        lastSeen: serverTimestamp(),
+        lastSeenTimestamp: Date.now(),
       };
 
       let collectionName = "";

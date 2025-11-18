@@ -20,7 +20,9 @@ import {
   createNotification,
   getConversationById,
   getOtherParticipant,
-  markNotificationAsRead
+  markNotificationAsRead,
+  setUserOnline,
+  setUserOffline
 } from "../App";
 
 // Chat Modal Component
@@ -442,9 +444,8 @@ const getUserNotifications = (userId, callback) => {
   }
 };
 
-export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAuth }) {
+export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   
   // Chat modal state
@@ -452,33 +453,49 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
 
-  // Get current user
+  // Get current user and set online status
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      
+      if (user) {
+        try {
+          // Determine user role and set online status
+          let userRole = 'tourist';
+          let userData = {};
+          
+          const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
+          if (touristDoc.exists()) {
+            userRole = 'tourist';
+            userData = touristDoc.data();
+          } else {
+            const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+            if (providerDoc.exists()) {
+              userRole = 'provider';
+              userData = providerDoc.data();
+            }
+          }
+          
+          await setUserOnline(user.uid, userRole, {
+            userName: user.displayName || userData.fullName || 'User',
+            email: user.email,
+            ...userData
+          });
+          
+          console.log(`✅ User ${user.uid} set online in JeepMain as ${userRole}`);
+        } catch (error) {
+          console.log('Error setting user online status in JeepMain:', error);
+        }
+      }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      if (currentUser) {
+        setUserOffline(currentUser.uid);
+      }
+      unsubscribeAuth();
+    };
   }, []);
-
-  // Load notifications when user is logged in
-  useEffect(() => {
-    if (user) {
-      console.log(`🔔 Setting up notifications listener for user: ${user.uid}`);
-      
-      const unsubscribe = getUserNotifications(user.uid, (notifications) => {
-        console.log(`📢 Received ${notifications.length} notifications`);
-        setNotifications(notifications);
-      });
-      
-      return () => {
-        console.log(`🔴 Unsubscribing from notifications for user: ${user.uid}`);
-        unsubscribe();
-      };
-    } else {
-      setNotifications([]);
-    }
-  }, [user]);
 
   // Handle notification click
   const handleNotificationClick = async (notification) => {
@@ -486,7 +503,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
     
     // Mark notification as read
     if (!notification.read) {
-      await markNotificationAsRead(notification.id);
+      await onMarkAsRead(notification.id);
     }
     
     if (notification.type === 'message' && notification.conversationId) {

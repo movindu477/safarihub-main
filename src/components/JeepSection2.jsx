@@ -77,7 +77,7 @@ const JeepSection2 = () => {
     ]
   };
 
-  // ✅ UPDATED: Fetch ONLY Jeep Driver service providers with real-time online status
+  // ✅ FIXED: Fetch ONLY Jeep Driver service providers with real-time online status
   useEffect(() => {
     const fetchJeeps = async () => {
       try {
@@ -100,7 +100,7 @@ const JeepSection2 = () => {
 
         console.log('📊 Total service providers found:', allProviders.length);
         
-        // ✅ UPDATED: Filter ONLY for Jeep Drivers with exact serviceType match
+        // ✅ FIXED: Filter ONLY for Jeep Drivers with exact serviceType match
         const jeepDrivers = allProviders.filter(provider => {
           const isJeepDriver = provider.serviceType === 'Jeep Driver';
           console.log(`Provider: ${provider.fullName}, Service Type: ${provider.serviceType}, Is Jeep Driver: ${isJeepDriver}`);
@@ -168,7 +168,7 @@ const JeepSection2 = () => {
     fetchJeeps();
   }, []);
 
-  // ✅ UPDATED: Real-time online status listener for ALL service providers
+  // ✅ FIXED: Enhanced real-time online status listener
   useEffect(() => {
     console.log('🔔 Setting up real-time online status listener...');
     
@@ -210,7 +210,7 @@ const JeepSection2 = () => {
     };
   }, []);
 
-  // ✅ UPDATED: Enhanced filter logic with exact matches
+  // ✅ FIXED: Enhanced filter logic with exact matches
   useEffect(() => {
     console.log('🔄 Applying filters...', filters);
     
@@ -302,18 +302,18 @@ const JeepSection2 = () => {
     }));
   };
 
-  // ✅ UPDATED: Handle profile box click with proper navigation
+  // ✅ FIXED: Handle profile box click with proper navigation
   const handleProfileClick = (jeep) => {
     navigate(`/jeepprofile?driverId=${jeep.id}`);
   };
 
-  // ✅ UPDATED: Handle chat button click
+  // ✅ FIXED: Handle chat button click
   const handleChatClick = (jeep, e) => {
     e.stopPropagation();
     navigate(`/jeepprofile?driverId=${jeep.id}&openChat=true`);
   };
 
-  // ✅ UPDATED: Clear filters completely
+  // ✅ FIXED: Clear filters completely
   const clearFilters = () => {
     setFilters({
       destination: '',
