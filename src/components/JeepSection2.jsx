@@ -4,12 +4,15 @@ import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { Wifi, WifiOff, MessageCircle, Star, MapPin, Clock, Users, Shield } from 'lucide-react';
 
+// Import the enhanced online status function from App
+import { getServiceProvidersOnlineStatus } from '../App';
+
 const JeepSection2 = () => {
   const [jeeps, setJeeps] = useState([]);
   const [filteredJeeps, setFilteredJeeps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [onlineStatus, setOnlineStatus] = useState({});
+  const [onlineStatusMap, setOnlineStatusMap] = useState({});
   const navigate = useNavigate();
 
   // Filter states
@@ -77,138 +80,119 @@ const JeepSection2 = () => {
     ]
   };
 
-  // ✅ FIXED: Fetch ONLY Jeep Driver service providers with real-time online status
+  // ✅ FIXED: Real-time online status listener for ALL service providers
   useEffect(() => {
-    const fetchJeeps = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        console.log('🔍 Fetching Jeep Driver service providers...');
-        
-        // Get ALL service providers first
-        const querySnapshot = await getDocs(collection(db, 'serviceProviders'));
-        const allProviders = [];
-        
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          allProviders.push({ 
-            id: doc.id, 
-            ...data
-          });
-        });
-
-        console.log('📊 Total service providers found:', allProviders.length);
-        
-        // ✅ FIXED: Filter ONLY for Jeep Drivers with exact serviceType match
-        const jeepDrivers = allProviders.filter(provider => {
-          const isJeepDriver = provider.serviceType === 'Jeep Driver';
-          console.log(`Provider: ${provider.fullName}, Service Type: ${provider.serviceType}, Is Jeep Driver: ${isJeepDriver}`);
-          return isJeepDriver;
-        });
-
-        console.log('🚙 Jeep Drivers filtered:', jeepDrivers.length);
-        
-        // Enhanced data mapping with better defaults
-        const enhancedJeepData = jeepDrivers.map(provider => ({
-          id: provider.id,
-          // Personal Info
-          driverName: provider.fullName || provider.driverName || 'Safari Driver',
-          imageUrl: provider.profilePicture || provider.imageUrl || '',
-          location: provider.location || provider.baseLocation || 'Sri Lanka',
-          
-          // Service Info
-          rating: typeof provider.rating === 'number' ? provider.rating : 
-                 typeof provider.rating === 'string' ? parseFloat(provider.rating) || 0 : 0,
-          pricePerDay: provider.pricePerDay || provider.price || provider.dailyRate || 0,
-          vehicleType: provider.vehicleType || 'Standard Safari Jeep',
-          experience: provider.experienceYears || provider.experience || 0,
-          
-          // Arrays with proper fallbacks
-          destinations: Array.isArray(provider.destinations) ? provider.destinations : 
-                       provider.destinations ? [provider.destinations] : 
-                       ['Multiple National Parks'],
-          languages: Array.isArray(provider.languages) ? provider.languages :
-                    Array.isArray(provider.languagesSpoken) ? provider.languagesSpoken :
-                    provider.languagesSpoken ? [provider.languagesSpoken] :
-                    provider.languages ? [provider.languages] :
-                    ['English', 'Sinhala'],
-          specialSkills: Array.isArray(provider.specialSkills) ? provider.specialSkills :
-                        provider.specialSkills ? [provider.specialSkills] : [],
-          certifications: Array.isArray(provider.certifications) ? provider.certifications :
-                         provider.certifications ? [provider.certifications] : [],
-          
-          // Contact Info
-          contactPhone: provider.contactPhone || provider.phone || provider.phoneNumber || 'Not provided',
-          contactEmail: provider.contactEmail || provider.email || '',
-          description: provider.description || provider.bio || 'Experienced safari jeep driver',
-          
-          // Online status (will be updated from real-time listener)
-          isOnline: provider.online || false,
-          lastSeen: provider.lastSeen || null,
-          
-          // Original data for debugging
-          originalData: provider
-        }));
-
-        console.log('🎯 Enhanced jeep data:', enhancedJeepData);
-        console.log('📝 Sample provider:', enhancedJeepData[0]);
-        
-        setJeeps(enhancedJeepData);
-        setFilteredJeeps(enhancedJeepData);
-        setLoading(false);
-        
-      } catch (error) {
-        console.error('❌ Error fetching service providers:', error);
-        setError('Failed to load safari jeeps. Please check your connection and try again.');
-        setLoading(false);
-      }
-    };
-
-    fetchJeeps();
-  }, []);
-
-  // ✅ FIXED: Enhanced real-time online status listener
-  useEffect(() => {
-    console.log('🔔 Setting up real-time online status listener...');
+    console.log('🔔 Setting up real-time online status listener for all service providers...');
     
-    const serviceProvidersRef = collection(db, 'serviceProviders');
-    const unsubscribe = onSnapshot(serviceProvidersRef, (snapshot) => {
-      const onlineStatusUpdates = {};
-      
-      snapshot.forEach((doc) => {
-        const providerData = doc.data();
-        onlineStatusUpdates[doc.id] = {
-          isOnline: providerData.online || false,
-          lastSeen: providerData.lastSeen || null
-        };
-      });
-
-      console.log('🔄 Real-time online status update:', onlineStatusUpdates);
+    const unsubscribeOnlineStatus = getServiceProvidersOnlineStatus((statusMap) => {
+      console.log('🔄 Real-time online status update received:', Object.keys(statusMap).length, 'drivers');
+      setOnlineStatusMap(statusMap);
       
       // Update jeeps with real-time online status
       setJeeps(prevJeeps => 
         prevJeeps.map(jeep => ({
           ...jeep,
-          isOnline: onlineStatusUpdates[jeep.id]?.isOnline || false,
-          lastSeen: onlineStatusUpdates[jeep.id]?.lastSeen || jeep.lastSeen
-        }))
-      );
-      
-      setFilteredJeeps(prevFiltered => 
-        prevFiltered.map(jeep => ({
-          ...jeep,
-          isOnline: onlineStatusUpdates[jeep.id]?.isOnline || false,
-          lastSeen: onlineStatusUpdates[jeep.id]?.lastSeen || jeep.lastSeen
+          isOnline: statusMap[jeep.id]?.isOnline || false,
+          lastSeen: statusMap[jeep.id]?.lastSeen || jeep.lastSeen
         }))
       );
     });
 
     return () => {
-      console.log('🔕 Cleaning up real-time listener');
-      unsubscribe();
+      console.log('🔕 Cleaning up online status listener');
+      unsubscribeOnlineStatus();
     };
   }, []);
+
+  // ✅ ENHANCED: Real-time data listener for service providers
+  useEffect(() => {
+    console.log('🔔 Setting up real-time data listener for service providers...');
+    
+    const serviceProvidersRef = collection(db, 'serviceProviders');
+    const jeepDriversQuery = query(
+      serviceProvidersRef,
+      where('serviceType', '==', 'Jeep Driver')
+    );
+
+    const unsubscribe = onSnapshot(jeepDriversQuery, (snapshot) => {
+      console.log('🔄 Real-time service providers data update received');
+      
+      const updatedJeeps = [];
+      
+      snapshot.forEach((doc) => {
+        const providerData = doc.data();
+        const providerId = doc.id;
+        
+        // Only include Jeep Drivers
+        if (providerData.serviceType === 'Jeep Driver') {
+          // Use real-time online status if available, otherwise fall back to stored data
+          const isOnline = onlineStatusMap[providerId]?.isOnline || 
+                          providerData.online || 
+                          providerData.isOnline || 
+                          false;
+          
+          updatedJeeps.push({
+            id: providerId,
+            // Personal Info
+            driverName: providerData.fullName || providerData.driverName || 'Safari Driver',
+            imageUrl: providerData.profilePicture || providerData.imageUrl || '',
+            location: providerData.location || providerData.baseLocation || 'Sri Lanka',
+            
+            // Service Info
+            rating: typeof providerData.rating === 'number' ? providerData.rating : 
+                   typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
+            pricePerDay: providerData.pricePerDay || providerData.price || providerData.dailyRate || 0,
+            vehicleType: providerData.vehicleType || 'Standard Safari Jeep',
+            experience: providerData.experienceYears || providerData.experience || 0,
+            
+            // Arrays with proper fallbacks
+            destinations: Array.isArray(providerData.destinations) ? providerData.destinations : 
+                         providerData.destinations ? [providerData.destinations] : 
+                         ['Multiple National Parks'],
+            languages: Array.isArray(providerData.languages) ? providerData.languages :
+                      Array.isArray(providerData.languagesSpoken) ? providerData.languagesSpoken :
+                      providerData.languagesSpoken ? [providerData.languagesSpoken] :
+                      providerData.languages ? [providerData.languages] :
+                      ['English', 'Sinhala'],
+            specialSkills: Array.isArray(providerData.specialSkills) ? providerData.specialSkills :
+                          providerData.specialSkills ? [providerData.specialSkills] : [],
+            certifications: Array.isArray(providerData.certifications) ? providerData.certifications :
+                           providerData.certifications ? [providerData.certifications] : [],
+            
+            // Contact Info
+            contactPhone: providerData.contactPhone || providerData.phone || providerData.phoneNumber || 'Not provided',
+            contactEmail: providerData.contactEmail || providerData.email || '',
+            description: providerData.description || providerData.bio || 'Experienced safari jeep driver',
+            
+            // Real-time online status - using real-time data first, then stored data
+            isOnline: isOnline,
+            lastSeen: onlineStatusMap[providerId]?.lastSeen || providerData.lastSeen || null,
+            
+            // Original data for debugging
+            originalData: providerData
+          });
+        }
+      });
+
+      console.log(`🚙 Real-time data update: ${updatedJeeps.length} jeep drivers found, ${updatedJeeps.filter(j => j.isOnline).length} online`);
+      
+      setJeeps(updatedJeeps);
+      setFilteredJeeps(updatedJeeps);
+      
+      if (loading) {
+        setLoading(false);
+      }
+    }, (error) => {
+      console.error('❌ Error in real-time data listener:', error);
+      setError('Failed to load real-time data. Please refresh the page.');
+      setLoading(false);
+    });
+
+    return () => {
+      console.log('🔕 Cleaning up real-time data listener');
+      unsubscribe();
+    };
+  }, [onlineStatusMap]); // Re-run when online status changes
 
   // ✅ FIXED: Enhanced filter logic with exact matches
   useEffect(() => {
@@ -355,9 +339,11 @@ const JeepSection2 = () => {
     }
   };
 
-  // Online status indicator component
+  // Online status indicator component - UPDATED with real-time data
   const OnlineStatusIndicator = ({ jeep }) => {
-    if (jeep.isOnline) {
+    const isOnline = jeep.isOnline;
+    
+    if (isOnline) {
       return (
         <div className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
           <Wifi className="h-3 w-3" />

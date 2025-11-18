@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -65,48 +65,121 @@ export const storage = getStorage(app);
 
 // ==================== ENHANCED FIREBASE FUNCTIONS ====================
 
-// Enhanced User Status Management
-export const setUserOnline = async (userId, userRole, userData) => {
+// Enhanced User Status Management with real-time updates
+export const setUserOnline = async (userId, userRole, userData = {}) => {
   try {
+    console.log(`🟢 Setting user ${userId} online as ${userRole}`);
+    
     const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
-    await updateDoc(userRef, {
+    
+    const onlineData = {
       online: true,
+      isOnline: true,
       lastSeen: serverTimestamp(),
       lastSeenTimestamp: Date.now(),
+      lastOnlineStatus: 'online',
+      status: 'online',
       ...userData
-    });
-    console.log(`✅ User ${userId} set online as ${userRole}`);
+    };
+    
+    await setDoc(userRef, onlineData, { merge: true });
+    
+    console.log(`✅ User ${userId} successfully set online`);
   } catch (error) {
-    console.error('Error setting user online:', error);
+    console.error('❌ Error setting user online:', error);
   }
 };
 
-export const setUserOffline = async (userId) => {
+export const setUserOffline = async (userId, userRole = null) => {
   try {
-    // Try both collections to ensure we set offline status
-    const touristRef = doc(db, 'tourists', userId);
-    const providerRef = doc(db, 'serviceProviders', userId);
+    console.log(`🔴 Setting user ${userId} offline`);
     
-    const batchUpdates = [];
-    
-    // Update tourist collection if exists
-    batchUpdates.push(updateDoc(touristRef, {
+    const offlineData = {
       online: false,
+      isOnline: false,
       lastSeen: serverTimestamp(),
-      lastSeenTimestamp: Date.now()
-    }).catch(() => null)); // Ignore if document doesn't exist
+      lastSeenTimestamp: Date.now(),
+      lastOnlineStatus: 'offline',
+      status: 'offline'
+    };
     
-    // Update service providers collection if exists
-    batchUpdates.push(updateDoc(providerRef, {
-      online: false,
-      lastSeen: serverTimestamp(),
-      lastSeenTimestamp: Date.now()
-    }).catch(() => null)); // Ignore if document doesn't exist
+    // Try to update based on role if provided
+    if (userRole) {
+      const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
+      await setDoc(userRef, offlineData, { merge: true });
+    } else {
+      // Update both collections to ensure we catch the user regardless of role
+      const touristRef = doc(db, 'tourists', userId);
+      const providerRef = doc(db, 'serviceProviders', userId);
+      
+      await Promise.all([
+        setDoc(touristRef, offlineData, { merge: true }).catch(() => null),
+        setDoc(providerRef, offlineData, { merge: true }).catch(() => null)
+      ]);
+    }
     
-    await Promise.all(batchUpdates);
-    console.log(`✅ User ${userId} set offline`);
+    console.log(`✅ User ${userId} successfully set offline`);
   } catch (error) {
-    console.error('Error setting user offline:', error);
+    console.error('❌ Error setting user offline:', error);
+  }
+};
+
+// Enhanced user role detection
+export const getUserRole = async (userId) => {
+  try {
+    const touristDoc = await getDoc(doc(db, 'tourists', userId));
+    if (touristDoc.exists()) return 'tourist';
+    
+    const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
+    if (providerDoc.exists()) return 'provider';
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting user role:', error);
+    return null;
+  }
+};
+
+// Enhanced real-time online status listener for service providers
+export const getServiceProvidersOnlineStatus = (callback) => {
+  try {
+    const providersRef = collection(db, 'serviceProviders');
+    const providersQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Jeep Driver')
+    );
+
+    const unsubscribe = onSnapshot(providersQuery, 
+      (snapshot) => {
+        const providers = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        // Create a map of online statuses
+        const onlineStatusMap = {};
+        providers.forEach(provider => {
+          onlineStatusMap[provider.id] = {
+            isOnline: provider.online || provider.isOnline || false,
+            lastSeen: provider.lastSeen,
+            lastSeenTimestamp: provider.lastSeenTimestamp
+          };
+        });
+        
+        console.log(`👥 Real-time online status update: ${providers.filter(p => p.online || p.isOnline).length} drivers online`);
+        callback(onlineStatusMap);
+      },
+      (error) => {
+        console.error('Error in online status snapshot:', error);
+        callback({});
+      }
+    );
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error getting online status:', error);
+    callback({});
+    return () => {};
   }
 };
 
@@ -119,16 +192,8 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
 
     if (!conversationDoc.exists()) {
       // Get user roles
-      let user1Role = 'tourist';
-      let user2Role = 'provider';
-      
-      const user1TouristDoc = await getDoc(doc(db, 'tourists', user1Id));
-      const user1ProviderDoc = await getDoc(doc(db, 'serviceProviders', user1Id));
-      const user2TouristDoc = await getDoc(doc(db, 'tourists', user2Id));
-      const user2ProviderDoc = await getDoc(doc(db, 'serviceProviders', user2Id));
-      
-      if (user1ProviderDoc.exists()) user1Role = 'provider';
-      if (user2TouristDoc.exists()) user2Role = 'tourist';
+      let user1Role = await getUserRole(user1Id) || 'tourist';
+      let user2Role = await getUserRole(user2Id) || 'provider';
 
       await setDoc(conversationRef, {
         participantIds: [user1Id, user2Id],
@@ -378,36 +443,6 @@ export const markNotificationAsRead = async (notificationId) => {
   }
 };
 
-// Get user data by ID (for cross-device communication)
-export const getUserData = async (userId) => {
-  try {
-    // Try tourists collection first
-    const touristDoc = await getDoc(doc(db, 'tourists', userId));
-    if (touristDoc.exists()) {
-      return {
-        id: userId,
-        ...touristDoc.data(),
-        role: 'tourist'
-      };
-    }
-    
-    // Try service providers collection
-    const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
-    if (providerDoc.exists()) {
-      return {
-        id: userId,
-        ...providerDoc.data(),
-        role: 'provider'
-      };
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Error getting user data:', error);
-    return null;
-  }
-};
-
 // Enhanced Chat Modal Component
 const ChatModal = ({ 
   isOpen, 
@@ -438,7 +473,10 @@ const ChatModal = ({
     const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
     const unsubscribe = onSnapshot(userRef, (doc) => {
       if (doc.exists()) {
-        setOtherUserOnline(doc.data().online || false);
+        const userData = doc.data();
+        const isOnline = userData.online || userData.isOnline || false;
+        setOtherUserOnline(isOnline);
+        console.log(`👀 ${otherUser.name} online status: ${isOnline}`);
       }
     });
 
@@ -786,41 +824,38 @@ function App() {
 
   // Enhanced auth state listener with proper online/offline management
   useEffect(() => {
+    let currentUserId = null;
+    let currentUserRole = null;
+    
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
       
-      // Set user offline for previous user if exists
-      if (user && user.uid !== user?.uid) {
-        await setUserOffline(user.uid);
+      // Set previous user offline if exists
+      if (currentUserId && currentUserId !== user?.uid) {
+        console.log(`🔄 Setting previous user ${currentUserId} offline`);
+        await setUserOffline(currentUserId, currentUserRole);
       }
       
       setUser(user);
       setLoading(false);
       
       if (user) {
+        currentUserId = user.uid;
+        
         try {
-          let userRole = 'tourist';
+          let userRole = await getUserRole(user.uid);
           let userName = user.displayName || 'User';
-          let userData = {};
           
-          const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
-          if (touristDoc.exists()) {
+          if (!userRole) {
+            // If no role found, default to tourist
             userRole = 'tourist';
-            userData = touristDoc.data();
-            userName = userData.fullName || userName;
-          } else {
-            const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
-            if (providerDoc.exists()) {
-              userRole = 'provider';
-              userData = providerDoc.data();
-              userName = userData.fullName || userName;
-            }
           }
+          
+          currentUserRole = userRole;
           
           await setUserOnline(user.uid, userRole, {
             userName: userName,
             email: user.email,
-            ...userData
           });
           
           console.log(`✅ User ${user.uid} set online as ${userRole}`);
@@ -828,12 +863,17 @@ function App() {
           console.log('Error setting user online status:', error);
         }
       } else {
+        currentUserId = null;
+        currentUserRole = null;
         setNotifications([]);
       }
     });
     
     return () => {
       console.log('🔴 Unsubscribing from auth state changes');
+      if (currentUserId) {
+        setUserOffline(currentUserId, currentUserRole);
+      }
       unsubscribe();
     };
   }, []);
@@ -860,7 +900,8 @@ function App() {
   const handleLogout = async () => {
     try {
       if (user) {
-        await setUserOffline(user.uid);
+        const userRole = await getUserRole(user.uid);
+        await setUserOffline(user.uid, userRole);
       }
       await signOut(auth);
       console.log('✅ User logged out successfully');
@@ -897,7 +938,8 @@ function App() {
   useEffect(() => {
     return () => {
       if (user) {
-        setUserOffline(user.uid);
+        const userRole = getUserRole(user.uid);
+        setUserOffline(user.uid, userRole);
       }
     };
   }, [user]);
@@ -1117,6 +1159,7 @@ function Authentication({ onAuthSuccess }) {
         updatedAt: serverTimestamp(),
         role: role,
         online: true, // Set online immediately after registration
+        isOnline: true,
         lastSeen: serverTimestamp(),
         lastSeenTimestamp: Date.now(),
       };

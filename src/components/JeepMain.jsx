@@ -22,7 +22,8 @@ import {
   getOtherParticipant,
   markNotificationAsRead,
   setUserOnline,
-  setUserOffline
+  setUserOffline,
+  getUserRole
 } from "../App";
 
 // Chat Modal Component
@@ -55,7 +56,10 @@ const ChatModal = ({
     const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
     const unsubscribe = onSnapshot(userRef, (doc) => {
       if (doc.exists()) {
-        setOtherUserOnline(doc.data().online || false);
+        const userData = doc.data();
+        const isOnline = userData.online || userData.isOnline || false;
+        setOtherUserOnline(isOnline);
+        console.log(`👀 ${otherUser.name} online status: ${isOnline}`);
       }
     });
 
@@ -455,43 +459,49 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
 
   // Get current user and set online status
   useEffect(() => {
+    let currentUserId = null;
+    
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      console.log(`🔐 JeepMain Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
+      
+      // Set previous user offline if exists
+      if (currentUserId && currentUserId !== user?.uid) {
+        console.log(`🔄 Setting previous user ${currentUserId} offline from JeepMain`);
+        await setUserOffline(currentUserId);
+      }
+      
       setCurrentUser(user);
       
       if (user) {
+        currentUserId = user.uid;
+        
         try {
           // Determine user role and set online status
-          let userRole = 'tourist';
-          let userData = {};
+          let userRole = await getUserRole(user.uid);
+          let userName = user.displayName || 'User';
           
-          const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
-          if (touristDoc.exists()) {
+          if (!userRole) {
+            // If no role found, default to tourist
             userRole = 'tourist';
-            userData = touristDoc.data();
-          } else {
-            const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
-            if (providerDoc.exists()) {
-              userRole = 'provider';
-              userData = providerDoc.data();
-            }
           }
           
           await setUserOnline(user.uid, userRole, {
-            userName: user.displayName || userData.fullName || 'User',
+            userName: userName,
             email: user.email,
-            ...userData
           });
           
           console.log(`✅ User ${user.uid} set online in JeepMain as ${userRole}`);
         } catch (error) {
           console.log('Error setting user online status in JeepMain:', error);
         }
+      } else {
+        currentUserId = null;
       }
     });
 
     return () => {
-      if (currentUser) {
-        setUserOffline(currentUser.uid);
+      if (currentUserId) {
+        setUserOffline(currentUserId);
       }
       unsubscribeAuth();
     };
