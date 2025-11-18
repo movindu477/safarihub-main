@@ -183,6 +183,8 @@ export const getServiceProvidersOnlineStatus = (callback) => {
   }
 };
 
+// ==================== ENHANCED MESSAGING SYSTEM ====================
+
 // Enhanced Conversation Management
 export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2Name) => {
   try {
@@ -205,11 +207,19 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
           [user1Id]: user1Role,
           [user2Id]: user2Role
         },
+        participantAvatars: {
+          [user1Id]: '',
+          [user2Id]: ''
+        },
         lastMessage: '',
         lastMessageTime: serverTimestamp(),
         lastMessageTimestamp: Date.now(),
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        unreadCount: {
+          [user1Id]: 0,
+          [user2Id]: 0
+        }
       });
       
       console.log(`✅ New conversation created: ${conversationId}`);
@@ -247,7 +257,8 @@ export const getOtherParticipant = (conversation, currentUserId) => {
   return {
     id: otherParticipantId,
     name: conversation.participantNames?.[otherParticipantId] || 'User',
-    role: conversation.participantRoles?.[otherParticipantId] || 'user'
+    role: conversation.participantRoles?.[otherParticipantId] || 'user',
+    avatar: conversation.participantAvatars?.[otherParticipantId] || ''
   };
 };
 
@@ -283,7 +294,7 @@ export const getUserConversations = (userId, callback) => {
   }
 };
 
-// Enhanced Message Management
+// Enhanced Message Management with real-time sync
 export const getMessages = (conversationId, callback) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
@@ -316,13 +327,16 @@ export const sendMessage = async (conversationId, messageData) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
     
-    const messageDoc = await addDoc(messagesRef, {
+    const messageWithData = {
       ...messageData,
       timestamp: serverTimestamp(),
       timestampValue: Date.now(),
       read: false,
-      delivered: false
-    });
+      delivered: false,
+      messageId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+    };
+
+    const messageDoc = await addDoc(messagesRef, messageWithData);
 
     // Update conversation last message
     const conversationRef = doc(db, 'conversations', conversationId);
@@ -372,7 +386,8 @@ export const markMessageAsDelivered = async (conversationId, messageId) => {
     const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
     await updateDoc(messageRef, {
       delivered: true,
-      deliveredAt: serverTimestamp()
+      deliveredAt: serverTimestamp(),
+      deliveredTimestamp: Date.now()
     });
   } catch (error) {
     console.error('Error marking message as delivered:', error);
@@ -419,7 +434,8 @@ export const createNotification = async (notificationData) => {
       ...notificationData,
       read: false,
       timestamp: serverTimestamp(),
-      timestampValue: Date.now()
+      timestampValue: Date.now(),
+      notificationId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
     });
     
     console.log(`✅ Notification created for user ${notificationData.recipientId}`);
@@ -443,7 +459,7 @@ export const markNotificationAsRead = async (notificationId) => {
   }
 };
 
-// Enhanced Chat Modal Component
+// Enhanced Chat Modal Component with Real-time Features
 const ChatModal = ({ 
   isOpen, 
   onClose, 
@@ -466,7 +482,7 @@ const ChatModal = ({
     scrollToBottom();
   }, [messages]);
 
-  // Monitor other user's online status
+  // Monitor other user's online status in real-time
   useEffect(() => {
     if (!otherUser?.id) return;
 
@@ -483,7 +499,7 @@ const ChatModal = ({
     return () => unsubscribe();
   }, [otherUser]);
 
-  // Load messages when conversation changes
+  // Load messages when conversation changes - REAL-TIME
   useEffect(() => {
     if (!conversationId || !isOpen) return;
 
@@ -493,7 +509,7 @@ const ChatModal = ({
       console.log(`📬 Received ${messagesData.length} messages`);
       setMessages(messagesData);
       
-      // Mark messages as read and delivered
+      // Mark messages as read and delivered in real-time
       if (currentUser) {
         markMessagesAsRead(conversationId, currentUser.uid);
         
@@ -524,19 +540,22 @@ const ChatModal = ({
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         receiverId: otherUser.id,
-        timestamp: new Date()
+        receiverName: otherUser.name,
+        timestamp: new Date(),
+        messageType: 'text'
       };
 
       console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
       
-      // Send the message
+      // Send the message - This will trigger real-time updates on all devices
       await sendMessage(conversationId, messageData);
 
       // Create notification for the recipient
       await createNotification({
         type: 'message',
         title: 'New Message',
-        message: `You have a new message from ${currentUser.displayName || 'a user'}: "${message.trim()}"`,
+        message: `You have a new message from ${currentUser.displayName || 'a user'}`,
+        content: message.trim(),
         recipientId: otherUser.id,
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
@@ -567,6 +586,39 @@ const ChatModal = ({
     } catch (error) {
       return '';
     }
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        return date.toLocaleDateString();
+      }
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // Group messages by date
+  const groupMessagesByDate = () => {
+    const groups = {};
+    messages.forEach(message => {
+      const date = formatDate(message.timestamp);
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push(message);
+    });
+    return groups;
   };
 
   if (!isOpen) return null;
@@ -612,37 +664,49 @@ const ChatModal = ({
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                      msg.senderId === currentUser?.uid
-                        ? 'bg-yellow-500 text-white rounded-br-none'
-                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                    }`}
-                  >
-                    <p className="text-sm">{msg.content}</p>
-                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
-                    }`}>
-                      <span>{formatTime(msg.timestamp)}</span>
-                      {msg.senderId === currentUser?.uid && (
-                        <span className="flex items-center space-x-1">
-                          {msg.read ? (
-                            <CheckCheck size={12} className="text-blue-300" title="Read" />
-                          ) : msg.delivered ? (
-                            <CheckCheck size={12} className="text-gray-300" title="Delivered" />
-                          ) : (
-                            <Check size={12} className="text-gray-300" title="Sent" />
-                          )}
-                        </span>
-                      )}
-                    </div>
+            <div className="space-y-4">
+              {Object.entries(groupMessagesByDate()).map(([date, dateMessages]) => (
+                <div key={date}>
+                  {/* Date separator */}
+                  <div className="flex justify-center my-4">
+                    <span className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+                      {date}
+                    </span>
                   </div>
+                  
+                  {/* Messages for this date */}
+                  {dateMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                          msg.senderId === currentUser?.uid
+                            ? 'bg-yellow-500 text-white rounded-br-none'
+                            : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.content}</p>
+                        <div className={`flex items-center space-x-2 mt-1 text-xs ${
+                          msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
+                        }`}>
+                          <span>{formatTime(msg.timestamp)}</span>
+                          {msg.senderId === currentUser?.uid && (
+                            <span className="flex items-center space-x-1">
+                              {msg.read ? (
+                                <CheckCheck size={12} className="text-blue-300" title="Read" />
+                              ) : msg.delivered ? (
+                                <CheckCheck size={12} className="text-gray-300" title="Delivered" />
+                              ) : (
+                                <Check size={12} className="text-gray-300" title="Sent" />
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
               <div ref={messagesEndRef} />

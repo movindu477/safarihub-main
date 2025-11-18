@@ -33,7 +33,9 @@ import {
   CheckCheck,
   Bell,
   X,
-  User
+  User,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 
 // Initialize Firebase
@@ -53,10 +55,11 @@ import {
   markNotificationAsRead,
   GlobalNotificationBell,
   setUserOnline,
-  setUserOffline
+  setUserOffline,
+  getUserRole
 } from "../App";
 
-// Chat Modal Component
+// Enhanced Chat Modal Component with Real-time Features
 const ChatModal = ({ 
   isOpen, 
   onClose, 
@@ -79,21 +82,24 @@ const ChatModal = ({
     scrollToBottom();
   }, [messages]);
 
-  // Monitor other user's online status
+  // Monitor other user's online status in real-time
   useEffect(() => {
     if (!otherUser?.id) return;
 
     const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
     const unsubscribe = onSnapshot(userRef, (doc) => {
       if (doc.exists()) {
-        setOtherUserOnline(doc.data().online || false);
+        const userData = doc.data();
+        const isOnline = userData.online || userData.isOnline || false;
+        setOtherUserOnline(isOnline);
+        console.log(`👀 ${otherUser.name} online status: ${isOnline}`);
       }
     });
 
     return () => unsubscribe();
   }, [otherUser]);
 
-  // Load messages when conversation changes
+  // Load messages when conversation changes - REAL-TIME
   useEffect(() => {
     if (!conversationId || !isOpen) return;
 
@@ -103,9 +109,16 @@ const ChatModal = ({
       console.log(`📬 Received ${messagesData.length} messages`);
       setMessages(messagesData);
       
-      // Mark messages as read and delivered
+      // Mark messages as read and delivered in real-time
       if (currentUser) {
         markMessagesAsRead(conversationId, currentUser.uid);
+        
+        // Mark own messages as delivered
+        messagesData.forEach(msg => {
+          if (msg.senderId === currentUser.uid && !msg.delivered) {
+            markMessageAsDelivered(conversationId, msg.id);
+          }
+        });
       }
     });
 
@@ -127,19 +140,22 @@ const ChatModal = ({
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         receiverId: otherUser.id,
-        timestamp: new Date()
+        receiverName: otherUser.name,
+        timestamp: new Date(),
+        messageType: 'text'
       };
 
       console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
       
-      // Send the message
+      // Send the message - This will trigger real-time updates on all devices
       await sendMessage(conversationId, messageData);
 
       // Create notification for the recipient
       await createNotification({
         type: 'message',
         title: 'New Message',
-        message: `You have a new message from ${currentUser.displayName || 'a user'}: "${message.trim()}"`,
+        message: `You have a new message from ${currentUser.displayName || 'a user'}`,
+        content: message.trim(),
         recipientId: otherUser.id,
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
@@ -170,6 +186,39 @@ const ChatModal = ({
     } catch (error) {
       return '';
     }
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        return date.toLocaleDateString();
+      }
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // Group messages by date
+  const groupMessagesByDate = () => {
+    const groups = {};
+    messages.forEach(message => {
+      const date = formatDate(message.timestamp);
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push(message);
+    });
+    return groups;
   };
 
   if (!isOpen) return null;
@@ -215,37 +264,49 @@ const ChatModal = ({
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                      msg.senderId === currentUser?.uid
-                        ? 'bg-yellow-500 text-white rounded-br-none'
-                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                    }`}
-                  >
-                    <p className="text-sm">{msg.content}</p>
-                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
-                    }`}>
-                      <span>{formatTime(msg.timestamp)}</span>
-                      {msg.senderId === currentUser?.uid && (
-                        <span className="flex items-center space-x-1">
-                          {msg.read ? (
-                            <CheckCheck size={12} className="text-blue-300" title="Read" />
-                          ) : msg.delivered ? (
-                            <CheckCheck size={12} className="text-gray-300" title="Delivered" />
-                          ) : (
-                            <Check size={12} className="text-gray-300" title="Sent" />
-                          )}
-                        </span>
-                      )}
-                    </div>
+            <div className="space-y-4">
+              {Object.entries(groupMessagesByDate()).map(([date, dateMessages]) => (
+                <div key={date}>
+                  {/* Date separator */}
+                  <div className="flex justify-center my-4">
+                    <span className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+                      {date}
+                    </span>
                   </div>
+                  
+                  {/* Messages for this date */}
+                  {dateMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                          msg.senderId === currentUser?.uid
+                            ? 'bg-yellow-500 text-white rounded-br-none'
+                            : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.content}</p>
+                        <div className={`flex items-center space-x-2 mt-1 text-xs ${
+                          msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
+                        }`}>
+                          <span>{formatTime(msg.timestamp)}</span>
+                          {msg.senderId === currentUser?.uid && (
+                            <span className="flex items-center space-x-1">
+                              {msg.read ? (
+                                <CheckCheck size={12} className="text-blue-300" title="Read" />
+                              ) : msg.delivered ? (
+                                <CheckCheck size={12} className="text-gray-300" title="Delivered" />
+                              ) : (
+                                <Check size={12} className="text-gray-300" title="Sent" />
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
               <div ref={messagesEndRef} />
@@ -474,7 +535,7 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
     initializeConversation();
   }, [currentUser, driverId, driver]);
 
-  // Load messages for the conversation
+  // Load messages for the conversation - REAL-TIME
   useEffect(() => {
     if (!conversationId) return;
 
@@ -537,7 +598,7 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
     }
   };
 
-  // Send message function
+  // Send message function - REAL-TIME
   const handleSendMessage = async (e) => {
     e.preventDefault();
     
@@ -551,10 +612,12 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         receiverId: driverId,
-        timestamp: new Date()
+        receiverName: driver.fullName || 'Driver',
+        timestamp: new Date(),
+        messageType: 'text'
       };
 
-      // Send the message
+      // Send the message - This will trigger real-time updates on all devices
       await sendMessage(conversationId, messageData);
 
       // Create notification for the driver
@@ -562,11 +625,12 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
         type: 'message',
         title: 'New Message',
         message: `You have a new message from ${currentUser.displayName || 'a tourist'}`,
+        content: message.trim(),
         recipientId: driverId,
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
-        relatedId: conversationId,
-        conversationId: conversationId
+        conversationId: conversationId,
+        relatedId: conversationId
       });
 
       setMessage("");
