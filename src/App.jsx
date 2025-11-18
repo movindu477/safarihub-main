@@ -79,14 +79,17 @@ export const setUserOnline = async (userId, userRole, userData = {}) => {
       lastSeenTimestamp: Date.now(),
       lastOnlineStatus: 'online',
       status: 'online',
+      lastActive: serverTimestamp(),
       ...userData
     };
     
     await setDoc(userRef, onlineData, { merge: true });
     
     console.log(`✅ User ${userId} successfully set online`);
+    return true;
   } catch (error) {
     console.error('❌ Error setting user online:', error);
+    return false;
   }
 };
 
@@ -100,7 +103,8 @@ export const setUserOffline = async (userId, userRole = null) => {
       lastSeen: serverTimestamp(),
       lastSeenTimestamp: Date.now(),
       lastOnlineStatus: 'offline',
-      status: 'offline'
+      status: 'offline',
+      lastActive: serverTimestamp()
     };
     
     // Try to update based on role if provided
@@ -119,8 +123,10 @@ export const setUserOffline = async (userId, userRole = null) => {
     }
     
     console.log(`✅ User ${userId} successfully set offline`);
+    return true;
   } catch (error) {
     console.error('❌ Error setting user offline:', error);
+    return false;
   }
 };
 
@@ -131,7 +137,10 @@ export const getUserRole = async (userId) => {
     if (touristDoc.exists()) return 'tourist';
     
     const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
-    if (providerDoc.exists()) return 'provider';
+    if (providerDoc.exists()) {
+      const data = providerDoc.data();
+      return data.serviceType === 'Jeep Driver' ? 'jeep_driver' : 'provider';
+    }
     
     return null;
   } catch (error) {
@@ -162,11 +171,13 @@ export const getServiceProvidersOnlineStatus = (callback) => {
           onlineStatusMap[provider.id] = {
             isOnline: provider.online || provider.isOnline || false,
             lastSeen: provider.lastSeen,
-            lastSeenTimestamp: provider.lastSeenTimestamp
+            lastSeenTimestamp: provider.lastSeenTimestamp,
+            status: provider.status || 'offline'
           };
         });
         
-        console.log(`👥 Real-time online status update: ${providers.filter(p => p.online || p.isOnline).length} drivers online`);
+        const onlineCount = Object.values(onlineStatusMap).filter(status => status.isOnline).length;
+        console.log(`👥 Real-time online status update: ${onlineCount} drivers online`);
         callback(onlineStatusMap);
       },
       (error) => {
@@ -181,6 +192,39 @@ export const getServiceProvidersOnlineStatus = (callback) => {
     callback({});
     return () => {};
   }
+};
+
+// Page visibility handler for automatic online/offline status
+export const setupPageVisibilityHandler = (userId, userRole) => {
+  const handleVisibilityChange = async () => {
+    if (document.hidden) {
+      // Page is hidden - set user as offline after a delay
+      setTimeout(async () => {
+        if (document.hidden) {
+          console.log(`📱 Page hidden, setting user ${userId} offline`);
+          await setUserOffline(userId, userRole);
+        }
+      }, 30000); // 30 seconds delay
+    } else {
+      // Page is visible - set user as online
+      console.log(`📱 Page visible, setting user ${userId} online`);
+      await setUserOnline(userId, userRole);
+    }
+  };
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+  // Also handle beforeunload for when user closes the tab/window
+  const handleBeforeUnload = async () => {
+    await setUserOffline(userId, userRole);
+  };
+
+  window.addEventListener('beforeunload', handleBeforeUnload);
+
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+  };
 };
 
 // ==================== ENHANCED MESSAGING SYSTEM ====================
@@ -812,7 +856,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
 };
 
 // Enhanced Home Page Component
-const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
+const HomePage = ({ user, userRole, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
@@ -861,6 +905,7 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
       
       <Navbar 
         user={user} 
+        userRole={userRole}
         onLogout={onLogout} 
         onLogin={onShowAuth}
         onRegister={onShowAuth}
@@ -882,6 +927,7 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
 // Enhanced Main App Component
 function App() {
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
@@ -890,6 +936,7 @@ function App() {
   useEffect(() => {
     let currentUserId = null;
     let currentUserRole = null;
+    let cleanupVisibilityHandler = null;
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
@@ -898,6 +945,11 @@ function App() {
       if (currentUserId && currentUserId !== user?.uid) {
         console.log(`🔄 Setting previous user ${currentUserId} offline`);
         await setUserOffline(currentUserId, currentUserRole);
+        
+        // Clean up previous visibility handler
+        if (cleanupVisibilityHandler) {
+          cleanupVisibilityHandler();
+        }
       }
       
       setUser(user);
@@ -916,20 +968,32 @@ function App() {
           }
           
           currentUserRole = userRole;
+          setUserRole(userRole);
           
+          // Set user online immediately
           await setUserOnline(user.uid, userRole, {
             userName: userName,
             email: user.email,
           });
           
           console.log(`✅ User ${user.uid} set online as ${userRole}`);
+          
+          // Set up page visibility handler for real-time status updates
+          cleanupVisibilityHandler = setupPageVisibilityHandler(user.uid, userRole);
+          
         } catch (error) {
           console.log('Error setting user online status:', error);
         }
       } else {
         currentUserId = null;
         currentUserRole = null;
+        setUserRole(null);
         setNotifications([]);
+        
+        // Clean up visibility handler
+        if (cleanupVisibilityHandler) {
+          cleanupVisibilityHandler();
+        }
       }
     });
     
@@ -937,6 +1001,9 @@ function App() {
       console.log('🔴 Unsubscribing from auth state changes');
       if (currentUserId) {
         setUserOffline(currentUserId, currentUserRole);
+      }
+      if (cleanupVisibilityHandler) {
+        cleanupVisibilityHandler();
       }
       unsubscribe();
     };
@@ -998,16 +1065,6 @@ function App() {
     await markNotificationAsRead(notificationId);
   };
 
-  // Set user offline when component unmounts or user changes
-  useEffect(() => {
-    return () => {
-      if (user) {
-        const userRole = getUserRole(user.uid);
-        setUserOffline(user.uid, userRole);
-      }
-    };
-  }, [user]);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -1031,6 +1088,7 @@ function App() {
           element={
             <HomePage 
               user={user}
+              userRole={userRole}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
               notifications={notifications}
@@ -1044,6 +1102,7 @@ function App() {
           element={
             <JeepDriversPage 
               user={user}
+              userRole={userRole}
               onLogout={handleLogout}
               notifications={notifications}
               onNotificationClick={handleNotificationClick}
@@ -1056,6 +1115,7 @@ function App() {
           element={
             <JeepProfile 
               user={user}
+              userRole={userRole}
               onLogout={handleLogout}
               notifications={notifications}
               onNotificationClick={handleNotificationClick}
@@ -1226,6 +1286,7 @@ function Authentication({ onAuthSuccess }) {
         isOnline: true,
         lastSeen: serverTimestamp(),
         lastSeenTimestamp: Date.now(),
+        status: 'online'
       };
 
       let collectionName = "";
