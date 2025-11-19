@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { Bell, MessageCircle, X, Send, Check, CheckCheck, User } from "lucide-react";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import { Bell, MessageCircle, X, Send, Check, CheckCheck, User, Wifi, WifiOff } from "lucide-react";
 import Navbar from "./Navbar";
 import JeepHero from "./JeepHero";
 import JeepSection2 from "./JeepSection2";
@@ -23,10 +23,14 @@ import {
   markNotificationAsRead,
   setUserOnline,
   setUserOffline,
-  getUserRole
+  getUserRole,
+  GlobalNotificationBell,
+  markMessageAsDelivered,
+  setupPageVisibilityHandler,
+  setupUserHeartbeat
 } from "../App";
 
-// Chat Modal Component
+// Enhanced Chat Modal Component with Real-time Features
 const ChatModal = ({ 
   isOpen, 
   onClose, 
@@ -38,6 +42,7 @@ const ChatModal = ({
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
   const [otherUserOnline, setOtherUserOnline] = useState(false);
+  const [otherUserStatus, setOtherUserStatus] = useState('offline');
   const messagesEndRef = React.useRef(null);
 
   // Scroll to bottom of messages
@@ -49,36 +54,57 @@ const ChatModal = ({
     scrollToBottom();
   }, [messages]);
 
-  // Monitor other user's online status
+  // Enhanced: Monitor other user's online status in real-time with better error handling
   useEffect(() => {
     if (!otherUser?.id) return;
 
-    const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
-    const unsubscribe = onSnapshot(userRef, (doc) => {
-      if (doc.exists()) {
-        const userData = doc.data();
-        const isOnline = userData.online || userData.isOnline || false;
-        setOtherUserOnline(isOnline);
-        console.log(`👀 ${otherUser.name} online status: ${isOnline}`);
-      }
-    });
+    console.log(`👀 Setting up real-time status monitor for ${otherUser.name} (${otherUser.id})`);
 
-    return () => unsubscribe();
+    const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
+    const unsubscribe = onSnapshot(userRef, 
+      (doc) => {
+        if (doc.exists()) {
+          const userData = doc.data();
+          const isOnline = userData.online || userData.isOnline || false;
+          const status = userData.status || 'offline';
+          
+          setOtherUserOnline(isOnline);
+          setOtherUserStatus(status);
+          
+          console.log(`👀 ${otherUser.name} status: ${isOnline ? 'Online' : 'Offline'} (${status})`);
+        }
+      },
+      (error) => {
+        console.error(`❌ Error monitoring ${otherUser.name} status:`, error);
+      }
+    );
+
+    return () => {
+      console.log(`🔴 Unsubscribing from ${otherUser.name} status monitor`);
+      unsubscribe();
+    };
   }, [otherUser]);
 
-  // Load messages when conversation changes
+  // Enhanced: Load messages when conversation changes - REAL-TIME with better error handling
   useEffect(() => {
     if (!conversationId || !isOpen) return;
 
     console.log(`📨 Loading messages for conversation: ${conversationId}`);
 
     const unsubscribe = getMessages(conversationId, (messagesData) => {
-      console.log(`📬 Received ${messagesData.length} messages`);
+      console.log(`📬 Received ${messagesData.length} messages for conversation ${conversationId}`);
       setMessages(messagesData);
       
-      // Mark messages as read and delivered
+      // Mark messages as read and delivered in real-time
       if (currentUser) {
         markMessagesAsRead(conversationId, currentUser.uid);
+        
+        // Mark own messages as delivered
+        messagesData.forEach(msg => {
+          if (msg.senderId === currentUser.uid && !msg.delivered) {
+            markMessageAsDelivered(conversationId, msg.id);
+          }
+        });
       }
     });
 
@@ -100,19 +126,22 @@ const ChatModal = ({
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         receiverId: otherUser.id,
-        timestamp: new Date()
+        receiverName: otherUser.name,
+        timestamp: new Date(),
+        messageType: 'text'
       };
 
       console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
       
-      // Send the message
+      // Send the message - This will trigger real-time updates on all devices
       await sendMessage(conversationId, messageData);
 
       // Create notification for the recipient
       await createNotification({
         type: 'message',
         title: 'New Message',
-        message: `You have a new message from ${currentUser.displayName || 'a user'}: "${message.trim()}"`,
+        message: `You have a new message from ${currentUser.displayName || 'a user'}`,
+        content: message.trim(),
         recipientId: otherUser.id,
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
@@ -145,12 +174,53 @@ const ChatModal = ({
     }
   };
 
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        return date.toLocaleDateString();
+      }
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // Group messages by date
+  const groupMessagesByDate = () => {
+    const groups = {};
+    messages.forEach(message => {
+      const date = formatDate(message.timestamp);
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push(message);
+    });
+    return groups;
+  };
+
+  // Get status display text
+  const getStatusDisplay = () => {
+    if (otherUserOnline) {
+      return 'Online • Active now';
+    }
+    return 'Offline • Will see your message later';
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col">
-        {/* Header */}
+        {/* Enhanced Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-t-xl">
           <div className="flex items-center space-x-3">
             <div className="relative">
@@ -158,13 +228,25 @@ const ChatModal = ({
                 <User className="h-5 w-5" />
               </div>
               <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                otherUserOnline ? 'bg-green-500' : 'bg-gray-400'
+                otherUserOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
               }`}></div>
             </div>
             <div>
               <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
-              <p className="text-yellow-100 text-sm">
-                {otherUserOnline ? 'Online' : 'Offline'} • {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
+              <p className="text-yellow-100 text-sm flex items-center gap-1">
+                {otherUserOnline ? (
+                  <>
+                    <Wifi className="h-3 w-3" />
+                    <span>Online • Active now</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="h-3 w-3" />
+                    <span>Offline • Will see your message later</span>
+                  </>
+                )}
+                <span className="mx-1">•</span>
+                <span>{otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}</span>
               </p>
             </div>
           </div>
@@ -180,45 +262,61 @@ const ChatModal = ({
         <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
-              <p className="text-lg font-medium">No messages yet</p>
-              <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
-              <p className="text-xs text-gray-400 mt-2">
-                {otherUserOnline ? 'User is online' : 'User is offline - they will see your message when they come online'}
+              <MessageCircle className="h-16 w-16 mb-4 text-gray-300" />
+              <p className="text-lg font-medium text-gray-600">No messages yet</p>
+              <p className="text-sm text-gray-500 mt-1">Start a conversation with {otherUser?.name || 'this user'}</p>
+              <p className={`text-xs mt-3 px-3 py-1 rounded-full ${
+                otherUserOnline 
+                  ? 'bg-green-100 text-green-700 border border-green-200' 
+                  : 'bg-gray-100 text-gray-600 border border-gray-200'
+              }`}>
+                {otherUserOnline ? '🟢 User is online and active' : '⚫ User is offline - they will see your message when they come online'}
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                      msg.senderId === currentUser?.uid
-                        ? 'bg-yellow-500 text-white rounded-br-none'
-                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                    }`}
-                  >
-                    <p className="text-sm">{msg.content}</p>
-                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
-                    }`}>
-                      <span>{formatTime(msg.timestamp)}</span>
-                      {msg.senderId === currentUser?.uid && (
-                        <span className="flex items-center space-x-1">
-                          {msg.read ? (
-                            <CheckCheck size={12} className="text-blue-300" title="Read" />
-                          ) : msg.delivered ? (
-                            <CheckCheck size={12} className="text-gray-300" title="Delivered" />
-                          ) : (
-                            <Check size={12} className="text-gray-300" title="Sent" />
-                          )}
-                        </span>
-                      )}
-                    </div>
+            <div className="space-y-4">
+              {Object.entries(groupMessagesByDate()).map(([date, dateMessages]) => (
+                <div key={date}>
+                  {/* Date separator */}
+                  <div className="flex justify-center my-4">
+                    <span className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full font-medium">
+                      {date}
+                    </span>
                   </div>
+                  
+                  {/* Messages for this date */}
+                  {dateMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                          msg.senderId === currentUser?.uid
+                            ? 'bg-yellow-500 text-white rounded-br-none shadow-md'
+                            : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.content}</p>
+                        <div className={`flex items-center space-x-2 mt-1 text-xs ${
+                          msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
+                        }`}>
+                          <span>{formatTime(msg.timestamp)}</span>
+                          {msg.senderId === currentUser?.uid && (
+                            <span className="flex items-center space-x-1">
+                              {msg.read ? (
+                                <CheckCheck size={12} className="text-blue-300" title="Read" />
+                              ) : msg.delivered ? (
+                                <CheckCheck size={12} className="text-gray-300" title="Delivered" />
+                              ) : (
+                                <Check size={12} className="text-gray-300" title="Sent" />
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
               <div ref={messagesEndRef} />
@@ -226,21 +324,21 @@ const ChatModal = ({
           )}
         </div>
 
-        {/* Message Input */}
+        {/* Enhanced Message Input */}
         <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
           <div className="flex space-x-3">
             <input
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+              placeholder={otherUserOnline ? `Message ${otherUser?.name || 'User'}...` : `${otherUser?.name || 'User'} is offline - they will see your message later`}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-all duration-300"
               disabled={sending}
             />
             <button
               type="submit"
               disabled={!message.trim() || sending}
-              className="bg-yellow-500 text-white p-3 rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="bg-yellow-500 text-white p-3 rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 disabled:transform-none"
             >
               {sending ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -249,181 +347,22 @@ const ChatModal = ({
               )}
             </button>
           </div>
+          {!otherUserOnline && (
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              💡 This user is currently offline. They will receive your message when they come back online.
+            </p>
+          )}
         </form>
       </div>
     </div>
   );
 };
 
-// Global Notification Bell for Bottom Right Corner
-const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showNotifications && !event.target.closest('.notification-container')) {
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showNotifications]);
-
-  const handleBellClick = () => {
-    setShowNotifications(!showNotifications);
-  };
-
-  const handleNotificationItemClick = async (notification) => {
-    // Mark as read when clicked
-    if (!notification.read && onMarkAsRead) {
-      await onMarkAsRead(notification.id);
-    }
-    
-    onNotificationClick(notification);
-    setShowNotifications(false);
-  };
-
-  const handleMarkAllAsRead = async () => {
-    const unreadNotifications = notifications.filter(n => !n.read);
-    for (const notification of unreadNotifications) {
-      await onMarkAsRead(notification.id);
-    }
-  };
-
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      const now = new Date();
-      const diffInHours = (now - date) / (1000 * 60 * 60);
-      
-      if (diffInHours < 1) {
-        const minutes = Math.floor(diffInHours * 60);
-        return minutes < 1 ? 'Just now' : `${minutes}m ago`;
-      } else if (diffInHours < 24) {
-        return `${Math.floor(diffInHours)}h ago`;
-      } else {
-        return date.toLocaleDateString();
-      }
-    } catch (error) {
-      return 'Recently';
-    }
-  };
-
-  if (!user) return null;
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 notification-container">
-      <div className="relative">
-        {/* Notification Panel - Positioned ABOVE the button */}
-        {showNotifications && (
-          <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-h-96 overflow-y-auto">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">Notifications</h3>
-                </div>
-                <div className="flex justify-between items-center mt-1">
-                  <p className="text-yellow-100 text-sm">
-                    {notifications.filter(n => !n.read).length} unread
-                  </p>
-                  {notifications.filter(n => !n.read).length > 0 && (
-                    <button
-                      onClick={handleMarkAllAsRead}
-                      className="text-yellow-200 hover:text-white text-xs underline"
-                    >
-                      Mark all read
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Notifications List */}
-              <div className="max-h-80 overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p>No notifications yet</p>
-                    <p className="text-sm mt-1">Notifications will appear here</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        onClick={() => handleNotificationItemClick(notification)}
-                        className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${
-                          notification.read ? 'bg-white' : 'bg-blue-50'
-                        }`}
-                      >
-                        <div className="flex items-start space-x-3">
-                          <div className="flex-shrink-0">
-                            <MessageCircle className="h-4 w-4 text-blue-500" />
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className={`font-medium text-sm ${
-                                notification.read ? 'text-gray-600' : 'text-gray-900'
-                              }`}>
-                                {notification.senderName || 'User'}
-                              </p>
-                              <div className="flex items-center space-x-1 text-xs text-gray-500">
-                                <span>{formatTime(notification.timestamp)}</span>
-                              </div>
-                            </div>
-                            
-                            <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                              {notification.message || 'New notification'}
-                            </p>
-                            
-                            <div className="flex items-center justify-between">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                <MessageCircle className="h-3 w-3 mr-1" />
-                                <span className="capitalize">
-                                  {notification.type || 'message'}
-                                </span>
-                              </span>
-                              
-                              {!notification.read && (
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Notification Bell Button */}
-        <button
-          onClick={handleBellClick}
-          className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
-        >
-          <Bell className="h-6 w-6 text-white" />
-          {notifications.filter(n => !n.read).length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-              {notifications.filter(n => !n.read).length}
-            </span>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// Notification management function
+// Enhanced notification management function
 const getUserNotifications = (userId, callback) => {
   try {
+    console.log(`🔔 Setting up notifications listener for user: ${userId}`);
+    
     const notificationsRef = collection(db, 'notifications');
     const notificationsQuery = query(
       notificationsRef,
@@ -431,14 +370,20 @@ const getUserNotifications = (userId, callback) => {
       orderBy('timestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-      const notifications = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      console.log(`🔔 Received ${notifications.length} notifications for user ${userId}`);
-      callback(notifications);
-    });
+    const unsubscribe = onSnapshot(notificationsQuery, 
+      (snapshot) => {
+        const notifications = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`📢 Received ${notifications.length} notifications for user ${userId}`);
+        callback(notifications);
+      },
+      (error) => {
+        console.error('❌ Error in notifications snapshot:', error);
+        callback([]);
+      }
+    );
 
     return unsubscribe;
   } catch (error) {
@@ -451,15 +396,57 @@ const getUserNotifications = (userId, callback) => {
 export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   // Chat modal state
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
 
-  // Get current user and set online status
+  // Enhanced logout handler for JeepMain - COMPLETELY UPDATED
+  const handleLogout = async () => {
+    if (isLoggingOut) return; // Prevent multiple logout calls
+    
+    setIsLoggingOut(true);
+    console.log('🚪 Starting logout process from JeepMain...');
+    
+    try {
+      // Set user offline in Firebase
+      if (currentUser && userRole) {
+        console.log(`🔴 Setting user ${currentUser.uid} offline`);
+        await setUserOffline(currentUser.uid, userRole);
+      }
+      
+      // Sign out from Firebase Auth
+      console.log('🔐 Signing out from Firebase Auth...');
+      await signOut(auth);
+      
+      // Clear local state
+      setCurrentUser(null);
+      setUserRole(null);
+      
+      console.log('✅ Successfully logged out from Firebase');
+      
+      // Force complete page refresh and redirect to home page
+      console.log('🔄 Refreshing page and redirecting to home...');
+      window.location.href = '/'; // This will completely refresh and show login/register buttons
+      
+    } catch (error) {
+      console.error('❌ Logout error in JeepMain:', error);
+      // Even if there's an error, still redirect to home
+      window.location.href = '/';
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  // Enhanced: Get current user and set online status with proper cleanup
   useEffect(() => {
     let currentUserId = null;
+    let currentUserRole = null;
+    let cleanupVisibilityHandler = null;
+    let cleanupHeartbeat = null;
     
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 JeepMain Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
@@ -467,7 +454,15 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
       // Set previous user offline if exists
       if (currentUserId && currentUserId !== user?.uid) {
         console.log(`🔄 Setting previous user ${currentUserId} offline from JeepMain`);
-        await setUserOffline(currentUserId);
+        await setUserOffline(currentUserId, currentUserRole);
+        
+        // Clean up previous handlers
+        if (cleanupVisibilityHandler) {
+          cleanupVisibilityHandler();
+        }
+        if (cleanupHeartbeat) {
+          cleanupHeartbeat();
+        }
       }
       
       setCurrentUser(user);
@@ -485,96 +480,172 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
             userRole = 'tourist';
           }
           
+          currentUserRole = userRole;
+          setUserRole(userRole);
+          
+          // Set user online immediately
           await setUserOnline(user.uid, userRole, {
             userName: userName,
             email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL
           });
           
           console.log(`✅ User ${user.uid} set online in JeepMain as ${userRole}`);
+          
+          // Set up page visibility handler for real-time status updates
+          cleanupVisibilityHandler = setupPageVisibilityHandler(user.uid, userRole);
+          
+          // Set up heartbeat to keep user online while active
+          cleanupHeartbeat = setupUserHeartbeat(user.uid, userRole);
+          
         } catch (error) {
-          console.log('Error setting user online status in JeepMain:', error);
+          console.log('❌ Error setting user online status in JeepMain:', error);
         }
       } else {
         currentUserId = null;
+        currentUserRole = null;
+        setUserRole(null);
       }
     });
 
     return () => {
+      console.log('🔴 Cleaning up JeepMain auth listener');
       if (currentUserId) {
-        setUserOffline(currentUserId);
+        setUserOffline(currentUserId, currentUserRole);
+      }
+      if (cleanupVisibilityHandler) {
+        cleanupVisibilityHandler();
+      }
+      if (cleanupHeartbeat) {
+        cleanupHeartbeat();
       }
       unsubscribeAuth();
     };
   }, []);
 
-  // Handle notification click
+  // Enhanced: Handle notification click with better error handling
   const handleNotificationClick = async (notification) => {
-    console.log('🔘 Notification clicked:', notification);
+    console.log('🔘 JeepMain Notification clicked:', notification);
     
-    // Mark notification as read
-    if (!notification.read) {
-      await onMarkAsRead(notification.id);
-    }
-    
-    if (notification.type === 'message' && notification.conversationId) {
-      // Open chat modal with the conversation
-      const conversation = await getConversationById(notification.conversationId);
-      if (conversation && user) {
-        const otherUser = getOtherParticipant(conversation, user.uid);
-        if (otherUser) {
-          setChatConversationId(notification.conversationId);
-          setChatOtherUser(otherUser);
-          setIsChatModalOpen(true);
-          console.log(`💬 Opening chat with ${otherUser.name}`);
-        }
+    try {
+      // Mark notification as read
+      if (!notification.read) {
+        await onMarkAsRead(notification.id);
       }
-    } else if (notification.type === 'message' && notification.relatedId) {
-      // Handle legacy notification format
-      const participantIds = notification.relatedId.split('_');
-      const otherParticipantId = participantIds.find(id => id !== user.uid);
       
-      if (otherParticipantId) {
-        // Try to get user data to open chat
-        try {
-          // Check if it's a service provider
-          const providerDoc = await getDoc(doc(db, 'serviceProviders', otherParticipantId));
-          if (providerDoc.exists()) {
-            const providerData = providerDoc.data();
-            setChatOtherUser({
-              id: otherParticipantId,
-              name: providerData.fullName || 'Driver',
-              role: 'provider'
-            });
-            
-            // Create or get conversation
-            const conversationId = await createOrGetConversation(
-              user.uid,
-              otherParticipantId,
-              user.displayName || 'User',
-              providerData.fullName || 'Driver'
-            );
-            
-            setChatConversationId(conversationId);
+      if (notification.type === 'message' && notification.conversationId) {
+        // Open chat modal with the conversation
+        const conversation = await getConversationById(notification.conversationId);
+        if (conversation && user) {
+          const otherUser = getOtherParticipant(conversation, user.uid);
+          if (otherUser) {
+            setChatConversationId(notification.conversationId);
+            setChatOtherUser(otherUser);
             setIsChatModalOpen(true);
+            console.log(`💬 Opening chat with ${otherUser.name} from notification`);
           }
-        } catch (error) {
-          console.error('Error handling notification:', error);
+        }
+      } else if (notification.type === 'message' && notification.relatedId) {
+        // Handle legacy notification format
+        const participantIds = notification.relatedId.split('_');
+        const otherParticipantId = participantIds.find(id => id !== user.uid);
+        
+        if (otherParticipantId) {
+          // Try to get user data to open chat
+          try {
+            // Check if it's a service provider
+            const providerDoc = await getDoc(doc(db, 'serviceProviders', otherParticipantId));
+            if (providerDoc.exists()) {
+              const providerData = providerDoc.data();
+              setChatOtherUser({
+                id: otherParticipantId,
+                name: providerData.fullName || 'Driver',
+                role: 'provider'
+              });
+              
+              // Create or get conversation
+              const conversationId = await createOrGetConversation(
+                user.uid,
+                otherParticipantId,
+                user.displayName || 'User',
+                providerData.fullName || 'Driver'
+              );
+              
+              setChatConversationId(conversationId);
+              setIsChatModalOpen(true);
+              console.log(`💬 Created new conversation with ${providerData.fullName || 'Driver'}`);
+            }
+          } catch (error) {
+            console.error('❌ Error handling legacy notification:', error);
+          }
         }
       }
+    } catch (error) {
+      console.error('❌ Error handling notification click:', error);
+      alert('Failed to open conversation. Please try again.');
     }
   };
 
   const handleMarkAsRead = async (notificationId) => {
     try {
       await markNotificationAsRead(notificationId);
+      console.log(`✅ Notification ${notificationId} marked as read`);
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error('❌ Error marking notification as read:', error);
     }
   };
 
+  // Enhanced: Handle page unload to set user offline
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      if (currentUser && userRole) {
+        console.log(`📴 Page unloading, setting user ${currentUser.uid} offline`);
+        await setUserOffline(currentUser.uid, userRole);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [currentUser, userRole]);
+
+  // Handle login navigation for JeepMain
+  const handleLoginClick = () => {
+    if (onLogin) {
+      onLogin();
+    } else {
+      navigate('/');
+    }
+  };
+
+  // Handle register navigation for JeepMain
+  const handleRegisterClick = () => {
+    if (onRegister) {
+      onRegister();
+    } else {
+      navigate('/');
+    }
+  };
+
+  // Show loading state during logout
+  if (isLoggingOut) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+          <p className="text-gray-700 text-lg">Logging out...</p>
+          <p className="text-gray-500 text-sm">Redirecting to home page</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Chat Modal */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Enhanced Chat Modal */}
       <ChatModal 
         isOpen={isChatModalOpen}
         onClose={() => setIsChatModalOpen(false)}
@@ -591,14 +662,21 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
         onMarkAsRead={handleMarkAsRead}
       />
       
+      {/* Enhanced Navbar with proper logout handling */}
       <Navbar 
         user={user} 
-        onLogin={onLogin || onShowAuth} 
-        onRegister={onRegister || onShowAuth} 
-        onLogout={onLogout} 
+        onLogin={handleLoginClick} 
+        onRegister={handleRegisterClick} 
+        onLogout={handleLogout} 
       />
+      
+      {/* Jeep Hero Section */}
       <JeepHero />
-      <div className="h-1 bg-black"></div>
+      
+      {/* Divider */}
+      <div className="h-1 bg-gradient-to-r from-yellow-400 to-orange-500 shadow-lg"></div>
+      
+      {/* Jeep Section with Drivers List */}
       <JeepSection2 />
     </div>
   );

@@ -90,33 +90,34 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
       await signOut(auth);
       setProfileOpen(false);
       setUserData(null);
+      
+      // Call the onLogout callback if provided
       if (onLogout) {
         onLogout();
       }
+      
+      // Force refresh the page to ensure clean state
+      window.location.reload();
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
-  // Handle login navigation - only navigate if we're not already on auth pages
+  // Handle login navigation
   const handleLoginClick = () => {
     if (onLogin) {
       onLogin();
     } else {
-      // If no onLogin prop provided (like on JeepDriver page), navigate to home for auth
       navigate('/');
-      // You might want to add a state to indicate login should open
     }
   };
 
-  // Handle register navigation - only navigate if we're not already on auth pages
+  // Handle register navigation
   const handleRegisterClick = () => {
     if (onRegister) {
       onRegister();
     } else {
-      // If no onRegister prop provided (like on JeepDriver page), navigate to home for auth
       navigate('/');
-      // You might want to add a state to indicate register should open
     }
   };
 
@@ -135,9 +136,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     setMobileServicesOpen(false);
     setMenuOpen(false);
   };
-
-  // Check if we're on the auth screen (login/register)
-  const isOnAuthScreen = location.pathname === '/' && (window.location.hash === '#login' || window.location.hash === '#register');
 
   // Check if we're on the JeepDriver page
   const isOnJeepDriverPage = location.pathname === '/driver';
@@ -262,35 +260,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             )}
           </div>
 
-          {/* User Icon - Only show if user is logged in */}
-          {user ? (
-            <div className="flex items-center space-x-4">
-              {/* Messages Button */}
-              <button
-                onClick={() => onStartChat && onStartChat('messages', 'Messages')}
-                className="relative p-2 text-white hover:text-emerald-200 transition-colors duration-300 hover:bg-emerald-600 rounded-lg"
-                title="Messages"
-              >
-                <MessageCircle className="h-5 w-5" />
-                {/* You can add notification badge here if needed */}
-                {/* <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                  3
-                </span> */}
-              </button>
-              
-              {/* User Profile */}
-              <div className="relative">
-                <img
-                  src={currentUser.avatar}
-                  alt="User"
-                  className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
-                  onClick={() => setProfileOpen(true)}
-                />
-                {/* Online indicator */}
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-700 shadow-sm"></div>
-              </div>
-            </div>
-          ) : (
+          {/* User Authentication Buttons - Show login/register when user is NOT logged in */}
+          {!user ? (
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleLoginClick}
@@ -305,12 +276,37 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 Register
               </button>
             </div>
+          ) : (
+            /* User Profile Section - Show when user IS logged in */
+            <div className="flex items-center space-x-4">
+              {/* Messages Button */}
+              <button
+                onClick={() => onStartChat && onStartChat('messages', 'Messages')}
+                className="relative p-2 text-white hover:text-emerald-200 transition-colors duration-300 hover:bg-emerald-600 rounded-lg"
+                title="Messages"
+              >
+                <MessageCircle className="h-5 w-5" />
+              </button>
+              
+              {/* User Profile */}
+              <div className="relative">
+                <img
+                  src={currentUser.avatar}
+                  alt="User"
+                  className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
+                  onClick={() => setProfileOpen(true)}
+                />
+                {/* Online indicator */}
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-700 shadow-sm"></div>
+              </div>
+            </div>
           )}
         </div>
 
         {/* Hamburger Menu (Mobile) */}
         <div className="md:hidden flex items-center space-x-4">
           {user ? (
+            /* Mobile - User is logged in */
             <div className="flex items-center space-x-2">
               {/* Messages Button for Mobile */}
               <button
@@ -333,6 +329,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
               </div>
             </div>
           ) : (
+            /* Mobile - User is NOT logged in */
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleLoginClick}
@@ -427,6 +424,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 </div>
               </div>
 
+              {/* Mobile Authentication Buttons - Show when user is NOT logged in */}
               {!user && (
                 <div className="space-y-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp"
                      style={{ animationDelay: "400ms" }}>
@@ -451,6 +449,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 </div>
               )}
 
+              {/* Mobile User Section - Show when user IS logged in */}
               {user && (
                 <div className="space-y-3 pt-6 border-t border-emerald-400/20">
                   {/* Messages Button in Mobile Menu */}
