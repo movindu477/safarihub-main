@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import back1 from "../assets/back1.jpg";
 import back2 from "../assets/back2ori.jpg";
 import back3 from "../assets/back3ori.jpg";
-import back4 from "../assets/back4.avif";
+import back4 from "../assets/back4ori.avif";
 
 export default function Section1() {
   // ✅ Use imported images
@@ -54,10 +54,11 @@ export default function Section1() {
           bg-black/40  /* Slight overlay for better readability */
         "
       >
-        {/* Title */}
-        <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight drop-shadow-lg">
-          Welcome to <span className="text-yellow-400">SafariHub</span>
-        </h1>
+<h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight drop-shadow-lg flex flex-col">
+  <span>Welcome to</span>
+  <span className="text-yellow-400">SafariHub</span>
+</h1>
+
 
         {/* Description */}
         <p className="text-base md:text-lg max-w-xl text-gray-100">

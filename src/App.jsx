@@ -912,14 +912,15 @@ const HomePage = ({ user, userRole, onLogout, onShowAuth, notifications, onNotif
       />
       
       {/* Home Content with All Sections */}
-      <div className="pt--1">
-        <Section1 />
-        <Section2 />
-        <Section3 />
-        <Section4 />
-        <Section5 />
-        <Footer />
-      </div>
+<div className="pt--1 space-y-1">
+  <Section1 />
+  <Section2 />
+  <Section3 />
+  <Section4 />
+  <Section5 />
+  <Footer />
+</div>
+
     </div>
   );
 };
