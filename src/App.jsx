@@ -1173,19 +1173,19 @@ function App() {
             />
           } 
         />
-        <Route 
-          path="/driver" 
-          element={
-            <JeepDriversPage 
-              user={user}
-              userRole={userRole}
-              onLogout={handleLogout}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          } 
-        />
+<Route 
+  path="/driver" 
+  element={
+    <JeepDriversPage 
+      user={user}
+      userRole={userRole}
+      onLogout={handleLogout}
+      notifications={notifications}
+      onNotificationClick={handleNotificationClick}
+      onMarkAsRead={handleMarkAsRead}
+    />
+  } 
+/>
         <Route 
           path="/jeepprofile" 
           element={

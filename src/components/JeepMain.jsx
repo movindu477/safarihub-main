@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { Bell, MessageCircle, X, Send, Check, CheckCheck, User, Wifi, WifiOff } from "lucide-react";
 import Navbar from "./Navbar";
 import JeepHero from "./JeepHero";
@@ -403,6 +403,35 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
 
+  // Enhanced logout handler for JeepMain
+  const handleLogout = async () => {
+    try {
+      console.log('🚪 Logging out from JeepMain...');
+      
+      // Set user offline in Firebase
+      if (currentUser && userRole) {
+        await setUserOffline(currentUser.uid, userRole);
+      }
+      
+      // Sign out from Firebase Auth
+      await signOut(auth);
+      
+      // Clear local state
+      setCurrentUser(null);
+      setUserRole(null);
+      
+      console.log('✅ Successfully logged out from JeepMain');
+      
+      // Force page refresh to ensure clean state and show login/register buttons
+      window.location.href = '/'; // Redirect to home page
+      
+    } catch (error) {
+      console.error('❌ Logout error in JeepMain:', error);
+      // Even if there's an error, still redirect to home
+      window.location.href = '/';
+    }
+  };
+
   // Enhanced: Get current user and set online status with proper cleanup
   useEffect(() => {
     let currentUserId = null;
@@ -574,6 +603,24 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
     };
   }, [currentUser, userRole]);
 
+  // Handle login navigation for JeepMain
+  const handleLoginClick = () => {
+    if (onLogin) {
+      onLogin();
+    } else {
+      navigate('/');
+    }
+  };
+
+  // Handle register navigation for JeepMain
+  const handleRegisterClick = () => {
+    if (onRegister) {
+      onRegister();
+    } else {
+      navigate('/');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Enhanced Chat Modal */}
@@ -593,12 +640,12 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
         onMarkAsRead={handleMarkAsRead}
       />
       
-      {/* Enhanced Navbar */}
+      {/* Enhanced Navbar with proper logout handling */}
       <Navbar 
         user={user} 
-        onLogin={onLogin || onShowAuth} 
-        onRegister={onRegister || onShowAuth} 
-        onLogout={onLogout} 
+        onLogin={handleLoginClick} 
+        onRegister={handleRegisterClick} 
+        onLogout={handleLogout} 
       />
       
       {/* Jeep Hero Section */}
