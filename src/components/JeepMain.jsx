@@ -397,38 +397,47 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   // Chat modal state
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
 
-  // Enhanced logout handler for JeepMain
+  // Enhanced logout handler for JeepMain - COMPLETELY UPDATED
   const handleLogout = async () => {
+    if (isLoggingOut) return; // Prevent multiple logout calls
+    
+    setIsLoggingOut(true);
+    console.log('🚪 Starting logout process from JeepMain...');
+    
     try {
-      console.log('🚪 Logging out from JeepMain...');
-      
       // Set user offline in Firebase
       if (currentUser && userRole) {
+        console.log(`🔴 Setting user ${currentUser.uid} offline`);
         await setUserOffline(currentUser.uid, userRole);
       }
       
       // Sign out from Firebase Auth
+      console.log('🔐 Signing out from Firebase Auth...');
       await signOut(auth);
       
       // Clear local state
       setCurrentUser(null);
       setUserRole(null);
       
-      console.log('✅ Successfully logged out from JeepMain');
+      console.log('✅ Successfully logged out from Firebase');
       
-      // Force page refresh to ensure clean state and show login/register buttons
-      window.location.href = '/'; // Redirect to home page
+      // Force complete page refresh and redirect to home page
+      console.log('🔄 Refreshing page and redirecting to home...');
+      window.location.href = '/'; // This will completely refresh and show login/register buttons
       
     } catch (error) {
       console.error('❌ Logout error in JeepMain:', error);
       // Even if there's an error, still redirect to home
       window.location.href = '/';
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -620,6 +629,19 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
       navigate('/');
     }
   };
+
+  // Show loading state during logout
+  if (isLoggingOut) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+          <p className="text-gray-700 text-lg">Logging out...</p>
+          <p className="text-gray-500 text-sm">Redirecting to home page</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
