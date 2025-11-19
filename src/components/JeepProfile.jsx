@@ -35,7 +35,13 @@ import {
   X,
   User,
   Wifi,
-  WifiOff
+  WifiOff,
+  Car,
+  DollarSign,
+  Calendar as CalendarIcon,
+  ShieldCheck,
+  Globe,
+  Camera
 } from "lucide-react";
 
 // Initialize Firebase
@@ -59,7 +65,7 @@ import {
   getUserRole
 } from "../App";
 
-// Enhanced Chat Modal Component with Real-time Features
+// Enhanced Chat Modal Component with Modern Design
 const ChatModal = ({ 
   isOpen, 
   onClose, 
@@ -224,52 +230,58 @@ const ChatModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden border border-gray-200/50">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-t-xl">
-          <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between p-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+          <div className="flex items-center space-x-4">
             <div className="relative">
-              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <User className="h-5 w-5" />
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <User className="h-6 w-6" />
               </div>
-              <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                otherUserOnline ? 'bg-green-500' : 'bg-gray-400'
+              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
+                otherUserOnline ? 'bg-emerald-400' : 'bg-gray-400'
               }`}></div>
             </div>
             <div>
-              <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
-              <p className="text-yellow-100 text-sm">
-                {otherUserOnline ? 'Online' : 'Offline'} • {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
+              <h3 className="font-bold text-lg">{otherUser?.name || 'User'}</h3>
+              <p className="text-blue-100 text-sm flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${otherUserOnline ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'}`}></span>
+                {otherUserOnline ? 'Online now' : 'Offline'} • {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+            className="p-2 hover:bg-white/20 rounded-xl transition-all duration-200 hover:scale-110"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-br from-gray-50 to-blue-50/30">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
-              <p className="text-lg font-medium">No messages yet</p>
-              <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
-              <p className="text-xs text-gray-400 mt-2">
-                {otherUserOnline ? 'User is online' : 'User is offline - they will see your message when they come online'}
+              <div className="w-20 h-20 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-4">
+                <MessageCircle className="h-8 w-8 text-blue-400" />
+              </div>
+              <p className="text-lg font-semibold text-gray-700 mb-2">No messages yet</p>
+              <p className="text-sm text-gray-500 text-center max-w-xs">
+                Start a conversation with {otherUser?.name || 'this user'}
+              </p>
+              <p className="text-xs text-gray-400 mt-3 flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${otherUserOnline ? 'bg-emerald-400' : 'bg-gray-400'}`}></span>
+                {otherUserOnline ? 'User is online and ready to chat' : 'User is offline - they will see your message when they come online'}
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {Object.entries(groupMessagesByDate()).map(([date, dateMessages]) => (
                 <div key={date}>
                   {/* Date separator */}
-                  <div className="flex justify-center my-4">
-                    <span className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+                  <div className="flex justify-center my-6">
+                    <span className="bg-white/80 backdrop-blur-sm text-gray-600 text-xs px-4 py-2 rounded-full border border-gray-200/50 shadow-sm">
                       {date}
                     </span>
                   </div>
@@ -278,28 +290,28 @@ const ChatModal = ({
                   {dateMessages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'} group`}
                     >
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl relative transition-all duration-200 ${
                           msg.senderId === currentUser?.uid
-                            ? 'bg-yellow-500 text-white rounded-br-none'
-                            : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                        }`}
+                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 rounded-br-md'
+                            : 'bg-white text-gray-800 shadow-lg shadow-gray-200/50 border border-gray-100 rounded-bl-md'
+                        } group-hover:shadow-xl group-hover:scale-[1.02]`}
                       >
-                        <p className="text-sm">{msg.content}</p>
-                        <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                          msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
+                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                        <div className={`flex items-center space-x-2 mt-2 text-xs ${
+                          msg.senderId === currentUser?.uid ? 'text-blue-100' : 'text-gray-500'
                         }`}>
                           <span>{formatTime(msg.timestamp)}</span>
                           {msg.senderId === currentUser?.uid && (
                             <span className="flex items-center space-x-1">
                               {msg.read ? (
-                                <CheckCheck size={12} className="text-blue-300" title="Read" />
+                                <CheckCheck size={12} className="text-emerald-300" title="Read" />
                               ) : msg.delivered ? (
-                                <CheckCheck size={12} className="text-gray-300" title="Delivered" />
+                                <CheckCheck size={12} className="text-blue-200" title="Delivered" />
                               ) : (
-                                <Check size={12} className="text-gray-300" title="Sent" />
+                                <Check size={12} className="text-blue-200" title="Sent" />
                               )}
                             </span>
                           )}
@@ -315,23 +327,23 @@ const ChatModal = ({
         </div>
 
         {/* Message Input */}
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
+        <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-100">
           <div className="flex space-x-3">
             <input
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Type your message..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+              className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
               disabled={sending}
             />
             <button
               type="submit"
               disabled={!message.trim() || sending}
-              className="bg-yellow-500 text-white p-3 rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg hover:scale-105 flex items-center justify-center min-w-[48px]"
             >
               {sending ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
               ) : (
                 <Send className="h-5 w-5" />
               )}
@@ -647,7 +659,7 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
     return Array.from({ length: 5 }, (_, i) => (
       <Star
         key={i}
-        size={16}
+        size={18}
         className={i < Math.round(rating || 0) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
       />
     ));
@@ -655,10 +667,10 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading driver profile...</p>
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading driver profile...</p>
         </div>
       </div>
     );
@@ -666,14 +678,16 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
 
   if (error || !driver) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Driver Not Found</h2>
-          <p className="text-gray-600 mb-4">{error || "The driver you're looking for doesn't exist."}</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 flex items-center justify-center">
+        <div className="text-center max-w-md mx-4">
+          <div className="w-24 h-24 bg-gradient-to-r from-red-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="text-4xl">⚠️</div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">Driver Not Found</h2>
+          <p className="text-gray-600 mb-6 leading-relaxed">{error || "The driver you're looking for doesn't exist or may have been removed."}</p>
           <button
             onClick={() => navigate(-1)}
-            className="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
+            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
           >
             Go Back
           </button>
@@ -683,7 +697,7 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
       {/* Chat Modal */}
       <ChatModal 
         isOpen={isChatModalOpen}
@@ -702,26 +716,28 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
       />
       
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20">
             <div className="flex items-center">
               <button
                 onClick={() => navigate(-1)}
-                className="flex items-center text-gray-600 hover:text-gray-900 mr-4"
+                className="flex items-center text-gray-600 hover:text-gray-900 mr-6 transition-colors duration-200 group"
               >
-                <ArrowLeft size={20} className="mr-2" />
-                Back
+                <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
+                Back to Drivers
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">Driver Profile</h1>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Driver Profile
+              </h1>
             </div>
             
             <div className="flex items-center space-x-4">
               {/* Online Status */}
-              <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${onlineStatus ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                <span className="text-sm text-gray-600">
-                  {onlineStatus ? 'Online' : 'Offline'}
+              <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-gray-200/50 shadow-sm">
+                <div className={`w-3 h-3 rounded-full ${onlineStatus ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                <span className="text-sm font-medium text-gray-700">
+                  {onlineStatus ? 'Online Now' : 'Currently Offline'}
                 </span>
               </div>
             </div>
@@ -733,63 +749,68 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border p-6 sticky top-8">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200/50 p-6 sticky top-8 backdrop-blur-sm bg-white/90">
               {/* Profile Header */}
               <div className="text-center mb-6">
                 <div className="relative inline-block">
-                  <img
-                    src={driver.profilePicture || "/api/placeholder/120/120"}
-                    alt={driver.fullName}
-                    className="w-32 h-32 rounded-full object-cover border-4 border-yellow-400 mx-auto mb-4"
-                  />
-                  <div className={`absolute bottom-4 right-4 w-4 h-4 rounded-full border-2 border-white ${
-                    onlineStatus ? 'bg-green-500' : 'bg-gray-400'
+                  <div className="relative">
+                    <img
+                      src={driver.profilePicture || "/api/placeholder/120/120"}
+                      alt={driver.fullName}
+                      className="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-lg mx-auto mb-4"
+                    />
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-600/20"></div>
+                  </div>
+                  <div className={`absolute bottom-4 right-4 w-5 h-5 rounded-full border-2 border-white shadow-lg ${
+                    onlineStatus ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'
                   }`}></div>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">{driver.fullName}</h2>
-                <p className="text-gray-600">{driver.serviceType}</p>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">{driver.fullName}</h2>
+                <p className="text-gray-600 mb-3">{driver.serviceType}</p>
                 
                 {/* Rating */}
-                <div className="flex items-center justify-center mt-2">
-                  <div className="flex items-center">
-                    {renderStars(driver.rating || 0)}
-                    <span className="ml-2 text-sm text-gray-600">
-                      ({driver.rating?.toFixed(1) || '0.0'}/5)
+                <div className="flex items-center justify-center">
+                  <div className="flex items-center bg-gradient-to-r from-yellow-50 to-orange-50 px-4 py-2 rounded-full border border-yellow-200">
+                    <div className="flex items-center mr-2">
+                      {renderStars(driver.rating || 0)}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-700">
+                      {driver.rating?.toFixed(1) || '0.0'}/5
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Contact Info */}
-              <div className="space-y-4">
+              <div className="space-y-4 mb-6">
                 {driver.contactPhone && (
-                  <div className="flex items-center text-gray-600">
-                    <Phone size={18} className="mr-3 text-yellow-500" />
-                    <span>{driver.contactPhone}</span>
+                  <div className="flex items-center text-gray-600 p-3 rounded-xl bg-gray-50/50 border border-gray-200/50">
+                    <Phone size={18} className="mr-3 text-blue-500" />
+                    <span className="font-medium">{driver.contactPhone}</span>
                   </div>
                 )}
                 
                 {driver.contactEmail && (
-                  <div className="flex items-center text-gray-600">
-                    <Mail size={18} className="mr-3 text-yellow-500" />
-                    <span>{driver.contactEmail}</span>
+                  <div className="flex items-center text-gray-600 p-3 rounded-xl bg-gray-50/50 border border-gray-200/50">
+                    <Mail size={18} className="mr-3 text-purple-500" />
+                    <span className="font-medium">{driver.contactEmail}</span>
                   </div>
                 )}
                 
                 {driver.location && (
-                  <div className="flex items-center text-gray-600">
-                    <MapPin size={18} className="mr-3 text-yellow-500" />
-                    <span>{driver.location}</span>
+                  <div className="flex items-center text-gray-600 p-3 rounded-xl bg-gray-50/50 border border-gray-200/50">
+                    <MapPin size={18} className="mr-3 text-emerald-500" />
+                    <span className="font-medium">{driver.location}</span>
                   </div>
                 )}
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-6 space-y-3">
+              <div className="space-y-3">
                 {currentUser && userRole === 'tourist' && (
                   <button
                     onClick={handleOpenChatModal}
-                    className="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center font-semibold"
                   >
                     <MessageCircle size={18} className="mr-2" />
                     Send Message
@@ -799,7 +820,7 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
                 {!currentUser && (
                   <button
                     onClick={() => navigate('/?showAuth=true')}
-                    className="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors"
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold"
                   >
                     Login to Message
                   </button>
@@ -811,43 +832,52 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
           {/* Main Content */}
           <div className="lg:col-span-2">
             {/* Tabs */}
-            <div className="bg-white rounded-lg shadow-sm border mb-6">
-              <div className="border-b">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200/50 mb-6 backdrop-blur-sm bg-white/90">
+              <div className="border-b border-gray-200/50">
                 <nav className="flex -mb-px">
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                    className={`py-5 px-8 text-center border-b-2 font-semibold text-sm transition-all duration-200 ${
                       activeTab === 'overview'
-                        ? 'border-yellow-500 text-yellow-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-blue-500 text-blue-600 bg-blue-50/50'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'
                     }`}
                   >
-                    Overview
+                    <div className="flex items-center space-x-2">
+                      <User size={18} />
+                      <span>Overview</span>
+                    </div>
                   </button>
                   <button
                     onClick={() => setActiveTab('services')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                    className={`py-5 px-8 text-center border-b-2 font-semibold text-sm transition-all duration-200 ${
                       activeTab === 'services'
-                        ? 'border-yellow-500 text-yellow-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-blue-500 text-blue-600 bg-blue-50/50'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'
                     }`}
                   >
-                    Services & Rates
+                    <div className="flex items-center space-x-2">
+                      <Car size={18} />
+                      <span>Services & Rates</span>
+                    </div>
                   </button>
                   {currentUser && (
                     <button
                       onClick={() => setActiveTab('chat')}
-                      className={`py-4 px-6 text-center border-b-2 font-medium text-sm relative ${
+                      className={`py-5 px-8 text-center border-b-2 font-semibold text-sm transition-all duration-200 relative ${
                         activeTab === 'chat'
-                          ? 'border-yellow-500 text-yellow-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          ? 'border-blue-500 text-blue-600 bg-blue-50/50'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'
                       }`}
                     >
-                      Messages
+                      <div className="flex items-center space-x-2">
+                        <MessageCircle size={18} />
+                        <span>Messages</span>
+                      </div>
                       {messages.filter(msg => 
                         msg.senderId === driverId && !msg.read
                       ).length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg">
                           {messages.filter(msg => 
                             msg.senderId === driverId && !msg.read
                           ).length}
@@ -859,26 +889,28 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
               </div>
 
               {/* Tab Content */}
-              <div className="p-6">
+              <div className="p-8">
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     {/* Experience */}
-                    <div className="flex items-start">
-                      <Clock className="text-yellow-500 mt-1 mr-4" size={20} />
+                    <div className="flex items-start p-4 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50/50 border border-blue-200/50">
+                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
+                        <Clock className="text-white" size={20} />
+                      </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900">Experience</h3>
+                        <h3 className="font-bold text-gray-900 text-lg mb-1">Experience</h3>
                         <p className="text-gray-600">
-                          {driver.experienceYears || 0} years of experience as a {driver.serviceType}
+                          {driver.experienceYears || 0} years of professional experience as a {driver.serviceType}
                         </p>
                       </div>
                     </div>
 
                     {/* Description */}
                     {driver.description && (
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2">About</h3>
-                        <p className="text-gray-600 leading-relaxed">
+                      <div className="p-4 rounded-xl bg-gradient-to-r from-gray-50 to-blue-50/30 border border-gray-200/50">
+                        <h3 className="font-bold text-gray-900 text-lg mb-3">About Me</h3>
+                        <p className="text-gray-600 leading-relaxed text-justify">
                           {driver.description}
                         </p>
                       </div>
@@ -886,15 +918,17 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
 
                     {/* Languages */}
                     {driver.languages && driver.languages.length > 0 && (
-                      <div className="flex items-start">
-                        <Languages className="text-yellow-500 mt-1 mr-4" size={20} />
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Languages</h3>
-                          <div className="flex flex-wrap gap-2 mt-1">
+                      <div className="flex items-start p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50/50 border border-emerald-200/50">
+                        <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
+                          <Languages className="text-white" size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-gray-900 text-lg mb-3">Languages</h3>
+                          <div className="flex flex-wrap gap-3">
                             {driver.languages.map((lang, index) => (
                               <span
                                 key={index}
-                                className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm"
+                                className="bg-white text-emerald-700 px-4 py-2 rounded-lg text-sm font-medium border border-emerald-200 shadow-sm"
                               >
                                 {lang}
                               </span>
@@ -906,15 +940,17 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
 
                     {/* Destinations */}
                     {driver.destinations && driver.destinations.length > 0 && (
-                      <div className="flex items-start">
-                        <MapPin className="text-yellow-500 mt-1 mr-4" size={20} />
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Destinations Covered</h3>
-                          <div className="flex flex-wrap gap-2 mt-1">
+                      <div className="flex items-start p-4 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50/50 border border-orange-200/50">
+                        <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
+                          <Globe className="text-white" size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-gray-900 text-lg mb-3">Destinations Covered</h3>
+                          <div className="flex flex-wrap gap-3">
                             {driver.destinations.map((destination, index) => (
                               <span
                                 key={index}
-                                className="bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full text-sm border border-yellow-200"
+                                className="bg-white text-amber-700 px-4 py-2 rounded-lg text-sm font-medium border border-amber-200 shadow-sm"
                               >
                                 {destination}
                               </span>
@@ -926,15 +962,17 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
 
                     {/* Certifications */}
                     {driver.certifications && driver.certifications.length > 0 && (
-                      <div className="flex items-start">
-                        <Award className="text-yellow-500 mt-1 mr-4" size={20} />
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Certifications</h3>
-                          <div className="flex flex-wrap gap-2 mt-1">
+                      <div className="flex items-start p-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50/50 border border-green-200/50">
+                        <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
+                          <ShieldCheck className="text-white" size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-gray-900 text-lg mb-3">Certifications</h3>
+                          <div className="flex flex-wrap gap-3">
                             {driver.certifications.map((cert, index) => (
                               <span
                                 key={index}
-                                className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm border border-green-200"
+                                className="bg-white text-emerald-700 px-4 py-2 rounded-lg text-sm font-medium border border-emerald-200 shadow-sm"
                               >
                                 {cert}
                               </span>
@@ -946,15 +984,17 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
 
                     {/* Special Skills */}
                     {driver.specialSkills && driver.specialSkills.length > 0 && (
-                      <div className="flex items-start">
-                        <Shield className="text-yellow-500 mt-1 mr-4" size={20} />
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Special Skills</h3>
-                          <div className="flex flex-wrap gap-2 mt-1">
+                      <div className="flex items-start p-4 rounded-xl bg-gradient-to-r from-purple-50 to-indigo-50/50 border border-purple-200/50">
+                        <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
+                          <Award className="text-white" size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-gray-900 text-lg mb-3">Special Skills</h3>
+                          <div className="flex flex-wrap gap-3">
                             {driver.specialSkills.map((skill, index) => (
                               <span
                                 key={index}
-                                className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm border border-blue-200"
+                                className="bg-white text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium border border-indigo-200 shadow-sm"
                               >
                                 {skill}
                               </span>
@@ -968,23 +1008,32 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
 
                 {/* Services & Rates Tab */}
                 {activeTab === 'services' && (
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     {/* Vehicle Type */}
                     {driver.vehicleType && (
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2">Vehicle Type</h3>
-                        <p className="text-gray-600">{driver.vehicleType}</p>
+                      <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-cyan-50/50 border border-blue-200/50">
+                        <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center">
+                          <Car className="mr-3 text-blue-500" size={24} />
+                          Vehicle Type
+                        </h3>
+                        <p className="text-gray-700 text-lg font-medium">{driver.vehicleType}</p>
                       </div>
                     )}
 
                     {/* Pricing */}
                     {driver.pricePerDay && (
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2">Rates</h3>
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="p-6 rounded-2xl bg-gradient-to-r from-yellow-50 to-amber-50/50 border border-yellow-200/50">
+                        <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center">
+                          <DollarSign className="mr-3 text-amber-500" size={24} />
+                          Rates & Pricing
+                        </h3>
+                        <div className="bg-white rounded-xl p-6 border border-amber-200 shadow-sm">
                           <div className="flex items-center justify-between">
-                            <span className="text-gray-700">Price per day:</span>
-                            <span className="text-2xl font-bold text-yellow-600">
+                            <div>
+                              <span className="text-gray-700 font-semibold">Daily Rate:</span>
+                              <p className="text-gray-500 text-sm mt-1">Full day safari service</p>
+                            </div>
+                            <span className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
                               LKR {driver.pricePerDay.toLocaleString()}
                             </span>
                           </div>
@@ -993,39 +1042,49 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
                     )}
 
                     {/* Availability */}
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">Availability</h3>
+                    <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50/50 border border-emerald-200/50">
+                      <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center">
+                        <CalendarIcon className="mr-3 text-emerald-500" size={24} />
+                        Availability
+                      </h3>
                       {driver.availableDates && driver.availableDates.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                           <p className="text-gray-600">
-                            Available on {driver.availableDates.length} dates
+                            Available for <span className="font-semibold text-emerald-600">{driver.availableDates.length}</span> dates
                           </p>
-                          <div className="flex flex-wrap gap-2">
-                            {driver.availableDates.slice(0, 5).map((date, index) => (
-                              <span
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {driver.availableDates.slice(0, 6).map((date, index) => (
+                              <div
                                 key={index}
-                                className="bg-green-50 text-green-700 px-3 py-1 rounded text-sm border border-green-200"
+                                className="bg-white text-emerald-700 px-4 py-3 rounded-lg text-sm font-medium border border-emerald-200 shadow-sm flex items-center justify-between"
                               >
-                                {new Date(date).toLocaleDateString()}
-                              </span>
+                                <span>{new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                                <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                              </div>
                             ))}
-                            {driver.availableDates.length > 5 && (
-                              <span className="text-gray-500 text-sm">
-                                +{driver.availableDates.length - 5} more dates
-                              </span>
-                            )}
                           </div>
+                          {driver.availableDates.length > 6 && (
+                            <p className="text-gray-500 text-sm text-center">
+                              +{driver.availableDates.length - 6} more available dates
+                            </p>
+                          )}
                         </div>
                       ) : (
-                        <p className="text-gray-600">Contact for availability</p>
+                        <div className="bg-white rounded-xl p-6 border border-gray-200 text-center">
+                          <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-gray-600 font-medium">Contact for availability</p>
+                          <p className="text-gray-500 text-sm mt-1">Get in touch to discuss available dates</p>
+                        </div>
                       )}
                     </div>
 
                     {/* Service Description */}
                     {driver.description && (
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2">Service Details</h3>
-                        <p className="text-gray-600 leading-relaxed">{driver.description}</p>
+                      <div className="p-6 rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50/50 border border-purple-200/50">
+                        <h3 className="font-bold text-gray-900 text-lg mb-4">Service Details</h3>
+                        <p className="text-gray-600 leading-relaxed text-justify bg-white/50 p-4 rounded-xl border border-purple-200/30">
+                          {driver.description}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1037,11 +1096,14 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
                     {currentUser ? (
                       <>
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto space-y-4 mb-4 p-2">
+                        <div className="flex-1 overflow-y-auto space-y-4 mb-6 p-2">
                           {messages.length === 0 ? (
-                            <div className="text-center text-gray-500 mt-8">
-                              <MessageCircle size={48} className="mx-auto mb-2 text-gray-300" />
-                              <p>No messages yet. Start a conversation!</p>
+                            <div className="text-center text-gray-500 mt-12">
+                              <div className="w-20 h-20 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <MessageCircle size={32} className="text-blue-400" />
+                              </div>
+                              <p className="text-lg font-semibold text-gray-700 mb-2">No messages yet</p>
+                              <p className="text-gray-500">Start a conversation with {driver.fullName}!</p>
                             </div>
                           ) : (
                             messages.map((msg) => (
@@ -1049,25 +1111,25 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
                                 key={msg.id}
                                 className={`flex ${
                                   msg.senderId === currentUser.uid ? 'justify-end' : 'justify-start'
-                                }`}
+                                } group`}
                               >
                                 <div
-                                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                  className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl transition-all duration-200 ${
                                     msg.senderId === currentUser.uid
-                                      ? 'bg-yellow-500 text-white'
-                                      : 'bg-gray-200 text-gray-800'
-                                  }`}
+                                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+                                      : 'bg-white text-gray-800 shadow-lg shadow-gray-200/50 border border-gray-100'
+                                  } group-hover:shadow-xl group-hover:scale-[1.02]`}
                                 >
-                                  <p className="text-sm">{msg.content}</p>
-                                  <div className={`text-xs mt-1 flex items-center ${
+                                  <p className="text-sm leading-relaxed">{msg.content}</p>
+                                  <div className={`flex items-center space-x-2 mt-2 text-xs ${
                                     msg.senderId === currentUser.uid 
-                                      ? 'text-yellow-100' 
+                                      ? 'text-blue-100' 
                                       : 'text-gray-500'
                                   }`}>
-                                    {formatTime(msg.timestamp)}
+                                    <span>{formatTime(msg.timestamp)}</span>
                                     {msg.senderId === currentUser.uid && (
-                                      <span className="ml-1">
-                                        {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
+                                      <span className="flex items-center space-x-1">
+                                        {msg.read ? <CheckCheck size={12} className="text-emerald-300" /> : <Check size={12} className="text-blue-200" />}
                                       </span>
                                     )}
                                   </div>
@@ -1079,40 +1141,45 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
                         </div>
 
                         {/* Message Input */}
-                        <form onSubmit={handleSendMessage} className="flex space-x-2">
+                        <form onSubmit={handleSendMessage} className="flex space-x-3 bg-white/80 backdrop-blur-sm p-4 rounded-xl border border-gray-200/50 shadow-sm">
                           <input
                             type="text"
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             placeholder="Type your message..."
-                            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
                             disabled={sending}
                           />
                           <button
                             type="submit"
                             disabled={sending || !message.trim()}
-                            className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg hover:scale-105 flex items-center justify-center font-semibold"
                           >
                             {sending ? (
                               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             ) : (
-                              <Send size={18} />
+                              <>
+                                <Send size={18} className="mr-2" />
+                                Send
+                              </>
                             )}
                           </button>
                         </form>
                       </>
                     ) : (
-                      <div className="text-center py-8">
-                        <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      <div className="text-center py-12">
+                        <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <MessageCircle size={32} className="text-blue-400" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-3">
                           Login to Message
                         </h3>
-                        <p className="text-gray-600 mb-4">
-                          Please login to start a conversation with {driver.fullName}
+                        <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                          Please login to start a conversation with {driver.fullName} and discuss your safari adventure.
                         </p>
                         <button
                           onClick={() => navigate('/?showAuth=true')}
-                          className="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
+                          className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold"
                         >
                           Login Now
                         </button>

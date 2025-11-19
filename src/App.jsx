@@ -80,6 +80,7 @@ export const setUserOnline = async (userId, userRole, userData = {}) => {
       lastOnlineStatus: 'online',
       status: 'online',
       lastActive: serverTimestamp(),
+      lastActiveTimestamp: Date.now(),
       ...userData
     };
     
@@ -104,7 +105,8 @@ export const setUserOffline = async (userId, userRole = null) => {
       lastSeenTimestamp: Date.now(),
       lastOnlineStatus: 'offline',
       status: 'offline',
-      lastActive: serverTimestamp()
+      lastActive: serverTimestamp(),
+      lastActiveTimestamp: Date.now()
     };
     
     // Try to update based on role if provided
@@ -172,7 +174,8 @@ export const getServiceProvidersOnlineStatus = (callback) => {
             isOnline: provider.online || provider.isOnline || false,
             lastSeen: provider.lastSeen,
             lastSeenTimestamp: provider.lastSeenTimestamp,
-            status: provider.status || 'offline'
+            status: provider.status || 'offline',
+            lastActive: provider.lastActive
           };
         });
         
@@ -196,17 +199,23 @@ export const getServiceProvidersOnlineStatus = (callback) => {
 
 // Page visibility handler for automatic online/offline status
 export const setupPageVisibilityHandler = (userId, userRole) => {
+  let timeoutId = null;
+  
   const handleVisibilityChange = async () => {
     if (document.hidden) {
       // Page is hidden - set user as offline after a delay
-      setTimeout(async () => {
+      timeoutId = setTimeout(async () => {
         if (document.hidden) {
           console.log(`📱 Page hidden, setting user ${userId} offline`);
           await setUserOffline(userId, userRole);
         }
       }, 30000); // 30 seconds delay
     } else {
-      // Page is visible - set user as online
+      // Page is visible - set user as online immediately
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       console.log(`📱 Page visible, setting user ${userId} online`);
       await setUserOnline(userId, userRole);
     }
@@ -216,6 +225,9 @@ export const setupPageVisibilityHandler = (userId, userRole) => {
   
   // Also handle beforeunload for when user closes the tab/window
   const handleBeforeUnload = async () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
     await setUserOffline(userId, userRole);
   };
 
@@ -224,7 +236,69 @@ export const setupPageVisibilityHandler = (userId, userRole) => {
   return () => {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('beforeunload', handleBeforeUnload);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   };
+};
+
+// Enhanced heartbeat to keep users online while active
+export const setupUserHeartbeat = (userId, userRole) => {
+  let heartbeatInterval = null;
+  
+  const updateHeartbeat = async () => {
+    try {
+      const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
+      await updateDoc(userRef, {
+        lastActive: serverTimestamp(),
+        lastActiveTimestamp: Date.now(),
+        online: true,
+        isOnline: true,
+        status: 'online'
+      });
+      console.log(`💓 Heartbeat updated for user ${userId}`);
+    } catch (error) {
+      console.error('Error updating heartbeat:', error);
+    }
+  };
+  
+  // Update every 2 minutes to keep user online
+  heartbeatInterval = setInterval(updateHeartbeat, 120000);
+  
+  // Also update on user interactions
+  const handleUserActivity = () => {
+    updateHeartbeat();
+  };
+  
+  // Add event listeners for user activity
+  const activityEvents = ['mousemove', 'keypress', 'click', 'scroll', 'touchstart'];
+  activityEvents.forEach(event => {
+    document.addEventListener(event, handleUserActivity);
+  });
+  
+  return () => {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+    }
+    activityEvents.forEach(event => {
+      document.removeEventListener(event, handleUserActivity);
+    });
+  };
+};
+
+// Enhanced function to mark message as delivered
+export const markMessageAsDelivered = async (conversationId, messageId) => {
+  try {
+    const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+    await updateDoc(messageRef, {
+      delivered: true,
+      deliveredAt: serverTimestamp(),
+      deliveredTimestamp: Date.now()
+    });
+    console.log(`✅ Message ${messageId} marked as delivered`);
+  } catch (error) {
+    console.error('Error marking message as delivered:', error);
+  }
 };
 
 // ==================== ENHANCED MESSAGING SYSTEM ====================
@@ -422,19 +496,6 @@ export const markMessagesAsRead = async (conversationId, userId) => {
     console.log(`✅ Marked ${snapshot.docs.length} messages as read in conversation ${conversationId}`);
   } catch (error) {
     console.error('Error marking messages as read:', error);
-  }
-};
-
-export const markMessageAsDelivered = async (conversationId, messageId) => {
-  try {
-    const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
-    await updateDoc(messageRef, {
-      delivered: true,
-      deliveredAt: serverTimestamp(),
-      deliveredTimestamp: Date.now()
-    });
-  } catch (error) {
-    console.error('Error marking message as delivered:', error);
   }
 };
 
@@ -912,15 +973,14 @@ const HomePage = ({ user, userRole, onLogout, onShowAuth, notifications, onNotif
       />
       
       {/* Home Content with All Sections */}
-<div className="pt--1 space-y-1">
-  <Section1 />
-  <Section2 />
-  <Section3 />
-  <Section4 />
-  <Section5 />
-  <Footer />
-</div>
-
+      <div className="pt--1 space-y-1">
+        <Section1 />
+        <Section2 />
+        <Section3 />
+        <Section4 />
+        <Section5 />
+        <Footer />
+      </div>
     </div>
   );
 };
@@ -938,6 +998,7 @@ function App() {
     let currentUserId = null;
     let currentUserRole = null;
     let cleanupVisibilityHandler = null;
+    let cleanupHeartbeat = null;
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
@@ -947,9 +1008,12 @@ function App() {
         console.log(`🔄 Setting previous user ${currentUserId} offline`);
         await setUserOffline(currentUserId, currentUserRole);
         
-        // Clean up previous visibility handler
+        // Clean up previous handlers
         if (cleanupVisibilityHandler) {
           cleanupVisibilityHandler();
+        }
+        if (cleanupHeartbeat) {
+          cleanupHeartbeat();
         }
       }
       
@@ -975,12 +1039,17 @@ function App() {
           await setUserOnline(user.uid, userRole, {
             userName: userName,
             email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL
           });
           
           console.log(`✅ User ${user.uid} set online as ${userRole}`);
           
           // Set up page visibility handler for real-time status updates
           cleanupVisibilityHandler = setupPageVisibilityHandler(user.uid, userRole);
+          
+          // Set up heartbeat to keep user online while active
+          cleanupHeartbeat = setupUserHeartbeat(user.uid, userRole);
           
         } catch (error) {
           console.log('Error setting user online status:', error);
@@ -991,9 +1060,12 @@ function App() {
         setUserRole(null);
         setNotifications([]);
         
-        // Clean up visibility handler
+        // Clean up handlers
         if (cleanupVisibilityHandler) {
           cleanupVisibilityHandler();
+        }
+        if (cleanupHeartbeat) {
+          cleanupHeartbeat();
         }
       }
     });
@@ -1005,6 +1077,9 @@ function App() {
       }
       if (cleanupVisibilityHandler) {
         cleanupVisibilityHandler();
+      }
+      if (cleanupHeartbeat) {
+        cleanupHeartbeat();
       }
       unsubscribe();
     };
