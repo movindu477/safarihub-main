@@ -20,7 +20,7 @@ import {
   ShoppingBag,
   MessageCircle
 } from "lucide-react";
-import { getAuth, signOut } from "firebase/auth";
+import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -36,11 +36,29 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   const [isScrolled, setIsScrolled] = useState(false);
   const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
+  const [authUser, setAuthUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const auth = getAuth();
   const db = getFirestore();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Listen to authentication state changes for persistence
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+      setAuthLoading(false);
+      console.log("Navbar auth state:", user ? "User logged in" : "No user");
+      
+      if (!user) {
+        setUserData(null);
+        setProfileOpen(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [auth]);
 
   // Add scroll effect for navbar
   useEffect(() => {
@@ -54,18 +72,20 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   // Fetch user data from Firestore when profile opens or user changes
   useEffect(() => {
     const fetchUserData = async () => {
-      if (user && profileOpen) {
+      const currentUser = user || authUser;
+      
+      if (currentUser && profileOpen) {
         setLoading(true);
         try {
           let userDocRef;
           
           // Try tourists collection first
-          userDocRef = doc(db, "tourists", user.uid);
+          userDocRef = doc(db, "tourists", currentUser.uid);
           let userDoc = await getDoc(userDocRef);
           
           // If not found in tourists, try serviceProviders
           if (!userDoc.exists()) {
-            userDocRef = doc(db, "serviceProviders", user.uid);
+            userDocRef = doc(db, "serviceProviders", currentUser.uid);
             userDoc = await getDoc(userDocRef);
           }
           
@@ -73,9 +93,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             setUserData(userDoc.data());
           } else {
             console.log("No user data found in Firestore");
+            setUserData(null);
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
+          setUserData(null);
         } finally {
           setLoading(false);
         }
@@ -83,40 +105,42 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     };
 
     fetchUserData();
-  }, [user, profileOpen, db]);
+  }, [user, authUser, profileOpen, db]);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
       setProfileOpen(false);
       setUserData(null);
+      setMenuOpen(false);
+      
+      // Call the onLogout callback if provided
       if (onLogout) {
         onLogout();
       }
+      
+      console.log("User logged out successfully");
+      
+      // Navigate to home page after logout
+      navigate('/');
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
-  // Handle login navigation - only navigate if we're not already on auth pages
+  // Handle login navigation
   const handleLoginClick = () => {
+    setMenuOpen(false);
     if (onLogin) {
       onLogin();
-    } else {
-      // If no onLogin prop provided (like on JeepDriver page), navigate to home for auth
-      navigate('/');
-      // You might want to add a state to indicate login should open
     }
   };
 
-  // Handle register navigation - only navigate if we're not already on auth pages
+  // Handle register navigation
   const handleRegisterClick = () => {
+    setMenuOpen(false);
     if (onRegister) {
       onRegister();
-    } else {
-      // If no onRegister prop provided (like on JeepDriver page), navigate to home for auth
-      navigate('/');
-      // You might want to add a state to indicate register should open
     }
   };
 
@@ -136,11 +160,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     setMenuOpen(false);
   };
 
-  // Check if we're on the auth screen (login/register)
-  const isOnAuthScreen = location.pathname === '/' && (window.location.hash === '#login' || window.location.hash === '#register');
-
-  // Check if we're on the JeepDriver page
-  const isOnJeepDriverPage = location.pathname === '/driver';
+  // Use parent user prop if available, otherwise use local auth state
+  const currentUser = user || authUser;
 
   const profileMenuItems = [
     { icon: User, label: "My Profile", href: "#" },
@@ -173,18 +194,36 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     avatar: userImage
   };
 
-  const currentUser = user ? {
-    name: user.displayName || userData?.fullName || userData?.fullname || "User",
-    email: user.email || "No email",
+  const userProfileData = currentUser ? {
+    name: currentUser.displayName || userData?.fullName || userData?.fullname || "User",
+    email: currentUser.email || "No email",
     membership: userData?.serviceType ? `${userData.serviceType}` : "Tourist",
     joinDate: userData?.createdAt ? new Date(userData.createdAt.toDate()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Recently",
-    avatar: user.photoURL || userData?.profilePicture || userImage,
+    avatar: currentUser.photoURL || userData?.profilePicture || userImage,
     phone: userData?.phone || userData?.phoneNumber || "Not provided",
     location: userData?.location || userData?.country || "Not specified",
     experience: userData?.experienceYears,
     languages: userData?.languagesSpoken || userData?.preferredLanguage || "Not specified",
     role: userData?.serviceType ? "Service Provider" : "Tourist"
   } : defaultUserData;
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl bg-emerald-500 text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-emerald-300/30 shadow-2xl shadow-emerald-800/30">
+        <div className="flex items-center space-x-3">
+          <img
+            src={logo}
+            alt="SafariHub Logo"
+            className="h-12 md:h-40 w-auto object-contain"
+          />
+        </div>
+        <div className="flex items-center">
+          <div className="animate-pulse bg-emerald-400 rounded-lg h-8 w-20"></div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <>
@@ -262,35 +301,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             )}
           </div>
 
-          {/* User Icon - Only show if user is logged in */}
-          {user ? (
-            <div className="flex items-center space-x-4">
-              {/* Messages Button */}
-              <button
-                onClick={() => onStartChat && onStartChat('messages', 'Messages')}
-                className="relative p-2 text-white hover:text-emerald-200 transition-colors duration-300 hover:bg-emerald-600 rounded-lg"
-                title="Messages"
-              >
-                <MessageCircle className="h-5 w-5" />
-                {/* You can add notification badge here if needed */}
-                {/* <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                  3
-                </span> */}
-              </button>
-              
-              {/* User Profile */}
-              <div className="relative">
-                <img
-                  src={currentUser.avatar}
-                  alt="User"
-                  className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
-                  onClick={() => setProfileOpen(true)}
-                />
-                {/* Online indicator */}
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-700 shadow-sm"></div>
-              </div>
-            </div>
-          ) : (
+          {/* User Authentication Buttons - Show when NOT logged in */}
+          {!currentUser ? (
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleLoginClick}
@@ -305,12 +317,35 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 Register
               </button>
             </div>
+          ) : (
+            <div className="flex items-center space-x-4">
+              {/* Messages Button */}
+              <button
+                onClick={() => onStartChat && onStartChat('messages', 'Messages')}
+                className="relative p-2 text-white hover:text-emerald-200 transition-colors duration-300 hover:bg-emerald-600 rounded-lg"
+                title="Messages"
+              >
+                <MessageCircle className="h-5 w-5" />
+              </button>
+              
+              {/* User Profile */}
+              <div className="relative">
+                <img
+                  src={userProfileData.avatar}
+                  alt="User"
+                  className="h-10 w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
+                  onClick={() => setProfileOpen(true)}
+                />
+                {/* Online indicator */}
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-700 shadow-sm"></div>
+              </div>
+            </div>
           )}
         </div>
 
         {/* Hamburger Menu (Mobile) */}
         <div className="md:hidden flex items-center space-x-4">
-          {user ? (
+          {currentUser ? (
             <div className="flex items-center space-x-2">
               {/* Messages Button for Mobile */}
               <button
@@ -324,7 +359,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
               {/* User Profile for Mobile */}
               <div className="relative">
                 <img
-                  src={currentUser.avatar}
+                  src={userProfileData.avatar}
                   alt="User"
                   className="h-8 w-8 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
                   onClick={() => setProfileOpen(true)}
@@ -427,23 +462,18 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 </div>
               </div>
 
-              {!user && (
+              {/* Authentication Buttons for Mobile - Show when NOT logged in */}
+              {!currentUser && (
                 <div className="space-y-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp"
                      style={{ animationDelay: "400ms" }}>
                   <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      handleLoginClick();
-                    }}
+                    onClick={handleLoginClick}
                     className="w-full bg-white hover:bg-emerald-100 text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
                   >
                     Login
                   </button>
                   <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      handleRegisterClick();
-                    }}
+                    onClick={handleRegisterClick}
                     className="w-full border-2 border-white text-white hover:bg-white hover:text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-emerald-400/20"
                   >
                     Register
@@ -451,7 +481,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 </div>
               )}
 
-              {user && (
+              {currentUser && (
                 <div className="space-y-3 pt-6 border-t border-emerald-400/20">
                   {/* Messages Button in Mobile Menu */}
                   <button
@@ -477,7 +507,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                   >
                     <div className="relative">
                       <img
-                        src={currentUser.avatar}
+                        src={userProfileData.avatar}
                         alt="User"
                         className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-emerald-300/60 group-hover:border-emerald-200 shadow-lg shadow-emerald-500/30"
                       />
@@ -485,9 +515,9 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                     </div>
                     <div>
                       <span className="text-white group-hover:text-emerald-200 transition-colors duration-300 font-medium text-lg block">
-                        {currentUser.name}
+                        {userProfileData.name}
                       </span>
-                      <span className="text-emerald-200 text-sm">{currentUser.membership}</span>
+                      <span className="text-emerald-200 text-sm">{userProfileData.membership}</span>
                     </div>
                   </div>
                 </div>
@@ -498,7 +528,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
       )}
 
       {/* Profile Side Panel */}
-      {profileOpen && user && (
+      {profileOpen && currentUser && (
         <>
           <div
             className="fixed inset-0 bg-black bg-opacity-70 z-40 backdrop-blur-sm animate-fadeIn"
@@ -520,7 +550,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 <div className="px-6 pb-6 -mt-16">
                   <div className="relative inline-block">
                     <img
-                      src={currentUser.avatar}
+                      src={userProfileData.avatar}
                       alt="User"
                       className="h-24 w-24 rounded-full border-4 border-black bg-black shadow-lg shadow-yellow-500/30"
                     />
@@ -528,14 +558,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                   </div>
 
                   <div className="mt-4">
-                    <h2 className="text-2xl font-bold text-white">{currentUser.name}</h2>
-                    <p className="text-yellow-200 text-sm mt-1">{currentUser.email}</p>
+                    <h2 className="text-2xl font-bold text-white">{userProfileData.name}</h2>
+                    <p className="text-yellow-200 text-sm mt-1">{userProfileData.email}</p>
                     <div className="flex flex-col gap-2 mt-3">
                       <span className="bg-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold w-fit shadow-lg shadow-yellow-500/30">
-                        {currentUser.membership}
+                        {userProfileData.membership}
                       </span>
                       <span className="text-yellow-300 text-sm">
-                        Member since {currentUser.joinDate}
+                        Member since {userProfileData.joinDate}
                       </span>
                     </div>
                   </div>
@@ -549,39 +579,39 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                     Profile Information
                   </h3>
                   <div className="space-y-3">
-                    {currentUser.phone !== "Not provided" && (
+                    {userProfileData.phone !== "Not provided" && (
                       <div className="flex items-center gap-3 text-sm">
                         <Phone className="h-4 w-4 text-yellow-400" />
                         <span className="text-yellow-300">Phone: </span>
-                        <span className="text-white">{currentUser.phone}</span>
+                        <span className="text-white">{userProfileData.phone}</span>
                       </div>
                     )}
                     
-                    {currentUser.location !== "Not specified" && (
+                    {userProfileData.location !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
                         <MapPin className="h-4 w-4 text-yellow-400" />
                         <span className="text-yellow-300">
-                          {currentUser.role === "Service Provider" ? "Location: " : "Country: "}
+                          {userProfileData.role === "Service Provider" ? "Location: " : "Country: "}
                         </span>
-                        <span className="text-white">{currentUser.location}</span>
+                        <span className="text-white">{userProfileData.location}</span>
                       </div>
                     )}
                     
-                    {currentUser.languages !== "Not specified" && (
+                    {userProfileData.languages !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm">
                         <Globe className="h-4 w-4 text-yellow-400" />
                         <span className="text-yellow-300">
-                          {currentUser.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
+                          {userProfileData.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
                         </span>
-                        <span className="text-white">{currentUser.languages}</span>
+                        <span className="text-white">{userProfileData.languages}</span>
                       </div>
                     )}
                     
-                    {currentUser.experience && (
+                    {userProfileData.experience && (
                       <div className="flex items-center gap-3 text-sm">
                         <Award className="h-4 w-4 text-yellow-400" />
                         <span className="text-yellow-300">Experience: </span>
-                        <span className="text-white">{currentUser.experience} years</span>
+                        <span className="text-white">{userProfileData.experience} years</span>
                       </div>
                     )}
                     
@@ -589,11 +619,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                       <User className="h-4 w-4 text-yellow-400" />
                       <span className="text-yellow-300">Role: </span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                        currentUser.role === "Service Provider" 
+                        userProfileData.role === "Service Provider" 
                           ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/30" 
                           : "bg-yellow-600 text-black shadow-lg shadow-yellow-600/30"
                       }`}>
-                        {currentUser.role}
+                        {userProfileData.role}
                       </span>
                     </div>
                   </div>

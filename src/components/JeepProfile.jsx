@@ -282,7 +282,7 @@ const ChatModal = ({
   );
 };
 
-const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMarkAsRead }) => {
+const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
@@ -734,7 +734,7 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
                 
                 {!currentUser && (
                   <button
-                    onClick={() => navigate('/?showAuth=true')}
+                    onClick={onShowAuth}
                     className="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors"
                   >
                     Login to Message
@@ -1047,7 +1047,7 @@ const JeepProfile = ({ user, onLogout, notifications, onNotificationClick, onMar
                           Please login to start a conversation with {driver.fullName}
                         </p>
                         <button
-                          onClick={() => navigate('/?showAuth=true')}
+                          onClick={onShowAuth}
                           className="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
                         >
                           Login Now

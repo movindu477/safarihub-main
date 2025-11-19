@@ -8,6 +8,8 @@ import {
   updateProfile,
   onAuthStateChanged,
   signOut,
+  setPersistence,
+  browserLocalPersistence
 } from "firebase/auth";
 import {
   getFirestore,
@@ -62,6 +64,15 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Set persistence to local storage
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log("Auth persistence set to local");
+  })
+  .catch((error) => {
+    console.error("Error setting auth persistence:", error);
+  });
 
 // ==================== ENHANCED FIREBASE FUNCTIONS ====================
 
@@ -803,7 +814,7 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
       />
       
       {/* Home Content with All Sections */}
-      <div className="pt-16">
+      <div className="pt--1">
         <Section1 />
         <Section2 />
         <Section3 />
@@ -897,18 +908,34 @@ function App() {
     }
   }, [user]);
 
-  const handleLogout = async () => {
-    try {
-      if (user) {
-        const userRole = await getUserRole(user.uid);
-        await setUserOffline(user.uid, userRole);
-      }
-      await signOut(auth);
-      console.log('✅ User logged out successfully');
-    } catch (error) {
-      console.error("Logout error:", error);
+const handleLogout = async () => {
+  try {
+    console.log('🔄 Starting logout...');
+    
+    // Force immediate UI update
+    setUser(null);
+    setNotifications([]);
+    
+    if (auth.currentUser) {
+      const userRole = await getUserRole(auth.currentUser.uid);
+      await setUserOffline(auth.currentUser.uid, userRole);
     }
-  };
+    
+    await signOut(auth);
+    
+    // Force navigation and small reload if needed
+    setTimeout(() => {
+      window.history.replaceState(null, '', '/');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, 100);
+    
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Still reset state
+    setUser(null);
+    window.location.href = '/';
+  }
+};
 
   const handleAuthSuccess = () => {
     setShowAuth(false);
@@ -981,6 +1008,7 @@ function App() {
             <JeepDriversPage 
               user={user}
               onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
               notifications={notifications}
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
@@ -993,6 +1021,7 @@ function App() {
             <JeepProfile 
               user={user}
               onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
               notifications={notifications}
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
