@@ -12,12 +12,13 @@ import {
   updateDoc,
   serverTimestamp,
   getDocs,
-  arrayUnion,
-  arrayRemove,
   getDoc,
-  deleteDoc
+  deleteDoc,
+  limit,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -35,39 +36,501 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
-// ==================== USER MANAGEMENT FUNCTIONS ====================
+// ==================== ENHANCED ONLINE STATUS MANAGEMENT ====================
+
+let activeListeners = new Map();
 
 /**
- * Set user online status
+ * Clean up all active listeners
  */
-export const setUserOnline = async (userId, userType = 'tourist', userData = {}) => {
+export const cleanupAllListeners = () => {
+  activeListeners.forEach((unsubscribe, listenerId) => {
+    unsubscribe();
+    console.log(`🧹 Cleaned up listener: ${listenerId}`);
+  });
+  activeListeners.clear();
+};
+
+/**
+ * Register and manage listener
+ */
+const registerListener = (listenerId, unsubscribe) => {
+  activeListeners.set(listenerId, unsubscribe);
+  return () => {
+    unsubscribe();
+    activeListeners.delete(listenerId);
+  };
+};
+
+// ==================== REVIEW MANAGEMENT SYSTEM ====================
+
+/**
+ * Add a new review for a service provider
+ */
+export const addReview = async (reviewData) => {
   try {
-    console.log(`🟢 Setting user ${userId} online as ${userType}`);
+    console.log('📝 Adding new review:', reviewData);
+    
+    const reviewDoc = await addDoc(collection(db, 'reviews'), {
+      ...reviewData,
+      timestamp: serverTimestamp(),
+      timestampValue: Date.now(),
+      likes: 0,
+      dislikes: 0,
+      likedBy: [],
+      dislikedBy: [],
+      reported: false,
+      reportCount: 0
+    });
+
+    // Update driver's average rating and review count
+    await updateDriverRating(reviewData.driverId);
+
+    console.log(`✅ Review added successfully with ID: ${reviewDoc.id}`);
+    return reviewDoc.id;
+  } catch (error) {
+    console.error('❌ Error adding review:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update an existing review
+ */
+export const updateReview = async (reviewId, reviewData) => {
+  try {
+    console.log(`📝 Updating review: ${reviewId}`);
+    
+    await updateDoc(doc(db, 'reviews', reviewId), {
+      ...reviewData,
+      updatedAt: serverTimestamp(),
+      updatedAtValue: Date.now()
+    });
+
+    // Update driver's average rating if rating changed
+    if (reviewData.rating !== undefined) {
+      const reviewDoc = await getDoc(doc(db, 'reviews', reviewId));
+      if (reviewDoc.exists()) {
+        await updateDriverRating(reviewDoc.data().driverId);
+      }
+    }
+
+    console.log(`✅ Review ${reviewId} updated successfully`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error updating review:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a review
+ */
+export const deleteReview = async (reviewId) => {
+  try {
+    console.log(`🗑️ Deleting review: ${reviewId}`);
+    
+    const reviewDoc = await getDoc(doc(db, 'reviews', reviewId));
+    if (!reviewDoc.exists()) {
+      throw new Error('Review not found');
+    }
+
+    const reviewData = reviewDoc.data();
+    await deleteDoc(doc(db, 'reviews', reviewId));
+
+    // Update driver's average rating after deletion
+    await updateDriverRating(reviewData.driverId);
+
+    console.log(`✅ Review ${reviewId} deleted successfully`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error deleting review:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update driver's average rating and review count
+ */
+export const updateDriverRating = async (driverId) => {
+  try {
+    console.log(`📊 Updating rating for driver: ${driverId}`);
+    
+    const reviewsQuery = query(
+      collection(db, 'reviews'),
+      where('driverId', '==', driverId)
+    );
+    
+    const querySnapshot = await getDocs(reviewsQuery);
+    const reviews = querySnapshot.docs.map(doc => doc.data());
+    
+    if (reviews.length > 0) {
+      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+      const averageRating = totalRating / reviews.length;
+      const roundedRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal place
+      
+      await updateDoc(doc(db, 'serviceProviders', driverId), {
+        rating: roundedRating,
+        totalReviews: reviews.length,
+        lastRatingUpdate: serverTimestamp()
+      });
+      
+      console.log(`✅ Driver ${driverId} rating updated: ${roundedRating} (${reviews.length} reviews)`);
+    } else {
+      // No reviews, reset rating
+      await updateDoc(doc(db, 'serviceProviders', driverId), {
+        rating: 0,
+        totalReviews: 0,
+        lastRatingUpdate: serverTimestamp()
+      });
+      
+      console.log(`✅ Driver ${driverId} rating reset (no reviews)`);
+    }
+  } catch (error) {
+    console.error('❌ Error updating driver rating:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get reviews for a specific driver with real-time updates
+ */
+export const getDriverReviews = (driverId, callback, options = {}) => {
+  try {
+    console.log(`🔔 Setting up real-time reviews listener for driver: ${driverId}`);
+    
+    const { limitResults = 50, orderByField = 'timestampValue', orderDirection = 'desc' } = options;
+    
+    const reviewsRef = collection(db, 'reviews');
+    const reviewsQuery = query(
+      reviewsRef,
+      where('driverId', '==', driverId),
+      orderBy(orderByField, orderDirection),
+      limit(limitResults)
+    );
+
+    const unsubscribe = onSnapshot(reviewsQuery, 
+      (snapshot) => {
+        const reviews = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        console.log(`📊 Real-time reviews update: ${reviews.length} reviews for driver ${driverId}`);
+        callback(reviews);
+      },
+      (error) => {
+        console.error('❌ Error in reviews snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`reviews_${driverId}`, unsubscribe);
+  } catch (error) {
+    console.error('❌ Error getting driver reviews:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+/**
+ * Get all reviews with real-time updates (for admin/moderation)
+ */
+export const getAllReviews = (callback, options = {}) => {
+  try {
+    const { limitResults = 100, orderByField = 'timestampValue', orderDirection = 'desc' } = options;
+    
+    const reviewsRef = collection(db, 'reviews');
+    const reviewsQuery = query(
+      reviewsRef,
+      orderBy(orderByField, orderDirection),
+      limit(limitResults)
+    );
+
+    const unsubscribe = onSnapshot(reviewsQuery, 
+      (snapshot) => {
+        const reviews = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        console.log(`📊 Real-time all reviews update: ${reviews.length} reviews loaded`);
+        callback(reviews);
+      },
+      (error) => {
+        console.error('❌ Error in all reviews snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener('all_reviews', unsubscribe);
+  } catch (error) {
+    console.error('❌ Error getting all reviews:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+/**
+ * Check if user has already reviewed a driver
+ */
+export const getUserReviewForDriver = async (userId, driverId) => {
+  try {
+    const reviewsQuery = query(
+      collection(db, 'reviews'),
+      where('driverId', '==', driverId),
+      where('userId', '==', userId)
+    );
+    
+    const querySnapshot = await getDocs(reviewsQuery);
+    
+    if (!querySnapshot.empty) {
+      const reviewDoc = querySnapshot.docs[0];
+      return {
+        id: reviewDoc.id,
+        ...reviewDoc.data()
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ Error checking user review:', error);
+    return null;
+  }
+};
+
+/**
+ * Like a review
+ */
+export const likeReview = async (reviewId, userId) => {
+  try {
+    const reviewRef = doc(db, 'reviews', reviewId);
+    const reviewDoc = await getDoc(reviewRef);
+    
+    if (!reviewDoc.exists()) {
+      throw new Error('Review not found');
+    }
+    
+    const reviewData = reviewDoc.data();
+    
+    // Check if user already liked
+    if (reviewData.likedBy?.includes(userId)) {
+      // Unlike
+      await updateDoc(reviewRef, {
+        likes: (reviewData.likes || 0) - 1,
+        likedBy: arrayRemove(userId)
+      });
+      console.log(`👍 Review ${reviewId} unliked by user ${userId}`);
+    } else {
+      // Like
+      const updates = {
+        likes: (reviewData.likes || 0) + 1,
+        likedBy: arrayUnion(userId)
+      };
+      
+      // Remove from dislikes if user previously disliked
+      if (reviewData.dislikedBy?.includes(userId)) {
+        updates.dislikes = Math.max(0, (reviewData.dislikes || 0) - 1);
+        updates.dislikedBy = arrayRemove(userId);
+      }
+      
+      await updateDoc(reviewRef, updates);
+      console.log(`👍 Review ${reviewId} liked by user ${userId}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Error liking review:', error);
+    throw error;
+  }
+};
+
+/**
+ * Dislike a review
+ */
+export const dislikeReview = async (reviewId, userId) => {
+  try {
+    const reviewRef = doc(db, 'reviews', reviewId);
+    const reviewDoc = await getDoc(reviewRef);
+    
+    if (!reviewDoc.exists()) {
+      throw new Error('Review not found');
+    }
+    
+    const reviewData = reviewDoc.data();
+    
+    // Check if user already disliked
+    if (reviewData.dislikedBy?.includes(userId)) {
+      // Remove dislike
+      await updateDoc(reviewRef, {
+        dislikes: Math.max(0, (reviewData.dislikes || 0) - 1),
+        dislikedBy: arrayRemove(userId)
+      });
+      console.log(`👎 Review ${reviewId} undisliked by user ${userId}`);
+    } else {
+      // Dislike
+      const updates = {
+        dislikes: (reviewData.dislikes || 0) + 1,
+        dislikedBy: arrayUnion(userId)
+      };
+      
+      // Remove from likes if user previously liked
+      if (reviewData.likedBy?.includes(userId)) {
+        updates.likes = Math.max(0, (reviewData.likes || 0) - 1);
+        updates.likedBy = arrayRemove(userId);
+      }
+      
+      await updateDoc(reviewRef, updates);
+      console.log(`👎 Review ${reviewId} disliked by user ${userId}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Error disliking review:', error);
+    throw error;
+  }
+};
+
+/**
+ * Report a review
+ */
+export const reportReview = async (reviewId, userId, reason) => {
+  try {
+    const reviewRef = doc(db, 'reviews', reviewId);
+    
+    await updateDoc(reviewRef, {
+      reported: true,
+      reportCount: arrayUnion({
+        userId: userId,
+        reason: reason,
+        timestamp: serverTimestamp()
+      }),
+      lastReportedAt: serverTimestamp()
+    });
+    
+    console.log(`🚩 Review ${reviewId} reported by user ${userId}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error reporting review:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get review statistics for a driver
+ */
+export const getDriverReviewStats = async (driverId) => {
+  try {
+    const reviewsQuery = query(
+      collection(db, 'reviews'),
+      where('driverId', '==', driverId)
+    );
+    
+    const querySnapshot = await getDocs(reviewsQuery);
+    const reviews = querySnapshot.docs.map(doc => doc.data());
+    
+    if (reviews.length === 0) {
+      return {
+        totalReviews: 0,
+        averageRating: 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        totalLikes: 0,
+        totalDislikes: 0
+      };
+    }
+    
+    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+    const averageRating = totalRating / reviews.length;
+    
+    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    reviews.forEach(review => {
+      ratingDistribution[review.rating]++;
+    });
+    
+    const totalLikes = reviews.reduce((sum, review) => sum + (review.likes || 0), 0);
+    const totalDislikes = reviews.reduce((sum, review) => sum + (review.dislikes || 0), 0);
+    
+    return {
+      totalReviews: reviews.length,
+      averageRating: Math.round(averageRating * 10) / 10,
+      ratingDistribution,
+      totalLikes,
+      totalDislikes
+    };
+  } catch (error) {
+    console.error('❌ Error getting review stats:', error);
+    return {
+      totalReviews: 0,
+      averageRating: 0,
+      ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      totalLikes: 0,
+      totalDislikes: 0
+    };
+  }
+};
+
+// ==================== OPTIMIZED ONLINE STATUS MANAGEMENT ====================
+
+/**
+ * Enhanced function to set user online status with proper role detection
+ */
+export const setUserOnline = async (userId, userRole = null, userData = {}) => {
+  try {
+    console.log(`🟢 Setting user ${userId} online as ${userRole}`);
+    
+    // If role not provided, detect it
+    let finalUserRole = userRole;
+    if (!finalUserRole) {
+      finalUserRole = await getUserRole(userId);
+    }
     
     const onlineData = {
       userId: userId,
-      userType: userType,
+      userRole: finalUserRole,
+      userName: userData.userName || 'User',
+      email: userData.email || '',
       isOnline: true,
       online: true,
       lastSeen: serverTimestamp(),
       lastSeenTimestamp: Date.now(),
+      lastOnlineStatus: 'online',
       status: 'online',
+      lastActive: new Date().toISOString(),
       ...userData
     };
     
     // Update both onlineStatus collection and user's main document
-    await Promise.all([
-      setDoc(doc(db, 'onlineStatus', userId), onlineData, { merge: true }),
-      setDoc(doc(db, userType === 'tourist' ? 'tourists' : 'serviceProviders', userId), {
-        online: true,
-        isOnline: true,
-        lastSeen: serverTimestamp(),
-        lastSeenTimestamp: Date.now(),
-        status: 'online'
-      }, { merge: true })
-    ]);
+    const updatePromises = [
+      setDoc(doc(db, 'onlineStatus', userId), onlineData, { merge: true })
+    ];
     
-    console.log(`✅ User ${userId} successfully set online`);
+    // Also update the user's main document based on role
+    if (finalUserRole === 'tourist') {
+      updatePromises.push(
+        setDoc(doc(db, 'tourists', userId), {
+          online: true,
+          isOnline: true,
+          lastSeen: serverTimestamp(),
+          lastSeenTimestamp: Date.now(),
+          status: 'online'
+        }, { merge: true })
+      );
+    } else if (finalUserRole === 'provider') {
+      updatePromises.push(
+        setDoc(doc(db, 'serviceProviders', userId), {
+          online: true,
+          isOnline: true,
+          lastSeen: serverTimestamp(),
+          lastSeenTimestamp: Date.now(),
+          status: 'online',
+          availability: true
+        }, { merge: true })
+      );
+    }
+    
+    await Promise.all(updatePromises);
+    
+    console.log(`✅ User ${userId} successfully set online as ${finalUserRole}`);
     return true;
   } catch (error) {
     console.error('❌ Error setting user online:', error);
@@ -76,38 +539,49 @@ export const setUserOnline = async (userId, userType = 'tourist', userData = {})
 };
 
 /**
- * Set user offline status
+ * Enhanced function to set user offline status
  */
-export const setUserOffline = async (userId, userType = null) => {
+export const setUserOffline = async (userId, userRole = null) => {
   try {
     console.log(`🔴 Setting user ${userId} offline`);
+    
+    // If role not provided, detect it
+    let finalUserRole = userRole;
+    if (!finalUserRole) {
+      finalUserRole = await getUserRole(userId);
+    }
     
     const offlineData = {
       isOnline: false,
       online: false,
       lastSeen: serverTimestamp(),
       lastSeenTimestamp: Date.now(),
-      status: 'offline'
+      lastOnlineStatus: 'offline',
+      status: 'offline',
+      lastActive: new Date().toISOString()
     };
     
+    // Update both onlineStatus collection and user's main document
     const updatePromises = [
       setDoc(doc(db, 'onlineStatus', userId), offlineData, { merge: true })
     ];
     
-    // Update user's main document if userType is provided
-    if (userType) {
+    // Also update the user's main document based on role
+    if (finalUserRole === 'tourist') {
       updatePromises.push(
-        setDoc(doc(db, userType === 'tourist' ? 'tourists' : 'serviceProviders', userId), offlineData, { merge: true })
+        setDoc(doc(db, 'tourists', userId), offlineData, { merge: true })
       );
-    } else {
-      // Update both collections to ensure we catch the user regardless of role
+    } else if (finalUserRole === 'provider') {
       updatePromises.push(
-        setDoc(doc(db, 'tourists', userId), offlineData, { merge: true }).catch(() => null),
-        setDoc(doc(db, 'serviceProviders', userId), offlineData, { merge: true }).catch(() => null)
+        setDoc(doc(db, 'serviceProviders', userId), {
+          ...offlineData,
+          availability: false
+        }, { merge: true })
       );
     }
     
     await Promise.all(updatePromises);
+    
     console.log(`✅ User ${userId} successfully set offline`);
     return true;
   } catch (error) {
@@ -117,7 +591,107 @@ export const setUserOffline = async (userId, userType = null) => {
 };
 
 /**
- * Get user online status in real-time
+ * Enhanced user role detection
+ */
+export const getUserRole = async (userId) => {
+  try {
+    const touristDoc = await getDoc(doc(db, 'tourists', userId));
+    if (touristDoc.exists()) return 'tourist';
+    
+    const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
+    if (providerDoc.exists()) return 'provider';
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting user role:', error);
+    return null;
+  }
+};
+
+/**
+ * Enhanced real-time online status for service providers with detailed offline tracking
+ */
+export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
+  try {
+    console.log('🔔 Setting up enhanced real-time online status listener for service providers...');
+    
+    const { maxResults = 100 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    const providersQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Jeep Driver'),
+      limit(maxResults)
+    );
+
+    const unsubscribe = onSnapshot(providersQuery, 
+      (snapshot) => {
+        const onlineStatusMap = {};
+        const now = Date.now();
+        
+        snapshot.docs.forEach(doc => {
+          const provider = doc.data();
+          const providerId = doc.id;
+          
+          // Calculate detailed offline status
+          const isOnline = provider.online || provider.isOnline || false;
+          const lastSeen = provider.lastSeen;
+          const lastSeenTimestamp = provider.lastSeenTimestamp;
+          
+          let offlineText = 'Offline';
+          let lastSeenText = 'Unknown';
+          
+          if (lastSeenTimestamp) {
+            const lastSeenDate = new Date(lastSeenTimestamp);
+            const diffInMinutes = Math.floor((now - lastSeenTimestamp) / (1000 * 60));
+            const diffInHours = Math.floor(diffInMinutes / 60);
+            const diffInDays = Math.floor(diffInHours / 24);
+            
+            if (diffInMinutes < 1) {
+              lastSeenText = 'Just now';
+            } else if (diffInMinutes < 60) {
+              lastSeenText = `${diffInMinutes}m ago`;
+            } else if (diffInHours < 24) {
+              lastSeenText = `${diffInHours}h ago`;
+            } else {
+              lastSeenText = `${diffInDays}d ago`;
+            }
+            
+            offlineText = `Last seen ${lastSeenText}`;
+          }
+          
+          onlineStatusMap[providerId] = {
+            isOnline: isOnline,
+            online: isOnline,
+            lastSeen: lastSeen,
+            lastSeenTimestamp: lastSeenTimestamp,
+            status: isOnline ? 'online' : 'offline',
+            offlineText: isOnline ? 'Online now' : offlineText,
+            lastSeenText: lastSeenText,
+            userName: provider.fullName || provider.driverName || 'Safari Driver',
+            userRole: 'provider'
+          };
+        });
+        
+        const onlineCount = Object.values(onlineStatusMap).filter(p => p.isOnline).length;
+        console.log(`👥 Enhanced real-time status: ${onlineCount} drivers online out of ${snapshot.docs.length}`);
+        callback(onlineStatusMap);
+      },
+      (error) => {
+        console.error('Error in enhanced online status snapshot:', error);
+        callback({});
+      }
+    );
+
+    return registerListener(`enhanced_providers_online_${Date.now()}`, unsubscribe);
+  } catch (error) {
+    console.error('Error getting enhanced online status:', error);
+    callback({});
+    return () => {};
+  }
+};
+
+/**
+ * Get individual user online status in real-time with detailed offline information
  */
 export const getUserOnlineStatus = (userId, callback) => {
   try {
@@ -127,81 +701,85 @@ export const getUserOnlineStatus = (userId, callback) => {
       (doc) => {
         if (doc.exists()) {
           const data = doc.data();
+          const now = Date.now();
+          const isOnline = data.isOnline || false;
+          const lastSeenTimestamp = data.lastSeenTimestamp;
+          
+          let offlineText = 'Offline';
+          let lastSeenText = 'Unknown';
+          
+          if (lastSeenTimestamp) {
+            const lastSeenDate = new Date(lastSeenTimestamp);
+            const diffInMinutes = Math.floor((now - lastSeenTimestamp) / (1000 * 60));
+            const diffInHours = Math.floor(diffInMinutes / 60);
+            const diffInDays = Math.floor(diffInHours / 24);
+            
+            if (diffInMinutes < 1) {
+              lastSeenText = 'Just now';
+            } else if (diffInMinutes < 60) {
+              lastSeenText = `${diffInMinutes}m ago`;
+            } else if (diffInHours < 24) {
+              lastSeenText = `${diffInHours}h ago`;
+            } else {
+              lastSeenText = `${diffInDays}d ago`;
+            }
+            
+            offlineText = `Last seen ${lastSeenText}`;
+          }
+          
           callback({
-            isOnline: data.isOnline || false,
-            online: data.online || false,
+            isOnline: isOnline,
+            online: isOnline,
             lastSeen: data.lastSeen,
+            lastSeenTimestamp: lastSeenTimestamp,
             userType: data.userType,
-            userName: data.userName
+            userRole: data.userRole,
+            userName: data.userName,
+            status: isOnline ? 'online' : 'offline',
+            offlineText: isOnline ? 'Online now' : offlineText,
+            lastSeenText: lastSeenText
           });
         } else {
-          callback({ isOnline: false, online: false, lastSeen: null });
+          callback({ 
+            isOnline: false, 
+            online: false,
+            lastSeen: null, 
+            status: 'offline',
+            offlineText: 'Never been online',
+            lastSeenText: 'Never'
+          });
         }
       },
       (error) => {
-        console.error('Error in online status snapshot:', error);
-        callback({ isOnline: false, online: false, lastSeen: null });
+        console.error('Error in user online status:', error);
+        callback({ 
+          isOnline: false, 
+          online: false,
+          lastSeen: null, 
+          status: 'offline',
+          offlineText: 'Status unavailable',
+          lastSeenText: 'Unknown'
+        });
       }
     );
     
-    return unsubscribe;
+    return registerListener(`user_status_${userId}`, unsubscribe);
   } catch (error) {
     console.error('Error getting user online status:', error);
-    callback({ isOnline: false, online: false, lastSeen: null });
+    callback({ 
+      isOnline: false, 
+      online: false,
+      lastSeen: null, 
+      status: 'offline',
+      offlineText: 'Error loading status',
+      lastSeenText: 'Unknown'
+    });
     return () => {};
   }
 };
 
-/**
- * Get all service providers online status in real-time
- */
-export const getServiceProvidersOnlineStatus = (callback) => {
-  try {
-    const providersRef = collection(db, 'serviceProviders');
-    const providersQuery = query(
-      providersRef,
-      where('serviceType', '==', 'Jeep Driver')
-    );
+// ==================== CONVERSATION & MESSAGING ====================
 
-    const unsubscribe = onSnapshot(providersQuery, 
-      (snapshot) => {
-        const providers = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        // Create a map of online statuses
-        const onlineStatusMap = {};
-        providers.forEach(provider => {
-          onlineStatusMap[provider.id] = {
-            isOnline: provider.online || provider.isOnline || false,
-            lastSeen: provider.lastSeen,
-            lastSeenTimestamp: provider.lastSeenTimestamp
-          };
-        });
-        
-        console.log(`👥 Real-time online status update: ${providers.filter(p => p.online || p.isOnline).length} drivers online`);
-        callback(onlineStatusMap);
-      },
-      (error) => {
-        console.error('Error in online status snapshot:', error);
-        callback({});
-      }
-    );
-
-    return unsubscribe;
-  } catch (error) {
-    console.error('Error getting online status:', error);
-    callback({});
-    return () => {};
-  }
-};
-
-// ==================== CONVERSATION & MESSAGING FUNCTIONS ====================
-
-/**
- * Create or get existing conversation between two users
- */
 export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2Name) => {
   try {
     const conversationId = [user1Id, user2Id].sort().join('_');
@@ -209,19 +787,8 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
     const conversationDoc = await getDoc(conversationRef);
 
     if (!conversationDoc.exists()) {
-      // Get user roles
-      let user1Role = 'tourist';
-      let user2Role = 'provider';
-      
-      try {
-        const touristDoc = await getDoc(doc(db, 'tourists', user1Id));
-        user1Role = touristDoc.exists() ? 'tourist' : 'provider';
-        
-        const providerDoc = await getDoc(doc(db, 'serviceProviders', user2Id));
-        user2Role = providerDoc.exists() ? 'provider' : 'tourist';
-      } catch (error) {
-        console.log('Error getting user roles, using defaults');
-      }
+      let user1Role = await getUserRole(user1Id) || 'tourist';
+      let user2Role = await getUserRole(user2Id) || 'provider';
 
       await setDoc(conversationRef, {
         participantIds: [user1Id, user2Id],
@@ -241,8 +808,6 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
       });
       
       console.log(`✅ New conversation created: ${conversationId}`);
-    } else {
-      console.log(`✅ Existing conversation found: ${conversationId}`);
     }
 
     return conversationId;
@@ -252,9 +817,6 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
   }
 };
 
-/**
- * Get conversation by ID
- */
 export const getConversationById = async (conversationId) => {
   try {
     const conversationDoc = await getDoc(doc(db, 'conversations', conversationId));
@@ -271,9 +833,6 @@ export const getConversationById = async (conversationId) => {
   }
 };
 
-/**
- * Get other participant in conversation
- */
 export const getOtherParticipant = (conversation, currentUserId) => {
   if (!conversation || !conversation.participantIds) return null;
   
@@ -285,9 +844,6 @@ export const getOtherParticipant = (conversation, currentUserId) => {
   };
 };
 
-/**
- * Get user conversations in real-time
- */
 export const getUserConversations = (userId, callback) => {
   try {
     const conversationsRef = collection(db, 'conversations');
@@ -312,7 +868,7 @@ export const getUserConversations = (userId, callback) => {
       }
     );
 
-    return unsubscribe;
+    return registerListener(`conversations_${userId}`, unsubscribe);
   } catch (error) {
     console.error('Error getting conversations:', error);
     callback([]);
@@ -320,9 +876,6 @@ export const getUserConversations = (userId, callback) => {
   }
 };
 
-/**
- * Get messages for a conversation in real-time
- */
 export const getMessages = (conversationId, callback) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
@@ -343,7 +896,7 @@ export const getMessages = (conversationId, callback) => {
       }
     );
 
-    return unsubscribe;
+    return registerListener(`messages_${conversationId}`, unsubscribe);
   } catch (error) {
     console.error('Error getting messages:', error);
     callback([]);
@@ -351,9 +904,6 @@ export const getMessages = (conversationId, callback) => {
   }
 };
 
-/**
- * Send message to conversation
- */
 export const sendMessage = async (conversationId, messageData) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
@@ -366,7 +916,6 @@ export const sendMessage = async (conversationId, messageData) => {
       delivered: false
     });
 
-    // Update conversation last message
     const conversationRef = doc(db, 'conversations', conversationId);
     await updateDoc(conversationRef, {
       lastMessage: messageData.content,
@@ -384,9 +933,6 @@ export const sendMessage = async (conversationId, messageData) => {
   }
 };
 
-/**
- * Mark messages as read in conversation
- */
 export const markMessagesAsRead = async (conversationId, userId) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
@@ -412,9 +958,6 @@ export const markMessagesAsRead = async (conversationId, userId) => {
   }
 };
 
-/**
- * Mark message as delivered
- */
 export const markMessageAsDelivered = async (conversationId, messageId) => {
   try {
     const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
@@ -429,9 +972,6 @@ export const markMessageAsDelivered = async (conversationId, messageId) => {
 
 // ==================== NOTIFICATION FUNCTIONS ====================
 
-/**
- * Get user notifications in real-time
- */
 export const getUserNotifications = (userId, callback) => {
   try {
     const notificationsRef = collection(db, 'notifications');
@@ -456,7 +996,7 @@ export const getUserNotifications = (userId, callback) => {
       }
     );
 
-    return unsubscribe;
+    return registerListener(`notifications_${userId}`, unsubscribe);
   } catch (error) {
     console.error('Error getting notifications:', error);
     callback([]);
@@ -464,9 +1004,6 @@ export const getUserNotifications = (userId, callback) => {
   }
 };
 
-/**
- * Create notification
- */
 export const createNotification = async (notificationData) => {
   try {
     const notificationRef = collection(db, 'notifications');
@@ -485,9 +1022,6 @@ export const createNotification = async (notificationData) => {
   }
 };
 
-/**
- * Mark notification as read
- */
 export const markNotificationAsRead = async (notificationId) => {
   try {
     await updateDoc(doc(db, 'notifications', notificationId), {
@@ -498,278 +1032,22 @@ export const markNotificationAsRead = async (notificationId) => {
     console.log(`✅ Notification ${notificationId} marked as read`);
   } catch (error) {
     console.error('Error marking notification as read:', error);
-    throw error;
-  }
-};
-
-/**
- * Mark all notifications as read for user
- */
-export const markAllNotificationsAsRead = async (userId) => {
-  try {
-    const notificationsRef = collection(db, 'notifications');
-    const unreadNotificationsQuery = query(
-      notificationsRef,
-      where('recipientId', '==', userId),
-      where('read', '==', false)
-    );
-
-    const snapshot = await getDocs(unreadNotificationsQuery);
-    const updatePromises = snapshot.docs.map(doc =>
-      updateDoc(doc.ref, {
-        read: true,
-        readAt: serverTimestamp(),
-        readAtTimestamp: Date.now()
-      })
-    );
-
-    await Promise.all(updatePromises);
-    console.log(`✅ Marked ${snapshot.docs.length} notifications as read for user ${userId}`);
-  } catch (error) {
-    console.error('Error marking all notifications as read:', error);
-    throw error;
-  }
-};
-
-// ==================== REVIEW FUNCTIONS ====================
-
-/**
- * Add review for a service provider
- */
-export const addReview = async (reviewData) => {
-  try {
-    const reviewWithTimestamp = {
-      ...reviewData,
-      timestamp: serverTimestamp(),
-      timestampValue: Date.now()
-    };
-    
-    const docRef = await addDoc(collection(db, 'reviews'), reviewWithTimestamp);
-    
-    // Update service provider's average rating
-    await updateServiceProviderRating(reviewData.jeepId);
-    
-    console.log('✅ Review added with ID:', docRef.id);
-    return docRef.id;
-  } catch (error) {
-    console.error('❌ Error adding review:', error);
-    throw error;
-  }
-};
-
-/**
- * Get reviews for a service provider in real-time
- */
-export const getReviews = (jeepId, callback) => {
-  try {
-    const q = query(
-      collection(db, 'reviews'),
-      where('jeepId', '==', jeepId),
-      orderBy('timestamp', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, 
-      (querySnapshot) => {
-        const reviews = [];
-        querySnapshot.forEach((doc) => {
-          reviews.push({ id: doc.id, ...doc.data() });
-        });
-        callback(reviews);
-      },
-      (error) => {
-        console.error('Error in reviews snapshot:', error);
-        callback([]);
-      }
-    );
-
-    return unsubscribe;
-  } catch (error) {
-    console.error('Error getting reviews:', error);
-    callback([]);
-    return () => {};
-  }
-};
-
-/**
- * Update service provider's average rating
- */
-const updateServiceProviderRating = async (providerId) => {
-  try {
-    const reviewsQuery = query(
-      collection(db, 'reviews'),
-      where('jeepId', '==', providerId)
-    );
-    
-    const snapshot = await getDocs(reviewsQuery);
-    const reviews = snapshot.docs.map(doc => doc.data());
-    
-    if (reviews.length > 0) {
-      const totalRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-      const averageRating = totalRating / reviews.length;
-      const totalRatings = reviews.length;
-      
-      await updateDoc(doc(db, 'serviceProviders', providerId), {
-        rating: parseFloat(averageRating.toFixed(1)),
-        totalRatings: totalRatings
-      });
-      
-      console.log(`✅ Updated rating for provider ${providerId}: ${averageRating.toFixed(1)} (${totalRatings} reviews)`);
-    }
-  } catch (error) {
-    console.error('Error updating service provider rating:', error);
-  }
-};
-
-// ==================== BOOKING FUNCTIONS ====================
-
-/**
- * Add booking
- */
-export const addBooking = async (bookingData) => {
-  try {
-    const bookingWithTimestamp = {
-      ...bookingData,
-      timestamp: serverTimestamp(),
-      timestampValue: Date.now(),
-      status: 'pending'
-    };
-    
-    const docRef = await addDoc(collection(db, 'bookings'), bookingWithTimestamp);
-    
-    // Create notification for the service provider
-    await createNotification({
-      type: 'booking',
-      title: 'New Booking Request',
-      message: `You have a new booking request from ${bookingData.userName}`,
-      recipientId: bookingData.driverId,
-      senderId: bookingData.userId,
-      senderName: bookingData.userName,
-      relatedId: docRef.id
-    });
-    
-    console.log('✅ Booking added with ID:', docRef.id);
-    return docRef.id;
-  } catch (error) {
-    console.error('❌ Error adding booking:', error);
-    throw error;
-  }
-};
-
-/**
- * Get bookings for a service provider in real-time
- */
-export const getBookings = (jeepId, callback) => {
-  try {
-    const q = query(
-      collection(db, 'bookings'),
-      where('jeepId', '==', jeepId),
-      orderBy('date', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(q, 
-      (querySnapshot) => {
-        const bookings = [];
-        querySnapshot.forEach((doc) => {
-          bookings.push({ id: doc.id, ...doc.data() });
-        });
-        callback(bookings);
-      },
-      (error) => {
-        console.error('Error in bookings snapshot:', error);
-        callback([]);
-      }
-    );
-
-    return unsubscribe;
-  } catch (error) {
-    console.error('Error getting bookings:', error);
-    callback([]);
-    return () => {};
-  }
-};
-
-/**
- * Get user bookings in real-time
- */
-export const getUserBookings = (userId, callback) => {
-  try {
-    const q = query(
-      collection(db, 'bookings'),
-      where('userId', '==', userId),
-      orderBy('timestamp', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, 
-      (querySnapshot) => {
-        const bookings = [];
-        querySnapshot.forEach((doc) => {
-          bookings.push({ id: doc.id, ...doc.data() });
-        });
-        callback(bookings);
-      },
-      (error) => {
-        console.error('Error in user bookings snapshot:', error);
-        callback([]);
-      }
-    );
-
-    return unsubscribe;
-  } catch (error) {
-    console.error('Error getting user bookings:', error);
-    callback([]);
-    return () => {};
-  }
-};
-
-/**
- * Update booking status
- */
-export const updateBookingStatus = async (bookingId, status, driverId = null) => {
-  try {
-    const updateData = {
-      status: status,
-      updatedAt: serverTimestamp()
-    };
-    
-    if (driverId) {
-      updateData.driverId = driverId;
-    }
-    
-    await updateDoc(doc(db, 'bookings', bookingId), updateData);
-    
-    // Get booking data to create notification
-    const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
-    if (bookingDoc.exists()) {
-      const bookingData = bookingDoc.data();
-      
-      await createNotification({
-        type: 'booking_update',
-        title: `Booking ${status}`,
-        message: `Your booking has been ${status}`,
-        recipientId: bookingData.userId,
-        senderId: driverId || bookingData.driverId,
-        senderName: 'System',
-        relatedId: bookingId
-      });
-    }
-    
-    console.log(`✅ Booking ${bookingId} status updated to: ${status}`);
-  } catch (error) {
-    console.error('Error updating booking status:', error);
-    throw error;
   }
 };
 
 // ==================== SERVICE PROVIDER FUNCTIONS ====================
 
 /**
- * Get all service providers in real-time
+ * Get all service providers with real-time updates
  */
-export const getServiceProviders = (callback, filters = {}) => {
+export const getServiceProviders = (callback, options = {}) => {
   try {
-    let providersQuery = query(
-      collection(db, 'serviceProviders'),
-      where('serviceType', '==', 'Jeep Driver')
+    const { serviceType = 'Jeep Driver', maxResults = 50 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    const providersQuery = query(
+      providersRef,
+      where('serviceType', '==', serviceType),
+      limit(maxResults)
     );
 
     const unsubscribe = onSnapshot(providersQuery, 
@@ -778,37 +1056,8 @@ export const getServiceProviders = (callback, filters = {}) => {
           id: doc.id,
           ...doc.data()
         }));
-        
-        // Apply filters if provided
-        let filteredProviders = providers;
-        
-        if (filters.destination) {
-          filteredProviders = filteredProviders.filter(provider => 
-            provider.destinations?.some(dest => 
-              dest.toLowerCase().includes(filters.destination.toLowerCase())
-            )
-          );
-        }
-        
-        if (filters.minRating) {
-          filteredProviders = filteredProviders.filter(provider => 
-            (provider.rating || 0) >= filters.minRating
-          );
-        }
-        
-        if (filters.maxPrice) {
-          filteredProviders = filteredProviders.filter(provider => 
-            (provider.pricePerDay || 0) <= filters.maxPrice
-          );
-        }
-        
-        if (filters.vehicleType) {
-          filteredProviders = filteredProviders.filter(provider => 
-            provider.vehicleType?.toLowerCase() === filters.vehicleType.toLowerCase()
-          );
-        }
-        
-        callback(filteredProviders);
+        console.log(`🚙 Loaded ${providers.length} service providers`);
+        callback(providers);
       },
       (error) => {
         console.error('Error in service providers snapshot:', error);
@@ -816,7 +1065,7 @@ export const getServiceProviders = (callback, filters = {}) => {
       }
     );
 
-    return unsubscribe;
+    return registerListener(`service_providers_${serviceType}`, unsubscribe);
   } catch (error) {
     console.error('Error getting service providers:', error);
     callback([]);
@@ -825,7 +1074,7 @@ export const getServiceProviders = (callback, filters = {}) => {
 };
 
 /**
- * Get service provider by ID
+ * Get specific service provider by ID
  */
 export const getServiceProvider = async (providerId) => {
   try {
@@ -839,194 +1088,56 @@ export const getServiceProvider = async (providerId) => {
     return null;
   } catch (error) {
     console.error('Error getting service provider:', error);
-    throw error;
-  }
-};
-
-/**
- * Update service provider profile
- */
-export const updateServiceProvider = async (providerId, updateData) => {
-  try {
-    await updateDoc(doc(db, 'serviceProviders', providerId), {
-      ...updateData,
-      updatedAt: serverTimestamp()
-    });
-    console.log(`✅ Service provider ${providerId} updated successfully`);
-  } catch (error) {
-    console.error('Error updating service provider:', error);
-    throw error;
-  }
-};
-
-// ==================== USER PROFILE FUNCTIONS ====================
-
-/**
- * Get user profile data
- */
-export const getUserProfile = async (userId) => {
-  try {
-    // Try tourists collection first
-    let userDoc = await getDoc(doc(db, 'tourists', userId));
-    
-    // If not found in tourists, try serviceProviders
-    if (!userDoc.exists()) {
-      userDoc = await getDoc(doc(db, 'serviceProviders', userId));
-    }
-    
-    if (userDoc.exists()) {
-      return {
-        id: userDoc.id,
-        ...userDoc.data()
-      };
-    }
-    
     return null;
-  } catch (error) {
-    console.error('Error getting user profile:', error);
-    throw error;
-  }
-};
-
-/**
- * Update user profile
- */
-export const updateUserProfile = async (userId, userType, updateData) => {
-  try {
-    const collectionName = userType === 'tourist' ? 'tourists' : 'serviceProviders';
-    
-    await updateDoc(doc(db, collectionName, userId), {
-      ...updateData,
-      updatedAt: serverTimestamp()
-    });
-    
-    console.log(`✅ User profile ${userId} updated successfully`);
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    throw error;
-  }
-};
-
-// ==================== FAVORITES FUNCTIONS ====================
-
-/**
- * Add service provider to user favorites
- */
-export const addToFavorites = async (userId, providerId) => {
-  try {
-    await updateDoc(doc(db, 'tourists', userId), {
-      favorites: arrayUnion(providerId),
-      updatedAt: serverTimestamp()
-    });
-    
-    console.log(`✅ Provider ${providerId} added to favorites for user ${userId}`);
-  } catch (error) {
-    console.error('Error adding to favorites:', error);
-    throw error;
-  }
-};
-
-/**
- * Remove service provider from user favorites
- */
-export const removeFromFavorites = async (userId, providerId) => {
-  try {
-    await updateDoc(doc(db, 'tourists', userId), {
-      favorites: arrayRemove(providerId),
-      updatedAt: serverTimestamp()
-    });
-    
-    console.log(`✅ Provider ${providerId} removed from favorites for user ${userId}`);
-  } catch (error) {
-    console.error('Error removing from favorites:', error);
-    throw error;
-  }
-};
-
-/**
- * Get user favorites in real-time
- */
-export const getUserFavorites = (userId, callback) => {
-  try {
-    const userRef = doc(db, 'tourists', userId);
-    
-    const unsubscribe = onSnapshot(userRef, 
-      (doc) => {
-        if (doc.exists()) {
-          const userData = doc.data();
-          callback(userData.favorites || []);
-        } else {
-          callback([]);
-        }
-      },
-      (error) => {
-        console.error('Error in favorites snapshot:', error);
-        callback([]);
-      }
-    );
-    
-    return unsubscribe;
-  } catch (error) {
-    console.error('Error getting user favorites:', error);
-    callback([]);
-    return () => {};
   }
 };
 
 // ==================== UTILITY FUNCTIONS ====================
 
 /**
- * Get user role (tourist or provider)
+ * Check if user exists and get basic info
  */
-export const getUserRole = async (userId) => {
+export const getUserInfo = async (userId) => {
   try {
+    // Check tourists collection
     const touristDoc = await getDoc(doc(db, 'tourists', userId));
-    if (touristDoc.exists()) return 'tourist';
+    if (touristDoc.exists()) {
+      return {
+        id: userId,
+        role: 'tourist',
+        ...touristDoc.data()
+      };
+    }
     
+    // Check service providers collection
     const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
-    if (providerDoc.exists()) return 'provider';
+    if (providerDoc.exists()) {
+      return {
+        id: userId,
+        role: 'provider',
+        ...providerDoc.data()
+      };
+    }
     
     return null;
   } catch (error) {
-    console.error('Error getting user role:', error);
+    console.error('Error getting user info:', error);
     return null;
   }
 };
 
 /**
- * Format timestamp for display
+ * Get active listener count for debugging
  */
-export const formatFirebaseTimestamp = (timestamp) => {
-  if (!timestamp) return '';
-  
-  try {
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleString();
-  } catch (error) {
-    return '';
-  }
+export const getActiveListenerCount = () => {
+  return activeListeners.size;
 };
 
 /**
- * Get time ago string from timestamp
+ * Get all active listener IDs for debugging
  */
-export const getTimeAgo = (timestamp) => {
-  if (!timestamp) return 'Unknown time';
-  
-  try {
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now - date) / 1000);
-    
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-    
-    return date.toLocaleDateString();
-  } catch (error) {
-    return 'Unknown time';
-  }
+export const getActiveListenerIds = () => {
+  return Array.from(activeListeners.keys());
 };
 
 // Export Firebase instances

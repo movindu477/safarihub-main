@@ -74,68 +74,9 @@ setPersistence(auth, browserLocalPersistence)
     console.error("Error setting auth persistence:", error);
   });
 
-// ==================== ENHANCED FIREBASE FUNCTIONS ====================
+// ==================== FIREBASE FUNCTIONS ====================
 
-// Enhanced User Status Management with real-time updates
-export const setUserOnline = async (userId, userRole, userData = {}) => {
-  try {
-    console.log(`🟢 Setting user ${userId} online as ${userRole}`);
-    
-    const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
-    
-    const onlineData = {
-      online: true,
-      isOnline: true,
-      lastSeen: serverTimestamp(),
-      lastSeenTimestamp: Date.now(),
-      lastOnlineStatus: 'online',
-      status: 'online',
-      ...userData
-    };
-    
-    await setDoc(userRef, onlineData, { merge: true });
-    
-    console.log(`✅ User ${userId} successfully set online`);
-  } catch (error) {
-    console.error('❌ Error setting user online:', error);
-  }
-};
-
-export const setUserOffline = async (userId, userRole = null) => {
-  try {
-    console.log(`🔴 Setting user ${userId} offline`);
-    
-    const offlineData = {
-      online: false,
-      isOnline: false,
-      lastSeen: serverTimestamp(),
-      lastSeenTimestamp: Date.now(),
-      lastOnlineStatus: 'offline',
-      status: 'offline'
-    };
-    
-    // Try to update based on role if provided
-    if (userRole) {
-      const userRef = doc(db, userRole === 'tourist' ? 'tourists' : 'serviceProviders', userId);
-      await setDoc(userRef, offlineData, { merge: true });
-    } else {
-      // Update both collections to ensure we catch the user regardless of role
-      const touristRef = doc(db, 'tourists', userId);
-      const providerRef = doc(db, 'serviceProviders', userId);
-      
-      await Promise.all([
-        setDoc(touristRef, offlineData, { merge: true }).catch(() => null),
-        setDoc(providerRef, offlineData, { merge: true }).catch(() => null)
-      ]);
-    }
-    
-    console.log(`✅ User ${userId} successfully set offline`);
-  } catch (error) {
-    console.error('❌ Error setting user offline:', error);
-  }
-};
-
-// Enhanced user role detection
+// User role detection
 export const getUserRole = async (userId) => {
   try {
     const touristDoc = await getDoc(doc(db, 'tourists', userId));
@@ -151,50 +92,7 @@ export const getUserRole = async (userId) => {
   }
 };
 
-// Enhanced real-time online status listener for service providers
-export const getServiceProvidersOnlineStatus = (callback) => {
-  try {
-    const providersRef = collection(db, 'serviceProviders');
-    const providersQuery = query(
-      providersRef,
-      where('serviceType', '==', 'Jeep Driver')
-    );
-
-    const unsubscribe = onSnapshot(providersQuery, 
-      (snapshot) => {
-        const providers = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        // Create a map of online statuses
-        const onlineStatusMap = {};
-        providers.forEach(provider => {
-          onlineStatusMap[provider.id] = {
-            isOnline: provider.online || provider.isOnline || false,
-            lastSeen: provider.lastSeen,
-            lastSeenTimestamp: provider.lastSeenTimestamp
-          };
-        });
-        
-        console.log(`👥 Real-time online status update: ${providers.filter(p => p.online || p.isOnline).length} drivers online`);
-        callback(onlineStatusMap);
-      },
-      (error) => {
-        console.error('Error in online status snapshot:', error);
-        callback({});
-      }
-    );
-
-    return unsubscribe;
-  } catch (error) {
-    console.error('Error getting online status:', error);
-    callback({});
-    return () => {};
-  }
-};
-
-// Enhanced Conversation Management
+// Conversation Management
 export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2Name) => {
   try {
     const conversationId = [user1Id, user2Id].sort().join('_');
@@ -294,7 +192,7 @@ export const getUserConversations = (userId, callback) => {
   }
 };
 
-// Enhanced Message Management
+// Message Management
 export const getMessages = (conversationId, callback) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
@@ -390,7 +288,7 @@ export const markMessageAsDelivered = async (conversationId, messageId) => {
   }
 };
 
-// Enhanced Notification Management
+// Notification Management
 export const getUserNotifications = (userId, callback) => {
   try {
     const notificationsRef = collection(db, 'notifications');
@@ -454,7 +352,7 @@ export const markNotificationAsRead = async (notificationId) => {
   }
 };
 
-// Enhanced Chat Modal Component
+// Chat Modal Component
 const ChatModal = ({ 
   isOpen, 
   onClose, 
@@ -465,7 +363,6 @@ const ChatModal = ({
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
-  const [otherUserOnline, setOtherUserOnline] = useState(false);
   const messagesEndRef = React.useRef(null);
 
   // Scroll to bottom of messages
@@ -476,23 +373,6 @@ const ChatModal = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // Monitor other user's online status
-  useEffect(() => {
-    if (!otherUser?.id) return;
-
-    const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
-    const unsubscribe = onSnapshot(userRef, (doc) => {
-      if (doc.exists()) {
-        const userData = doc.data();
-        const isOnline = userData.online || userData.isOnline || false;
-        setOtherUserOnline(isOnline);
-        console.log(`👀 ${otherUser.name} online status: ${isOnline}`);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [otherUser]);
 
   // Load messages when conversation changes
   useEffect(() => {
@@ -592,14 +472,11 @@ const ChatModal = ({
               <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <User className="h-5 w-5" />
               </div>
-              <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                otherUserOnline ? 'bg-green-500' : 'bg-gray-400'
-              }`}></div>
             </div>
             <div>
               <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
               <p className="text-yellow-100 text-sm">
-                {otherUserOnline ? 'Online' : 'Offline'} • {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
+                {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
               </p>
             </div>
           </div>
@@ -618,9 +495,6 @@ const ChatModal = ({
               <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
               <p className="text-lg font-medium">No messages yet</p>
               <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
-              <p className="text-xs text-gray-400 mt-2">
-                {otherUserOnline ? 'User is online' : 'User is offline - they will see your message when they come online'}
-              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -758,7 +632,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
   );
 };
 
-// Enhanced Home Page Component
+// Home Page Component
 const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
@@ -826,66 +700,29 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
   );
 };
 
-// Enhanced Main App Component
+// Main App Component
 function App() {
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
 
-  // Enhanced auth state listener with proper online/offline management
+  // Auth state listener
   useEffect(() => {
-    let currentUserId = null;
-    let currentUserRole = null;
-    
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
-      
-      // Set previous user offline if exists
-      if (currentUserId && currentUserId !== user?.uid) {
-        console.log(`🔄 Setting previous user ${currentUserId} offline`);
-        await setUserOffline(currentUserId, currentUserRole);
-      }
       
       setUser(user);
       setLoading(false);
       
-      if (user) {
-        currentUserId = user.uid;
-        
-        try {
-          let userRole = await getUserRole(user.uid);
-          let userName = user.displayName || 'User';
-          
-          if (!userRole) {
-            // If no role found, default to tourist
-            userRole = 'tourist';
-          }
-          
-          currentUserRole = userRole;
-          
-          await setUserOnline(user.uid, userRole, {
-            userName: userName,
-            email: user.email,
-          });
-          
-          console.log(`✅ User ${user.uid} set online as ${userRole}`);
-        } catch (error) {
-          console.log('Error setting user online status:', error);
-        }
-      } else {
-        currentUserId = null;
-        currentUserRole = null;
+      if (!user) {
         setNotifications([]);
       }
     });
     
     return () => {
-      console.log('🔴 Unsubscribing from auth state changes');
-      if (currentUserId) {
-        setUserOffline(currentUserId, currentUserRole);
-      }
-      unsubscribe();
+      console.log('🔴 Cleaning up auth listener');
+      unsubscribeAuth();
     };
   }, []);
 
@@ -908,34 +745,29 @@ function App() {
     }
   }, [user]);
 
-const handleLogout = async () => {
-  try {
-    console.log('🔄 Starting logout...');
-    
-    // Force immediate UI update
-    setUser(null);
-    setNotifications([]);
-    
-    if (auth.currentUser) {
-      const userRole = await getUserRole(auth.currentUser.uid);
-      await setUserOffline(auth.currentUser.uid, userRole);
+  const handleLogout = async () => {
+    try {
+      console.log('🔄 Starting logout...');
+      
+      // Force immediate UI update
+      setUser(null);
+      setNotifications([]);
+      
+      await signOut(auth);
+      
+      // Force navigation
+      setTimeout(() => {
+        window.history.replaceState(null, '', '/');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, 100);
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still reset state
+      setUser(null);
+      window.location.href = '/';
     }
-    
-    await signOut(auth);
-    
-    // Force navigation and small reload if needed
-    setTimeout(() => {
-      window.history.replaceState(null, '', '/');
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    }, 100);
-    
-  } catch (error) {
-    console.error('Logout error:', error);
-    // Still reset state
-    setUser(null);
-    window.location.href = '/';
-  }
-};
+  };
 
   const handleAuthSuccess = () => {
     setShowAuth(false);
@@ -953,23 +785,12 @@ const handleLogout = async () => {
       await markNotificationAsRead(notification.id);
     }
     
-    // This will be handled by individual page components
     console.log('Notification click handled by global system:', notification);
   };
 
   const handleMarkAsRead = async (notificationId) => {
     await markNotificationAsRead(notificationId);
   };
-
-  // Set user offline when component unmounts or user changes
-  useEffect(() => {
-    return () => {
-      if (user) {
-        const userRole = getUserRole(user.uid);
-        setUserOffline(user.uid, userRole);
-      }
-    };
-  }, [user]);
 
   if (loading) {
     return (
@@ -1145,15 +966,20 @@ function Authentication({ onAuthSuccess }) {
     }
   };
 
-  // Enhanced Register Function
+  // Register Function
   const handleRegister = async (e) => {
     e.preventDefault();
     
     console.log("🔄 Starting registration process...");
+    console.log("Role:", role);
+    console.log("Form data:", {
+      email, fullName, phone, serviceType, vehicleType, experience, pricePerDay,
+      destinations, languages, specialSkills, certifications
+    });
     
-    // Phone validation for service providers
-    if (role === 'provider' && phone && !isValidSriLankanPhone(phone)) {
-      setMsg("❌ Please enter a valid Sri Lankan phone number (e.g., +94701234567)");
+    // Basic validation
+    if (!email || !fullName || !password) {
+      setMsg("❌ Please fill in all required fields");
       return;
     }
     
@@ -1161,8 +987,15 @@ function Authentication({ onAuthSuccess }) {
       setMsg("❌ Passwords do not match!");
       return;
     }
+    
     if (password.length < 6) {
       setMsg("❌ Password must be at least 6 characters!");
+      return;
+    }
+    
+    // Phone validation for service providers
+    if (role === 'provider' && phone && !isValidSriLankanPhone(phone)) {
+      setMsg("❌ Please enter a valid Sri Lankan phone number (e.g., +94701234567)");
       return;
     }
     
@@ -1170,6 +1003,7 @@ function Authentication({ onAuthSuccess }) {
     setMsg("⏳ Creating your account...");
     
     try {
+      console.log("Creating user with email:", email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
       
@@ -1187,10 +1021,6 @@ function Authentication({ onAuthSuccess }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         role: role,
-        online: true, // Set online immediately after registration
-        isOnline: true,
-        lastSeen: serverTimestamp(),
-        lastSeenTimestamp: Date.now(),
       };
 
       let collectionName = "";
@@ -1209,10 +1039,10 @@ function Authentication({ onAuthSuccess }) {
         userData = {
           ...userData,
           location: locationBase?.trim() || "",
-          experienceYears: parseInt(experience) || 0,
+          experienceYears: experience ? parseInt(experience) : 0,
           serviceType: serviceType || "Jeep Driver",
           vehicleType: vehicleType || "",
-          pricePerDay: parseInt(pricePerDay) || 0,
+          pricePerDay: pricePerDay ? parseInt(pricePerDay) : 0,
           rating: 0,
           totalRatings: 0,
           destinations: destinations || [],
@@ -1220,13 +1050,16 @@ function Authentication({ onAuthSuccess }) {
           specialSkills: specialSkills || [],
           certifications: certifications || [],
           availableDates: availableDates || [],
-          availability: availableDates.length > 0,
+          availability: true,
           description: description?.trim() || "",
           featured: false,
           contactEmail: email,
           contactPhone: formattedPhone,
         };
       }
+
+      console.log("Saving user data to collection:", collectionName);
+      console.log("User data:", userData);
 
       await setDoc(doc(db, collectionName, uid), userData);
       console.log("✅ User data saved to Firestore successfully!");
@@ -1251,8 +1084,10 @@ function Authentication({ onAuthSuccess }) {
             photoURL: photoURL 
           });
           
+          console.log("✅ Profile picture uploaded successfully");
         } catch (uploadError) {
           console.error("❌ Profile image upload failed:", uploadError);
+          // Continue without profile picture
         }
       } else {
         await updateProfile(userCredential.user, { 
@@ -1267,7 +1102,7 @@ function Authentication({ onAuthSuccess }) {
         signOut(auth);
         setScreen("login");
         resetForm();
-      }, 1500);
+      }, 2000);
       
     } catch (error) {
       console.error("❌ Registration error:", error);
@@ -1327,7 +1162,7 @@ function Authentication({ onAuthSuccess }) {
     }
   }, [screen]);
 
-  // ✅ Login Page
+  // Login Page
   if (screen === "login")
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
@@ -1426,7 +1261,7 @@ function Authentication({ onAuthSuccess }) {
       </div>
     );
 
-  // ✅ Register Page
+  // Register Page
   if (screen === "register")
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
@@ -1524,7 +1359,7 @@ const UserTypeSelection = ({ onSelect, logo }) => (
   </div>
 );
 
-// Enhanced RegistrationForm Component
+// RegistrationForm Component
 const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileImageSelect, onSubmit, busy, msg }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -1588,6 +1423,16 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     }
   };
 
+  // Handle multi-select changes
+  const handleMultiSelectChange = (field, value) => {
+    const currentArray = formData[field] || [];
+    const updatedArray = currentArray.includes(value)
+      ? currentArray.filter(item => item !== value)
+      : [...currentArray, value];
+    
+    handlers[`set${field.charAt(0).toUpperCase() + field.slice(1)}`](updatedArray);
+  };
+
   return (
     <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl max-h-[80vh] overflow-y-auto">
       <div className="text-center mb-4">
@@ -1646,8 +1491,9 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                 value={formData.password}
                 onChange={(e) => handlers.setPassword(e.target.value)}
                 required
+                minLength="6"
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs pr-8"
-                placeholder="Create password"
+                placeholder="Create password (min. 6 characters)"
               />
               <button
                 type="button"
@@ -1670,6 +1516,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                 value={formData.confirm}
                 onChange={(e) => handlers.setConfirm(e.target.value)}
                 required
+                minLength="6"
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs pr-8"
                 placeholder="Confirm password"
               />
@@ -1812,6 +1659,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                     type="number"
                     value={formData.pricePerDay}
                     onChange={(e) => handlers.setPricePerDay(e.target.value)}
+                    min="0"
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
                     placeholder="e.g., 12000"
                   />
@@ -1831,14 +1679,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                       type="checkbox"
                       id={`dest-${destination}`}
                       checked={formData.destinations?.includes(destination) || false}
-                      onChange={(e) => {
-                        const updatedDestinations = formData.destinations || [];
-                        if (e.target.checked) {
-                          handlers.setDestinations([...updatedDestinations, destination]);
-                        } else {
-                          handlers.setDestinations(updatedDestinations.filter(d => d !== destination));
-                        }
-                      }}
+                      onChange={(e) => handleMultiSelectChange('destinations', destination)}
                       className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
                     />
                     <label htmlFor={`dest-${destination}`} className="text-white text-xs">
@@ -1861,18 +1702,57 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                       type="checkbox"
                       id={`lang-${language}`}
                       checked={formData.languages?.includes(language) || false}
-                      onChange={(e) => {
-                        const updatedLanguages = formData.languages || [];
-                        if (e.target.checked) {
-                          handlers.setLanguages([...updatedLanguages, language]);
-                        } else {
-                          handlers.setLanguages(updatedLanguages.filter(l => l !== language));
-                        }
-                      }}
+                      onChange={(e) => handleMultiSelectChange('languages', language)}
                       className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
                     />
                     <label htmlFor={`lang-${language}`} className="text-white text-xs">
                       {language}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Special Skills (Multi-select) */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-white font-medium text-xs">
+                🎯 Special Skills
+              </label>
+              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                {specialSkills.map(skill => (
+                  <div key={skill} className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      id={`skill-${skill}`}
+                      checked={formData.specialSkills?.includes(skill) || false}
+                      onChange={(e) => handleMultiSelectChange('specialSkills', skill)}
+                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                    />
+                    <label htmlFor={`skill-${skill}`} className="text-white text-xs">
+                      {skill}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Certifications (Multi-select) */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-white font-medium text-xs">
+                📜 Certifications
+              </label>
+              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                {certifications.map(cert => (
+                  <div key={cert} className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      id={`cert-${cert}`}
+                      checked={formData.certifications?.includes(cert) || false}
+                      onChange={(e) => handleMultiSelectChange('certifications', cert)}
+                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                    />
+                    <label htmlFor={`cert-${cert}`} className="text-white text-xs">
+                      {cert}
                     </label>
                   </div>
                 ))}
@@ -1912,6 +1792,7 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
             />
           </div>
+          <p className="text-xs text-gray-400">Max file size: 2MB</p>
         </div>
 
         {/* Submit Button */}

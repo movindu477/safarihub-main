@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------
+    // Conversations
+    // --------------------------
+    match /conversations/{conversationId} {
+      allow read, write: if request.auth != null 
+        && resource.data.participants.hasAny([request.auth.uid]);
+
+      allow create: if request.auth != null 
+        && request.auth.uid in request.data.participants;
+    }
+
+    match /conversations/{conversationId}/messages/{messageId} {
+      allow read, write: if request.auth != null 
+        && get(/databases/$(database)/documents/conversations/$(conversationId))
+          .data.participants.hasAny([request.auth.uid]);
+    }
+
+    // --------------------------
+    // LEGACY MESSAGES (fixed)
+    // --------------------------
+    match /messages/{messageId} {
+      // Only allow a user to write their own message
+      allow create: if request.auth != null
+        && request.auth.uid == request.data.userId;
+
+      allow read, update, delete: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+    }
+
+    // --------------------------
+    // Notifications
+    // --------------------------
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null 
+        && resource.data.userId == request.auth.uid;
+
+      allow write: if request.auth != null;
+    }
+
+    // --------------------------
+    // Reviews
+    // --------------------------
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // --------------------------
+    // Bookings (secure create)
+    // --------------------------
+    match /bookings/{bookingId} {
+      // Creating booking
+      allow create: if request.auth != null
+        && request.auth.uid == request.data.userId;
+
+      // Reading/updating existing booking
+      allow read, update, delete: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+    }
+
+    // --------------------------
+    // Tourists (profile)
+    // --------------------------
+    match /tourists/{touristId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == touristId;
+    }
+
+    // --------------------------
+    // Service Providers (fixed)
+    // --------------------------
+    match /serviceProviders/{providerId} {
+      allow read: if true;
+
+      allow create: if request.auth != null
+        && request.auth.uid == providerId;
+
+      allow update, delete: if request.auth != null
+        && request.auth.uid == providerId;
+    }
+
+    // --------------------------
+    // Online Status
+    // --------------------------
+    match /onlineStatus/{userId} {
+      allow read: if request.auth != null;
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+  }
+}

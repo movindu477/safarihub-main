@@ -1,18 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { Wifi, WifiOff, MessageCircle, Star, MapPin, Clock, Users, Shield } from 'lucide-react';
+import { MessageCircle, Star, MapPin, Clock, Users, Shield } from 'lucide-react';
 
-// Import the enhanced online status function from App
-import { getServiceProvidersOnlineStatus } from '../App';
-
-const JeepSection2 = () => {
+const JeepSection2 = ({ currentUser }) => {
   const [jeeps, setJeeps] = useState([]);
   const [filteredJeeps, setFilteredJeeps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [onlineStatusMap, setOnlineStatusMap] = useState({});
   const navigate = useNavigate();
 
   // Filter states
@@ -80,38 +76,15 @@ const JeepSection2 = () => {
     ]
   };
 
-  // ✅ FIXED: Real-time online status listener for ALL service providers
-  useEffect(() => {
-    console.log('🔔 Setting up real-time online status listener for all service providers...');
-    
-    const unsubscribeOnlineStatus = getServiceProvidersOnlineStatus((statusMap) => {
-      console.log('🔄 Real-time online status update received:', Object.keys(statusMap).length, 'drivers');
-      setOnlineStatusMap(statusMap);
-      
-      // Update jeeps with real-time online status
-      setJeeps(prevJeeps => 
-        prevJeeps.map(jeep => ({
-          ...jeep,
-          isOnline: statusMap[jeep.id]?.isOnline || false,
-          lastSeen: statusMap[jeep.id]?.lastSeen || jeep.lastSeen
-        }))
-      );
-    });
-
-    return () => {
-      console.log('🔕 Cleaning up online status listener');
-      unsubscribeOnlineStatus();
-    };
-  }, []);
-
-  // ✅ ENHANCED: Real-time data listener for service providers
+  // Real-time data listener for service providers
   useEffect(() => {
     console.log('🔔 Setting up real-time data listener for service providers...');
     
     const serviceProvidersRef = collection(db, 'serviceProviders');
     const jeepDriversQuery = query(
       serviceProvidersRef,
-      where('serviceType', '==', 'Jeep Driver')
+      where('serviceType', '==', 'Jeep Driver'),
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(jeepDriversQuery, (snapshot) => {
@@ -125,12 +98,6 @@ const JeepSection2 = () => {
         
         // Only include Jeep Drivers
         if (providerData.serviceType === 'Jeep Driver') {
-          // Use real-time online status if available, otherwise fall back to stored data
-          const isOnline = onlineStatusMap[providerId]?.isOnline || 
-                          providerData.online || 
-                          providerData.isOnline || 
-                          false;
-          
           updatedJeeps.push({
             id: providerId,
             // Personal Info
@@ -141,6 +108,7 @@ const JeepSection2 = () => {
             // Service Info
             rating: typeof providerData.rating === 'number' ? providerData.rating : 
                    typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
+            totalReviews: providerData.totalReviews || 0,
             pricePerDay: providerData.pricePerDay || providerData.price || providerData.dailyRate || 0,
             vehicleType: providerData.vehicleType || 'Standard Safari Jeep',
             experience: providerData.experienceYears || providerData.experience || 0,
@@ -164,17 +132,18 @@ const JeepSection2 = () => {
             contactEmail: providerData.contactEmail || providerData.email || '',
             description: providerData.description || providerData.bio || 'Experienced safari jeep driver',
             
-            // Real-time online status - using real-time data first, then stored data
-            isOnline: isOnline,
-            lastSeen: onlineStatusMap[providerId]?.lastSeen || providerData.lastSeen || null,
-            
-            // Original data for debugging
-            originalData: providerData
+            // Mark if this is the current user's profile
+            isCurrentUser: currentUser && currentUser.uid === providerId
           });
         }
       });
 
-      console.log(`🚙 Real-time data update: ${updatedJeeps.length} jeep drivers found, ${updatedJeeps.filter(j => j.isOnline).length} online`);
+      const currentUserJeep = updatedJeeps.find(j => j.isCurrentUser);
+      
+      console.log(`🚙 Real-time data: ${updatedJeeps.length} jeep drivers`);
+      if (currentUserJeep) {
+        console.log(`👤 Current user jeep: ${currentUserJeep.driverName}`);
+      }
       
       setJeeps(updatedJeeps);
       setFilteredJeeps(updatedJeeps);
@@ -192,9 +161,9 @@ const JeepSection2 = () => {
       console.log('🔕 Cleaning up real-time data listener');
       unsubscribe();
     };
-  }, [onlineStatusMap]); // Re-run when online status changes
+  }, [currentUser, loading]);
 
-  // ✅ FIXED: Enhanced filter logic with exact matches
+  // Filter logic
   useEffect(() => {
     console.log('🔄 Applying filters...', filters);
     
@@ -286,18 +255,18 @@ const JeepSection2 = () => {
     }));
   };
 
-  // ✅ FIXED: Handle profile box click with proper navigation
+  // Handle profile box click
   const handleProfileClick = (jeep) => {
     navigate(`/jeepprofile?driverId=${jeep.id}`);
   };
 
-  // ✅ FIXED: Handle chat button click
+  // Handle chat button click
   const handleChatClick = (jeep, e) => {
     e.stopPropagation();
     navigate(`/jeepprofile?driverId=${jeep.id}&openChat=true`);
   };
 
-  // ✅ FIXED: Clear filters completely
+  // Clear filters completely
   const clearFilters = () => {
     setFilters({
       destination: '',
@@ -309,9 +278,7 @@ const JeepSection2 = () => {
       certifications: []
     });
     
-    // Reset to show all jeeps
     setFilteredJeeps(jeeps);
-    
     console.log('🧹 All filters cleared, showing all jeeps:', jeeps.length);
   };
 
@@ -321,41 +288,76 @@ const JeepSection2 = () => {
     return new Intl.NumberFormat('en-LK').format(price);
   };
 
-  // Get last seen time
-  const getLastSeenTime = (lastSeen) => {
-    if (!lastSeen) return 'Never online';
-    
-    try {
-      const lastSeenDate = lastSeen.toDate ? lastSeen.toDate() : new Date(lastSeen);
-      const now = new Date();
-      const diffInMinutes = Math.floor((now - lastSeenDate) / (1000 * 60));
-      
-      if (diffInMinutes < 1) return 'Just now';
-      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-      return lastSeenDate.toLocaleDateString();
-    } catch (error) {
-      return 'Unknown';
-    }
+  // Render star rating component
+  const renderStars = (rating, showCount = true) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+    return (
+      <div className="flex items-center">
+        <div className="flex text-yellow-400 mr-2">
+          {'★'.repeat(fullStars)}
+          {hasHalfStar && '½'}
+          {'☆'.repeat(emptyStars)}
+        </div>
+        {showCount && (
+          <span className="text-sm text-gray-600">
+            ({rating > 0 ? rating.toFixed(1) : 'New'})
+            {rating > 0 && <span className="text-xs text-gray-500 ml-1">• {jeeps.find(j => j.rating === rating)?.totalReviews || 0} reviews</span>}
+          </span>
+        )}
+      </div>
+    );
   };
 
-  // Online status indicator component - UPDATED with real-time data
-  const OnlineStatusIndicator = ({ jeep }) => {
-    const isOnline = jeep.isOnline;
-    
-    if (isOnline) {
+  // Profile Image Component with proper error handling
+  const ProfileImage = ({ jeep }) => {
+    const [imageError, setImageError] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
+
+    const handleImageError = () => {
+      console.log(`❌ Image failed to load for ${jeep.driverName}: ${jeep.imageUrl}`);
+      setImageError(true);
+    };
+
+    const handleImageLoad = () => {
+      console.log(`✅ Image loaded successfully for ${jeep.driverName}`);
+      setImageLoaded(true);
+    };
+
+    // If no image URL or image failed to load, show placeholder
+    if (!jeep.imageUrl || imageError) {
       return (
-        <div className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-          <Wifi className="h-3 w-3" />
-          <span>Online</span>
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-yellow-100 to-yellow-200">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-2">
+              <span className="text-2xl">🚙</span>
+            </div>
+            <p className="text-sm font-medium text-gray-600">No Photo</p>
+          </div>
         </div>
       );
     }
-    
+
+    // Show image with proper loading states
     return (
-      <div className="flex items-center gap-1 bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
-        <WifiOff className="h-3 w-3" />
-        <span>{jeep.lastSeen ? getLastSeenTime(jeep.lastSeen) : 'Offline'}</span>
+      <div className="w-full h-full relative">
+        {!imageLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+          </div>
+        )}
+        <img
+          src={jeep.imageUrl}
+          alt={jeep.driverName}
+          className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          onError={handleImageError}
+          onLoad={handleImageLoad}
+          loading="lazy"
+        />
       </div>
     );
   };
@@ -407,22 +409,20 @@ const JeepSection2 = () => {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Discover experienced safari jeep drivers for your wildlife adventures. Filter by your preferences to find the perfect match.
           </p>
-          
-          {/* Online Status Legend */}
-          <div className="flex justify-center items-center gap-6 mt-4 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Online Now</span>
+
+          {/* Current User Status Indicator */}
+          {currentUser && (
+            <div className="mt-4 p-3 bg-white rounded-lg shadow-sm border border-gray-200 max-w-md mx-auto">
+              <p className="text-sm text-gray-600">
+                <span className="font-semibold">Your Profile:</span>{' '}
+                {jeeps.find(j => j.isCurrentUser) ? (
+                  <span className="text-green-600 font-medium">🟢 Listed - Other users can see your profile</span>
+                ) : (
+                  <span className="text-gray-500">⚫ Not listed - Register as a service provider</span>
+                )}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-              <span>Offline</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-4 w-4 text-blue-500" />
-              <span>Chat Available</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Filter Section */}
@@ -591,16 +591,12 @@ const JeepSection2 = () => {
         </div>
 
         {/* Results Count */}
-        <div className="mb-6 flex justify-between items-center">
+        <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <p className="text-gray-600 text-lg">
             Found <span className="font-bold text-yellow-600">{filteredJeeps.length}</span> jeep{filteredJeeps.length !== 1 ? 's' : ''} 
             {jeeps.length > 0 && ` out of ${jeeps.length} total`}
           </p>
-          <div className="flex items-center gap-4 text-sm text-gray-500">
-            <span className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              {filteredJeeps.filter(j => j.isOnline).length} online
-            </span>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
             <span className="flex items-center gap-1">
               <MessageCircle className="h-4 w-4 text-blue-500" />
               Chat available
@@ -617,37 +613,21 @@ const JeepSection2 = () => {
                 className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
                 onClick={() => handleProfileClick(jeep)}
               >
-                {/* Profile Image */}
-                <div className="h-48 bg-gradient-to-br from-yellow-100 to-yellow-200 relative overflow-hidden">
-                  {jeep.imageUrl ? (
-                    <img
-                      src={jeep.imageUrl}
-                      alt={jeep.driverName}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'flex';
-                      }}
-                    />
-                  ) : null}
-                  <div className={`w-full h-full flex items-center justify-center text-gray-500 ${jeep.imageUrl ? 'hidden' : 'flex'}`}>
-                    <div className="text-center">
-                      <div className="w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-2">
-                        <span className="text-2xl">🚙</span>
-                      </div>
-                      <p className="text-sm font-medium text-gray-600">No Photo</p>
-                    </div>
-                  </div>
-                  
-                  {/* Online Status Badge */}
-                  <div className="absolute top-3 left-3">
-                    <OnlineStatusIndicator jeep={jeep} />
-                  </div>
+                {/* Profile Image Section */}
+                <div className="h-48 relative overflow-hidden">
+                  <ProfileImage jeep={jeep} />
                   
                   {/* Experience Badge */}
                   {jeep.experience > 0 && (
                     <div className="absolute top-3 right-3 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {jeep.experience}+ years
+                    </div>
+                  )}
+
+                  {/* Current User Badge */}
+                  {jeep.isCurrentUser && (
+                    <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg">
+                      Your Profile
                     </div>
                   )}
                 </div>
@@ -659,15 +639,18 @@ const JeepSection2 = () => {
                     <div className="flex items-start justify-between mb-1">
                       <h3 className="text-xl font-bold text-gray-900 line-clamp-1 flex-1">
                         {jeep.driverName}
+                        {jeep.isCurrentUser && <span className="ml-1 text-purple-600 text-sm">(You)</span>}
                       </h3>
-                      {/* Quick Chat Button */}
-                      <button 
-                        className="ml-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors shadow-lg"
-                        onClick={(e) => handleChatClick(jeep, e)}
-                        title="Start Chat"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </button>
+                      {/* Quick Chat Button - Show for all users except current user */}
+                      {!jeep.isCurrentUser && (
+                        <button 
+                          className="ml-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors shadow-lg"
+                          onClick={(e) => handleChatClick(jeep, e)}
+                          title="Start Chat"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center text-gray-600 text-sm">
                       <MapPin className="h-3 w-3 mr-1" />
@@ -677,15 +660,7 @@ const JeepSection2 = () => {
 
                   {/* Rating and Price */}
                   <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center">
-                      <div className="flex text-yellow-400 mr-2">
-                        {'★'.repeat(Math.floor(jeep.rating || 0))}
-                        {'☆'.repeat(5 - Math.floor(jeep.rating || 0))}
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        ({jeep.rating > 0 ? jeep.rating.toFixed(1) : 'New'})
-                      </span>
-                    </div>
+                    {renderStars(jeep.rating || 0)}
                     <div className="text-lg font-bold text-green-600">
                       {jeep.pricePerDay > 0 ? (
                         <>LKR {formatPrice(jeep.pricePerDay)}<span className="text-sm font-normal text-gray-500">/day</span></>
@@ -735,17 +710,6 @@ const JeepSection2 = () => {
                     </p>
                   </div>
 
-                  {/* Special Skills */}
-                  {jeep.specialSkills && jeep.specialSkills.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-sm font-semibold text-gray-700 mb-1">Services:</p>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {jeep.specialSkills.slice(0, 2).join(', ')}
-                        {jeep.specialSkills.length > 2 && '...'}
-                      </p>
-                    </div>
-                  )}
-
                   {/* Action Buttons */}
                   <div className="flex gap-2 mt-4">
                     <button 
@@ -755,21 +719,23 @@ const JeepSection2 = () => {
                         handleProfileClick(jeep);
                       }}
                     >
-                      View Profile
+                      {jeep.isCurrentUser ? 'View Your Profile' : 'View Profile'}
                     </button>
-                    <button 
-                      className="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (jeep.contactPhone && jeep.contactPhone !== 'Not provided') {
-                          const phoneNumber = jeep.contactPhone.replace(/\D/g, '');
-                          const whatsappUrl = `https://wa.me/${phoneNumber}`;
-                          window.open(whatsappUrl, '_blank');
-                        }
-                      }}
-                    >
-                      📞 Call
-                    </button>
+                    {!jeep.isCurrentUser && (
+                      <button 
+                        className="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (jeep.contactPhone && jeep.contactPhone !== 'Not provided') {
+                            const phoneNumber = jeep.contactPhone.replace(/\D/g, '');
+                            const whatsappUrl = `https://wa.me/${phoneNumber}`;
+                            window.open(whatsappUrl, '_blank');
+                          }
+                        }}
+                      >
+                        📞 Call
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

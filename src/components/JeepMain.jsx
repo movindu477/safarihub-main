@@ -7,12 +7,10 @@ import Navbar from "./Navbar";
 import JeepHero from "./JeepHero";
 import JeepSection2 from "./JeepSection2";
 
-// Initialize Firebase
-const db = getFirestore();
-const auth = getAuth();
-
-// Import Firebase functions from App
+// Import Firebase functions
 import { 
+  db, 
+  auth, 
   createOrGetConversation, 
   sendMessage, 
   getMessages, 
@@ -21,10 +19,8 @@ import {
   getConversationById,
   getOtherParticipant,
   markNotificationAsRead,
-  setUserOnline,
-  setUserOffline,
   getUserRole
-} from "../App";
+} from '../firebase';
 
 // Chat Modal Component
 const ChatModal = ({ 
@@ -37,7 +33,6 @@ const ChatModal = ({
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
-  const [otherUserOnline, setOtherUserOnline] = useState(false);
   const messagesEndRef = React.useRef(null);
 
   // Scroll to bottom of messages
@@ -48,23 +43,6 @@ const ChatModal = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // Monitor other user's online status
-  useEffect(() => {
-    if (!otherUser?.id) return;
-
-    const userRef = doc(db, otherUser.role === 'tourist' ? 'tourists' : 'serviceProviders', otherUser.id);
-    const unsubscribe = onSnapshot(userRef, (doc) => {
-      if (doc.exists()) {
-        const userData = doc.data();
-        const isOnline = userData.online || userData.isOnline || false;
-        setOtherUserOnline(isOnline);
-        console.log(`👀 ${otherUser.name} online status: ${isOnline}`);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [otherUser]);
 
   // Load messages when conversation changes
   useEffect(() => {
@@ -157,14 +135,11 @@ const ChatModal = ({
               <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                 <User className="h-5 w-5" />
               </div>
-              <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                otherUserOnline ? 'bg-green-500' : 'bg-gray-400'
-              }`}></div>
             </div>
             <div>
               <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
               <p className="text-yellow-100 text-sm">
-                {otherUserOnline ? 'Online' : 'Offline'} • {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
+                {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
               </p>
             </div>
           </div>
@@ -183,9 +158,6 @@ const ChatModal = ({
               <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
               <p className="text-lg font-medium">No messages yet</p>
               <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
-              <p className="text-xs text-gray-400 mt-2">
-                {otherUserOnline ? 'User is online' : 'User is offline - they will see your message when they come online'}
-              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -457,52 +429,15 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
 
-  // Get current user and set online status
+  // Auth state listener
   useEffect(() => {
-    let currentUserId = null;
-    
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 JeepMain Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
-      
-      // Set previous user offline if exists
-      if (currentUserId && currentUserId !== user?.uid) {
-        console.log(`🔄 Setting previous user ${currentUserId} offline from JeepMain`);
-        await setUserOffline(currentUserId);
-      }
-      
       setCurrentUser(user);
-      
-      if (user) {
-        currentUserId = user.uid;
-        
-        try {
-          // Determine user role and set online status
-          let userRole = await getUserRole(user.uid);
-          let userName = user.displayName || 'User';
-          
-          if (!userRole) {
-            // If no role found, default to tourist
-            userRole = 'tourist';
-          }
-          
-          await setUserOnline(user.uid, userRole, {
-            userName: userName,
-            email: user.email,
-          });
-          
-          console.log(`✅ User ${user.uid} set online in JeepMain as ${userRole}`);
-        } catch (error) {
-          console.log('Error setting user online status in JeepMain:', error);
-        }
-      } else {
-        currentUserId = null;
-      }
     });
 
     return () => {
-      if (currentUserId) {
-        setUserOffline(currentUserId);
-      }
+      console.log('🔴 Cleaning up JeepMain auth listener');
       unsubscribeAuth();
     };
   }, []);
@@ -512,7 +447,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
     console.log('🔘 Notification clicked:', notification);
     
     // Mark notification as read
-    if (!notification.read) {
+    if (!notification.read && onMarkAsRead) {
       await onMarkAsRead(notification.id);
     }
     
@@ -599,7 +534,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
       />
       <JeepHero />
       <div className="h-1 bg-black"></div>
-      <JeepSection2 />
+      <JeepSection2 currentUser={user} />
     </div>
   );
 }
