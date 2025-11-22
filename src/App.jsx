@@ -869,22 +869,34 @@ function App() {
             />
           } 
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
-         {/* Guide Route - ADD THIS */}
-    <Route 
-      path="/guide" 
-      element={
-        <GuideApp 
-          user={user}
-          onLogout={handleLogout}
-          onShowAuth={handleShowAuth}
-          notifications={notifications}
-          onNotificationClick={handleNotificationClick}
-          onMarkAsRead={handleMarkAsRead}
+        {/* Guide Route */}
+        <Route 
+          path="/guide" 
+          element={
+            <GuideApp 
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          } 
         />
-      } 
-    />
-    <Route path="*" element={<Navigate to="/" replace />} />
+        <Route 
+          path="/guide-profile/:guideId" 
+          element={
+            <GuideApp 
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          } 
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
@@ -953,6 +965,15 @@ function Authentication({ onAuthSuccess }) {
   const [description, setDescription] = useState("");
   const [availableDates, setAvailableDates] = useState([]);
 
+  // Tour Guide specific fields
+  const [specialQualifications, setSpecialQualifications] = useState([]);
+  const [areasOfExpertise, setAreasOfExpertise] = useState([]);
+  const [verificationDocuments, setVerificationDocuments] = useState([]);
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [dailyRate, setDailyRate] = useState("");
+  const [specialPackageRates, setSpecialPackageRates] = useState("");
+  const [currencyPreference, setCurrencyPreference] = useState("LKR");
+
   // Handle phone number input with formatting
   const handlePhoneChange = (value) => {
     const cleaned = value.replace(/[^\d+]/g, '');
@@ -982,6 +1003,13 @@ function Authentication({ onAuthSuccess }) {
     setCertifications([]);
     setDescription("");
     setAvailableDates([]);
+    setSpecialQualifications([]);
+    setAreasOfExpertise([]);
+    setVerificationDocuments([]);
+    setHourlyRate("");
+    setDailyRate("");
+    setSpecialPackageRates("");
+    setCurrencyPreference("LKR");
     setMsg("");
     setBusy(false);
   };
@@ -1009,7 +1037,8 @@ function Authentication({ onAuthSuccess }) {
     console.log("Role:", role);
     console.log("Form data:", {
       email, fullName, phone, serviceType, vehicleType, experience, pricePerDay,
-      destinations, languages, specialSkills, certifications
+      destinations, languages, specialSkills, certifications, specialQualifications,
+      areasOfExpertise, verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
     });
     
     // Basic validation
@@ -1071,6 +1100,8 @@ function Authentication({ onAuthSuccess }) {
         };
       } else {
         collectionName = "serviceProviders";
+        
+        // Base provider data
         userData = {
           ...userData,
           location: locationBase?.trim() || "",
@@ -1080,17 +1111,39 @@ function Authentication({ onAuthSuccess }) {
           pricePerDay: pricePerDay ? parseInt(pricePerDay) : 0,
           rating: 0,
           totalRatings: 0,
-          destinations: destinations || [],
-          languages: languages || [],
-          specialSkills: specialSkills || [],
-          certifications: certifications || [],
-          availableDates: availableDates || [],
           availability: true,
-          description: description?.trim() || "",
-          featured: false,
           contactEmail: email,
           contactPhone: formattedPhone,
         };
+
+        // Service type specific data
+        if (serviceType === "Tour Guide") {
+          userData = {
+            ...userData,
+            specialQualifications: specialQualifications || [],
+            areasOfExpertise: areasOfExpertise || [],
+            verificationDocuments: verificationDocuments || [],
+            hourlyRate: hourlyRate ? parseInt(hourlyRate) : 0,
+            dailyRate: dailyRate ? parseInt(dailyRate) : 0,
+            specialPackageRates: specialPackageRates || "",
+            currencyPreference: currencyPreference || "LKR",
+            languages: languages || [],
+            description: description?.trim() || "",
+            featured: false,
+          };
+        } else {
+          // For Jeep Driver and other services
+          userData = {
+            ...userData,
+            destinations: destinations || [],
+            languages: languages || [],
+            specialSkills: specialSkills || [],
+            certifications: certifications || [],
+            availableDates: availableDates || [],
+            description: description?.trim() || "",
+            featured: false,
+          };
+        }
       }
 
       console.log("Saving user data to collection:", collectionName);
@@ -1323,19 +1376,22 @@ function Authentication({ onAuthSuccess }) {
           ) : (
             <RegistrationForm 
               role={role}
+              serviceType={serviceType}
               formData={{ 
                 email, fullName, password, confirm, country, phone, language,
                 locationBase, experience, languagesSpoken, serviceType,
                 vehicleType, pricePerDay, destinations, languages, 
                 specialSkills, certifications, description,
-                availableDates
+                availableDates, specialQualifications, areasOfExpertise,
+                verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
               }}
               handlers={{ 
                 setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone: handlePhoneChange, setLanguage,
                 setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
                 setVehicleType, setPricePerDay, setDestinations, setLanguages,
                 setSpecialSkills, setCertifications, setDescription,
-                setAvailableDates
+                setAvailableDates, setSpecialQualifications, setAreasOfExpertise,
+                setVerificationDocuments, setHourlyRate, setDailyRate, setSpecialPackageRates, setCurrencyPreference
               }}
               profilePreview={profilePreview}
               onProfileImageSelect={handleProfileImageSelect}
@@ -1395,11 +1451,12 @@ const UserTypeSelection = ({ onSelect, logo }) => (
 );
 
 // RegistrationForm Component
-const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileImageSelect, onSubmit, busy, msg }) => {
+const RegistrationForm = ({ role, serviceType, formData, handlers, profilePreview, onProfileImageSelect, onSubmit, busy, msg }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const isTourist = role === 'tourist';
+  const isTourGuide = serviceType === "Tour Guide";
 
   const serviceTypes = [
     "Jeep Driver",
@@ -1442,6 +1499,43 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
     "Tourism Board Licensed",
     "First Aid Certified",
     "Eco Tourism Certified"
+  ];
+
+  // Tour Guide specific options
+  const specialQualifications = [
+    "Tourism License",
+    "Tour Guide Certificate",
+    "Wildlife Department Certification",
+    "Eco Tourism Certification",
+    "Cultural Heritage Knowledge",
+    "Adventure Tourism Certified"
+  ];
+
+  const areasOfExpertise = [
+    "National Parks",
+    "Beaches & Coastal Areas",
+    "Forest Reserves",
+    "Camping Sites",
+    "Wildlife Sanctuaries",
+    "Cultural Heritage Sites",
+    "Adventure Tourism",
+    "Bird Watching Areas",
+    "Historical Sites",
+    "Mountain Regions"
+  ];
+
+  const verificationDocuments = [
+    "Government Guide License",
+    "First Aid Certificate",
+    "Driving License",
+    "Police Clearance Certificate"
+  ];
+
+  const currencyOptions = [
+    "LKR - Sri Lankan Rupee",
+    "USD - US Dollar",
+    "EUR - Euro",
+    "GBP - British Pound"
   ];
 
   // Phone input helper text
@@ -1684,8 +1778,8 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
                 />
               </div>
 
-              {/* Price per Day (for Jeep Drivers and Tour Guides) */}
-              {(formData.serviceType === "Jeep Driver" || formData.serviceType === "Tour Guide") && (
+              {/* Price per Day (for Jeep Drivers) */}
+              {formData.serviceType === "Jeep Driver" && (
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
                     💰 Price per Day (LKR)
@@ -1702,109 +1796,249 @@ const RegistrationForm = ({ role, formData, handlers, profilePreview, onProfileI
               )}
             </div>
 
-            {/* Destinations (Multi-select) */}
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                🗺️ Destinations Covered
-              </label>
-              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                {destinations.map(destination => (
-                  <div key={destination} className="flex items-center mb-1">
-                    <input
-                      type="checkbox"
-                      id={`dest-${destination}`}
-                      checked={formData.destinations?.includes(destination) || false}
-                      onChange={(e) => handleMultiSelectChange('destinations', destination)}
-                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`dest-${destination}`} className="text-white text-xs">
-                      {destination}
-                    </label>
+            {/* Tour Guide Specific Fields */}
+            {isTourGuide && (
+              <>
+                {/* Special Qualifications (Multi-select) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    🎓 Special Qualifications
+                  </label>
+                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                    {specialQualifications.map(qualification => (
+                      <div key={qualification} className="flex items-center mb-1">
+                        <input
+                          type="checkbox"
+                          id={`qual-${qualification}`}
+                          checked={formData.specialQualifications?.includes(qualification) || false}
+                          onChange={(e) => handleMultiSelectChange('specialQualifications', qualification)}
+                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                        />
+                        <label htmlFor={`qual-${qualification}`} className="text-white text-xs">
+                          {qualification}
+                        </label>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Languages Spoken (Multi-select) */}
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                🌐 Languages Spoken
-              </label>
-              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                {languages.map(language => (
-                  <div key={language} className="flex items-center mb-1">
-                    <input
-                      type="checkbox"
-                      id={`lang-${language}`}
-                      checked={formData.languages?.includes(language) || false}
-                      onChange={(e) => handleMultiSelectChange('languages', language)}
-                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`lang-${language}`} className="text-white text-xs">
-                      {language}
-                    </label>
+                {/* Areas of Expertise (Multi-select) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    🗺️ Areas of Expertise
+                  </label>
+                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                    {areasOfExpertise.map(area => (
+                      <div key={area} className="flex items-center mb-1">
+                        <input
+                          type="checkbox"
+                          id={`area-${area}`}
+                          checked={formData.areasOfExpertise?.includes(area) || false}
+                          onChange={(e) => handleMultiSelectChange('areasOfExpertise', area)}
+                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                        />
+                        <label htmlFor={`area-${area}`} className="text-white text-xs">
+                          {area}
+                        </label>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Special Skills (Multi-select) */}
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                🎯 Special Skills
-              </label>
-              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                {specialSkills.map(skill => (
-                  <div key={skill} className="flex items-center mb-1">
-                    <input
-                      type="checkbox"
-                      id={`skill-${skill}`}
-                      checked={formData.specialSkills?.includes(skill) || false}
-                      onChange={(e) => handleMultiSelectChange('specialSkills', skill)}
-                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`skill-${skill}`} className="text-white text-xs">
-                      {skill}
-                    </label>
+                {/* Verification Documents (Multi-select) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    📄 Verification Documents
+                  </label>
+                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                    {verificationDocuments.map(doc => (
+                      <div key={doc} className="flex items-center mb-1">
+                        <input
+                          type="checkbox"
+                          id={`verif-${doc}`}
+                          checked={formData.verificationDocuments?.includes(doc) || false}
+                          onChange={(e) => handleMultiSelectChange('verificationDocuments', doc)}
+                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                        />
+                        <label htmlFor={`verif-${doc}`} className="text-white text-xs">
+                          {doc}
+                        </label>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Certifications (Multi-select) */}
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                📜 Certifications
-              </label>
-              <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                {certifications.map(cert => (
-                  <div key={cert} className="flex items-center mb-1">
-                    <input
-                      type="checkbox"
-                      id={`cert-${cert}`}
-                      checked={formData.certifications?.includes(cert) || false}
-                      onChange={(e) => handleMultiSelectChange('certifications', cert)}
-                      className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`cert-${cert}`} className="text-white text-xs">
-                      {cert}
+                {/* Pricing Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      💰 Hourly Rate
                     </label>
+                    <input
+                      type="number"
+                      value={formData.hourlyRate}
+                      onChange={(e) => handlers.setHourlyRate(e.target.value)}
+                      min="0"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                      placeholder="e.g., 2000"
+                    />
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      💰 Daily Rate
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.dailyRate}
+                      onChange={(e) => handlers.setDailyRate(e.target.value)}
+                      min="0"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                      placeholder="e.g., 15000"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      💰 Special Package Rates
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.specialPackageRates}
+                      onChange={(e) => handlers.setSpecialPackageRates(e.target.value)}
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                      placeholder="e.g., 3-day package: 40,000 LKR"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      💵 Currency Preference
+                    </label>
+                    <select
+                      value={formData.currencyPreference}
+                      onChange={(e) => handlers.setCurrencyPreference(e.target.value)}
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                    >
+                      {currencyOptions.map(currency => (
+                        <option key={currency} value={currency.split(' - ')[0]}>{currency}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Jeep Driver Specific Fields */}
+            {!isTourGuide && (
+              <>
+                {/* Destinations (Multi-select) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    🗺️ Destinations Covered
+                  </label>
+                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                    {destinations.map(destination => (
+                      <div key={destination} className="flex items-center mb-1">
+                        <input
+                          type="checkbox"
+                          id={`dest-${destination}`}
+                          checked={formData.destinations?.includes(destination) || false}
+                          onChange={(e) => handleMultiSelectChange('destinations', destination)}
+                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                        />
+                        <label htmlFor={`dest-${destination}`} className="text-white text-xs">
+                          {destination}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Languages Spoken (Multi-select) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    🌐 Languages Spoken
+                  </label>
+                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                    {languages.map(language => (
+                      <div key={language} className="flex items-center mb-1">
+                        <input
+                          type="checkbox"
+                          id={`lang-${language}`}
+                          checked={formData.languages?.includes(language) || false}
+                          onChange={(e) => handleMultiSelectChange('languages', language)}
+                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                        />
+                        <label htmlFor={`lang-${language}`} className="text-white text-xs">
+                          {language}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Special Skills (Multi-select) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    🎯 Special Skills
+                  </label>
+                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                    {specialSkills.map(skill => (
+                      <div key={skill} className="flex items-center mb-1">
+                        <input
+                          type="checkbox"
+                          id={`skill-${skill}`}
+                          checked={formData.specialSkills?.includes(skill) || false}
+                          onChange={(e) => handleMultiSelectChange('specialSkills', skill)}
+                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                        />
+                        <label htmlFor={`skill-${skill}`} className="text-white text-xs">
+                          {skill}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Certifications (Multi-select) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    📜 Certifications
+                  </label>
+                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                    {certifications.map(cert => (
+                      <div key={cert} className="flex items-center mb-1">
+                        <input
+                          type="checkbox"
+                          id={`cert-${cert}`}
+                          checked={formData.certifications?.includes(cert) || false}
+                          onChange={(e) => handleMultiSelectChange('certifications', cert)}
+                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                        />
+                        <label htmlFor={`cert-${cert}`} className="text-white text-xs">
+                          {cert}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Description */}
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
-                📝 Service Description
+                📝 {isTourGuide ? 'Service Description' : 'Service Description'}
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => handlers.setDescription(e.target.value)}
                 rows="2"
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                placeholder="Describe your services, expertise, and what makes you unique..."
+                placeholder={isTourGuide ? "Describe your guiding services, expertise, and what makes you unique..." : "Describe your services, expertise, and what makes you unique..."}
               />
             </div>
           </>

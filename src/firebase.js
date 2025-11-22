@@ -65,11 +65,11 @@ const registerListener = (listenerId, unsubscribe) => {
 // ==================== REVIEW SYSTEM FUNCTIONS ====================
 
 /**
- * Add a new review for a driver
+ * Add a new review for a driver/guide
  */
 export const addReview = async (reviewData) => {
   try {
-    console.log('📝 Adding new review for driver:', reviewData.driverId);
+    console.log('📝 Adding new review for provider:', reviewData.providerId);
     
     const reviewRef = await addDoc(collection(db, 'reviews'), {
       ...reviewData,
@@ -79,7 +79,7 @@ export const addReview = async (reviewData) => {
     });
     
     // Update provider's average rating and total reviews
-    await updateProviderRating(reviewData.driverId);
+    await updateProviderRating(reviewData.providerId);
     
     console.log('✅ Review added successfully with ID:', reviewRef.id);
     return reviewRef.id;
@@ -92,13 +92,13 @@ export const addReview = async (reviewData) => {
 /**
  * Update provider's average rating and total reviews count
  */
-export const updateProviderRating = async (driverId) => {
+export const updateProviderRating = async (providerId) => {
   try {
-    console.log('🔄 Updating provider rating for:', driverId);
+    console.log('🔄 Updating provider rating for:', providerId);
     
     const reviewsQuery = query(
       collection(db, 'reviews'),
-      where('driverId', '==', driverId)
+      where('providerId', '==', providerId)
     );
     
     const reviewsSnapshot = await getDocs(reviewsQuery);
@@ -112,24 +112,24 @@ export const updateProviderRating = async (driverId) => {
       const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
       const averageRating = totalRating / reviews.length;
       
-      const providerRef = doc(db, 'serviceProviders', driverId);
+      const providerRef = doc(db, 'serviceProviders', providerId);
       await updateDoc(providerRef, {
         rating: averageRating,
         totalReviews: reviews.length,
         updatedAt: serverTimestamp()
       });
       
-      console.log(`✅ Provider ${driverId} rating updated: ${averageRating.toFixed(1)}/5 from ${reviews.length} reviews`);
+      console.log(`✅ Provider ${providerId} rating updated: ${averageRating.toFixed(1)}/5 from ${reviews.length} reviews`);
     } else {
       // No reviews, reset to default
-      const providerRef = doc(db, 'serviceProviders', driverId);
+      const providerRef = doc(db, 'serviceProviders', providerId);
       await updateDoc(providerRef, {
         rating: 0,
         totalReviews: 0,
         updatedAt: serverTimestamp()
       });
       
-      console.log(`✅ Provider ${driverId} rating reset to default (no reviews)`);
+      console.log(`✅ Provider ${providerId} rating reset to default (no reviews)`);
     }
     
     return reviews;
@@ -140,15 +140,15 @@ export const updateProviderRating = async (driverId) => {
 };
 
 /**
- * Get real-time reviews for a driver
+ * Get real-time reviews for a provider (driver or guide)
  */
-export const getReviews = (driverId, callback) => {
+export const getReviews = (providerId, callback) => {
   try {
-    console.log('📖 Setting up real-time reviews listener for driver:', driverId);
+    console.log('📖 Setting up real-time reviews listener for provider:', providerId);
     
     const reviewsQuery = query(
       collection(db, 'reviews'),
-      where('driverId', '==', driverId),
+      where('providerId', '==', providerId),
       orderBy('createdAtValue', 'desc')
     );
     
@@ -158,7 +158,7 @@ export const getReviews = (driverId, callback) => {
         snapshot.forEach(doc => {
           reviews.push({ id: doc.id, ...doc.data() });
         });
-        console.log(`📚 Received ${reviews.length} reviews for driver ${driverId}`);
+        console.log(`📚 Received ${reviews.length} reviews for provider ${providerId}`);
         callback(reviews);
       },
       (error) => {
@@ -167,7 +167,7 @@ export const getReviews = (driverId, callback) => {
       }
     );
 
-    return registerListener(`reviews_${driverId}`, unsubscribe);
+    return registerListener(`reviews_${providerId}`, unsubscribe);
   } catch (error) {
     console.error('❌ Error getting reviews:', error);
     callback([]);
@@ -178,14 +178,14 @@ export const getReviews = (driverId, callback) => {
 /**
  * Delete a review
  */
-export const deleteReview = async (reviewId, driverId) => {
+export const deleteReview = async (reviewId, providerId) => {
   try {
     console.log('🗑️ Deleting review:', reviewId);
     
     await deleteDoc(doc(db, 'reviews', reviewId));
     
     // Update provider rating after deletion
-    await updateProviderRating(driverId);
+    await updateProviderRating(providerId);
     
     console.log('✅ Review deleted successfully');
     return true;
@@ -196,15 +196,15 @@ export const deleteReview = async (reviewId, driverId) => {
 };
 
 /**
- * Get user's existing review for a driver
+ * Get user's existing review for a provider
  */
-export const getUserReviewForDriver = async (userId, driverId) => {
+export const getUserReviewForProvider = async (userId, providerId) => {
   try {
-    console.log('🔍 Checking user review for driver:', { userId, driverId });
+    console.log('🔍 Checking user review for provider:', { userId, providerId });
     
     const userReviewQuery = query(
       collection(db, 'reviews'),
-      where('driverId', '==', driverId),
+      where('providerId', '==', providerId),
       where('userId', '==', userId)
     );
     
@@ -238,7 +238,7 @@ export const updateReview = async (reviewId, reviewData) => {
     });
     
     // Update provider rating
-    await updateProviderRating(reviewData.driverId);
+    await updateProviderRating(reviewData.providerId);
     
     console.log('✅ Review updated successfully');
     return true;
@@ -394,13 +394,19 @@ export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
   try {
     console.log('🔔 Setting up enhanced real-time online status listener for service providers...');
     
-    const { maxResults = 100 } = options;
+    const { serviceType = 'all', maxResults = 100 } = options;
     const providersRef = collection(db, 'serviceProviders');
-    const providersQuery = query(
-      providersRef,
-      where('serviceType', '==', 'Jeep Driver'),
-      limit(maxResults)
-    );
+    
+    let providersQuery;
+    if (serviceType === 'all') {
+      providersQuery = query(providersRef, limit(maxResults));
+    } else {
+      providersQuery = query(
+        providersRef,
+        where('serviceType', '==', serviceType),
+        limit(maxResults)
+      );
+    }
 
     const unsubscribe = onSnapshot(providersQuery, 
       (snapshot) => {
@@ -446,13 +452,20 @@ export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
             status: isOnline ? 'online' : 'offline',
             offlineText: isOnline ? 'Online now' : offlineText,
             lastSeenText: lastSeenText,
-            userName: provider.fullName || provider.driverName || 'Safari Driver',
-            userRole: 'provider'
+            userName: provider.fullName || provider.driverName || 'Service Provider',
+            userRole: 'provider',
+            serviceType: provider.serviceType,
+            // Include guide-specific data if available
+            specialQualifications: provider.specialQualifications || [],
+            areasOfExpertise: provider.areasOfExpertise || [],
+            hourlyRate: provider.hourlyRate || 0,
+            dailyRate: provider.dailyRate || 0,
+            currencyPreference: provider.currencyPreference || 'LKR'
           };
         });
         
         const onlineCount = Object.values(onlineStatusMap).filter(p => p.isOnline).length;
-        console.log(`👥 Enhanced real-time status: ${onlineCount} drivers online out of ${snapshot.docs.length}`);
+        console.log(`👥 Enhanced real-time status: ${onlineCount} ${serviceType === 'all' ? 'providers' : serviceType + 's'} online out of ${snapshot.docs.length}`);
         callback(onlineStatusMap);
       },
       (error) => {
@@ -461,7 +474,7 @@ export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
       }
     );
 
-    return registerListener(`enhanced_providers_online_${Date.now()}`, unsubscribe);
+    return registerListener(`enhanced_providers_online_${serviceType}_${Date.now()}`, unsubscribe);
   } catch (error) {
     console.error('Error getting enhanced online status:', error);
     callback({});
@@ -817,25 +830,67 @@ export const markNotificationAsRead = async (notificationId) => {
 // ==================== SERVICE PROVIDER FUNCTIONS ====================
 
 /**
- * Get all service providers with real-time updates
+ * Get all service providers with real-time updates (including Tour Guides)
  */
 export const getServiceProviders = (callback, options = {}) => {
   try {
-    const { serviceType = 'Jeep Driver', maxResults = 50 } = options;
+    const { serviceType = 'all', maxResults = 50 } = options;
     const providersRef = collection(db, 'serviceProviders');
-    const providersQuery = query(
-      providersRef,
-      where('serviceType', '==', serviceType),
-      limit(maxResults)
-    );
+    
+    let providersQuery;
+    if (serviceType === 'all') {
+      providersQuery = query(
+        providersRef,
+        limit(maxResults)
+      );
+    } else {
+      providersQuery = query(
+        providersRef,
+        where('serviceType', '==', serviceType),
+        limit(maxResults)
+      );
+    }
 
     const unsubscribe = onSnapshot(providersQuery, 
       (snapshot) => {
-        const providers = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        console.log(`🚙 Loaded ${providers.length} service providers`);
+        const providers = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            // Common fields
+            fullName: data.fullName,
+            email: data.email,
+            phone: data.phone,
+            profilePicture: data.profilePicture,
+            serviceType: data.serviceType,
+            location: data.location,
+            experienceYears: data.experienceYears || 0,
+            rating: data.rating || 0,
+            totalReviews: data.totalReviews || 0,
+            availability: data.availability || false,
+            online: data.online || false,
+            description: data.description,
+            languages: data.languages || [],
+            // Jeep Driver specific fields
+            vehicleType: data.vehicleType,
+            pricePerDay: data.pricePerDay,
+            destinations: data.destinations || [],
+            specialSkills: data.specialSkills || [],
+            certifications: data.certifications || [],
+            // Tour Guide specific fields
+            specialQualifications: data.specialQualifications || [],
+            areasOfExpertise: data.areasOfExpertise || [],
+            verificationDocuments: data.verificationDocuments || [],
+            hourlyRate: data.hourlyRate || 0,
+            dailyRate: data.dailyRate || 0,
+            specialPackageRates: data.specialPackageRates || '',
+            currencyPreference: data.currencyPreference || 'LKR',
+            // Timestamps
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          };
+        });
+        console.log(`🚙 Loaded ${providers.length} ${serviceType === 'all' ? 'service providers' : serviceType + 's'}`);
         callback(providers);
       },
       (error) => {
@@ -853,21 +908,375 @@ export const getServiceProviders = (callback, options = {}) => {
 };
 
 /**
- * Get specific service provider by ID
+ * Get Tour Guides specifically with all guide details
+ */
+export const getTourGuides = (callback, options = {}) => {
+  try {
+    const { maxResults = 50, filters = {} } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    
+    let tourGuidesQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Tour Guide'),
+      limit(maxResults)
+    );
+
+    const unsubscribe = onSnapshot(tourGuidesQuery, 
+      (snapshot) => {
+        const tourGuides = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            // Basic info
+            fullName: data.fullName,
+            email: data.email,
+            phone: data.phone,
+            profilePicture: data.profilePicture,
+            serviceType: data.serviceType,
+            location: data.location,
+            experienceYears: data.experienceYears || 0,
+            rating: data.rating || 0,
+            totalReviews: data.totalReviews || 0,
+            availability: data.availability || false,
+            online: data.online || false,
+            description: data.description,
+            // Guide specific details
+            specialQualifications: data.specialQualifications || [],
+            areasOfExpertise: data.areasOfExpertise || [],
+            verificationDocuments: data.verificationDocuments || [],
+            hourlyRate: data.hourlyRate || 0,
+            dailyRate: data.dailyRate || 0,
+            specialPackageRates: data.specialPackageRates || '',
+            currencyPreference: data.currencyPreference || 'LKR',
+            languages: data.languages || [],
+            // Additional fields
+            contactEmail: data.contactEmail,
+            contactPhone: data.contactPhone,
+            featured: data.featured || false,
+            // Timestamps
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          };
+        });
+        console.log(`🗺️ Loaded ${tourGuides.length} tour guides with full details`);
+        callback(tourGuides);
+      },
+      (error) => {
+        console.error('Error in tour guides snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`tour_guides_full`, unsubscribe);
+  } catch (error) {
+    console.error('Error getting tour guides:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+/**
+ * Get Jeep Drivers specifically
+ */
+export const getJeepDrivers = (callback, options = {}) => {
+  try {
+    const { maxResults = 50 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    const jeepDriversQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Jeep Driver'),
+      limit(maxResults)
+    );
+
+    const unsubscribe = onSnapshot(jeepDriversQuery, 
+      (snapshot) => {
+        const jeepDrivers = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`🚙 Loaded ${jeepDrivers.length} jeep drivers`);
+        callback(jeepDrivers);
+      },
+      (error) => {
+        console.error('Error in jeep drivers snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`jeep_drivers`, unsubscribe);
+  } catch (error) {
+    console.error('Error getting jeep drivers:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+/**
+ * Get specific service provider by ID with complete details
  */
 export const getServiceProvider = async (providerId) => {
   try {
     const providerDoc = await getDoc(doc(db, 'serviceProviders', providerId));
     if (providerDoc.exists()) {
+      const data = providerDoc.data();
       return {
         id: providerDoc.id,
-        ...providerDoc.data()
+        // Common fields
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
+        profilePicture: data.profilePicture,
+        serviceType: data.serviceType,
+        location: data.location,
+        experienceYears: data.experienceYears || 0,
+        rating: data.rating || 0,
+        totalReviews: data.totalReviews || 0,
+        availability: data.availability || false,
+        online: data.online || false,
+        description: data.description,
+        languages: data.languages || [],
+        // Jeep Driver specific fields
+        vehicleType: data.vehicleType,
+        pricePerDay: data.pricePerDay,
+        destinations: data.destinations || [],
+        specialSkills: data.specialSkills || [],
+        certifications: data.certifications || [],
+        availableDates: data.availableDates || [],
+        // Tour Guide specific fields
+        specialQualifications: data.specialQualifications || [],
+        areasOfExpertise: data.areasOfExpertise || [],
+        verificationDocuments: data.verificationDocuments || [],
+        hourlyRate: data.hourlyRate || 0,
+        dailyRate: data.dailyRate || 0,
+        specialPackageRates: data.specialPackageRates || '',
+        currencyPreference: data.currencyPreference || 'LKR',
+        // Contact info
+        contactEmail: data.contactEmail,
+        contactPhone: data.contactPhone,
+        featured: data.featured || false,
+        // Timestamps
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt
       };
     }
     return null;
   } catch (error) {
     console.error('Error getting service provider:', error);
     return null;
+  }
+};
+
+/**
+ * Update service provider profile
+ */
+export const updateServiceProvider = async (providerId, updateData) => {
+  try {
+    console.log(`✏️ Updating service provider: ${providerId}`);
+    
+    await updateDoc(doc(db, 'serviceProviders', providerId), {
+      ...updateData,
+      updatedAt: serverTimestamp()
+    });
+    
+    console.log(`✅ Service provider ${providerId} updated successfully`);
+    return true;
+  } catch (error) {
+    console.error('Error updating service provider:', error);
+    throw error;
+  }
+};
+
+// ==================== TOUR GUIDE SPECIFIC FUNCTIONS ====================
+
+/**
+ * Get tour guides by specialization
+ */
+export const getTourGuidesBySpecialization = (specialization, callback, options = {}) => {
+  try {
+    const { maxResults = 50 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    const tourGuidesQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Tour Guide'),
+      where('specialQualifications', 'array-contains', specialization),
+      limit(maxResults)
+    );
+
+    const unsubscribe = onSnapshot(tourGuidesQuery, 
+      (snapshot) => {
+        const tourGuides = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`🎯 Loaded ${tourGuides.length} tour guides specialized in ${specialization}`);
+        callback(tourGuides);
+      },
+      (error) => {
+        console.error('Error in specialized tour guides snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`tour_guides_${specialization}`, unsubscribe);
+  } catch (error) {
+    console.error('Error getting specialized tour guides:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+/**
+ * Get tour guides by area of expertise
+ */
+export const getTourGuidesByExpertise = (expertise, callback, options = {}) => {
+  try {
+    const { maxResults = 50 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    const tourGuidesQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Tour Guide'),
+      where('areasOfExpertise', 'array-contains', expertise),
+      limit(maxResults)
+    );
+
+    const unsubscribe = onSnapshot(tourGuidesQuery, 
+      (snapshot) => {
+        const tourGuides = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`🗺️ Loaded ${tourGuides.length} tour guides expert in ${expertise}`);
+        callback(tourGuides);
+      },
+      (error) => {
+        console.error('Error in expertise-specific tour guides snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`tour_guides_expertise_${expertise}`, unsubscribe);
+  } catch (error) {
+    console.error('Error getting expertise-specific tour guides:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+/**
+ * Get tour guides by language
+ */
+export const getTourGuidesByLanguage = (language, callback, options = {}) => {
+  try {
+    const { maxResults = 50 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    const tourGuidesQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Tour Guide'),
+      where('languages', 'array-contains', language),
+      limit(maxResults)
+    );
+
+    const unsubscribe = onSnapshot(tourGuidesQuery, 
+      (snapshot) => {
+        const tourGuides = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`🌐 Loaded ${tourGuides.length} tour guides speaking ${language}`);
+        callback(tourGuides);
+      },
+      (error) => {
+        console.error('Error in language-specific tour guides snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`tour_guides_language_${language}`, unsubscribe);
+  } catch (error) {
+    console.error('Error getting language-specific tour guides:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+/**
+ * Get tour guides by price range
+ */
+export const getTourGuidesByPriceRange = (minPrice, maxPrice, priceType = 'hourly', callback, options = {}) => {
+  try {
+    const { maxResults = 50 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    
+    let priceField = 'hourlyRate';
+    if (priceType === 'daily') {
+      priceField = 'dailyRate';
+    }
+    
+    const tourGuidesQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Tour Guide'),
+      where(priceField, '>=', minPrice),
+      where(priceField, '<=', maxPrice),
+      limit(maxResults)
+    );
+
+    const unsubscribe = onSnapshot(tourGuidesQuery, 
+      (snapshot) => {
+        const tourGuides = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`💰 Loaded ${tourGuides.length} tour guides with ${priceType} rate between ${minPrice}-${maxPrice}`);
+        callback(tourGuides);
+      },
+      (error) => {
+        console.error('Error in price-range tour guides snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`tour_guides_price_${minPrice}_${maxPrice}`, unsubscribe);
+  } catch (error) {
+    console.error('Error getting price-range tour guides:', error);
+    callback([]);
+    return () => {};
+  }
+};
+
+/**
+ * Get featured tour guides
+ */
+export const getFeaturedTourGuides = (callback, options = {}) => {
+  try {
+    const { maxResults = 20 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    const featuredTourGuidesQuery = query(
+      providersRef,
+      where('serviceType', '==', 'Tour Guide'),
+      where('featured', '==', true),
+      limit(maxResults)
+    );
+
+    const unsubscribe = onSnapshot(featuredTourGuidesQuery, 
+      (snapshot) => {
+        const tourGuides = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`⭐ Loaded ${tourGuides.length} featured tour guides`);
+        callback(tourGuides);
+      },
+      (error) => {
+        console.error('Error in featured tour guides snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`featured_tour_guides`, unsubscribe);
+  } catch (error) {
+    console.error('Error getting featured tour guides:', error);
+    callback([]);
+    return () => {};
   }
 };
 
@@ -891,10 +1300,18 @@ export const getUserInfo = async (userId) => {
     // Check service providers collection
     const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
     if (providerDoc.exists()) {
+      const data = providerDoc.data();
       return {
         id: userId,
         role: 'provider',
-        ...providerDoc.data()
+        serviceType: data.serviceType,
+        // Include guide-specific data if available
+        specialQualifications: data.specialQualifications || [],
+        areasOfExpertise: data.areasOfExpertise || [],
+        hourlyRate: data.hourlyRate || 0,
+        dailyRate: data.dailyRate || 0,
+        currencyPreference: data.currencyPreference || 'LKR',
+        ...data
       };
     }
     
@@ -902,6 +1319,55 @@ export const getUserInfo = async (userId) => {
   } catch (error) {
     console.error('Error getting user info:', error);
     return null;
+  }
+};
+
+/**
+ * Search service providers by name, location, or service type
+ */
+export const searchServiceProviders = (searchTerm, callback, options = {}) => {
+  try {
+    const { maxResults = 50 } = options;
+    const providersRef = collection(db, 'serviceProviders');
+    
+    // Since Firestore doesn't support OR queries directly, we'll search in memory
+    const providersQuery = query(providersRef, limit(maxResults));
+
+    const unsubscribe = onSnapshot(providersQuery, 
+      (snapshot) => {
+        const allProviders = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        const filteredProviders = allProviders.filter(provider => {
+          const searchLower = searchTerm.toLowerCase();
+          return (
+            provider.fullName?.toLowerCase().includes(searchLower) ||
+            provider.location?.toLowerCase().includes(searchLower) ||
+            provider.serviceType?.toLowerCase().includes(searchLower) ||
+            provider.description?.toLowerCase().includes(searchLower) ||
+            (provider.specialQualifications && provider.specialQualifications.some(qual => 
+              qual.toLowerCase().includes(searchLower))) ||
+            (provider.areasOfExpertise && provider.areasOfExpertise.some(area => 
+              area.toLowerCase().includes(searchLower)))
+          );
+        });
+        
+        console.log(`🔍 Found ${filteredProviders.length} providers matching "${searchTerm}"`);
+        callback(filteredProviders);
+      },
+      (error) => {
+        console.error('Error in search snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return registerListener(`search_${searchTerm}`, unsubscribe);
+  } catch (error) {
+    console.error('Error searching service providers:', error);
+    callback([]);
+    return () => {};
   }
 };
 
