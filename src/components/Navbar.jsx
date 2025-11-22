@@ -160,6 +160,22 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     setMenuOpen(false);
   };
 
+  // Function to handle Destination navigation
+  const handleDestinationClick = () => {
+    navigate('/destination');
+    setServicesDropdownOpen(false);
+    setMobileServicesOpen(false);
+    setMenuOpen(false);
+  };
+
+  // Function to handle Guide navigation
+  const handleGuideClick = () => {
+    navigate('/guide');
+    setServicesDropdownOpen(false);
+    setMobileServicesOpen(false);
+    setMenuOpen(false);
+  };
+
   // Use parent user prop if available, otherwise use local auth state
   const currentUser = user || authUser;
 
@@ -173,8 +189,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   ];
 
   const servicesItems = [
-    { icon: Map, label: "Find a Guide", href: "#guides" },
-    { icon: Compass, label: "Explore Destinations", href: "#destinations" },
+    { icon: Map, label: "Find a Guide", onClick: handleGuideClick },
+    { icon: Compass, label: "Explore Destinations", onClick: handleDestinationClick },
     { icon: Car, label: "Find a Jeep Driver", onClick: handleJeepDriverClick },
     { icon: ShoppingBag, label: "Rent Equipment", href: "#equipment" },
   ];

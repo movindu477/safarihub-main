@@ -49,6 +49,12 @@ import JeepDriversPage from "./components/JeepMain";
 import JeepProfile from "./components/JeepProfile";
 import NotificationPanel from "./components/NotificationPanel";
 
+// Import Destination App
+import DestinationApp from "./components/destination/App";
+
+// Import Guide App
+import GuideApp from "./components/guide/App";
+
 // 🔥 Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyAXjQQ9BYX4upBJx_Ko5jTUq9nTCIDItSA",
@@ -849,7 +855,36 @@ function App() {
             />
           } 
         />
+        {/* Destination Route */}
+        <Route 
+          path="/destination" 
+          element={
+            <DestinationApp 
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          } 
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
+         {/* Guide Route - ADD THIS */}
+    <Route 
+      path="/guide" 
+      element={
+        <GuideApp 
+          user={user}
+          onLogout={handleLogout}
+          onShowAuth={handleShowAuth}
+          notifications={notifications}
+          onNotificationClick={handleNotificationClick}
+          onMarkAsRead={handleMarkAsRead}
+        />
+      } 
+    />
+    <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

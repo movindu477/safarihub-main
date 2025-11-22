@@ -62,32 +62,27 @@ const registerListener = (listenerId, unsubscribe) => {
   };
 };
 
-// ==================== REVIEW MANAGEMENT SYSTEM ====================
+// ==================== REVIEW SYSTEM FUNCTIONS ====================
 
 /**
- * Add a new review for a service provider
+ * Add a new review for a driver
  */
 export const addReview = async (reviewData) => {
   try {
-    console.log('📝 Adding new review:', reviewData);
+    console.log('📝 Adding new review for driver:', reviewData.driverId);
     
-    const reviewDoc = await addDoc(collection(db, 'reviews'), {
+    const reviewRef = await addDoc(collection(db, 'reviews'), {
       ...reviewData,
-      timestamp: serverTimestamp(),
-      timestampValue: Date.now(),
-      likes: 0,
-      dislikes: 0,
-      likedBy: [],
-      dislikedBy: [],
-      reported: false,
-      reportCount: 0
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      createdAtValue: Date.now()
     });
-
-    // Update driver's average rating and review count
-    await updateDriverRating(reviewData.driverId);
-
-    console.log(`✅ Review added successfully with ID: ${reviewDoc.id}`);
-    return reviewDoc.id;
+    
+    // Update provider's average rating and total reviews
+    await updateProviderRating(reviewData.driverId);
+    
+    console.log('✅ Review added successfully with ID:', reviewRef.id);
+    return reviewRef.id;
   } catch (error) {
     console.error('❌ Error adding review:', error);
     throw error;
@@ -95,128 +90,75 @@ export const addReview = async (reviewData) => {
 };
 
 /**
- * Update an existing review
+ * Update provider's average rating and total reviews count
  */
-export const updateReview = async (reviewId, reviewData) => {
+export const updateProviderRating = async (driverId) => {
   try {
-    console.log(`📝 Updating review: ${reviewId}`);
-    
-    await updateDoc(doc(db, 'reviews', reviewId), {
-      ...reviewData,
-      updatedAt: serverTimestamp(),
-      updatedAtValue: Date.now()
-    });
-
-    // Update driver's average rating if rating changed
-    if (reviewData.rating !== undefined) {
-      const reviewDoc = await getDoc(doc(db, 'reviews', reviewId));
-      if (reviewDoc.exists()) {
-        await updateDriverRating(reviewDoc.data().driverId);
-      }
-    }
-
-    console.log(`✅ Review ${reviewId} updated successfully`);
-    return true;
-  } catch (error) {
-    console.error('❌ Error updating review:', error);
-    throw error;
-  }
-};
-
-/**
- * Delete a review
- */
-export const deleteReview = async (reviewId) => {
-  try {
-    console.log(`🗑️ Deleting review: ${reviewId}`);
-    
-    const reviewDoc = await getDoc(doc(db, 'reviews', reviewId));
-    if (!reviewDoc.exists()) {
-      throw new Error('Review not found');
-    }
-
-    const reviewData = reviewDoc.data();
-    await deleteDoc(doc(db, 'reviews', reviewId));
-
-    // Update driver's average rating after deletion
-    await updateDriverRating(reviewData.driverId);
-
-    console.log(`✅ Review ${reviewId} deleted successfully`);
-    return true;
-  } catch (error) {
-    console.error('❌ Error deleting review:', error);
-    throw error;
-  }
-};
-
-/**
- * Update driver's average rating and review count
- */
-export const updateDriverRating = async (driverId) => {
-  try {
-    console.log(`📊 Updating rating for driver: ${driverId}`);
+    console.log('🔄 Updating provider rating for:', driverId);
     
     const reviewsQuery = query(
       collection(db, 'reviews'),
       where('driverId', '==', driverId)
     );
     
-    const querySnapshot = await getDocs(reviewsQuery);
-    const reviews = querySnapshot.docs.map(doc => doc.data());
+    const reviewsSnapshot = await getDocs(reviewsQuery);
+    const reviews = [];
+    
+    reviewsSnapshot.forEach(doc => {
+      reviews.push({ id: doc.id, ...doc.data() });
+    });
     
     if (reviews.length > 0) {
       const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
       const averageRating = totalRating / reviews.length;
-      const roundedRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal place
       
-      await updateDoc(doc(db, 'serviceProviders', driverId), {
-        rating: roundedRating,
+      const providerRef = doc(db, 'serviceProviders', driverId);
+      await updateDoc(providerRef, {
+        rating: averageRating,
         totalReviews: reviews.length,
-        lastRatingUpdate: serverTimestamp()
+        updatedAt: serverTimestamp()
       });
       
-      console.log(`✅ Driver ${driverId} rating updated: ${roundedRating} (${reviews.length} reviews)`);
+      console.log(`✅ Provider ${driverId} rating updated: ${averageRating.toFixed(1)}/5 from ${reviews.length} reviews`);
     } else {
-      // No reviews, reset rating
-      await updateDoc(doc(db, 'serviceProviders', driverId), {
+      // No reviews, reset to default
+      const providerRef = doc(db, 'serviceProviders', driverId);
+      await updateDoc(providerRef, {
         rating: 0,
         totalReviews: 0,
-        lastRatingUpdate: serverTimestamp()
+        updatedAt: serverTimestamp()
       });
       
-      console.log(`✅ Driver ${driverId} rating reset (no reviews)`);
+      console.log(`✅ Provider ${driverId} rating reset to default (no reviews)`);
     }
+    
+    return reviews;
   } catch (error) {
-    console.error('❌ Error updating driver rating:', error);
+    console.error('❌ Error updating provider rating:', error);
     throw error;
   }
 };
 
 /**
- * Get reviews for a specific driver with real-time updates
+ * Get real-time reviews for a driver
  */
-export const getDriverReviews = (driverId, callback, options = {}) => {
+export const getReviews = (driverId, callback) => {
   try {
-    console.log(`🔔 Setting up real-time reviews listener for driver: ${driverId}`);
+    console.log('📖 Setting up real-time reviews listener for driver:', driverId);
     
-    const { limitResults = 50, orderByField = 'timestampValue', orderDirection = 'desc' } = options;
-    
-    const reviewsRef = collection(db, 'reviews');
     const reviewsQuery = query(
-      reviewsRef,
+      collection(db, 'reviews'),
       where('driverId', '==', driverId),
-      orderBy(orderByField, orderDirection),
-      limit(limitResults)
+      orderBy('createdAtValue', 'desc')
     );
-
+    
     const unsubscribe = onSnapshot(reviewsQuery, 
       (snapshot) => {
-        const reviews = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        console.log(`📊 Real-time reviews update: ${reviews.length} reviews for driver ${driverId}`);
+        const reviews = [];
+        snapshot.forEach(doc => {
+          reviews.push({ id: doc.id, ...doc.data() });
+        });
+        console.log(`📚 Received ${reviews.length} reviews for driver ${driverId}`);
         callback(reviews);
       },
       (error) => {
@@ -227,245 +169,82 @@ export const getDriverReviews = (driverId, callback, options = {}) => {
 
     return registerListener(`reviews_${driverId}`, unsubscribe);
   } catch (error) {
-    console.error('❌ Error getting driver reviews:', error);
+    console.error('❌ Error getting reviews:', error);
     callback([]);
     return () => {};
   }
 };
 
 /**
- * Get all reviews with real-time updates (for admin/moderation)
+ * Delete a review
  */
-export const getAllReviews = (callback, options = {}) => {
+export const deleteReview = async (reviewId, driverId) => {
   try {
-    const { limitResults = 100, orderByField = 'timestampValue', orderDirection = 'desc' } = options;
+    console.log('🗑️ Deleting review:', reviewId);
     
-    const reviewsRef = collection(db, 'reviews');
-    const reviewsQuery = query(
-      reviewsRef,
-      orderBy(orderByField, orderDirection),
-      limit(limitResults)
-    );
-
-    const unsubscribe = onSnapshot(reviewsQuery, 
-      (snapshot) => {
-        const reviews = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        console.log(`📊 Real-time all reviews update: ${reviews.length} reviews loaded`);
-        callback(reviews);
-      },
-      (error) => {
-        console.error('❌ Error in all reviews snapshot:', error);
-        callback([]);
-      }
-    );
-
-    return registerListener('all_reviews', unsubscribe);
+    await deleteDoc(doc(db, 'reviews', reviewId));
+    
+    // Update provider rating after deletion
+    await updateProviderRating(driverId);
+    
+    console.log('✅ Review deleted successfully');
+    return true;
   } catch (error) {
-    console.error('❌ Error getting all reviews:', error);
-    callback([]);
-    return () => {};
+    console.error('❌ Error deleting review:', error);
+    throw error;
   }
 };
 
 /**
- * Check if user has already reviewed a driver
+ * Get user's existing review for a driver
  */
 export const getUserReviewForDriver = async (userId, driverId) => {
   try {
-    const reviewsQuery = query(
+    console.log('🔍 Checking user review for driver:', { userId, driverId });
+    
+    const userReviewQuery = query(
       collection(db, 'reviews'),
       where('driverId', '==', driverId),
       where('userId', '==', userId)
     );
     
-    const querySnapshot = await getDocs(reviewsQuery);
+    const querySnapshot = await getDocs(userReviewQuery);
     
     if (!querySnapshot.empty) {
-      const reviewDoc = querySnapshot.docs[0];
-      return {
-        id: reviewDoc.id,
-        ...reviewDoc.data()
-      };
+      const doc = querySnapshot.docs[0];
+      const reviewData = { id: doc.id, ...doc.data() };
+      console.log('✅ Found existing user review');
+      return reviewData;
     }
     
+    console.log('ℹ️ No existing review found for user');
     return null;
   } catch (error) {
-    console.error('❌ Error checking user review:', error);
-    return null;
-  }
-};
-
-/**
- * Like a review
- */
-export const likeReview = async (reviewId, userId) => {
-  try {
-    const reviewRef = doc(db, 'reviews', reviewId);
-    const reviewDoc = await getDoc(reviewRef);
-    
-    if (!reviewDoc.exists()) {
-      throw new Error('Review not found');
-    }
-    
-    const reviewData = reviewDoc.data();
-    
-    // Check if user already liked
-    if (reviewData.likedBy?.includes(userId)) {
-      // Unlike
-      await updateDoc(reviewRef, {
-        likes: (reviewData.likes || 0) - 1,
-        likedBy: arrayRemove(userId)
-      });
-      console.log(`👍 Review ${reviewId} unliked by user ${userId}`);
-    } else {
-      // Like
-      const updates = {
-        likes: (reviewData.likes || 0) + 1,
-        likedBy: arrayUnion(userId)
-      };
-      
-      // Remove from dislikes if user previously disliked
-      if (reviewData.dislikedBy?.includes(userId)) {
-        updates.dislikes = Math.max(0, (reviewData.dislikes || 0) - 1);
-        updates.dislikedBy = arrayRemove(userId);
-      }
-      
-      await updateDoc(reviewRef, updates);
-      console.log(`👍 Review ${reviewId} liked by user ${userId}`);
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('❌ Error liking review:', error);
+    console.error('❌ Error getting user review:', error);
     throw error;
   }
 };
 
 /**
- * Dislike a review
+ * Update an existing review
  */
-export const dislikeReview = async (reviewId, userId) => {
+export const updateReview = async (reviewId, reviewData) => {
   try {
-    const reviewRef = doc(db, 'reviews', reviewId);
-    const reviewDoc = await getDoc(reviewRef);
+    console.log('✏️ Updating review:', reviewId);
     
-    if (!reviewDoc.exists()) {
-      throw new Error('Review not found');
-    }
-    
-    const reviewData = reviewDoc.data();
-    
-    // Check if user already disliked
-    if (reviewData.dislikedBy?.includes(userId)) {
-      // Remove dislike
-      await updateDoc(reviewRef, {
-        dislikes: Math.max(0, (reviewData.dislikes || 0) - 1),
-        dislikedBy: arrayRemove(userId)
-      });
-      console.log(`👎 Review ${reviewId} undisliked by user ${userId}`);
-    } else {
-      // Dislike
-      const updates = {
-        dislikes: (reviewData.dislikes || 0) + 1,
-        dislikedBy: arrayUnion(userId)
-      };
-      
-      // Remove from likes if user previously liked
-      if (reviewData.likedBy?.includes(userId)) {
-        updates.likes = Math.max(0, (reviewData.likes || 0) - 1);
-        updates.likedBy = arrayRemove(userId);
-      }
-      
-      await updateDoc(reviewRef, updates);
-      console.log(`👎 Review ${reviewId} disliked by user ${userId}`);
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('❌ Error disliking review:', error);
-    throw error;
-  }
-};
-
-/**
- * Report a review
- */
-export const reportReview = async (reviewId, userId, reason) => {
-  try {
-    const reviewRef = doc(db, 'reviews', reviewId);
-    
-    await updateDoc(reviewRef, {
-      reported: true,
-      reportCount: arrayUnion({
-        userId: userId,
-        reason: reason,
-        timestamp: serverTimestamp()
-      }),
-      lastReportedAt: serverTimestamp()
+    await updateDoc(doc(db, 'reviews', reviewId), {
+      ...reviewData,
+      updatedAt: serverTimestamp()
     });
     
-    console.log(`🚩 Review ${reviewId} reported by user ${userId}`);
+    // Update provider rating
+    await updateProviderRating(reviewData.driverId);
+    
+    console.log('✅ Review updated successfully');
     return true;
   } catch (error) {
-    console.error('❌ Error reporting review:', error);
+    console.error('❌ Error updating review:', error);
     throw error;
-  }
-};
-
-/**
- * Get review statistics for a driver
- */
-export const getDriverReviewStats = async (driverId) => {
-  try {
-    const reviewsQuery = query(
-      collection(db, 'reviews'),
-      where('driverId', '==', driverId)
-    );
-    
-    const querySnapshot = await getDocs(reviewsQuery);
-    const reviews = querySnapshot.docs.map(doc => doc.data());
-    
-    if (reviews.length === 0) {
-      return {
-        totalReviews: 0,
-        averageRating: 0,
-        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-        totalLikes: 0,
-        totalDislikes: 0
-      };
-    }
-    
-    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
-    const averageRating = totalRating / reviews.length;
-    
-    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    reviews.forEach(review => {
-      ratingDistribution[review.rating]++;
-    });
-    
-    const totalLikes = reviews.reduce((sum, review) => sum + (review.likes || 0), 0);
-    const totalDislikes = reviews.reduce((sum, review) => sum + (review.dislikes || 0), 0);
-    
-    return {
-      totalReviews: reviews.length,
-      averageRating: Math.round(averageRating * 10) / 10,
-      ratingDistribution,
-      totalLikes,
-      totalDislikes
-    };
-  } catch (error) {
-    console.error('❌ Error getting review stats:', error);
-    return {
-      totalReviews: 0,
-      averageRating: 0,
-      ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-      totalLikes: 0,
-      totalDislikes: 0
-    };
   }
 };
 

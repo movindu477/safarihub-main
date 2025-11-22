@@ -6,6 +6,7 @@ import { Bell, MessageCircle, X, Send, Check, CheckCheck, User } from "lucide-re
 import Navbar from "./Navbar";
 import JeepHero from "./JeepHero";
 import JeepSection2 from "./JeepSection2";
+import Footer from "./Footer";
 
 // Import Firebase functions
 import { 
@@ -535,6 +536,8 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
       <JeepHero />
       <div className="h-1 bg-black"></div>
       <JeepSection2 currentUser={user} />
+            <div className="h-1 bg-black"></div>
+      <Footer />
     </div>
   );
 }
