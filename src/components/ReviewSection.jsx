@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  addReview, 
-  updateReview, 
-  deleteReview, 
-  getDriverReviews, 
+import { Star, ThumbsUp, ThumbsDown, Flag, Edit, Trash2, User, AlertCircle, CheckCircle } from 'lucide-react';
+
+// Import all Firebase functions from the service file
+import {
+  addReview,
+  updateDriverRating,
+  updateReview,
+  deleteReview,
+  getDriverReviews,
   getUserReviewForDriver,
   likeReview,
   dislikeReview,
   reportReview,
   getDriverReviewStats
-} from '../firebase';
-import { Star, ThumbsUp, ThumbsDown, Flag, Edit, Trash2, User } from 'lucide-react';
+} from '../reviewservice';
 
-const ReviewSection = ({ driverId, currentUser, userRole }) => {
+const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
   const [reviews, setReviews] = useState([]);
   const [userReview, setUserReview] = useState(null);
   const [rating, setRating] = useState(0);
@@ -20,43 +23,162 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('reviews');
   const [reviewStats, setReviewStats] = useState(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(true);
 
   // Load reviews and user's existing review
   useEffect(() => {
-    if (!driverId) return;
+    if (!driverId) {
+      console.error('❌ No driverId provided to ReviewSection');
+      setError('No driver ID provided');
+      setLoading(false);
+      return;
+    }
+
+    console.log('📝 Setting up review section for driver:', driverId);
+    console.log('👤 Current user:', currentUser?.uid);
+    setError('');
+    setSuccess('');
+
+    // Load user's specific review
+    const loadUserReview = async () => {
+      if (currentUser) {
+        try {
+          console.log('🔍 Loading user review for:', currentUser.uid);
+          const userRev = await getUserReviewForDriver(driverId, currentUser.uid);
+          console.log('📋 User review found:', userRev ? 'Yes' : 'No');
+          setUserReview(userRev);
+          
+          if (userRev) {
+            setRating(userRev.rating);
+            setReviewText(userRev.comment);
+          }
+        } catch (err) {
+          console.error('Error loading user review:', err);
+        }
+      }
+    };
 
     // Load review statistics
     const loadReviewStats = async () => {
-      const stats = await getDriverReviewStats(driverId);
-      setReviewStats(stats);
+      try {
+        console.log('📈 Loading review stats for driver:', driverId);
+        const stats = await getDriverReviewStats(driverId);
+        setReviewStats(stats);
+        console.log('✅ Review stats loaded:', stats);
+      } catch (err) {
+        console.error('Error loading review stats:', err);
+      }
     };
 
+    loadUserReview();
     loadReviewStats();
 
     // Real-time reviews listener
+    console.log('🎯 Setting up real-time reviews listener');
     const unsubscribe = getDriverReviews(driverId, (reviewsData) => {
-      setReviews(reviewsData);
+      console.log(`🔄 Received ${reviewsData.length} reviews from server`);
       
-      // Find current user's review
+      setReviews(reviewsData);
+      setLoading(false);
+      
+      // Update user review from server data
       if (currentUser) {
         const userRev = reviewsData.find(review => review.userId === currentUser.uid);
-        setUserReview(userRev || null);
-        
-        if (userRev) {
+        console.log('🔍 User review found in server data:', userRev ? 'Yes' : 'No');
+        if (userRev && (!userReview || userReview.id !== userRev.id)) {
+          setUserReview(userRev);
           setRating(userRev.rating);
           setReviewText(userRev.comment);
+        } else if (!userRev) {
+          setUserReview(null);
         }
+      }
+
+      // Update review stats based on actual server data
+      calculateReviewStats(reviewsData);
+    });
+
+    return () => {
+      console.log('🔕 Cleaning up review section');
+      unsubscribe();
+    };
+  }, [driverId, currentUser]);
+
+  // Calculate review statistics from current reviews
+  const calculateReviewStats = (reviewsData) => {
+    if (!reviewsData || reviewsData.length === 0) {
+      setReviewStats({
+        totalReviews: 0,
+        averageRating: 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      });
+      return;
+    }
+
+    const totalRating = reviewsData.reduce((sum, review) => sum + (review.rating || 0), 0);
+    const averageRating = totalRating / reviewsData.length;
+    
+    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    reviewsData.forEach(review => {
+      const rating = Math.floor(review.rating || 0);
+      if (rating >= 1 && rating <= 5) {
+        ratingDistribution[rating]++;
       }
     });
 
-    return unsubscribe;
-  }, [driverId, currentUser]);
+    setReviewStats({
+      totalReviews: reviewsData.length,
+      averageRating: Math.round(averageRating * 10) / 10,
+      ratingDistribution
+    });
+  };
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
-    if (!rating || !reviewText.trim() || !currentUser || !driverId || submitting) return;
+    
+    console.log('🎯 Submit review button clicked');
+    console.log('📊 Form data:', { 
+      rating, 
+      reviewTextLength: reviewText.length,
+      currentUser: !!currentUser,
+      currentUserId: currentUser?.uid,
+      driverId 
+    });
+
+    // Validation
+    if (!rating) {
+      const errorMsg = 'Please select a rating';
+      console.error('❌ Validation failed:', errorMsg);
+      setError(errorMsg);
+      return;
+    }
+    
+    if (!reviewText.trim() || reviewText.trim().length < 10) {
+      const errorMsg = 'Review must be at least 10 characters long';
+      console.error('❌ Validation failed:', errorMsg);
+      setError(errorMsg);
+      return;
+    }
+    
+    if (!currentUser) {
+      const errorMsg = 'Please login to submit a review';
+      console.error('❌ Validation failed:', errorMsg);
+      setError(errorMsg);
+      return;
+    }
+
+    if (!driverId) {
+      const errorMsg = 'No driver selected';
+      console.error('❌ Validation failed:', errorMsg);
+      setError(errorMsg);
+      return;
+    }
 
     setSubmitting(true);
+    setError('');
+    setSuccess('');
     
     try {
       const reviewData = {
@@ -64,41 +186,60 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
         userId: currentUser.uid,
         userName: currentUser.displayName || 'Anonymous User',
         userPhoto: currentUser.photoURL || '',
-        rating,
+        rating: Number(rating),
         comment: reviewText.trim(),
         userEmail: currentUser.email || ''
       };
 
+      console.log('📤 Submitting review data:', reviewData);
+
       if (userReview) {
         // Update existing review
+        console.log('🔄 Updating existing review:', userReview.id);
         await updateReview(userReview.id, reviewData);
+        setSuccess('Review updated successfully!');
       } else {
         // Add new review
+        console.log('➕ Adding new review for user:', currentUser.uid);
         await addReview(reviewData);
+        setSuccess('Review submitted successfully!');
       }
 
-      // Reset form
-      setReviewText('');
-      setRating(0);
+      // Update driver rating
+      await updateDriverRating(driverId);
+      
+      // Reset form only for new reviews
+      if (!userReview) {
+        setReviewText('');
+        setRating(0);
+      }
       
       // Switch to reviews tab and show success
       setActiveTab('reviews');
       
-      // Show success message
-      setTimeout(() => {
-        const newReviewElement = document.getElementById(`review-${userReview?.id || 'new'}`);
-        if (newReviewElement) {
-          newReviewElement.scrollIntoView({ behavior: 'smooth' });
-          newReviewElement.classList.add('bg-yellow-50', 'border-yellow-200');
-          setTimeout(() => {
-            newReviewElement.classList.remove('bg-yellow-50', 'border-yellow-200');
-          }, 3000);
-        }
-      }, 500);
+      // Call parent callback if provided
+      if (onReviewAdded) {
+        onReviewAdded();
+      }
+      
+      console.log('✅ Review submitted successfully!');
 
     } catch (error) {
-      console.error('Error submitting review:', error);
-      alert('Failed to submit review. Please try again.');
+      console.error('❌ Error submitting review:', error);
+      console.error('Full error object:', error);
+      
+      let errorMessage = 'Failed to submit review. Please try again.';
+      
+      // Provide more specific error messages based on Firebase error codes
+      if (error.code === 'permission-denied') {
+        errorMessage = 'Permission denied. Please check if you are logged in and have the right permissions.';
+      } else if (error.code === 'unavailable') {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -109,67 +250,86 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
 
     if (window.confirm('Are you sure you want to delete your review?')) {
       try {
-        await deleteReview(userReview.id);
+        console.log('🗑️ Deleting review:', userReview.id);
+        await deleteReview(userReview.id, driverId);
         setUserReview(null);
         setRating(0);
         setReviewText('');
+        setError('');
+        setSuccess('Review deleted successfully!');
+        
+        // Call parent callback if provided
+        if (onReviewAdded) {
+          onReviewAdded();
+        }
       } catch (error) {
         console.error('Error deleting review:', error);
-        alert('Failed to delete review. Please try again.');
+        setError('Failed to delete review. Please try again.');
       }
     }
   };
 
   const handleLikeReview = async (reviewId) => {
     if (!currentUser) {
-      alert('Please login to like reviews');
+      setError('Please login to like reviews');
       return;
     }
     
     try {
       await likeReview(reviewId, currentUser.uid);
+      setError('');
     } catch (error) {
       console.error('Error liking review:', error);
+      setError('Failed to like review. Please try again.');
     }
   };
 
   const handleDislikeReview = async (reviewId) => {
     if (!currentUser) {
-      alert('Please login to dislike reviews');
+      setError('Please login to dislike reviews');
       return;
     }
     
     try {
       await dislikeReview(reviewId, currentUser.uid);
+      setError('');
     } catch (error) {
       console.error('Error disliking review:', error);
+      setError('Failed to dislike review. Please try again.');
     }
   };
 
-  const handleReportReview = async (reviewId) => {
+  const handleReportReview = async (reviewId, userName) => {
     if (!currentUser) {
-      alert('Please login to report reviews');
+      setError('Please login to report reviews');
       return;
     }
 
-    const reason = prompt('Please specify the reason for reporting this review:');
+    const reason = prompt(`Please specify the reason for reporting ${userName}'s review (minimum 5 characters):`);
     if (reason && reason.trim()) {
+      if (reason.trim().length < 5) {
+        setError('Report reason must be at least 5 characters long');
+        return;
+      }
+      
       try {
         await reportReview(reviewId, currentUser.uid, reason.trim());
         alert('Review reported successfully. Our team will review it shortly.');
+        setError('');
       } catch (error) {
         console.error('Error reporting review:', error);
-        alert('Failed to report review. Please try again.');
+        setError('Failed to report review. Please try again.');
       }
     }
   };
 
   const renderStars = (rating, size = 16) => {
+    const numericRating = Number(rating) || 0;
     return Array.from({ length: 5 }, (_, i) => (
       <Star
         key={i}
         size={size}
-        className={i < Math.floor(rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
+        className={i < Math.floor(numericRating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
       />
     ));
   };
@@ -178,19 +338,73 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
     if (!timestamp) return 'Recently';
     
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      let date;
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        date = new Date(timestamp);
+      }
+      
+      const now = new Date();
+      const diffTime = Math.abs(now - date);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+      
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
     } catch (error) {
+      console.error('Error formatting date:', error);
       return 'Recently';
     }
   };
 
+  // Check if user can write a review
+  const canWriteReview = currentUser && (userRole === 'tourist' || !userRole);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading reviews...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
+            <p className="text-green-700 text-sm font-medium">{success}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+            <div>
+              <p className="text-red-700 text-sm font-medium">Error</p>
+              <p className="text-red-600 text-sm mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Review Header with Stats */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -204,7 +418,7 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
           {reviewStats && (
             <div className="flex items-center gap-6">
               <div className="text-center">
-                <div className="text-3xl font-bold text-gray-900">{reviewStats.averageRating}</div>
+                <div className="text-3xl font-bold text-gray-900">{reviewStats.averageRating.toFixed(1)}</div>
                 <div className="flex items-center justify-center mt-1">
                   {renderStars(reviewStats.averageRating, 16)}
                 </div>
@@ -252,7 +466,7 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
             All Reviews ({reviews.length})
           </button>
           
-          {currentUser && userRole === 'tourist' && (
+          {canWriteReview && (
             <button
               onClick={() => setActiveTab('write')}
               className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors ${
@@ -267,8 +481,8 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
         </nav>
       </div>
 
-      {/* Write Review Tab */}
-      {activeTab === 'write' && currentUser && userRole === 'tourist' && (
+      {/* Write Review Form */}
+      {activeTab === 'write' && canWriteReview && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             {userReview ? 'Edit Your Review' : 'Share Your Experience'}
@@ -317,9 +531,11 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
                 rows="6"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
                 required
+                minLength="10"
               />
               <p className="text-sm text-gray-500 mt-1">
                 Minimum 10 characters. Your review will be visible to all users.
+                {reviewText.length > 0 && ` (${reviewText.length}/10)`}
               </p>
             </div>
 
@@ -355,7 +571,11 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
               
               <button
                 type="button"
-                onClick={() => setActiveTab('reviews')}
+                onClick={() => {
+                  setActiveTab('reviews');
+                  setError('');
+                  setSuccess('');
+                }}
                 className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
                 Cancel
@@ -365,7 +585,7 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
         </div>
       )}
 
-      {/* Reviews List Tab */}
+      {/* Reviews List */}
       {activeTab === 'reviews' && (
         <div className="space-y-4">
           {reviews.length === 0 ? (
@@ -375,13 +595,20 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
               <p className="text-gray-500 mb-4">
                 Be the first to share your experience with this driver!
               </p>
-              {currentUser && userRole === 'tourist' && (
+              {canWriteReview && (
                 <button
                   onClick={() => setActiveTab('write')}
                   className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
                 >
                   Write First Review
                 </button>
+              )}
+              {!currentUser && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-blue-700 text-sm">
+                    Please login to write a review and share your experience.
+                  </p>
+                </div>
               )}
             </div>
           ) : (
@@ -411,6 +638,9 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
                           {renderStars(review.rating, 14)}
                           <span className="text-xs text-gray-500 ml-2">
                             {formatDate(review.timestamp)}
+                            {review.lastUpdated && review.timestamp?.toDate?.()?.getTime() !== review.lastUpdated?.toDate?.()?.getTime() && (
+                              <span className="text-gray-400"> • Edited</span>
+                            )}
                           </span>
                         </div>
                       </div>
@@ -422,6 +652,8 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
                           setActiveTab('write');
                           setRating(review.rating);
                           setReviewText(review.comment);
+                          setError('');
+                          setSuccess('');
                         }}
                         className="text-gray-400 hover:text-gray-600 transition-colors flex items-center"
                         title="Edit your review"
@@ -466,7 +698,7 @@ const ReviewSection = ({ driverId, currentUser, userRole }) => {
                     
                     {currentUser && currentUser.uid !== review.userId && (
                       <button
-                        onClick={() => handleReportReview(review.id)}
+                        onClick={() => handleReportReview(review.id, review.userName)}
                         className="text-gray-400 hover:text-red-600 transition-colors flex items-center text-sm"
                         title="Report this review"
                       >
