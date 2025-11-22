@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 // Only import DestinationHero with correct relative path
 import DestinationHero from './destinationhero'
 import Navbar from '../Navbar'
-import Destination2 from './destinationsection2'
+import Destination2 from './DestinationSection2'
 import Footer from '../Footer'
 
 // Firebase - use correct relative path to go up two levels to src
