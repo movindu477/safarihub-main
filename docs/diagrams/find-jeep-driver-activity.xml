@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Activity Diagram: Find Jeep Driver in SafariHub
+  Description: Complete workflow for tourists to discover, filter, and contact jeep drivers
+  Actors: Tourist, System, Driver
+-->
+<activityDiagram name="Find Jeep Driver Workflow">
+  
+  <!-- Initial Node -->
+  <initialNode id="start" name="Start">
+    <description>Tourist begins the process</description>
+  </initialNode>
+
+  <!-- Tourist Activities -->
+  <swimlane name="Tourist" color="LightBlue">
+    
+    <activity id="access_platform" name="Access SafariHub Platform">
+      <description>Tourist navigates to the SafariHub website</description>
+      <incoming>start</incoming>
+      <outgoing>navigate_drivers</outgoing>
+    </activity>
+
+    <activity id="navigate_drivers" name="Navigate to Safari Jeep Drivers Section">
+      <description>Tourist clicks on the jeep drivers menu option</description>
+      <incoming>access_platform</incoming>
+      <outgoing>system_load</outgoing>
+    </activity>
+
+    <decision id="filter_decision" name="Want to Apply Filters?">
+      <description>Tourist decides whether to filter or browse all drivers</description>
+      <incoming>display_list</incoming>
+      <outgoing condition="yes">select_filters</outgoing>
+      <outgoing condition="no">browse_all</outgoing>
+    </decision>
+
+    <activity id="select_filters" name="Select Filter Criteria">
+      <description>Tourist selects one or more filters</description>
+      <filters>
+        <filter>Destination (6 national parks)</filter>
+        <filter>Rating (1-5 stars)</filter>
+        <filter>Price Range (LKR 5,000-100,000)</filter>
+        <filter>Vehicle Type (4 types)</filter>
+        <filter>Languages (8+ options)</filter>
+        <filter>Special Skills (8+ services)</filter>
+        <filter>Certifications (5+ types)</filter>
+      </filters>
+      <incoming>filter_decision</incoming>
+      <outgoing>system_filter</outgoing>
+    </activity>
+
+    <activity id="browse_all" name="Browse All Available Drivers">
+      <description>Tourist views complete list without filters</description>
+      <incoming>filter_decision</incoming>
+      <outgoing>review_cards</outgoing>
+    </activity>
+
+    <decision id="results_found" name="Results Found?">
+      <description>System checks if filtered results exist</description>
+      <incoming>update_list</incoming>
+      <outgoing condition="yes">view_filtered</outgoing>
+      <outgoing condition="no">no_results</outgoing>
+    </decision>
+
+    <activity id="view_filtered" name="View Filtered Driver List">
+      <description>Tourist sees filtered results</description>
+      <incoming>results_found</incoming>
+      <outgoing>review_cards</outgoing>
+    </activity>
+
+    <activity id="no_results" name="See No Results Message">
+      <description>System displays no drivers found message</description>
+      <incoming>results_found</incoming>
+      <outgoing>clear_choice</outgoing>
+    </activity>
+
+    <decision id="clear_choice" name="Clear Filters?">
+      <description>Tourist decides to clear filters or adjust criteria</description>
+      <incoming>no_results</incoming>
+      <outgoing condition="yes">clear_filters</outgoing>
+      <outgoing condition="no">adjust_filters</outgoing>
+    </decision>
+
+    <activity id="adjust_filters" name="Adjust Filter Criteria">
+      <description>Tourist modifies filter selections</description>
+      <incoming>clear_choice</incoming>
+      <outgoing>select_filters</outgoing>
+    </activity>
+
+    <activity id="review_cards" name="Review Driver Cards">
+      <description>Tourist browses driver information cards</description>
+      <displayInfo>
+        <field>Driver name and photo</field>
+        <field>Online/offline status</field>
+        <field>Location (base city)</field>
+        <field>Star rating (0-5)</field>
+        <field>Price per day (LKR)</field>
+        <field>Years of experience</field>
+        <field>Vehicle type</field>
+        <field>Destinations covered</field>
+        <field>Languages spoken</field>
+        <field>Special services</field>
+      </displayInfo>
+      <incoming>view_filtered</incoming>
+      <incoming>browse_all</incoming>
+      <outgoing>found_driver</outgoing>
+    </activity>
+
+    <decision id="found_driver" name="Found Suitable Driver?">
+      <description>Tourist decides if any driver meets their needs</description>
+      <incoming>review_cards</incoming>
+      <outgoing condition="yes">view_profile_choice</outgoing>
+      <outgoing condition="no">try_again</outgoing>
+    </decision>
+
+    <decision id="try_again" name="Try Again?">
+      <description>Tourist decides to adjust search or exit</description>
+      <incoming>found_driver</incoming>
+      <outgoing condition="yes">display_list</outgoing>
+      <outgoing condition="no">exit</outgoing>
+    </decision>
+
+    <decision id="view_profile_choice" name="View Full Profile?">
+      <description>Tourist chooses between quick contact or detailed profile</description>
+      <incoming>found_driver</incoming>
+      <outgoing condition="yes">click_card</outgoing>
+      <outgoing condition="no">quick_contact</outgoing>
+    </decision>
+
+    <activity id="quick_contact" name="Quick Phone Contact">
+      <description>Tourist initiates phone call directly from card</description>
+      <incoming>view_profile_choice</incoming>
+      <outgoing>phone_call</outgoing>
+    </activity>
+
+    <activity id="click_card" name="Click on Driver Card">
+      <description>Tourist clicks to view full profile</description>
+      <incoming>view_profile_choice</incoming>
+      <outgoing>navigate_profile</outgoing>
+    </activity>
+
+    <activity id="review_details" name="Review Detailed Profile">
+      <description>Tourist examines complete driver information</description>
+      <profileTabs>
+        <tab>Overview - Experience, certifications, languages, destinations</tab>
+        <tab>Services and Rates - Vehicle details, pricing, availability</tab>
+        <tab>Messages - Chat interface (requires login)</tab>
+      </profileTabs>
+      <incoming>show_tabs</incoming>
+      <outgoing>logged_in</outgoing>
+    </activity>
+
+    <decision id="logged_in" name="User Logged In?">
+      <description>System verifies authentication status</description>
+      <incoming>review_details</incoming>
+      <outgoing condition="yes">contact_driver</outgoing>
+      <outgoing condition="no">login_prompt</outgoing>
+    </decision>
+
+    <activity id="login_prompt" name="See Login Prompt">
+      <description>System shows login required message</description>
+      <incoming>logged_in</incoming>
+      <outgoing>want_login</outgoing>
+    </activity>
+
+    <decision id="want_login" name="Want to Login?">
+      <description>Tourist decides to login or skip</description>
+      <incoming>login_prompt</incoming>
+      <outgoing condition="yes">login_redirect</outgoing>
+      <outgoing condition="no">note_info</outgoing>
+    </decision>
+
+    <activity id="note_info" name="Note Driver Information">
+      <description>Tourist saves driver details for later</description>
+      <incoming>want_login</incoming>
+      <outgoing>exit</outgoing>
+    </activity>
+
+    <decision id="contact_driver" name="Want to Contact Driver?">
+      <description>Tourist decides to initiate contact</description>
+      <incoming>logged_in</incoming>
+      <incoming>return_profile</incoming>
+      <outgoing condition="yes">contact_method</outgoing>
+      <outgoing condition="no">continue_browse</outgoing>
+    </decision>
+
+    <activity id="continue_browse" name="Continue Browsing">
+      <description>Tourist keeps exploring other options</description>
+      <incoming>contact_driver</incoming>
+      <outgoing>exit</outgoing>
+    </activity>
+
+    <decision id="contact_method" name="Contact Method?">
+      <description>Tourist chooses communication channel</description>
+      <incoming>contact_driver</incoming>
+      <outgoing condition="chat">open_chat</outgoing>
+      <outgoing condition="phone">click_phone</outgoing>
+    </decision>
+
+    <activity id="open_chat" name="Click Send Message Button">
+      <description>Tourist initiates chat conversation</description>
+      <incoming>contact_method</incoming>
+      <outgoing>create_conversation</outgoing>
+    </activity>
+
+    <activity id="type_message" name="Type and Send Message">
+      <description>Tourist writes and sends message to driver</description>
+      <incoming>enable_sync</incoming>
+      <outgoing>save_message</outgoing>
+    </activity>
+
+    <activity id="click_phone" name="Click Phone Button">
+      <description>Tourist initiates phone call</description>
+      <incoming>contact_method</incoming>
+      <outgoing>open_phone</outgoing>
+    </activity>
+
+    <activity id="make_call" name="Make Phone Call">
+      <description>Tourist contacts driver via phone or WhatsApp</description>
+      <incoming>phone_call</incoming>
+      <incoming>open_phone</incoming>
+      <outgoing>discuss</outgoing>
+    </activity>
+
+    <activity id="discuss" name="Discuss Safari Details">
+      <description>Tourist and driver discuss trip requirements</description>
+      <incoming>make_call</incoming>
+      <incoming>driver_responds</incoming>
+      <outgoing>negotiate</outgoing>
+    </activity>
+
+    <activity id="negotiate" name="Negotiate Terms">
+      <description>Finalize pricing, dates, and services</description>
+      <incoming>discuss</incoming>
+      <outgoing>confirm</outgoing>
+    </activity>
+
+    <activity id="confirm" name="Confirm Booking">
+      <description>Tourist confirms the booking</description>
+      <incoming>negotiate</incoming>
+      <outgoing>complete</outgoing>
+    </activity>
+
+  </swimlane>
+
+  <!-- System Activities -->
+  <swimlane name="System" color="LightGreen">
+    
+    <activity id="system_load" name="Load Jeep Driver Profiles">
+      <description>Fetch all service providers from Firebase Firestore</description>
+      <database>Firebase Firestore</database>
+      <collection>serviceProviders</collection>
+      <incoming>navigate_drivers</incoming>
+      <outgoing>filter_drivers</outgoing>
+    </activity>
+
+    <activity id="filter_drivers" name="Filter by Service Type">
+      <description>Filter providers where serviceType equals 'Jeep Driver'</description>
+      <filterCriteria>serviceType === "Jeep Driver"</filterCriteria>
+      <incoming>system_load</incoming>
+      <outgoing>display_list</outgoing>
+    </activity>
+
+    <activity id="display_list" name="Display Initial Driver List">
+      <description>Show drivers with online/offline status indicators</description>
+      <realtimeFeature>WebSocket connection for status updates</realtimeFeature>
+      <incoming>filter_drivers</incoming>
+      <incoming>clear_filters</incoming>
+      <incoming>try_again</incoming>
+      <outgoing>filter_decision</outgoing>
+    </activity>
+
+    <activity id="clear_filters" name="Reset All Filters">
+      <description>Clear all applied filters and show complete list</description>
+      <incoming>clear_choice</incoming>
+      <outgoing>display_list</outgoing>
+    </activity>
+
+    <activity id="system_filter" name="Apply Selected Filters">
+      <description>Filter drivers based on tourist criteria</description>
+      <incoming>select_filters</incoming>
+      <incoming>adjust_filters</incoming>
+      <outgoing>update_list</outgoing>
+    </activity>
+
+    <activity id="update_list" name="Update Driver List in Real-time">
+      <description>Refresh display with filtered results</description>
+      <incoming>system_filter</incoming>
+      <outgoing>results_found</outgoing>
+    </activity>
+
+    <activity id="phone_call" name="Open WhatsApp or Phone Dialer">
+      <description>Launch external phone application</description>
+      <incoming>quick_contact</incoming>
+      <outgoing>make_call</outgoing>
+    </activity>
+
+    <activity id="navigate_profile" name="Navigate to Driver Profile Page">
+      <description>Route to detailed profile view</description>
+      <route>/jeepprofile?driverId={id}</route>
+      <incoming>click_card</incoming>
+      <outgoing>load_profile</outgoing>
+    </activity>
+
+    <activity id="load_profile" name="Load Complete Driver Information">
+      <description>Fetch full driver details from database</description>
+      <incoming>navigate_profile</incoming>
+      <outgoing>show_tabs</outgoing>
+    </activity>
+
+    <activity id="show_tabs" name="Display Profile Tabs">
+      <description>Show organized information in tabs</description>
+      <tabs>
+        <tab name="Overview">Experience, certifications, languages, destinations, skills</tab>
+        <tab name="Services and Rates">Vehicle type, pricing, availability calendar</tab>
+        <tab name="Messages">Real-time chat (authenticated users only)</tab>
+      </tabs>
+      <incoming>load_profile</incoming>
+      <outgoing>review_details</outgoing>
+    </activity>
+
+    <activity id="login_redirect" name="Redirect to Authentication Page">
+      <description>Navigate to login/register page</description>
+      <incoming>want_login</incoming>
+      <outgoing>auth_process</outgoing>
+    </activity>
+
+    <activity id="auth_process" name="Complete Authentication">
+      <description>User logs in or registers</description>
+      <incoming>login_redirect</incoming>
+      <outgoing>return_profile</outgoing>
+    </activity>
+
+    <activity id="return_profile" name="Return to Driver Profile">
+      <description>Navigate back to profile after login</description>
+      <incoming>auth_process</incoming>
+      <outgoing>contact_driver</outgoing>
+    </activity>
+
+    <activity id="create_conversation" name="Create or Retrieve Conversation">
+      <description>Initialize chat conversation in database</description>
+      <conversationId>Format: {userId1}_{userId2} (sorted)</conversationId>
+      <collection>conversations</collection>
+      <incoming>open_chat</incoming>
+      <outgoing>load_messages</outgoing>
+    </activity>
+
+    <activity id="load_messages" name="Load Message History">
+      <description>Fetch existing messages from conversation</description>
+      <collection>conversations/{conversationId}/messages</collection>
+      <incoming>create_conversation</incoming>
+      <outgoing>enable_sync</outgoing>
+    </activity>
+
+    <activity id="enable_sync" name="Enable Real-time Message Sync">
+      <description>Set up Firebase real-time listeners</description>
+      <realtimeFeature>onSnapshot listener for message updates</realtimeFeature>
+      <incoming>load_messages</incoming>
+      <outgoing>type_message</outgoing>
+    </activity>
+
+    <activity id="save_message" name="Save Message to Firebase">
+      <description>Store message in Firestore database</description>
+      <fields>
+        <field>text - Message content</field>
+        <field>senderId - Tourist ID</field>
+        <field>receiverId - Driver ID</field>
+        <field>timestamp - Server timestamp</field>
+        <field>read - Boolean (false initially)</field>
+      </fields>
+      <incoming>type_message</incoming>
+      <outgoing>create_notification</outgoing>
+    </activity>
+
+    <activity id="create_notification" name="Create Notification for Driver">
+      <description>Generate push notification</description>
+      <collection>notifications</collection>
+      <notificationData>
+        <field>type - 'message'</field>
+        <field>title - 'New Message'</field>
+        <field>recipientId - Driver ID</field>
+        <field>senderId - Tourist ID</field>
+        <field>relatedId - Conversation ID</field>
+        <field>read - false</field>
+      </notificationData>
+      <incoming>save_message</incoming>
+      <outgoing>update_conversation</outgoing>
+    </activity>
+
+    <activity id="update_conversation" name="Update Conversation Metadata">
+      <description>Update last message and timestamp</description>
+      <incoming>create_notification</incoming>
+      <outgoing>mark_sent</outgoing>
+    </activity>
+
+    <activity id="mark_sent" name="Mark Message as Sent (✓)">
+      <description>Show delivery confirmation to tourist</description>
+      <incoming>update_conversation</incoming>
+      <outgoing>driver_receives</outgoing>
+    </activity>
+
+    <activity id="mark_read" name="Update Read Status (✓✓)">
+      <description>Show read confirmation when driver views message</description>
+      <incoming>driver_views</incoming>
+      <outgoing>driver_responds</outgoing>
+    </activity>
+
+    <activity id="open_phone" name="Open WhatsApp or Dialer">
+      <description>Launch external communication app</description>
+      <incoming>click_phone</incoming>
+      <outgoing>make_call</outgoing>
+    </activity>
+
+  </swimlane>
+
+  <!-- Driver Activities -->
+  <swimlane name="Driver" color="LightYellow">
+    
+    <activity id="driver_receives" name="Receive Notification">
+      <description>Driver gets push notification about new message</description>
+      <incoming>mark_sent</incoming>
+      <outgoing>driver_views</outgoing>
+    </activity>
+
+    <activity id="driver_views" name="View Message">
+      <description>Driver opens and reads the message</description>
+      <incoming>driver_receives</incoming>
+      <outgoing>mark_read</outgoing>
+    </activity>
+
+    <activity id="driver_responds" name="Respond to Tourist">
+      <description>Driver sends reply message</description>
+      <incoming>mark_read</incoming>
+      <outgoing>discuss</outgoing>
+    </activity>
+
+  </swimlane>
+
+  <!-- Final Nodes -->
+  <finalNode id="exit" name="Exit">
+    <description>Tourist exits without booking</description>
+    <incoming>try_again</incoming>
+    <incoming>note_info</incoming>
+    <incoming>continue_browse</incoming>
+  </finalNode>
+
+  <finalNode id="complete" name="Booking Complete">
+    <description>Successful booking completion</description>
+    <incoming>confirm</incoming>
+  </finalNode>
+
+  <!-- Real-time Features -->
+  <realtimeFeatures>
+    <feature name="Online Status">
+      <description>Live updates of driver availability</description>
+      <technology>Firebase real-time listeners</technology>
+      <updateFrequency>Immediate</updateFrequency>
+    </feature>
+    <feature name="Message Delivery">
+      <description>Instant message delivery with sent receipt</description>
+      <indicator>✓ (single check)</indicator>
+    </feature>
+    <feature name="Message Read Status">
+      <description>Read confirmation when driver views message</description>
+      <indicator>✓✓ (double check)</indicator>
+    </feature>
+    <feature name="Push Notifications">
+      <description>Real-time alerts for new messages</description>
+      <technology>Firebase Cloud Messaging</technology>
+    </feature>
+    <feature name="Filter Updates">
+      <description>Instant result updates as filters change</description>
+      <technology>React state management</technology>
+    </feature>
+  </realtimeFeatures>
+
+  <!-- Data Architecture -->
+  <dataArchitecture>
+    <database type="Firebase Firestore">
+      <collection name="serviceProviders">
+        <document>
+          <field name="uid" type="string" required="true"/>
+          <field name="fullName" type="string" required="true"/>
+          <field name="serviceType" type="string" required="true"/>
+          <field name="rating" type="number"/>
+          <field name="pricePerDay" type="number"/>
+          <field name="online" type="boolean"/>
+          <field name="lastSeen" type="timestamp"/>
+          <field name="destinations" type="array"/>
+          <field name="languages" type="array"/>
+          <field name="specialSkills" type="array"/>
+          <field name="certifications" type="array"/>
+        </document>
+      </collection>
+      <collection name="conversations">
+        <document>
+          <field name="participantIds" type="array" required="true"/>
+          <field name="lastMessage" type="string"/>
+          <field name="lastMessageTime" type="timestamp"/>
+          <subcollection name="messages">
+            <document>
+              <field name="text" type="string" required="true"/>
+              <field name="senderId" type="string" required="true"/>
+              <field name="receiverId" type="string" required="true"/>
+              <field name="timestamp" type="timestamp" required="true"/>
+              <field name="read" type="boolean"/>
+            </document>
+          </subcollection>
+        </document>
+      </collection>
+      <collection name="notifications">
+        <document>
+          <field name="type" type="string" required="true"/>
+          <field name="recipientId" type="string" required="true"/>
+          <field name="senderId" type="string" required="true"/>
+          <field name="message" type="string" required="true"/>
+          <field name="timestamp" type="timestamp" required="true"/>
+          <field name="read" type="boolean"/>
+        </document>
+      </collection>
+    </database>
+  </dataArchitecture>
+
+  <!-- Metadata -->
+  <metadata>
+    <created>2025-11-17</created>
+    <version>1.0</version>
+    <author>GitHub Copilot</author>
+    <project>SafariHub</project>
+    <feature>Find Jeep Driver</feature>
+    <documentationType>Activity Diagram</documentationType>
+    <totalActivities>50+</totalActivities>
+    <totalDecisionPoints>10</totalDecisionPoints>
+    <actors>3</actors>
+  </metadata>
+
+</activityDiagram>

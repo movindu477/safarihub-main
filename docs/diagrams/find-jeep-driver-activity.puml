@@ -1,0 +1,189 @@
+@startuml Find Jeep Driver Activity Diagram
+!theme plain
+title Activity Diagram - Find Jeep Driver in SafariHub
+
+|#LightBlue|Tourist|
+start
+:Access SafariHub Platform;
+:Navigate to "Safari Jeep Drivers" section;
+
+|#LightGreen|System|
+:Load all Jeep Driver profiles from Firebase;
+:Filter service providers by serviceType = "Jeep Driver";
+:Display initial list of available drivers;
+:Show online/offline status indicators;
+
+|#LightBlue|Tourist|
+if (Want to apply filters?) then (yes)
+  :Select filter criteria:
+  - Destination
+  - Rating
+  - Price range
+  - Vehicle type
+  - Languages
+  - Special skills
+  - Certifications;
+  
+  |#LightGreen|System|
+  :Apply selected filters;
+  :Update driver list in real-time;
+  :Display filtered results count;
+  
+  |#LightBlue|Tourist|
+  if (Results found?) then (yes)
+    :View filtered driver list;
+  else (no)
+    :See "No drivers found" message;
+    if (Clear filters?) then (yes)
+      |#LightGreen|System|
+      :Reset all filters;
+      :Show all drivers again;
+      |#LightBlue|Tourist|
+    else (no)
+      :Adjust filter criteria;
+      |#LightGreen|System|
+    endif
+  endif
+else (no)
+  :Browse all available drivers;
+endif
+
+|#LightBlue|Tourist|
+:Review driver cards showing:
+- Driver name & photo
+- Online/offline status
+- Location
+- Rating (★ stars)
+- Price per day
+- Experience years
+- Vehicle type
+- Destinations covered
+- Languages spoken
+- Special skills;
+
+if (Found suitable driver?) then (yes)
+  if (Want to view full profile?) then (yes)
+    :Click on driver card;
+    
+    |#LightGreen|System|
+    :Navigate to driver profile page;
+    :Load complete driver information;
+    :Initialize real-time status listener;
+    :Display driver details in tabs:
+    - Overview
+    - Services & Rates
+    - Messages (if logged in);
+    
+    |#LightBlue|Tourist|
+    :Review detailed profile:
+    - Experience & certifications
+    - Descriptions & bio
+    - Languages spoken
+    - Destinations covered
+    - Special skills
+    - Vehicle details
+    - Pricing information
+    - Availability calendar;
+    
+    if (Is user logged in?) then (yes)
+      if (Want to contact driver?) then (yes)
+        if (Contact method?) then (Chat)
+          :Click "Send Message" button;
+          
+          |#LightGreen|System|
+          :Open chat interface;
+          :Create/retrieve conversation ID;
+          :Load existing messages;
+          :Enable real-time message sync;
+          
+          |#LightBlue|Tourist|
+          :Type and send message;
+          
+          |#LightGreen|System|
+          :Save message to Firebase;
+          :Create notification for driver;
+          :Update conversation timestamp;
+          :Mark as sent ✓;
+          if (Message read by driver?) then (yes)
+            :Update to read status ✓✓;
+          endif
+          
+          |#LightYellow|Driver|
+          :Receive notification;
+          :View message;
+          :Respond to tourist;
+          
+        else (Phone/WhatsApp)
+          :Click phone/call button;
+          |#LightGreen|System|
+          :Open WhatsApp/Phone dialer;
+          |#LightBlue|Tourist|
+          :Make phone call;
+        endif
+        
+        :Discuss safari details;
+        :Negotiate terms;
+        :Confirm booking;
+        
+        |#LightBlue|Tourist|
+        :Complete booking process;
+        stop
+        
+      else (no)
+        :Continue browsing;
+      endif
+    else (no)
+      :See "Login to Message" prompt;
+      if (Want to login?) then (yes)
+        |#LightGreen|System|
+        :Redirect to authentication page;
+        |#LightBlue|Tourist|
+        :Complete login process;
+        |#LightGreen|System|
+        :Return to driver profile;
+        |#LightBlue|Tourist|
+      else (no)
+        :Note driver information;
+        :Login later;
+        stop
+      endif
+    endif
+  else (no)
+    :Quick contact via phone;
+    |#LightGreen|System|
+    :Open WhatsApp/Phone;
+    |#LightBlue|Tourist|
+    stop
+  endif
+else (no)
+  if (Clear filters and try again?) then (yes)
+    |#LightGreen|System|
+    :Clear all filters;
+    :Show all drivers;
+    |#LightBlue|Tourist|
+  else (no)
+    :Exit search;
+    stop
+  endif
+endif
+
+note right of System
+  Real-time Features:
+  - Online/offline status updates
+  - Message delivery & read receipts
+  - Live notification system
+  - Instant filter updates
+end note
+
+note left of Tourist
+  Filter Options Available:
+  - Destinations (6 national parks)
+  - Rating (1-5 stars)
+  - Price range (LKR 5k-100k)
+  - Vehicle type (4 types)
+  - Languages (8+ languages)
+  - Special skills (8+ services)
+  - Certifications (5+ types)
+end note
+
+@enduml
