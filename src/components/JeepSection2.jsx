@@ -329,9 +329,9 @@ const JeepSection2 = ({ currentUser }) => {
     // If no image URL or image failed to load, show placeholder
     if (!jeep.imageUrl || imageError) {
       return (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-yellow-100 to-yellow-200">
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-100 to-emerald-200">
           <div className="text-center">
-            <div className="w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-2">
+            <div className="w-16 h-16 bg-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2">
               <span className="text-2xl">🚙</span>
             </div>
             <p className="text-sm font-medium text-gray-600">No Photo</p>
@@ -345,7 +345,7 @@ const JeepSection2 = ({ currentUser }) => {
       <div className="w-full h-full relative">
         {!imageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
           </div>
         )}
         <img
@@ -366,7 +366,7 @@ const JeepSection2 = ({ currentUser }) => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <h3 className="text-xl font-semibold text-gray-700 mb-2">Loading Safari Jeeps</h3>
           <p className="text-gray-500">Finding the best drivers for your adventure...</p>
         </div>
@@ -384,7 +384,7 @@ const JeepSection2 = ({ currentUser }) => {
           <div className="space-y-3">
             <button 
               onClick={() => window.location.reload()}
-              className="w-full bg-yellow-500 text-white py-3 px-6 rounded-lg hover:bg-yellow-600 transition-colors font-semibold"
+              className="w-full bg-emerald-500 text-white py-3 px-6 rounded-lg hover:bg-emerald-600 transition-colors font-semibold"
             >
               Try Again
             </button>
@@ -401,19 +401,19 @@ const JeepSection2 = ({ currentUser }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
+      <div className="container mx-auto px-4 py-12">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Safari Jeep Drivers</h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-emerald-900 mb-4">Safari Jeep Drivers</h1>
+          <p className="text-lg text-emerald-700 max-w-2xl mx-auto">
             Discover experienced safari jeep drivers for your wildlife adventures. Filter by your preferences to find the perfect match.
           </p>
 
           {/* Current User Status Indicator */}
           {currentUser && (
-            <div className="mt-4 p-3 bg-white rounded-lg shadow-sm border border-gray-200 max-w-md mx-auto">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 p-3 bg-white/90 rounded-xl shadow-xl border border-emerald-100 max-w-md mx-auto backdrop-blur">
+              <p className="text-sm text-emerald-700">
                 <span className="font-semibold">Your Profile:</span>{' '}
                 {jeeps.find(j => j.isCurrentUser) ? (
                   <span className="text-green-600 font-medium">🟢 Listed - Other users can see your profile</span>
@@ -426,17 +426,17 @@ const JeepSection2 = ({ currentUser }) => {
         </div>
 
         {/* Filter Section */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <div className="bg-white/90 backdrop-blur rounded-2xl shadow-2xl border border-emerald-100 p-6 mb-10">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Filter Safari Jeeps</h2>
-              <p className="text-gray-600 text-sm mt-1">
+              <h2 className="text-2xl font-bold text-emerald-900">Filter Safari Jeeps</h2>
+              <p className="text-emerald-700 text-sm mt-1">
                 Refine your search to find the perfect match
               </p>
             </div>
             <button
               onClick={clearFilters}
-              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+              className="px-6 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-medium shadow-lg shadow-emerald-500/30"
             >
               Clear All Filters
             </button>
@@ -452,7 +452,7 @@ const JeepSection2 = ({ currentUser }) => {
               <select
                 value={filters.destination}
                 onChange={(e) => handleFilterChange('destination', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
               >
                 <option value="">All Destinations</option>
                 {filterOptions.destinations.map(dest => (
@@ -469,7 +469,7 @@ const JeepSection2 = ({ currentUser }) => {
               <select
                 value={filters.rating}
                 onChange={(e) => handleFilterChange('rating', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
               >
                 <option value="">All Ratings</option>
                 {filterOptions.ratings.map(rating => (
@@ -488,7 +488,7 @@ const JeepSection2 = ({ currentUser }) => {
               <select
                 value={filters.priceRange}
                 onChange={(e) => handleFilterChange('priceRange', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
               >
                 <option value="">All Prices</option>
                 {filterOptions.priceRanges.map(range => (
@@ -507,7 +507,7 @@ const JeepSection2 = ({ currentUser }) => {
               <select
                 value={filters.vehicleType}
                 onChange={(e) => handleFilterChange('vehicleType', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
               >
                 <option value="">All Types</option>
                 {filterOptions.vehicleTypes.map(type => (
@@ -532,7 +532,7 @@ const JeepSection2 = ({ currentUser }) => {
                       id={`lang-${language}`}
                       checked={filters.languages.includes(language)}
                       onChange={() => handleMultiSelectChange('languages', language)}
-                      className="mr-3 h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                      className="mr-3 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
                     />
                     <label htmlFor={`lang-${language}`} className="text-sm text-gray-700 flex-1">
                       {language}
@@ -555,7 +555,7 @@ const JeepSection2 = ({ currentUser }) => {
                       id={`skill-${skill}`}
                       checked={filters.specialSkills.includes(skill)}
                       onChange={() => handleMultiSelectChange('specialSkills', skill)}
-                      className="mr-3 h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                      className="mr-3 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
                     />
                     <label htmlFor={`skill-${skill}`} className="text-sm text-gray-700 flex-1">
                       {skill}
@@ -578,7 +578,7 @@ const JeepSection2 = ({ currentUser }) => {
                       id={`cert-${cert}`}
                       checked={filters.certifications.includes(cert)}
                       onChange={() => handleMultiSelectChange('certifications', cert)}
-                      className="mr-3 h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                      className="mr-3 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
                     />
                     <label htmlFor={`cert-${cert}`} className="text-sm text-gray-700 flex-1">
                       {cert}
@@ -593,12 +593,12 @@ const JeepSection2 = ({ currentUser }) => {
         {/* Results Count */}
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <p className="text-gray-600 text-lg">
-            Found <span className="font-bold text-yellow-600">{filteredJeeps.length}</span> jeep{filteredJeeps.length !== 1 ? 's' : ''} 
+            Found <span className="font-bold text-emerald-600">{filteredJeeps.length}</span> jeep{filteredJeeps.length !== 1 ? 's' : ''} 
             {jeeps.length > 0 && ` out of ${jeeps.length} total`}
           </p>
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
             <span className="flex items-center gap-1">
-              <MessageCircle className="h-4 w-4 text-blue-500" />
+              <MessageCircle className="h-4 w-4 text-emerald-500" />
               Chat available
             </span>
           </div>
@@ -614,12 +614,13 @@ const JeepSection2 = ({ currentUser }) => {
                 onClick={() => handleProfileClick(jeep)}
               >
                 {/* Profile Image Section */}
-                <div className="h-48 relative overflow-hidden">
+                <div className="h-48 relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700">
                   <ProfileImage jeep={jeep} />
+                  <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
                   
                   {/* Experience Badge */}
                   {jeep.experience > 0 && (
-                    <div className="absolute top-3 right-3 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                    <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {jeep.experience}+ years
                     </div>
                   )}
@@ -644,7 +645,7 @@ const JeepSection2 = ({ currentUser }) => {
                       {/* Quick Chat Button - Show for all users except current user */}
                       {!jeep.isCurrentUser && (
                         <button 
-                          className="ml-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors shadow-lg"
+                          className="ml-2 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
                           onClick={(e) => handleChatClick(jeep, e)}
                           title="Start Chat"
                         >
@@ -688,9 +689,10 @@ const JeepSection2 = ({ currentUser }) => {
 
                   {/* Vehicle Type */}
                   <div className="mb-3">
-                    <div className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Type:</p>
+                    <p className="text-sm text-gray-600 line-clamp-1">
                       {jeep.vehicleType}
-                    </div>
+                    </p>
                   </div>
 
                   {/* Destinations */}
@@ -710,33 +712,7 @@ const JeepSection2 = ({ currentUser }) => {
                     </p>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 mt-4">
-                    <button 
-                      className="flex-1 bg-yellow-500 text-white py-2.5 px-4 rounded-lg hover:bg-yellow-600 transition-colors font-semibold text-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleProfileClick(jeep);
-                      }}
-                    >
-                      {jeep.isCurrentUser ? 'View Your Profile' : 'View Profile'}
-                    </button>
-                    {!jeep.isCurrentUser && (
-                      <button 
-                        className="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (jeep.contactPhone && jeep.contactPhone !== 'Not provided') {
-                            const phoneNumber = jeep.contactPhone.replace(/\D/g, '');
-                            const whatsappUrl = `https://wa.me/${phoneNumber}`;
-                            window.open(whatsappUrl, '_blank');
-                          }
-                        }}
-                      >
-                        📞 Call
-                      </button>
-                    )}
-                  </div>
+                  {/* Action Buttons Removed */}
                 </div>
               </div>
             ))}
@@ -755,7 +731,7 @@ const JeepSection2 = ({ currentUser }) => {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={clearFilters}
-                className="px-8 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-semibold"
+                className="px-8 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-semibold"
               >
                 Clear All Filters
               </button>

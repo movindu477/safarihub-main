@@ -56,6 +56,7 @@ import DestinationApp from "./components/destination/App";
 import GuideApp from "./components/guide/App";
 import GuideProfile from "./components/guide/GuideProfile";
 
+
 // 🔥 Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyAXjQQ9BYX4upBJx_Ko5jTUq9nTCIDItSA",
@@ -359,6 +360,56 @@ export const markNotificationAsRead = async (notificationId) => {
   }
 };
 
+// Booking Management
+export const updateBookingStatus = async (bookingId, status, driverId, customerId, driverName, customerName) => {
+  try {
+    // Update booking status
+    await updateDoc(doc(db, 'bookings', bookingId), {
+      status: status,
+      updatedAt: serverTimestamp(),
+      statusUpdatedAt: serverTimestamp()
+    });
+    
+    // Create notification for customer
+    const statusMessage = status === 'accepted' 
+      ? `Your booking with ${driverName} has been accepted!`
+      : `Your booking with ${driverName} has been declined.`;
+    
+    await createNotification({
+      type: 'booking',
+      title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+      message: statusMessage,
+      recipientId: customerId,
+      senderId: driverId,
+      senderName: driverName,
+      relatedId: bookingId,
+      bookingId: bookingId
+    });
+    
+    console.log(`✅ Booking ${bookingId} status updated to ${status}`);
+  } catch (error) {
+    console.error('Error updating booking status:', error);
+    throw error;
+  }
+};
+
+export const getBookingById = async (bookingId) => {
+  try {
+    const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
+    if (bookingDoc.exists()) {
+      return {
+        id: bookingDoc.id,
+        ...bookingDoc.data()
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting booking:', error);
+    return null;
+  }
+};
+
+
 // Chat Modal Component
 const ChatModal = ({ 
   isOpen, 
@@ -619,6 +670,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
               onClose={() => setShowNotifications(false)}
               onNotificationClick={handleNotificationItemClick}
               onMarkAsRead={onMarkAsRead}
+              currentUser={user}
             />
           </div>
         )}

@@ -1,7 +1,8 @@
 import React from 'react';
-import { MessageCircle, X, Clock, CheckCircle, MapPin, User } from 'lucide-react';
+import { MessageCircle, X, Clock, CheckCircle, MapPin, User, Check, X as XIcon } from 'lucide-react';
+import { updateBookingStatus } from '../App';
 
-const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMarkAsRead }) => {
+const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMarkAsRead, currentUser }) => {
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     try {
@@ -125,6 +126,74 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                     <p className="text-sm text-gray-600 mb-2 line-clamp-2">
                       {notification.message || 'New notification'}
                     </p>
+                    
+                    {/* Booking Details */}
+                    {notification.type === 'booking' && notification.bookingData && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-2 mb-2 text-xs">
+                        <p className="text-green-800">
+                          <strong>Dates:</strong> {notification.bookingData.dates}
+                        </p>
+                        <p className="text-green-800">
+                          <strong>Days:</strong> {notification.bookingData.numberOfDays} • <strong>Total:</strong> LKR {notification.bookingData.totalPrice?.toLocaleString() || '0'}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Accept/Decline Buttons for Pending Bookings - Only show for drivers receiving booking requests */}
+                    {notification.type === 'booking' && notification.bookingId && currentUser && currentUser.uid === notification.recipientId && (
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              // Driver is accepting, so driverId is currentUser.uid, customerId is senderId
+                              await updateBookingStatus(
+                                notification.bookingId,
+                                'accepted',
+                                currentUser.uid, // driverId (the person accepting)
+                                notification.senderId, // customerId (the person who made the booking)
+                                currentUser.displayName || 'Driver', // driverName
+                                notification.bookingData?.customerName || notification.senderName || 'Customer' // customerName
+                              );
+                              await onMarkAsRead(notification.id);
+                              alert('✅ Booking accepted! The customer has been notified.');
+                            } catch (error) {
+                              console.error('Error accepting booking:', error);
+                              alert('Failed to accept booking. Please try again.');
+                            }
+                          }}
+                          className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                        >
+                          <Check size={14} />
+                          Accept
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              // Driver is declining, so driverId is currentUser.uid, customerId is senderId
+                              await updateBookingStatus(
+                                notification.bookingId,
+                                'declined',
+                                currentUser.uid, // driverId (the person declining)
+                                notification.senderId, // customerId (the person who made the booking)
+                                currentUser.displayName || 'Driver', // driverName
+                                notification.bookingData?.customerName || notification.senderName || 'Customer' // customerName
+                              );
+                              await onMarkAsRead(notification.id);
+                              alert('❌ Booking declined. The customer has been notified.');
+                            } catch (error) {
+                              console.error('Error declining booking:', error);
+                              alert('Failed to decline booking. Please try again.');
+                            }
+                          }}
+                          className="flex-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-1"
+                        >
+                          <XIcon size={14} />
+                          Decline
+                        </button>
+                      </div>
+                    )}
                     
                     <div className="flex items-center justify-between">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getNotificationColor(notification.type)}`}>

@@ -4,16 +4,19 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"vite\" \"node server.js\" --names \"frontend,backend\" --prefix-colors \"cyan,yellow\"",
+    "dev:frontend": "vite",
+    "dev:backend": "node server.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server.js",
-    "dev:full": "concurrently \"npm run dev\" \"npm run server\"",
+    "dev:full": "concurrently \"npm run dev:frontend\" \"npm run server\"",
     "start": "node server.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.16",
+    "axios": "^1.13.2",
     "concurrently": "^9.2.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",

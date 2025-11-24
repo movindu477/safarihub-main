@@ -782,7 +782,7 @@ useEffect(() => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-gray-50">
       <ChatModal 
         isOpen={isChatModalOpen}
         onClose={() => setIsChatModalOpen(false)}
@@ -798,98 +798,108 @@ useEffect(() => {
         onMarkAsRead={onMarkAsRead}
       />
       
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white/80 backdrop-blur-md shadow-lg border-b border-emerald-100/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20">
             <div className="flex items-center">
               <button
                 onClick={() => navigate('/guide')}
-                className="flex items-center text-gray-600 hover:text-gray-900 mr-4 transition-colors"
+                className="flex items-center text-emerald-700 hover:text-emerald-900 mr-6 transition-all duration-300 hover:scale-105 font-medium group"
               >
-                <ArrowLeft size={20} className="mr-2" />
+                <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" />
                 Back to Guides
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">Tour Guide Profile</h1>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-700 to-emerald-900 bg-clip-text text-transparent">Tour Guide Profile</h1>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sticky top-8">
+            <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-emerald-100/50 p-8 sticky top-8 transition-all duration-300 hover:shadow-emerald-200/20">
               {/* Profile Header */}
-              <div className="text-center mb-6">
+              <div className="text-center mb-8">
                 <div className="relative inline-block">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full blur-xl opacity-30"></div>
                   <img
                     src={guide.imageUrl || "/api/placeholder/120/120"}
                     alt={guide.guideName}
-                    className="w-32 h-32 rounded-full object-cover border-4 border-emerald-500 mx-auto mb-4 shadow-md"
+                    className="relative w-36 h-36 rounded-full object-cover border-4 border-emerald-500 mx-auto mb-5 shadow-2xl shadow-emerald-500/30 ring-4 ring-emerald-100"
                   />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">{guide.guideName}</h2>
-                <p className="text-gray-600">Professional Tour Guide</p>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">{guide.guideName}</h2>
+                <p className="text-emerald-600 font-medium mb-4">Professional Tour Guide</p>
                 
                 {/* Rating */}
-                <div className="flex items-center justify-center mt-2">
+                <div className="flex items-center justify-center mt-3 bg-emerald-50 rounded-xl p-3 border border-emerald-100">
                   <div className="flex items-center">
                     {renderStars(guide.rating || 0)}
-                    <span className="ml-2 text-sm text-gray-600">
-                      ({guide.rating?.toFixed(1) || '0.0'}/5) • {guide.totalReviews || 0} reviews
+                    <span className="ml-3 text-sm font-semibold text-gray-700">
+                      {guide.rating?.toFixed(1) || '0.0'}/5
+                    </span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      • {guide.totalReviews || 0} reviews
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Contact Info */}
-              <div className="space-y-4 mb-6">
+              <div className="space-y-3 mb-8">
                 {guide.contactPhone && guide.contactPhone !== 'Not provided' && (
-                  <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <Phone size={18} className="mr-3 text-emerald-600" />
-                    <span className="font-medium">{guide.contactPhone}</span>
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                      <Phone size={16} className="text-white" />
+                    </div>
+                    <span className="font-semibold">{guide.contactPhone}</span>
                   </div>
                 )}
                 
                 {guide.contactEmail && (
-                  <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <Mail size={18} className="mr-3 text-emerald-600" />
-                    <span className="font-medium">{guide.contactEmail}</span>
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                      <Mail size={16} className="text-white" />
+                    </div>
+                    <span className="font-semibold">{guide.contactEmail}</span>
                   </div>
                 )}
                 
                 {guide.location && (
-                  <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <MapPin size={18} className="mr-3 text-emerald-600" />
-                    <span className="font-medium">{guide.location}</span>
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                      <MapPin size={16} className="text-white" />
+                    </div>
+                    <span className="font-semibold">{guide.location}</span>
                   </div>
                 )}
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {currentUser && userRole === 'tourist' && (
                   <>
                     <button
                       onClick={handleOpenChatModal}
-                      className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center font-medium shadow-md"
+                      className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 flex items-center justify-center font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] transform"
                     >
-                      <MessageCircle size={18} className="mr-2" />
+                      <MessageCircle size={20} className="mr-2" />
                       Send Message
                     </button>
                     
                     {selectedDates.length > 0 && (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-emerald-800 font-medium">Total:</span>
-                          <span className="text-emerald-800 font-bold text-lg">
+                      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/80 border-2 border-emerald-200 rounded-2xl p-5 shadow-lg">
+                        <div className="flex justify-between items-center mb-4">
+                          <span className="text-emerald-800 font-bold text-sm uppercase tracking-wide">Total:</span>
+                          <span className="text-emerald-900 font-black text-2xl">
                             {getCurrencySymbol(guide.currencyPreference)}{(selectedDates.length * (guide.dailyRate || guide.hourlyRate * 8 || 0)).toLocaleString()}
                           </span>
                         </div>
                         <button
                           onClick={handleBooking}
-                          className="w-full bg-emerald-700 text-white py-2 px-4 rounded-lg hover:bg-emerald-800 transition-colors font-medium"
+                          className="w-full bg-gradient-to-r from-emerald-700 to-emerald-800 text-white py-3 px-4 rounded-xl hover:from-emerald-800 hover:to-emerald-900 transition-all duration-300 font-bold shadow-lg hover:shadow-xl hover:scale-[1.02] transform"
                         >
                           Book Now ({selectedDates.length} days)
                         </button>
@@ -901,7 +911,7 @@ useEffect(() => {
                 {!currentUser && (
                   <button
                     onClick={onShowAuth}
-                    className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium shadow-md"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] transform"
                   >
                     Login to Book or Message
                   </button>
@@ -913,70 +923,85 @@ useEffect(() => {
           {/* Main Content */}
           <div className="lg:col-span-2">
             {/* Tabs */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 mb-6 overflow-hidden">
-              <div className="border-b border-gray-200">
-                <nav className="flex -mb-px overflow-x-auto">
+            <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-emerald-100/50 mb-8 overflow-hidden">
+              <div className="border-b border-emerald-100/50 bg-gradient-to-r from-emerald-50/50 to-transparent">
+                <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                       activeTab === 'overview'
-                        ? 'border-emerald-600 text-emerald-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                     }`}
                   >
                     Overview
+                    {activeTab === 'overview' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                    )}
                   </button>
                   <button
                     onClick={() => setActiveTab('services')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                       activeTab === 'services'
-                        ? 'border-emerald-600 text-emerald-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                     }`}
                   >
                     Services & Rates
+                    {activeTab === 'services' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                    )}
                   </button>
                   {currentUser && userRole === 'tourist' && (
                     <button
                       onClick={() => setActiveTab('booking')}
-                      className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                         activeTab === 'booking'
-                          ? 'border-emerald-600 text-emerald-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                          : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                       }`}
                     >
                       <CalendarIcon size={16} className="inline mr-2" />
                       Book Now
+                      {activeTab === 'booking' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                      )}
                     </button>
                   )}
                   <button
                     onClick={() => setActiveTab('reviews')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                       activeTab === 'reviews'
-                        ? 'border-emerald-600 text-emerald-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                     }`}
                   >
                     Reviews ({guide.totalReviews || 0})
+                    {activeTab === 'reviews' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                    )}
                   </button>
                   {currentUser && (
                     <button
                       onClick={() => setActiveTab('chat')}
-                      className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap relative ${
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                         activeTab === 'chat'
-                          ? 'border-emerald-600 text-emerald-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                          : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                       }`}
                     >
                       Messages
                       {messages.filter(msg => 
                         msg.senderId === guideId && !msg.read
                       ).length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
                           {messages.filter(msg => 
                             msg.senderId === guideId && !msg.read
                           ).length}
                         </span>
+                      )}
+                      {activeTab === 'chat' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
                       )}
                     </button>
                   )}
@@ -984,13 +1009,15 @@ useEffect(() => {
               </div>
 
               {/* Tab Content */}
-              <div className="p-6 max-h-[600px] overflow-y-auto">
+              <div className="p-8 max-h-[700px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-emerald-50">
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <div className="space-y-6">
                     {/* Experience */}
-                    <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                      <Clock className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                    <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                      <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                        <Clock className="text-white" size={22} />
+                      </div>
                       <div>
                         <h3 className="font-semibold text-gray-900 mb-1">Experience</h3>
                         <p className="text-gray-600">
@@ -1001,9 +1028,9 @@ useEffect(() => {
 
                     {/* Description */}
                     {guide.description && (
-                      <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <h3 className="font-semibold text-gray-900 mb-2">About</h3>
-                        <p className="text-gray-600 leading-relaxed">
+                      <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <h3 className="font-bold text-gray-900 mb-3 text-lg">About</h3>
+                        <p className="text-gray-700 leading-relaxed text-base">
                           {guide.description}
                         </p>
                       </div>
@@ -1011,8 +1038,10 @@ useEffect(() => {
 
                     {/* Languages */}
                     {guide.languages && guide.languages.length > 0 && (
-                      <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <Languages className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                          <Languages className="text-white" size={22} />
+                        </div>
                         <div>
                           <h3 className="font-semibold text-gray-900 mb-2">Languages</h3>
                           <div className="flex flex-wrap gap-2">
@@ -1031,15 +1060,17 @@ useEffect(() => {
 
                     {/* Areas of Expertise */}
                     {guide.areasOfExpertise && guide.areasOfExpertise.length > 0 && (
-                      <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <Globe className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                          <Globe className="text-white" size={22} />
+                        </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Areas of Expertise</h3>
+                          <h3 className="font-bold text-gray-900 mb-3 text-lg">Areas of Expertise</h3>
                           <div className="flex flex-wrap gap-2">
                             {guide.areasOfExpertise.map((area, index) => (
                               <span
                                 key={index}
-                                className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm border border-emerald-200 font-medium"
+                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
                               >
                                 {area}
                               </span>
@@ -1051,15 +1082,17 @@ useEffect(() => {
 
                     {/* Special Qualifications */}
                     {guide.specialQualifications && guide.specialQualifications.length > 0 && (
-                      <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <GraduationCap className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                          <GraduationCap className="text-white" size={22} />
+                        </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Special Qualifications</h3>
+                          <h3 className="font-bold text-gray-900 mb-3 text-lg">Special Qualifications</h3>
                           <div className="flex flex-wrap gap-2">
                             {guide.specialQualifications.map((qual, index) => (
                               <span
                                 key={index}
-                                className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm border border-green-200 font-medium"
+                                className="bg-gradient-to-r from-green-100 to-green-50 text-green-800 px-4 py-2 rounded-full text-sm border-2 border-green-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
                               >
                                 {qual}
                               </span>
@@ -1071,8 +1104,10 @@ useEffect(() => {
 
                     {/* Verification Documents */}
                     {guide.verificationDocuments && guide.verificationDocuments.length > 0 && (
-                      <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <FileText className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                          <FileText className="text-white" size={22} />
+                        </div>
                         <div>
                           <h3 className="font-semibold text-gray-900 mb-2">Verification Documents</h3>
                           <div className="flex flex-wrap gap-2">
@@ -1095,35 +1130,41 @@ useEffect(() => {
                 {activeTab === 'services' && (
                   <div className="space-y-6">
                     {/* Pricing */}
-                    <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200">
-                      <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-                        <DollarSign className="text-emerald-600 mr-2" size={20} />
+                    <div className="p-8 rounded-2xl bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-white border-2 border-emerald-200 shadow-xl">
+                      <h3 className="font-bold text-gray-900 mb-6 flex items-center text-xl">
+                        <div className="p-2 bg-emerald-600 rounded-xl mr-3 shadow-lg">
+                          <DollarSign className="text-white" size={24} />
+                        </div>
                         Rates & Pricing
                       </h3>
                       <div className="space-y-4">
                         {guide.hourlyRate > 0 && (
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-100">
+                          <div className="flex items-center justify-between p-6 bg-white rounded-xl border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
                             <div>
-                              <span className="text-gray-700 font-medium">Hourly Rate:</span>
-                              <p className="text-sm text-gray-500">Perfect for short tours and consultations</p>
+                              <span className="text-gray-800 font-bold text-lg">Hourly Rate:</span>
+                              <p className="text-sm text-gray-600 mt-1">Perfect for short tours and consultations</p>
                             </div>
-                            <span className="text-2xl font-bold text-emerald-600">
-                              {getCurrencySymbol(guide.currencyPreference)}{guide.hourlyRate.toLocaleString()}
-                              <span className="text-sm font-normal text-gray-500">/hour</span>
-                            </span>
+                            <div className="text-right">
+                              <span className="text-3xl font-black text-emerald-600">
+                                {getCurrencySymbol(guide.currencyPreference)}{guide.hourlyRate.toLocaleString()}
+                              </span>
+                              <span className="text-sm font-semibold text-gray-500 block">/hour</span>
+                            </div>
                           </div>
                         )}
                         
                         {guide.dailyRate > 0 && (
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-100">
+                          <div className="flex items-center justify-between p-6 bg-white rounded-xl border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
                             <div>
-                              <span className="text-gray-700 font-medium">Daily Rate:</span>
-                              <p className="text-sm text-gray-500">Full day guided tours (8+ hours)</p>
+                              <span className="text-gray-800 font-bold text-lg">Daily Rate:</span>
+                              <p className="text-sm text-gray-600 mt-1">Full day guided tours (8+ hours)</p>
                             </div>
-                            <span className="text-2xl font-bold text-emerald-600">
-                              {getCurrencySymbol(guide.currencyPreference)}{guide.dailyRate.toLocaleString()}
-                              <span className="text-sm font-normal text-gray-500">/day</span>
-                            </span>
+                            <div className="text-right">
+                              <span className="text-3xl font-black text-emerald-600">
+                                {getCurrencySymbol(guide.currencyPreference)}{guide.dailyRate.toLocaleString()}
+                              </span>
+                              <span className="text-sm font-semibold text-gray-500 block">/day</span>
+                            </div>
                           </div>
                         )}
                         

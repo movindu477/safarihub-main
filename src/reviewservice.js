@@ -94,7 +94,14 @@ export const addReview = async (reviewData) => {
     console.log('📤 Final review data to submit:', reviewDataWithTimestamp);
     
     const docRef = await addDoc(collection(db, 'reviews'), reviewDataWithTimestamp);
-    console.log('✅ Successfully created new review:', docRef.id);
+    console.log('✅ Successfully created new review with unique ID:', docRef.id);
+    console.log('📋 Review data saved:', {
+      id: docRef.id,
+      driverId: reviewDataWithTimestamp.driverId,
+      userId: reviewDataWithTimestamp.userId,
+      rating: reviewDataWithTimestamp.rating,
+      commentLength: reviewDataWithTimestamp.comment.length
+    });
     return docRef.id;
 
   } catch (error) {

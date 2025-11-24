@@ -3,9 +3,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { 
   getFirestore, 
   doc, 
-  getDoc
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp
 } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../App";
 import { 
   MapPin, 
   Star, 
@@ -38,7 +42,7 @@ import {
 
 // Initialize Firebase
 const db = getFirestore();
-const auth = getAuth();
+// Use auth from App.jsx instead of creating new instance
 
 // Import the fixed ReviewSection component
 import ReviewSection from "./ReviewSection";
@@ -58,7 +62,7 @@ import {
 } from "../App";
 
 // Calendar Component for Date Selection
-const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => {
+const DatePickerCalendar = ({ selectedDates, onDateSelect }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   const getDaysInMonth = (date) => {
@@ -68,6 +72,13 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
     const lastDay = new Date(year, month + 1, 0);
     
     const days = [];
+    // Add empty cells for days before the first day of the month
+    const startDay = firstDay.getDay();
+    for (let i = 0; i < startDay; i++) {
+      days.push(null);
+    }
+    
+    // Add all days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
     }
@@ -83,24 +94,22 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
     });
   };
 
-  const isDateAvailable = (date) => {
-    if (!availableDates || availableDates.length === 0) return true;
-    
-    const dateString = date.toISOString().split('T')[0];
-    return availableDates.some(availableDate => {
-      const availableDateString = new Date(availableDate).toISOString().split('T')[0];
-      return availableDateString === dateString;
-    });
-  };
-
   const isDateSelected = (date) => {
+    if (!date) return false;
     return selectedDates.some(selectedDate => 
       selectedDate.toDateString() === date.toDateString()
     );
   };
 
+  const isDatePast = (date) => {
+    if (!date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+  };
+
   const handleDateClick = (date) => {
-    if (!isDateAvailable(date)) return;
+    if (!date || isDatePast(date)) return;
     onDateSelect(date);
   };
 
@@ -108,7 +117,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <button 
           onClick={() => navigateMonth(-1)}
@@ -136,25 +145,29 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
       </div>
       
       <div className="grid grid-cols-7 gap-1">
-        {days.map(day => {
-          const available = isDateAvailable(day);
+        {days.map((day, index) => {
+          if (!day) {
+            return <div key={`empty-${index}`} className="h-8"></div>;
+          }
+          
           const selected = isDateSelected(day);
           const isToday = day.toDateString() === new Date().toDateString();
+          const isPast = isDatePast(day);
           
           return (
             <button
               key={day.toString()}
               onClick={() => handleDateClick(day)}
-              disabled={!available}
+              disabled={isPast}
               className={`
                 h-8 text-sm rounded-lg transition-all
                 ${selected 
-                  ? 'bg-green-600 text-white font-medium' 
-                  : available
-                    ? isToday
-                      ? 'bg-green-100 text-green-700 border border-green-300'
-                      : 'bg-gray-50 text-gray-700 hover:bg-green-50 hover:text-green-700'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  ? 'bg-emerald-600 text-white font-medium shadow-lg' 
+                  : isPast
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : isToday
+                      ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300 font-semibold'
+                      : 'bg-gray-50 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-md'
                 }
               `}
             >
@@ -165,13 +178,13 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
       </div>
       
       {selectedDates.length > 0 && (
-        <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-          <h4 className="font-medium text-green-800 mb-2">Selected Dates:</h4>
+        <div className="mt-4 p-4 bg-emerald-50 rounded-xl border-2 border-emerald-200">
+          <h4 className="font-bold text-emerald-800 mb-3">Selected Dates:</h4>
           <div className="flex flex-wrap gap-2">
             {selectedDates.map((date, index) => (
               <span 
                 key={index}
-                className="bg-green-600 text-white px-2 py-1 rounded text-xs"
+                className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md"
               >
                 {date.toLocaleDateString()}
               </span>
@@ -275,7 +288,7 @@ const ChatModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-t-xl">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-t-xl">
           <div className="flex items-center space-x-3">
             <div className="relative">
               <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
@@ -284,7 +297,7 @@ const ChatModal = ({
             </div>
             <div>
               <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
-              <p className="text-green-100 text-sm">
+              <p className="text-emerald-100 text-sm">
                 {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
               </p>
             </div>
@@ -314,19 +327,19 @@ const ChatModal = ({
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                       msg.senderId === currentUser?.uid
-                        ? 'bg-green-600 text-white rounded-br-none'
-                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                        ? 'bg-emerald-600 text-white rounded-br-none shadow-lg'
+                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-md'
                     }`}
                   >
                     <p className="text-sm">{msg.content}</p>
                     <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-green-100' : 'text-gray-500'
+                      msg.senderId === currentUser?.uid ? 'text-emerald-100' : 'text-gray-500'
                     }`}>
                       <span>{formatTime(msg.timestamp)}</span>
                       {msg.senderId === currentUser?.uid && (
                         <span className="flex items-center space-x-1">
                           {msg.read ? (
-                            <CheckCheck size={12} className="text-blue-300" title="Read" />
+                            <CheckCheck size={12} className="text-emerald-300" title="Read" />
                           ) : msg.delivered ? (
                             <CheckCheck size={12} className="text-gray-300" title="Delivered" />
                           ) : (
@@ -350,13 +363,13 @@ const ChatModal = ({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Type your message..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               disabled={sending}
             />
             <button
               type="submit"
               disabled={!message.trim() || sending}
-              className="bg-green-600 text-white p-3 rounded-full hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="bg-emerald-600 text-white p-3 rounded-full hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
             >
               {sending ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -387,6 +400,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [userRole, setUserRole] = useState("");
   const [conversationId, setConversationId] = useState(null);
   const [selectedDates, setSelectedDates] = useState([]);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessageData, setSuccessMessageData] = useState(null);
   
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
@@ -395,6 +410,20 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const searchParams = new URLSearchParams(location.search);
   const driverId = searchParams.get('driverId');
   const openChat = searchParams.get('openChat');
+
+  // Reset state when driverId changes (navigating to different driver or going back)
+  useEffect(() => {
+    // Reset component state when driverId changes or is cleared
+    setError("");
+    setActiveTab("overview");
+    setMessage("");
+    setMessages([]);
+    setConversationId(null);
+    setSelectedDates([]);
+    setIsChatModalOpen(false);
+    setChatConversationId(null);
+    setChatOtherUser(null);
+  }, [driverId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -426,6 +455,151 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       return date.toLocaleDateString();
     } catch (error) {
       return 'Recently';
+    }
+  };
+
+  const handleDateSelect = (date) => {
+    setSelectedDates(prev => {
+      const isSelected = prev.some(selectedDate => 
+        selectedDate.toDateString() === date.toDateString()
+      );
+      
+      if (isSelected) {
+        return prev.filter(selectedDate => 
+          selectedDate.toDateString() !== date.toDateString()
+        );
+      } else {
+        return [...prev, date].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const handleBooking = async () => {
+    if (selectedDates.length === 0) {
+      alert('Please select at least one date for your booking.');
+      return;
+    }
+    
+    if (!currentUser) {
+      alert('Please login to make a booking.');
+      return;
+    }
+    
+    if (!driver) {
+      alert('Driver information not available.');
+      return;
+    }
+    
+    try {
+      // Get the authenticated user directly from Firebase Auth
+      // This ensures we have the most up-to-date auth state
+      const authUser = auth.currentUser;
+      
+      if (!authUser) {
+        alert('Please login to make a booking.');
+        return;
+      }
+      
+      // Verify we have a valid user ID
+      if (!authUser.uid) {
+        alert('Authentication error. Please try logging in again.');
+        return;
+      }
+      
+      const totalPrice = selectedDates.length * (driver.pricePerDay || 0);
+      const datesString = selectedDates.map(d => d.toLocaleDateString()).join(', ');
+      
+      // Create booking in Firestore
+      // Ensure all fields match Firestore rules requirements exactly
+      const bookingData = {
+        driverId: String(driver.id), // Must be a string
+        driverName: driver.fullName || '',
+        customerId: authUser.uid, // MUST match request.auth.uid
+        customerName: authUser.displayName || 'Customer',
+        customerEmail: authUser.email || '',
+        selectedDates: selectedDates.map(d => d.toISOString()), // Must be an array
+        datesString: datesString,
+        totalPrice: Number(totalPrice), // Must be a number
+        pricePerDay: Number(driver.pricePerDay || 0),
+        numberOfDays: Number(selectedDates.length),
+        serviceType: driver.serviceType || 'Jeep Driver',
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      // Log booking data for debugging
+      console.log('📝 Creating booking with data:', {
+        authUid: authUser.uid,
+        customerId: bookingData.customerId,
+        customerIdMatch: authUser.uid === bookingData.customerId,
+        driverId: bookingData.driverId,
+        driverIdType: typeof bookingData.driverId,
+        selectedDates: bookingData.selectedDates,
+        selectedDatesType: Array.isArray(bookingData.selectedDates) ? 'array' : typeof bookingData.selectedDates,
+        selectedDatesLength: bookingData.selectedDates.length,
+        totalPrice: bookingData.totalPrice,
+        totalPriceType: typeof bookingData.totalPrice
+      });
+      
+      // Create the booking document
+      const bookingRef = collection(db, 'bookings');
+      const bookingDoc = await addDoc(bookingRef, bookingData);
+      const bookingId = bookingDoc.id;
+      
+      console.log('✅ Booking created with ID:', bookingId);
+      
+      // Create notification for driver
+      await createNotification({
+        type: 'booking',
+        title: 'New Booking Request',
+        message: `You have a new booking request from ${authUser.displayName || 'a customer'} for ${selectedDates.length} day(s). Dates: ${datesString}. Total: LKR ${totalPrice.toLocaleString()}`,
+        recipientId: driver.id,
+        senderId: authUser.uid,
+        senderName: authUser.displayName || 'Customer',
+        relatedId: bookingId,
+        bookingId: bookingId,
+        bookingData: {
+          dates: datesString,
+          numberOfDays: selectedDates.length,
+          totalPrice: totalPrice,
+          customerName: authUser.displayName || 'Customer'
+        }
+      });
+      
+      // Show success animation
+      setSuccessMessageData({
+        driverName: driver.fullName,
+        dates: datesString,
+        totalPrice: totalPrice,
+        numberOfDays: selectedDates.length
+      });
+      setShowSuccessMessage(true);
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 5000);
+      
+      // Reset selected dates
+      setSelectedDates([]);
+      
+    } catch (error) {
+      console.error('❌ Error creating booking:', error);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Full error:', JSON.stringify(error, null, 2));
+      
+      let errorMessage = 'Failed to create booking. ';
+      if (error.code === 'permission-denied') {
+        errorMessage += 'Permission denied. Please ensure:\n1. You are logged in\n2. Firestore rules are deployed\n3. Your user ID matches the customerId';
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -464,6 +638,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         return;
       }
 
+      // Reset state before fetching
+      setLoading(true);
+      setError("");
+      setDriver(null);
+      setActiveTab("overview");
+
       try {
         const driverDoc = await getDoc(doc(db, 'serviceProviders', driverId));
         
@@ -484,7 +664,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       }
     };
 
-    fetchDriverData();
+    if (driverId) {
+      fetchDriverData();
+    }
   }, [driverId]);
 
   const initializeConversation = async () => {
@@ -506,60 +688,36 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   };
 
   useEffect(() => {
-    initializeConversation();
-  }, [currentUser, driverId, driver]);
+    // Only initialize conversation if driver data is loaded
+    if (currentUser && driverId && driver && !loading) {
+      initializeConversation();
+    }
+  }, [currentUser, driverId, driver, loading]);
 
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !currentUser) {
+      setMessages([]);
+      return;
+    }
 
     const unsubscribe = getMessages(conversationId, (messagesData) => {
       setMessages(messagesData);
       
       const unreadMessages = messagesData.filter(msg => 
-        msg.senderId !== currentUser?.uid && !msg.read
+        msg.senderId !== currentUser.uid && !msg.read
       );
       
-      if (unreadMessages.length > 0 && currentUser) {
+      if (unreadMessages.length > 0) {
         markMessagesAsRead(conversationId, currentUser.uid);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      setMessages([]);
+    };
   }, [conversationId, currentUser]);
 
-  const handleDateSelect = (date) => {
-    setSelectedDates(prev => {
-      const isSelected = prev.some(selectedDate => 
-        selectedDate.toDateString() === date.toDateString()
-      );
-      
-      if (isSelected) {
-        return prev.filter(selectedDate => 
-          selectedDate.toDateString() !== date.toDateString()
-        );
-      } else {
-        return [...prev, date];
-      }
-    });
-  };
-
-  const handleBooking = () => {
-    if (selectedDates.length === 0) {
-      alert('Please select at least one date for your booking.');
-      return;
-    }
-    
-    const totalPrice = selectedDates.length * (driver.pricePerDay || 0);
-    alert(`Booking confirmed for ${selectedDates.length} day(s)! Total: LKR ${totalPrice.toLocaleString()}`);
-    
-    console.log('Booking details:', {
-      driverId: driver.id,
-      driverName: driver.fullName,
-      selectedDates: selectedDates.map(d => d.toISOString()),
-      totalPrice,
-      customerId: currentUser?.uid
-    });
-  };
 
   const handleNotificationClick = async (notification) => {
     console.log('Notification clicked:', notification);
@@ -658,10 +816,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading driver profile...</p>
+          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading driver profile...</p>
         </div>
       </div>
     );
@@ -669,14 +827,14 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
   if (error || !driver) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Driver Not Found</h2>
           <p className="text-gray-600 mb-4">{error || "The driver you're looking for doesn't exist."}</p>
           <button
             onClick={() => navigate(-1)}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+            className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-3 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl"
           >
             Go Back
           </button>
@@ -686,7 +844,67 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-gray-50">
+      {/* Success Message Animation */}
+      {showSuccessMessage && successMessageData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all animate-slideUp">
+            <div className="text-center">
+              {/* Success Icon Animation */}
+              <div className="mb-4 flex justify-center">
+                <div className="relative">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center animate-scaleIn">
+                    <CheckCircle className="w-12 h-12 text-green-600" />
+                  </div>
+                  <div className="absolute inset-0 bg-green-200 rounded-full animate-ping opacity-75"></div>
+                </div>
+              </div>
+              
+              {/* Success Message */}
+              <h2 className="text-2xl font-bold text-gray-900 mb-2 animate-fadeIn">
+                Booking Request Sent! 🎉
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Your booking request has been sent to the driver.
+              </p>
+              
+              {/* Booking Details */}
+              <div className="bg-emerald-50 rounded-xl p-4 mb-6 text-left space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Driver:</span>
+                  <span className="text-gray-900 font-semibold">{successMessageData.driverName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Dates:</span>
+                  <span className="text-gray-900 font-semibold">{successMessageData.dates}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Days:</span>
+                  <span className="text-gray-900 font-semibold">{successMessageData.numberOfDays} day(s)</span>
+                </div>
+                <div className="flex justify-between border-t border-emerald-200 pt-2 mt-2">
+                  <span className="text-gray-600 font-bold">Total:</span>
+                  <span className="text-emerald-600 font-bold text-lg">LKR {successMessageData.totalPrice.toLocaleString()}</span>
+                </div>
+              </div>
+              
+              {/* Info Message */}
+              <p className="text-sm text-gray-500 mb-4">
+                The driver will receive a notification and can accept or decline your booking.
+              </p>
+              
+              {/* Close Button */}
+              <button
+                onClick={() => setShowSuccessMessage(false)}
+                className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors font-semibold shadow-lg"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <ChatModal 
         isOpen={isChatModalOpen}
         onClose={() => setIsChatModalOpen(false)}
@@ -702,110 +920,103 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         onMarkAsRead={onMarkAsRead}
       />
       
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white/80 backdrop-blur-md shadow-lg border-b border-emerald-100/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20">
             <div className="flex items-center">
               <button
                 onClick={() => navigate(-1)}
-                className="flex items-center text-gray-600 hover:text-gray-900 mr-4 transition-colors"
+                className="flex items-center text-emerald-700 hover:text-emerald-900 mr-6 transition-all duration-300 hover:scale-105 font-medium group"
               >
-                <ArrowLeft size={20} className="mr-2" />
+                <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" />
                 Back
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">Driver Profile</h1>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-700 to-emerald-900 bg-clip-text text-transparent">Jeep Driver Profile</h1>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sticky top-8">
+            <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-emerald-100/50 p-8 sticky top-8 transition-all duration-300 hover:shadow-emerald-200/20">
               {/* Profile Header */}
-              <div className="text-center mb-6">
+              <div className="text-center mb-8">
                 <div className="relative inline-block">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full blur-xl opacity-30"></div>
                   <img
                     src={driver.profilePicture || "/api/placeholder/120/120"}
                     alt={driver.fullName}
-                    className="w-32 h-32 rounded-full object-cover border-4 border-green-500 mx-auto mb-4 shadow-md"
+                    className="relative w-36 h-36 rounded-full object-cover border-4 border-emerald-500 mx-auto mb-5 shadow-2xl shadow-emerald-500/30 ring-4 ring-emerald-100"
                   />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">{driver.fullName}</h2>
-                <p className="text-gray-600">{driver.serviceType}</p>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">{driver.fullName}</h2>
+                <p className="text-emerald-600 font-medium mb-4">{driver.serviceType}</p>
                 
                 {/* Rating */}
-                <div className="flex items-center justify-center mt-2">
+                <div className="flex items-center justify-center mt-3 bg-emerald-50 rounded-xl p-3 border border-emerald-100">
                   <div className="flex items-center">
                     {renderStars(driver.rating || 0)}
-                    <span className="ml-2 text-sm text-gray-600">
-                      ({driver.rating?.toFixed(1) || '0.0'}/5) • {driver.totalReviews || 0} reviews
+                    <span className="ml-3 text-sm font-semibold text-gray-700">
+                      {driver.rating?.toFixed(1) || '0.0'}/5
+                    </span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      • {driver.totalReviews || 0} reviews
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Contact Info */}
-              <div className="space-y-4 mb-6">
+              <div className="space-y-3 mb-8">
                 {driver.contactPhone && (
-                  <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <Phone size={18} className="mr-3 text-green-600" />
-                    <span className="font-medium">{driver.contactPhone}</span>
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                      <Phone size={16} className="text-white" />
+                    </div>
+                    <span className="font-semibold">{driver.contactPhone}</span>
                   </div>
                 )}
                 
                 {driver.contactEmail && (
-                  <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <Mail size={18} className="mr-3 text-green-600" />
-                    <span className="font-medium">{driver.contactEmail}</span>
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                      <Mail size={16} className="text-white" />
+                    </div>
+                    <span className="font-semibold">{driver.contactEmail}</span>
                   </div>
                 )}
                 
                 {driver.location && (
-                  <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <MapPin size={18} className="mr-3 text-green-600" />
-                    <span className="font-medium">{driver.location}</span>
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                      <MapPin size={16} className="text-white" />
+                    </div>
+                    <span className="font-semibold">{driver.location}</span>
                   </div>
                 )}
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {currentUser && userRole === 'tourist' && (
                   <>
                     <button
                       onClick={handleOpenChatModal}
-                      className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center font-medium shadow-md"
+                      className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 flex items-center justify-center font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] transform"
                     >
-                      <MessageCircle size={18} className="mr-2" />
+                      <MessageCircle size={20} className="mr-2" />
                       Send Message
                     </button>
-                    
-                    {selectedDates.length > 0 && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-green-800 font-medium">Total:</span>
-                          <span className="text-green-800 font-bold text-lg">
-                            LKR {(selectedDates.length * (driver.pricePerDay || 0)).toLocaleString()}
-                          </span>
-                        </div>
-                        <button
-                          onClick={handleBooking}
-                          className="w-full bg-green-700 text-white py-2 px-4 rounded-lg hover:bg-green-800 transition-colors font-medium"
-                        >
-                          Book Now ({selectedDates.length} days)
-                        </button>
-                      </div>
-                    )}
                   </>
                 )}
                 
                 {!currentUser && (
                   <button
                     onClick={onShowAuth}
-                    className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium shadow-md"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] transform"
                   >
                     Login to Book or Message
                   </button>
@@ -817,70 +1028,85 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           {/* Main Content */}
           <div className="lg:col-span-2">
             {/* Tabs */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 mb-6 overflow-hidden">
-              <div className="border-b border-gray-200">
-                <nav className="flex -mb-px overflow-x-auto">
+            <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-emerald-100/50 mb-8 overflow-hidden">
+              <div className="border-b border-emerald-100/50 bg-gradient-to-r from-emerald-50/50 to-transparent">
+                <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                       activeTab === 'overview'
-                        ? 'border-green-600 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                     }`}
                   >
                     Overview
+                    {activeTab === 'overview' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                    )}
                   </button>
                   <button
                     onClick={() => setActiveTab('services')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                       activeTab === 'services'
-                        ? 'border-green-600 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                     }`}
                   >
                     Services & Rates
+                    {activeTab === 'services' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('reviews')}
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
+                      activeTab === 'reviews'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                    }`}
+                  >
+                    Reviews ({driver.totalReviews || 0})
+                    {activeTab === 'reviews' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                    )}
                   </button>
                   {currentUser && userRole === 'tourist' && (
                     <button
                       onClick={() => setActiveTab('booking')}
-                      className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                         activeTab === 'booking'
-                          ? 'border-green-600 text-green-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                          : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                       }`}
                     >
                       <CalendarIcon size={16} className="inline mr-2" />
                       Book Now
+                      {activeTab === 'booking' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                      )}
                     </button>
                   )}
-                  <button
-                    onClick={() => setActiveTab('reviews')}
-                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
-                      activeTab === 'reviews'
-                        ? 'border-green-600 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Reviews ({driver.totalReviews || 0})
-                  </button>
                   {currentUser && (
                     <button
                       onClick={() => setActiveTab('chat')}
-                      className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap relative ${
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
                         activeTab === 'chat'
-                          ? 'border-green-600 text-green-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                          : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
                       }`}
                     >
                       Messages
                       {messages.filter(msg => 
                         msg.senderId === driverId && !msg.read
                       ).length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
                           {messages.filter(msg => 
                             msg.senderId === driverId && !msg.read
                           ).length}
                         </span>
+                      )}
+                      {activeTab === 'chat' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
                       )}
                     </button>
                   )}
@@ -888,16 +1114,18 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               </div>
 
               {/* Tab Content */}
-              <div className="p-6 max-h-[600px] overflow-y-auto">
+              <div className="p-8 max-h-[700px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-emerald-50">
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <div className="space-y-6">
                     {/* Experience */}
-                    <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                      <Clock className="text-green-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                    <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                      <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                        <Clock className="text-white" size={22} />
+                      </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 mb-1">Experience</h3>
-                        <p className="text-gray-600">
+                        <h3 className="font-bold text-gray-900 mb-1 text-lg">Experience</h3>
+                        <p className="text-gray-700">
                           {driver.experienceYears || 0} years of experience as a {driver.serviceType}
                         </p>
                       </div>
@@ -905,9 +1133,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Description */}
                     {driver.description && (
-                      <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <h3 className="font-semibold text-gray-900 mb-2">About</h3>
-                        <p className="text-gray-600 leading-relaxed">
+                      <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <h3 className="font-bold text-gray-900 mb-3 text-lg">About</h3>
+                        <p className="text-gray-700 leading-relaxed text-base">
                           {driver.description}
                         </p>
                       </div>
@@ -915,15 +1143,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Languages */}
                     {driver.languages && driver.languages.length > 0 && (
-                      <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <Languages className="text-green-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                          <Languages className="text-white" size={22} />
+                        </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Languages</h3>
+                          <h3 className="font-bold text-gray-900 mb-3 text-lg">Languages</h3>
                           <div className="flex flex-wrap gap-2">
                             {driver.languages.map((lang, index) => (
                               <span
                                 key={index}
-                                className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium"
+                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
                               >
                                 {lang}
                               </span>
@@ -935,15 +1165,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Destinations */}
                     {driver.destinations && driver.destinations.length > 0 && (
-                      <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <MapPin className="text-green-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                          <MapPin className="text-white" size={22} />
+                        </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Destinations Covered</h3>
+                          <h3 className="font-bold text-gray-900 mb-3 text-lg">Destinations Covered</h3>
                           <div className="flex flex-wrap gap-2">
                             {driver.destinations.map((destination, index) => (
                               <span
                                 key={index}
-                                className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm border border-green-200 font-medium"
+                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
                               >
                                 {destination}
                               </span>
@@ -955,15 +1187,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Certifications */}
                     {driver.certifications && driver.certifications.length > 0 && (
-                      <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <Award className="text-green-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                          <Award className="text-white" size={22} />
+                        </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Certifications</h3>
+                          <h3 className="font-bold text-gray-900 mb-3 text-lg">Certifications</h3>
                           <div className="flex flex-wrap gap-2">
                             {driver.certifications.map((cert, index) => (
                               <span
                                 key={index}
-                                className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm border border-blue-200 font-medium"
+                                className="bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 px-4 py-2 rounded-full text-sm border-2 border-blue-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
                               >
                                 {cert}
                               </span>
@@ -975,15 +1209,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Special Skills */}
                     {driver.specialSkills && driver.specialSkills.length > 0 && (
-                      <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <Shield className="text-green-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                          <Shield className="text-white" size={22} />
+                        </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Special Skills</h3>
+                          <h3 className="font-bold text-gray-900 mb-3 text-lg">Special Skills</h3>
                           <div className="flex flex-wrap gap-2">
                             {driver.specialSkills.map((skill, index) => (
                               <span
                                 key={index}
-                                className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-sm border border-purple-200 font-medium"
+                                className="bg-gradient-to-r from-purple-100 to-purple-50 text-purple-800 px-4 py-2 rounded-full text-sm border-2 border-purple-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
                               >
                                 {skill}
                               </span>
@@ -1000,35 +1236,51 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   <div className="space-y-6">
                     {/* Vehicle Type */}
                     {driver.vehicleType && (
-                      <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                          <Car className="text-green-600 mr-2" size={20} />
+                      <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <h3 className="font-bold text-gray-900 mb-3 flex items-center text-lg">
+                          <div className="p-2 bg-emerald-600 rounded-xl mr-3 shadow-lg">
+                            <Car className="text-white" size={22} />
+                          </div>
                           Vehicle Type
                         </h3>
-                        <p className="text-gray-600 text-lg font-medium">{driver.vehicleType}</p>
+                        <p className="text-gray-700 text-xl font-bold">{driver.vehicleType}</p>
                       </div>
                     )}
 
                     {/* Pricing */}
                     {driver.pricePerDay && (
-                      <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                        <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-                          <DollarSign className="text-green-600 mr-2" size={20} />
+                      <div className="p-8 rounded-2xl bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-white border-2 border-emerald-200 shadow-xl">
+                        <h3 className="font-bold text-gray-900 mb-6 flex items-center text-xl">
+                          <div className="p-2 bg-emerald-600 rounded-xl mr-3 shadow-lg">
+                            <DollarSign className="text-white" size={24} />
+                          </div>
                           Rates
                         </h3>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-700 font-medium">Price per day:</span>
-                            <span className="text-2xl font-bold text-green-600">
-                              LKR {driver.pricePerDay.toLocaleString()}
-                            </span>
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                            <div>
+                              <span className="text-gray-800 font-bold text-lg">Price per day:</span>
+                              <p className="text-sm text-gray-600 mt-1">Full day safari tours</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-3xl font-black text-emerald-600">
+                                LKR {driver.pricePerDay.toLocaleString()}
+                              </span>
+                              <span className="text-sm font-semibold text-gray-500 block">/day</span>
+                            </div>
                           </div>
                           {driver.pricePerHour && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-700 font-medium">Price per hour:</span>
-                              <span className="text-xl font-bold text-green-600">
-                                LKR {driver.pricePerHour.toLocaleString()}
-                              </span>
+                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                              <div>
+                                <span className="text-gray-800 font-bold text-lg">Price per hour:</span>
+                                <p className="text-sm text-gray-600 mt-1">Hourly rate</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-2xl font-black text-emerald-600">
+                                  LKR {driver.pricePerHour.toLocaleString()}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-500 block">/hour</span>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1036,27 +1288,29 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     )}
 
                     {/* Availability */}
-                    <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                        <CalendarIcon className="text-green-600 mr-2" size={20} />
+                    <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                      <h3 className="font-bold text-gray-900 mb-4 flex items-center text-lg">
+                        <div className="p-2 bg-emerald-600 rounded-xl mr-3 shadow-lg">
+                          <CalendarIcon className="text-white" size={22} />
+                        </div>
                         Availability
                       </h3>
                       {driver.availableDates && driver.availableDates.length > 0 ? (
                         <div className="space-y-3">
-                          <p className="text-gray-600">
+                          <p className="text-gray-700 font-medium">
                             Available on {driver.availableDates.length} dates
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {driver.availableDates.slice(0, 6).map((date, index) => (
                               <span
                                 key={index}
-                                className="bg-green-100 text-green-800 px-3 py-1 rounded text-sm border border-green-200 font-medium"
+                                className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg text-sm border-2 border-emerald-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
                               >
                                 {new Date(date).toLocaleDateString()}
                               </span>
                             ))}
                             {driver.availableDates.length > 6 && (
-                              <span className="text-gray-500 text-sm font-medium">
+                              <span className="text-gray-600 text-sm font-semibold">
                                 +{driver.availableDates.length - 6} more dates
                               </span>
                             )}
@@ -1069,12 +1323,22 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Service Description */}
                     {driver.description && (
-                      <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <h3 className="font-semibold text-gray-900 mb-2">Service Details</h3>
-                        <p className="text-gray-600 leading-relaxed">{driver.description}</p>
+                      <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <h3 className="font-bold text-gray-900 mb-3 text-lg">Service Details</h3>
+                        <p className="text-gray-700 leading-relaxed text-base">{driver.description}</p>
                       </div>
                     )}
                   </div>
+                )}
+
+
+                {activeTab === 'reviews' && (
+                  <ReviewSection 
+                    driverId={driverId}
+                    currentUser={currentUser}
+                    userRole={userRole}
+                    onReviewAdded={handleReviewAdded}
+                  />
                 )}
 
                 {/* Booking Tab */}
@@ -1087,7 +1351,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         <DatePickerCalendar 
                           selectedDates={selectedDates}
                           onDateSelect={handleDateSelect}
-                          availableDates={driver.availableDates}
                         />
                       </div>
 
@@ -1142,16 +1405,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     </div>
                   </div>
                 )}
-
-{/* // In the reviews tab section of JeepProfile.jsx, replace with: */}
-{activeTab === 'reviews' && (
-  <ReviewSection 
-    driverId={driverId}
-    currentUser={currentUser}
-    userRole={userRole}
-    onReviewAdded={handleReviewAdded}
-  />
-)}
 
                 {/* Chat Tab */}
                 {activeTab === 'chat' && (

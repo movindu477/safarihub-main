@@ -222,6 +222,14 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
         onReviewAdded();
       }
       
+      // Scroll to top of reviews section after a short delay to ensure DOM update
+      setTimeout(() => {
+        const reviewsSection = document.getElementById('reviews-section');
+        if (reviewsSection) {
+          reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+      
       console.log('✅ Review submitted successfully!');
 
     } catch (error) {
@@ -368,6 +376,18 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
 
   // Check if user can write a review
   const canWriteReview = currentUser && (userRole === 'tourist' || !userRole);
+  
+  // Debug logging
+  useEffect(() => {
+    if (activeTab === 'write') {
+      console.log('📝 Write review tab active');
+      console.log('👤 Current user:', currentUser?.uid);
+      console.log('🎭 User role:', userRole);
+      console.log('✅ Can write review:', canWriteReview);
+      console.log('📊 Current review text:', reviewText);
+      console.log('⭐ Current rating:', rating);
+    }
+  }, [activeTab, currentUser, userRole, canWriteReview, reviewText, rating]);
 
   if (loading) {
     return (
@@ -384,10 +404,13 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
     <div className="space-y-6">
       {/* Success Message */}
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 shadow-lg animate-pulse">
           <div className="flex items-center">
-            <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
-            <p className="text-green-700 text-sm font-medium">{success}</p>
+            <CheckCircle className="h-6 w-6 text-green-500 mr-3" />
+            <div>
+              <p className="text-green-800 font-bold text-base">{success}</p>
+              <p className="text-green-600 text-sm mt-1">Your review is now visible to all users!</p>
+            </div>
           </div>
         </div>
       )}
@@ -482,13 +505,27 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
       </div>
 
       {/* Write Review Form */}
-      {activeTab === 'write' && canWriteReview && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            {userReview ? 'Edit Your Review' : 'Share Your Experience'}
-          </h3>
-          
-          <form onSubmit={handleSubmitReview} className="space-y-4">
+      {activeTab === 'write' && (
+        <div className="bg-white rounded-lg border-2 border-emerald-200 shadow-lg p-6">
+          {!canWriteReview ? (
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 text-center">
+              <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-yellow-900 mb-2">Cannot Write Review</h3>
+              {!currentUser ? (
+                <p className="text-yellow-800">Please login to write a review.</p>
+              ) : userRole === 'provider' ? (
+                <p className="text-yellow-800">Service providers cannot review other service providers.</p>
+              ) : (
+                <p className="text-yellow-800">You don't have permission to write a review.</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {userReview ? 'Edit Your Review' : 'Share Your Experience'}
+              </h3>
+              
+              <form onSubmit={handleSubmitReview} className="space-y-4" noValidate>
             {/* Star Rating */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -526,17 +563,41 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
               </label>
               <textarea
                 value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  console.log('Textarea onChange triggered, value length:', newValue.length);
+                  setReviewText(newValue);
+                }}
+                onKeyDown={(e) => {
+                  console.log('Key pressed:', e.key);
+                }}
+                onClick={() => {
+                  console.log('Textarea clicked');
+                }}
                 placeholder="Share your experience with this driver... What did you like? What could be improved? Be specific about the service, vehicle condition, knowledge, and overall experience."
                 rows="6"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none bg-white text-gray-900 placeholder-gray-400 transition-all duration-200 hover:border-emerald-300"
+                style={{ 
+                  pointerEvents: submitting ? 'none' : 'auto',
+                  cursor: submitting ? 'not-allowed' : 'text'
+                }}
                 required
                 minLength="10"
+                disabled={submitting}
+                readOnly={submitting}
+                autoComplete="off"
+                spellCheck="true"
               />
-              <p className="text-sm text-gray-500 mt-1">
-                Minimum 10 characters. Your review will be visible to all users.
-                {reviewText.length > 0 && ` (${reviewText.length}/10)`}
-              </p>
+              <div className="flex justify-between items-center mt-1">
+                <p className="text-sm text-gray-500">
+                  Minimum 10 characters. Your review will be visible to all users.
+                </p>
+                <p className={`text-sm font-medium ${
+                  reviewText.length >= 10 ? 'text-green-600' : 'text-gray-500'
+                }`}>
+                  {reviewText.length}/10 characters
+                </p>
+              </div>
             </div>
 
             {/* Submit Buttons */}
@@ -582,12 +643,14 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
               </button>
             </div>
           </form>
+            </>
+          )}
         </div>
       )}
 
       {/* Reviews List */}
       {activeTab === 'reviews' && (
-        <div className="space-y-4">
+        <div id="reviews-section" className="space-y-4">
           {reviews.length === 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
               <Star className="h-12 w-12 text-gray-300 mx-auto mb-3" />
@@ -613,11 +676,19 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
             </div>
           ) : (
             <div className="space-y-4">
-              {reviews.map((review) => (
+              {reviews.map((review, index) => (
                 <div 
                   key={review.id}
                   id={`review-${review.id}`}
-                  className="bg-white rounded-lg border border-gray-200 p-6 transition-all duration-300"
+                  className={`bg-white rounded-lg border-2 p-6 transition-all duration-300 ${
+                    currentUser?.uid === review.userId 
+                      ? 'border-emerald-300 bg-emerald-50/30 shadow-md' 
+                      : 'border-gray-200'
+                  } ${
+                    index === 0 && currentUser?.uid === review.userId
+                      ? 'animate-pulse border-emerald-400'
+                      : ''
+                  }`}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
