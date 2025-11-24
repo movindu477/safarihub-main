@@ -62,24 +62,24 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
   return (
     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-h-96 overflow-hidden w-80 sm:w-96">
       {/* Header */}
-      <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-4">
+      <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-lg">Notifications</h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-yellow-400 rounded-full transition-colors"
+            className="p-1 hover:bg-green-400 rounded-full transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="flex justify-between items-center mt-1">
-          <p className="text-yellow-100 text-sm">
+          <p className="text-green-100 text-sm">
             {notifications.filter(n => !n.read).length} unread
           </p>
           {notifications.filter(n => !n.read).length > 0 && (
             <button
               onClick={handleMarkAllAsRead}
-              className="text-yellow-200 hover:text-white text-xs underline"
+              className="text-green-200 hover:text-white text-xs underline"
             >
               Mark all read
             </button>
@@ -127,11 +127,21 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                       {notification.message || 'New notification'}
                     </p>
                     
-                    {/* Booking Details */}
+                    {/* Booking Details - Show sender name and selected dates */}
                     {notification.type === 'booking' && notification.bookingData && (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-2 mb-2 text-xs">
+                        <p className="text-green-800 font-semibold mb-1">
+                          <strong>From:</strong> {notification.senderName || notification.bookingData.customerName || 'Customer'}
+                        </p>
                         <p className="text-green-800">
-                          <strong>Dates:</strong> {notification.bookingData.dates}
+                          <strong>Selected Dates:</strong> {notification.bookingData.dates || (notification.bookingData.selectedDates ? notification.bookingData.selectedDates.map((d, idx) => {
+                            try {
+                              const date = new Date(d);
+                              return date.toLocaleDateString();
+                            } catch {
+                              return d;
+                            }
+                          }).join(', ') : 'N/A')}
                         </p>
                         <p className="text-green-800">
                           <strong>Days:</strong> {notification.bookingData.numberOfDays} • <strong>Total:</strong> LKR {notification.bookingData.totalPrice?.toLocaleString() || '0'}

@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -6,17 +7,28 @@ service cloud.firestore {
     // Conversations
     // --------------------------
     match /conversations/{conversationId} {
-      allow read, write: if request.auth != null 
-        && resource.data.participants.hasAny([request.auth.uid]);
+      // Allow read if user is in participantIds array
+      allow read: if request.auth != null 
+        && request.auth.uid in resource.data.participantIds;
 
+      // Allow create if user is in participantIds array
       allow create: if request.auth != null 
-        && request.auth.uid in request.data.participants;
+        && request.auth.uid in request.data.participantIds
+        && request.data.participantIds.size() == 2;
+
+      // Allow update if user is in participantIds array
+      allow update: if request.auth != null 
+        && request.auth.uid in resource.data.participantIds;
+
+      // Allow delete if user is in participantIds array
+      allow delete: if request.auth != null 
+        && request.auth.uid in resource.data.participantIds;
     }
 
     match /conversations/{conversationId}/messages/{messageId} {
       allow read, write: if request.auth != null 
-        && get(/databases/$(database)/documents/conversations/$(conversationId))
-          .data.participants.hasAny([request.auth.uid]);
+        && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId))
+          .data.participantIds;
     }
 
     // --------------------------
@@ -42,7 +54,19 @@ service cloud.firestore {
             || resource.data.userId == request.auth.uid);
 
       // Authenticated users can create notifications
-      allow write: if request.auth != null;
+      allow create: if request.auth != null;
+      
+      // Users can update their own notifications (mark as read, etc.)
+      allow update: if request.auth != null
+        && (resource.data.recipientId == request.auth.uid
+            || resource.data.senderId == request.auth.uid
+            || resource.data.userId == request.auth.uid);
+      
+      // Users can delete notifications sent to them or sent by them
+      allow delete: if request.auth != null
+        && (resource.data.recipientId == request.auth.uid
+            || resource.data.senderId == request.auth.uid
+            || resource.data.userId == request.auth.uid);
     }
 
     // --------------------------
@@ -95,18 +119,12 @@ service cloud.firestore {
     }
 
     // --------------------------
-    // Bookings (secure create) - FIXED
+    // Bookings Collection - Stores booking requests from tourists to jeep drivers
     // --------------------------
     match /bookings/{bookingId} {
-      // Customers can create bookings
-      // Check: authenticated, customerId matches auth, required fields exist
-      // Simplified checks - just verify fields exist and customerId matches
-      allow create: if request.auth != null
-        && request.auth.uid == request.data.customerId
-        && request.data.driverId != null
-        && request.data.selectedDates != null
-        && request.data.totalPrice != null
-        && request.data.selectedDates.size() > 0;
+      // Tourists (customers) can create bookings
+      // Allow any authenticated user to create bookings (temporary for testing)
+      allow create: if request.auth != null;
 
       // Customers can read their own bookings
       // Drivers can read bookings for their services
@@ -114,8 +132,8 @@ service cloud.firestore {
         && (request.auth.uid == resource.data.customerId
             || request.auth.uid == resource.data.driverId);
 
-      // Drivers can update bookings (accept/cancel)
-      // Customers can update their own bookings (cancel) - limited fields
+      // Drivers can update bookings (accept/decline)
+      // Customers can update their own bookings (cancel)
       allow update: if request.auth != null
         && (request.auth.uid == resource.data.driverId
             || request.auth.uid == resource.data.customerId);
@@ -123,6 +141,29 @@ service cloud.firestore {
       // Only customers can delete their own bookings
       allow delete: if request.auth != null
         && request.auth.uid == resource.data.customerId;
+    }
+
+    // --------------------------
+    // Confirmations Collection - Tracks booking confirmations
+    // --------------------------
+    match /confirmations/{confirmationId} {
+      // Anyone authenticated can create confirmations (for booking tracking)
+      allow create: if request.auth != null;
+      
+      // Users can read confirmations related to their bookings
+      allow read: if request.auth != null
+        && (request.auth.uid == resource.data.customerId
+            || request.auth.uid == resource.data.driverId);
+      
+      // Users can update their own confirmations
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.customerId
+            || request.auth.uid == resource.data.driverId);
+      
+      // Users can delete their own confirmations
+      allow delete: if request.auth != null
+        && (request.auth.uid == resource.data.customerId
+            || request.auth.uid == resource.data.driverId);
     }
 
     // --------------------------

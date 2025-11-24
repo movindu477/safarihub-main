@@ -402,6 +402,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [selectedDates, setSelectedDates] = useState([]);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessageData, setSuccessMessageData] = useState(null);
+  const [isBooking, setIsBooking] = useState(false);
   
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
@@ -475,45 +476,107 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   };
 
   const handleBooking = async () => {
+    // Prevent double-clicks
+    if (isBooking) {
+      console.warn('⚠️ Booking already in progress, ignoring click');
+      return;
+    }
+    
+    console.log('🔵 handleBooking called');
+    console.log('🔵 Current state:', {
+      selectedDates: selectedDates.length,
+      currentUser: !!currentUser,
+      driver: !!driver,
+      driverId: driver?.id,
+      isBooking: isBooking
+    });
+    
     if (selectedDates.length === 0) {
+      console.warn('⚠️ No dates selected');
       alert('Please select at least one date for your booking.');
       return;
     }
     
     if (!currentUser) {
+      console.warn('⚠️ No current user');
       alert('Please login to make a booking.');
       return;
     }
     
     if (!driver) {
+      console.warn('⚠️ No driver data');
       alert('Driver information not available.');
       return;
     }
+      
+      // Verify driver has a valid ID
+      if (!driver.id) {
+        console.error('❌ Driver ID is missing:', driver);
+        alert('Driver information is incomplete. Please try again.');
+        return;
+      }
+      
+    console.log('✅ All pre-checks passed, starting booking process...');
+    setIsBooking(true);
     
     try {
       // Get the authenticated user directly from Firebase Auth
       // This ensures we have the most up-to-date auth state
       const authUser = auth.currentUser;
       
+      console.log('🔐 Auth check:', {
+        authUser: !!authUser,
+        authUserUid: authUser?.uid,
+        authUserEmail: authUser?.email,
+        currentUser: !!currentUser,
+        currentUserUid: currentUser?.uid
+      });
+      
       if (!authUser) {
-        alert('Please login to make a booking.');
+        console.error('❌ No authenticated user found');
+        alert('Please login to make a booking. No authenticated user found.');
         return;
       }
       
       // Verify we have a valid user ID
       if (!authUser.uid) {
+        console.error('❌ No user ID found in auth user');
         alert('Authentication error. Please try logging in again.');
         return;
+      }
+      
+      // Verify user is logged in as tourist (optional check, but helpful for debugging)
+      try {
+        const touristDoc = await getDoc(doc(db, 'tourists', authUser.uid));
+        if (!touristDoc.exists()) {
+          console.warn('⚠️ User is not in tourists collection. They might be a provider.');
+        } else {
+          console.log('✅ User confirmed as tourist');
+        }
+      } catch (roleCheckError) {
+        console.warn('⚠️ Could not verify user role:', roleCheckError);
       }
       
       const totalPrice = selectedDates.length * (driver.pricePerDay || 0);
       const datesString = selectedDates.map(d => d.toLocaleDateString()).join(', ');
       
+      // Get driver email from driver data (could be contactEmail, email, or from auth)
+      const driverEmail = driver.contactEmail || driver.email || '';
+      
+      // Validate driver ID before proceeding
+      const driverIdString = String(driver.id || '');
+      if (!driverIdString || driverIdString === 'undefined' || driverIdString === 'null' || driverIdString.trim() === '') {
+        console.error('❌ Invalid driver ID:', driver.id);
+        alert('Invalid driver information. Please refresh the page and try again.');
+        return;
+      }
+      
       // Create booking in Firestore
       // Ensure all fields match Firestore rules requirements exactly
       const bookingData = {
-        driverId: String(driver.id), // Must be a string
-        driverName: driver.fullName || '',
+        driverId: driverIdString, // Must be a string
+        driverName: driver.fullName || driver.driverName || 'Driver',
+        driverEmail: driverEmail, // Store driver email in booking
         customerId: authUser.uid, // MUST match request.auth.uid
         customerName: authUser.displayName || 'Customer',
         customerEmail: authUser.email || '',
@@ -531,48 +594,172 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       // Log booking data for debugging
       console.log('📝 Creating booking with data:', {
         authUid: authUser.uid,
+        authUserEmail: authUser.email,
         customerId: bookingData.customerId,
         customerIdMatch: authUser.uid === bookingData.customerId,
         driverId: bookingData.driverId,
         driverIdType: typeof bookingData.driverId,
+        driverIdIsString: typeof bookingData.driverId === 'string',
+        driverIdLength: String(bookingData.driverId).length,
         selectedDates: bookingData.selectedDates,
         selectedDatesType: Array.isArray(bookingData.selectedDates) ? 'array' : typeof bookingData.selectedDates,
+        selectedDatesIsArray: Array.isArray(bookingData.selectedDates),
         selectedDatesLength: bookingData.selectedDates.length,
         totalPrice: bookingData.totalPrice,
-        totalPriceType: typeof bookingData.totalPrice
+        totalPriceType: typeof bookingData.totalPrice,
+        totalPriceIsNumber: typeof bookingData.totalPrice === 'number',
+        fullBookingData: bookingData
       });
       
-      // Create the booking document
-      const bookingRef = collection(db, 'bookings');
-      const bookingDoc = await addDoc(bookingRef, bookingData);
-      const bookingId = bookingDoc.id;
-      
-      console.log('✅ Booking created with ID:', bookingId);
-      
-      // Create notification for driver
-      await createNotification({
-        type: 'booking',
-        title: 'New Booking Request',
-        message: `You have a new booking request from ${authUser.displayName || 'a customer'} for ${selectedDates.length} day(s). Dates: ${datesString}. Total: LKR ${totalPrice.toLocaleString()}`,
-        recipientId: driver.id,
-        senderId: authUser.uid,
-        senderName: authUser.displayName || 'Customer',
-        relatedId: bookingId,
-        bookingId: bookingId,
-        bookingData: {
-          dates: datesString,
-          numberOfDays: selectedDates.length,
-          totalPrice: totalPrice,
-          customerName: authUser.displayName || 'Customer'
+      // Create the booking document in Firestore 'bookings' collection
+      // This is the critical operation - if this fails, the whole booking fails
+      console.log('🔐 Pre-booking validation:', {
+        authUserExists: !!authUser,
+        authUserUid: authUser?.uid,
+        authUserEmail: authUser?.email,
+        customerId: bookingData.customerId,
+        customerIdMatch: authUser?.uid === bookingData.customerId,
+        driverId: bookingData.driverId,
+        driverIdType: typeof bookingData.driverId,
+        selectedDatesCount: bookingData.selectedDates.length,
+        selectedDatesIsArray: Array.isArray(bookingData.selectedDates),
+        totalPrice: bookingData.totalPrice,
+        totalPriceType: typeof bookingData.totalPrice,
+        allFieldsPresent: {
+          customerId: !!bookingData.customerId,
+          driverId: !!bookingData.driverId,
+          selectedDates: !!bookingData.selectedDates,
+          totalPrice: bookingData.totalPrice !== null && bookingData.totalPrice !== undefined
         }
       });
       
-      // Show success animation
+      // Double-check data types before sending
+      const validatedBookingData = {
+        ...bookingData,
+        driverId: String(bookingData.driverId), // Ensure it's a string
+        selectedDates: Array.isArray(bookingData.selectedDates) ? bookingData.selectedDates : [],
+        totalPrice: Number(bookingData.totalPrice) // Ensure it's a number
+      };
+      
+      console.log('✅ Validated booking data:', validatedBookingData);
+      
+      const bookingRef = collection(db, 'bookings');
+      let bookingId;
+      
+      // Store bookingData in outer scope for error handling
+      const finalBookingData = validatedBookingData;
+      
+      try {
+        console.log('🚀 Attempting to create booking in Firestore...');
+        console.log('🚀 Data being sent:', {
+          customerId: finalBookingData.customerId,
+          driverId: finalBookingData.driverId,
+          selectedDates: finalBookingData.selectedDates,
+          selectedDatesLength: finalBookingData.selectedDates.length,
+          totalPrice: finalBookingData.totalPrice,
+          authUid: authUser.uid,
+          match: authUser.uid === finalBookingData.customerId,
+          fullData: JSON.stringify(finalBookingData, null, 2)
+        });
+        
+        // Final validation before sending
+        if (authUser.uid !== finalBookingData.customerId) {
+          throw new Error('Customer ID mismatch! Auth UID: ' + authUser.uid + ', Customer ID: ' + finalBookingData.customerId);
+        }
+        
+        console.log('✅ Validation passed, creating document...');
+        const bookingDoc = await addDoc(bookingRef, finalBookingData);
+        bookingId = bookingDoc.id;
+        
+        console.log('✅ Booking created successfully with ID:', bookingId);
+        console.log('📦 Booking stored in Firestore:', {
+          collection: 'bookings',
+          documentId: bookingId,
+          customerId: finalBookingData.customerId,
+          driverId: finalBookingData.driverId,
+          totalPrice: finalBookingData.totalPrice,
+          numberOfDays: finalBookingData.numberOfDays
+        });
+      } catch (bookingError) {
+        console.error('❌ CRITICAL: Failed to create booking document:', bookingError);
+        console.error('❌ Booking error details:', {
+          code: bookingError.code,
+          message: bookingError.message,
+          stack: bookingError.stack,
+          dataSent: {
+            customerId: finalBookingData.customerId,
+            driverId: finalBookingData.driverId,
+            selectedDatesLength: finalBookingData.selectedDates.length,
+            totalPrice: finalBookingData.totalPrice
+          }
+        });
+        throw bookingError; // Re-throw to be caught by outer catch block
+      }
+      
+      // Also create a confirmation record in a 'confirmations' subcollection for better tracking
+      try {
+        const confirmationRef = collection(db, 'confirmations');
+        const confirmationData = {
+          bookingId: bookingId,
+          ...bookingData,
+          confirmationStatus: 'pending',
+          confirmedAt: serverTimestamp(),
+          confirmationType: 'booking_request'
+        };
+        const confirmationDoc = await addDoc(confirmationRef, confirmationData);
+        console.log('✅ Confirmation record created with ID:', confirmationDoc.id);
+      } catch (confirmationError) {
+        console.warn('⚠️ Could not create confirmation record (non-critical):', confirmationError);
+        // Don't fail the booking if confirmation record fails
+      }
+      
+      // Create comprehensive notification for driver with all booking details
+      // Wrap in try-catch so notification failure doesn't break the booking
+      try {
+        const notificationData = {
+          type: 'booking',
+          title: 'New Booking Request',
+          message: `You have a new booking request from ${authUser.displayName || 'a customer'} for ${selectedDates.length} day(s). Dates: ${datesString}. Total: LKR ${totalPrice.toLocaleString()}`,
+          recipientId: driver.id, // Driver's user ID (from serviceProviders collection)
+          senderId: authUser.uid, // Tourist's user ID
+          senderName: authUser.displayName || 'Customer', // Tourist's name
+          senderEmail: authUser.email || '', // Tourist's email
+          driverEmail: driverEmail, // Driver's email stored in booking
+          relatedId: bookingId,
+          bookingId: bookingId,
+          bookingData: {
+            dates: datesString, // Formatted dates string for display
+            selectedDates: selectedDates.map(d => d.toISOString()), // ISO date strings
+            numberOfDays: selectedDates.length,
+            totalPrice: totalPrice,
+            customerName: authUser.displayName || 'Customer',
+            customerEmail: authUser.email || '',
+            driverId: driver.id,
+            driverName: driver.fullName || driver.driverName || 'Driver',
+            driverEmail: driverEmail,
+            pricePerDay: driver.pricePerDay || 0,
+            status: 'pending'
+          }
+        };
+        
+        const notificationId = await createNotification(notificationData);
+        console.log('✅ Notification created for driver:', {
+          notificationId: notificationId,
+          recipientId: driver.id,
+          bookingId: bookingId
+        });
+      } catch (notificationError) {
+        console.warn('⚠️ Could not create notification (non-critical):', notificationError);
+        // Don't fail the booking if notification fails - booking is already created
+      }
+      
+      // Show success animation with booking ID
       setSuccessMessageData({
         driverName: driver.fullName,
         dates: datesString,
         totalPrice: totalPrice,
-        numberOfDays: selectedDates.length
+        numberOfDays: selectedDates.length,
+        bookingId: bookingId
       });
       setShowSuccessMessage(true);
       
@@ -583,20 +770,53 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       
       // Reset selected dates
       setSelectedDates([]);
+      setIsBooking(false);
+      
+      // Auto-refresh page after 3 seconds to show updated data
+      setTimeout(() => {
+        console.log('🔄 Auto-refreshing page...');
+        window.location.reload(true);
+      }, 3000);
       
     } catch (error) {
+      setIsBooking(false);
       console.error('❌ Error creating booking:', error);
       console.error('❌ Error code:', error.code);
       console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
       console.error('❌ Full error:', JSON.stringify(error, null, 2));
       
+      // Hide any success message that might have been shown
+      setShowSuccessMessage(false);
+      setSuccessMessageData(null);
+      
       let errorMessage = 'Failed to create booking. ';
+      
+      // Get auth user for error details
+      const authUserForError = auth.currentUser;
+      
       if (error.code === 'permission-denied') {
-        errorMessage += 'Permission denied. Please ensure:\n1. You are logged in\n2. Firestore rules are deployed\n3. Your user ID matches the customerId';
-      } else if (error.message) {
-        errorMessage += error.message;
+        console.error('❌ Permission denied details:', {
+          authUser: authUserForError?.uid,
+          authUserEmail: authUserForError?.email,
+          errorCode: error.code,
+          errorMessage: error.message
+        });
+        errorMessage = 'Unable to complete your booking request.\n\nThis may be due to:\n• Your session may have expired\n• Database permissions need to be updated\n\nPlease try:\n1. Log out and log back in\n2. Wait a few moments and try again\n\nIf the problem continues, please contact support.';
+      } else if (error.code === 'unavailable') {
+        errorMessage = 'Unable to connect to the server.\n\nPlease check your internet connection and try again.';
+      } else if (error.code === 'failed-precondition') {
+        errorMessage = 'The booking system is temporarily unavailable.\n\nPlease refresh the page and try again in a few moments.';
+      } else if (error.message && !error.message.includes('localhost')) {
+        // Only show error message if it doesn't contain localhost
+        const cleanMessage = error.message.replace(/localhost:\d+/g, '').trim();
+        if (cleanMessage) {
+          errorMessage = `Booking failed: ${cleanMessage}`;
+        } else {
+          errorMessage = 'An unexpected error occurred while processing your booking.\n\nPlease try again. If the problem persists, please contact support.';
+        }
       } else {
-        errorMessage += 'Please try again.';
+        errorMessage = 'An unexpected error occurred while processing your booking.\n\nPlease try again. If the problem persists, please contact support.';
       }
       
       alert(errorMessage);
@@ -862,11 +1082,19 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               
               {/* Success Message */}
               <h2 className="text-2xl font-bold text-gray-900 mb-2 animate-fadeIn">
-                Booking Request Sent! 🎉
+                Booking Confirmed! 🎉
               </h2>
-              <p className="text-gray-600 mb-6">
-                Your booking request has been sent to the driver.
+              <p className="text-gray-600 mb-2">
+                Your booking request has been successfully sent to the driver.
               </p>
+              <p className="text-sm text-emerald-600 font-semibold mb-6">
+                The driver will receive a notification and can accept or decline your booking.
+              </p>
+              {successMessageData.bookingId && (
+                <p className="text-xs text-gray-500 mb-4">
+                  Booking ID: {successMessageData.bookingId.substring(0, 8)}...
+                </p>
+              )}
               
               {/* Booking Details */}
               <div className="bg-emerald-50 rounded-xl p-4 mb-6 text-left space-y-2">
@@ -1385,10 +1613,37 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                               </div>
                               
                               <button
-                                onClick={handleBooking}
-                                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium mt-4 shadow-md"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log('🔵 Confirm Booking button clicked');
+                                  console.log('🔵 Button state:', {
+                                    selectedDates: selectedDates.length,
+                                    currentUser: !!currentUser,
+                                    driver: !!driver,
+                                    isBooking: isBooking
+                                  });
+                                  if (!isBooking) {
+                                    handleBooking().catch((error) => {
+                                      console.error('❌ Unhandled error in handleBooking:', error);
+                                      setIsBooking(false);
+                                      alert('An unexpected error occurred. Please check the console (F12) for details.');
+                                    });
+                                  }
+                                }}
+                                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium mt-4 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                disabled={selectedDates.length === 0 || isBooking}
                               >
-                                Confirm Booking
+                                {isBooking ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                    Processing...
+                                  </>
+                                ) : selectedDates.length === 0 ? (
+                                  'Select Dates First'
+                                ) : (
+                                  'Confirm Booking'
+                                )}
                               </button>
                             </div>
                           )}

@@ -1146,8 +1146,8 @@ useEffect(() => {
                             </div>
                             <div className="text-right">
                               <span className="text-3xl font-black text-emerald-600">
-                                {getCurrencySymbol(guide.currencyPreference)}{guide.hourlyRate.toLocaleString()}
-                              </span>
+                              {getCurrencySymbol(guide.currencyPreference)}{guide.hourlyRate.toLocaleString()}
+                            </span>
                               <span className="text-sm font-semibold text-gray-500 block">/hour</span>
                             </div>
                           </div>
@@ -1161,8 +1161,8 @@ useEffect(() => {
                             </div>
                             <div className="text-right">
                               <span className="text-3xl font-black text-emerald-600">
-                                {getCurrencySymbol(guide.currencyPreference)}{guide.dailyRate.toLocaleString()}
-                              </span>
+                              {getCurrencySymbol(guide.currencyPreference)}{guide.dailyRate.toLocaleString()}
+                            </span>
                               <span className="text-sm font-semibold text-gray-500 block">/day</span>
                             </div>
                           </div>

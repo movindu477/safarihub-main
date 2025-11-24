@@ -803,13 +803,20 @@ export const createNotification = async (notificationData) => {
       ...notificationData,
       read: false,
       timestamp: serverTimestamp(),
-      timestampValue: Date.now()
+      timestampValue: Date.now(),
+      createdAt: serverTimestamp(),
+      createdAtValue: Date.now()
     });
     
-    console.log(`✅ Notification created for user ${notificationData.recipientId}`);
+    console.log(`✅ Notification created for user ${notificationData.recipientId}`, {
+      notificationId: notificationDoc.id,
+      type: notificationData.type,
+      recipientId: notificationData.recipientId,
+      bookingId: notificationData.bookingId || 'N/A'
+    });
     return notificationDoc.id;
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('❌ Error creating notification:', error);
     throw error;
   }
 };

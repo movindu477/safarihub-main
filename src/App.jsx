@@ -677,7 +677,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
 
         <button
           onClick={handleBellClick}
-          className="relative bg-yellow-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110"
+          className="relative bg-green-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-600"
         >
           <Bell className="h-6 w-6 text-white" />
           {notifications.filter(n => !n.read).length > 0 && (
