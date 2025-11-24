@@ -54,6 +54,7 @@ import DestinationApp from "./components/destination/App";
 
 // Import Guide App
 import GuideApp from "./components/guide/App";
+import GuideProfile from "./components/guide/GuideProfile";
 
 // 🔥 Firebase Config
 const firebaseConfig = {
@@ -886,7 +887,7 @@ function App() {
         <Route 
           path="/guide-profile/:guideId" 
           element={
-            <GuideApp 
+            <GuideProfile 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}

@@ -152,11 +152,11 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
               className={`
                 h-8 text-sm rounded-lg transition-all
                 ${selected 
-                  ? 'bg-blue-600 text-white font-medium' 
+                  ? 'bg-emerald-600 text-white font-medium' 
                   : available
                     ? isToday
-                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                      : 'bg-gray-50 text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                      : 'bg-gray-50 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }
               `}
@@ -168,13 +168,13 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
       </div>
       
       {selectedDates.length > 0 && (
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 className="font-medium text-blue-800 mb-2">Selected Dates:</h4>
+        <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+          <h4 className="font-medium text-emerald-800 mb-2">Selected Dates:</h4>
           <div className="flex flex-wrap gap-2">
             {selectedDates.map((date, index) => (
               <span 
                 key={index}
-                className="bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                className="bg-emerald-600 text-white px-2 py-1 rounded text-xs"
               >
                 {date.toLocaleDateString()}
               </span>
@@ -278,7 +278,7 @@ const ChatModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-xl">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-t-xl">
           <div className="flex items-center space-x-3">
             <div className="relative">
               <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
@@ -287,7 +287,7 @@ const ChatModal = ({
             </div>
             <div>
               <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
-              <p className="text-blue-100 text-sm">
+              <p className="text-emerald-100 text-sm">
                 {otherUser?.role === 'tourist' ? 'Tourist' : 'Tour Guide'}
               </p>
             </div>
@@ -317,19 +317,19 @@ const ChatModal = ({
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                       msg.senderId === currentUser?.uid
-                        ? 'bg-blue-600 text-white rounded-br-none'
+                        ? 'bg-emerald-600 text-white rounded-br-none'
                         : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
                     }`}
                   >
                     <p className="text-sm">{msg.content}</p>
                     <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-blue-100' : 'text-gray-500'
+                      msg.senderId === currentUser?.uid ? 'text-emerald-100' : 'text-gray-500'
                     }`}>
                       <span>{formatTime(msg.timestamp)}</span>
                       {msg.senderId === currentUser?.uid && (
                         <span className="flex items-center space-x-1">
                           {msg.read ? (
-                            <CheckCheck size={12} className="text-blue-300" title="Read" />
+                            <CheckCheck size={12} className="text-emerald-300" title="Read" />
                           ) : msg.delivered ? (
                             <CheckCheck size={12} className="text-gray-300" title="Delivered" />
                           ) : (
@@ -353,13 +353,13 @@ const ChatModal = ({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Type your message..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               disabled={sending}
             />
             <button
               type="submit"
               disabled={!message.trim() || sending}
-              className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="bg-emerald-600 text-white p-3 rounded-full hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {sending ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -754,9 +754,9 @@ useEffect(() => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading guide profile...</p>
         </div>
       </div>
@@ -765,14 +765,14 @@ useEffect(() => {
 
   if (error || !guide) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Guide Not Found</h2>
           <p className="text-gray-600 mb-4">{error || "The guide you're looking for doesn't exist."}</p>
           <button
             onClick={() => navigate('/guides')}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
           >
             Browse All Guides
           </button>
@@ -782,7 +782,7 @@ useEffect(() => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-gray-100">
       <ChatModal 
         isOpen={isChatModalOpen}
         onClose={() => setIsChatModalOpen(false)}
@@ -803,7 +803,7 @@ useEffect(() => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <button
-                onClick={() => navigate('/guides')}
+                onClick={() => navigate('/guide')}
                 className="flex items-center text-gray-600 hover:text-gray-900 mr-4 transition-colors"
               >
                 <ArrowLeft size={20} className="mr-2" />
@@ -826,7 +826,7 @@ useEffect(() => {
                   <img
                     src={guide.imageUrl || "/api/placeholder/120/120"}
                     alt={guide.guideName}
-                    className="w-32 h-32 rounded-full object-cover border-4 border-blue-500 mx-auto mb-4 shadow-md"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-emerald-500 mx-auto mb-4 shadow-md"
                   />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900">{guide.guideName}</h2>
@@ -847,21 +847,21 @@ useEffect(() => {
               <div className="space-y-4 mb-6">
                 {guide.contactPhone && guide.contactPhone !== 'Not provided' && (
                   <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <Phone size={18} className="mr-3 text-blue-600" />
+                    <Phone size={18} className="mr-3 text-emerald-600" />
                     <span className="font-medium">{guide.contactPhone}</span>
                   </div>
                 )}
                 
                 {guide.contactEmail && (
                   <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <Mail size={18} className="mr-3 text-blue-600" />
+                    <Mail size={18} className="mr-3 text-emerald-600" />
                     <span className="font-medium">{guide.contactEmail}</span>
                   </div>
                 )}
                 
                 {guide.location && (
                   <div className="flex items-center text-gray-600 p-2 rounded-lg bg-gray-50">
-                    <MapPin size={18} className="mr-3 text-blue-600" />
+                    <MapPin size={18} className="mr-3 text-emerald-600" />
                     <span className="font-medium">{guide.location}</span>
                   </div>
                 )}
@@ -873,23 +873,23 @@ useEffect(() => {
                   <>
                     <button
                       onClick={handleOpenChatModal}
-                      className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center font-medium shadow-md"
+                      className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center font-medium shadow-md"
                     >
                       <MessageCircle size={18} className="mr-2" />
                       Send Message
                     </button>
                     
                     {selectedDates.length > 0 && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-blue-800 font-medium">Total:</span>
-                          <span className="text-blue-800 font-bold text-lg">
+                          <span className="text-emerald-800 font-medium">Total:</span>
+                          <span className="text-emerald-800 font-bold text-lg">
                             {getCurrencySymbol(guide.currencyPreference)}{(selectedDates.length * (guide.dailyRate || guide.hourlyRate * 8 || 0)).toLocaleString()}
                           </span>
                         </div>
                         <button
                           onClick={handleBooking}
-                          className="w-full bg-blue-700 text-white py-2 px-4 rounded-lg hover:bg-blue-800 transition-colors font-medium"
+                          className="w-full bg-emerald-700 text-white py-2 px-4 rounded-lg hover:bg-emerald-800 transition-colors font-medium"
                         >
                           Book Now ({selectedDates.length} days)
                         </button>
@@ -901,7 +901,7 @@ useEffect(() => {
                 {!currentUser && (
                   <button
                     onClick={onShowAuth}
-                    className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
+                    className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium shadow-md"
                   >
                     Login to Book or Message
                   </button>
@@ -920,7 +920,7 @@ useEffect(() => {
                     onClick={() => setActiveTab('overview')}
                     className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                       activeTab === 'overview'
-                        ? 'border-blue-600 text-blue-600'
+                        ? 'border-emerald-600 text-emerald-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
@@ -930,7 +930,7 @@ useEffect(() => {
                     onClick={() => setActiveTab('services')}
                     className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                       activeTab === 'services'
-                        ? 'border-blue-600 text-blue-600'
+                        ? 'border-emerald-600 text-emerald-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
@@ -941,7 +941,7 @@ useEffect(() => {
                       onClick={() => setActiveTab('booking')}
                       className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                         activeTab === 'booking'
-                          ? 'border-blue-600 text-blue-600'
+                          ? 'border-emerald-600 text-emerald-600'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -953,7 +953,7 @@ useEffect(() => {
                     onClick={() => setActiveTab('reviews')}
                     className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                       activeTab === 'reviews'
-                        ? 'border-blue-600 text-blue-600'
+                        ? 'border-emerald-600 text-emerald-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
@@ -964,7 +964,7 @@ useEffect(() => {
                       onClick={() => setActiveTab('chat')}
                       className={`py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors whitespace-nowrap relative ${
                         activeTab === 'chat'
-                          ? 'border-blue-600 text-blue-600'
+                          ? 'border-emerald-600 text-emerald-600'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -990,7 +990,7 @@ useEffect(() => {
                   <div className="space-y-6">
                     {/* Experience */}
                     <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                      <Clock className="text-blue-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                      <Clock className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
                       <div>
                         <h3 className="font-semibold text-gray-900 mb-1">Experience</h3>
                         <p className="text-gray-600">
@@ -1012,14 +1012,14 @@ useEffect(() => {
                     {/* Languages */}
                     {guide.languages && guide.languages.length > 0 && (
                       <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <Languages className="text-blue-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                        <Languages className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
                         <div>
                           <h3 className="font-semibold text-gray-900 mb-2">Languages</h3>
                           <div className="flex flex-wrap gap-2">
                             {guide.languages.map((lang, index) => (
                               <span
                                 key={index}
-                                className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
+                                className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-medium"
                               >
                                 {lang}
                               </span>
@@ -1032,14 +1032,14 @@ useEffect(() => {
                     {/* Areas of Expertise */}
                     {guide.areasOfExpertise && guide.areasOfExpertise.length > 0 && (
                       <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <Globe className="text-blue-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                        <Globe className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
                         <div>
                           <h3 className="font-semibold text-gray-900 mb-2">Areas of Expertise</h3>
                           <div className="flex flex-wrap gap-2">
                             {guide.areasOfExpertise.map((area, index) => (
                               <span
                                 key={index}
-                                className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm border border-blue-200 font-medium"
+                                className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-sm border border-emerald-200 font-medium"
                               >
                                 {area}
                               </span>
@@ -1052,7 +1052,7 @@ useEffect(() => {
                     {/* Special Qualifications */}
                     {guide.specialQualifications && guide.specialQualifications.length > 0 && (
                       <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <GraduationCap className="text-blue-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                        <GraduationCap className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
                         <div>
                           <h3 className="font-semibold text-gray-900 mb-2">Special Qualifications</h3>
                           <div className="flex flex-wrap gap-2">
@@ -1072,7 +1072,7 @@ useEffect(() => {
                     {/* Verification Documents */}
                     {guide.verificationDocuments && guide.verificationDocuments.length > 0 && (
                       <div className="flex items-start p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <FileText className="text-blue-600 mt-1 mr-4 flex-shrink-0" size={20} />
+                        <FileText className="text-emerald-600 mt-1 mr-4 flex-shrink-0" size={20} />
                         <div>
                           <h3 className="font-semibold text-gray-900 mb-2">Verification Documents</h3>
                           <div className="flex flex-wrap gap-2">
@@ -1095,19 +1095,19 @@ useEffect(() => {
                 {activeTab === 'services' && (
                   <div className="space-y-6">
                     {/* Pricing */}
-                    <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                    <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200">
                       <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-                        <DollarSign className="text-blue-600 mr-2" size={20} />
+                        <DollarSign className="text-emerald-600 mr-2" size={20} />
                         Rates & Pricing
                       </h3>
                       <div className="space-y-4">
                         {guide.hourlyRate > 0 && (
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-100">
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-100">
                             <div>
                               <span className="text-gray-700 font-medium">Hourly Rate:</span>
                               <p className="text-sm text-gray-500">Perfect for short tours and consultations</p>
                             </div>
-                            <span className="text-2xl font-bold text-blue-600">
+                            <span className="text-2xl font-bold text-emerald-600">
                               {getCurrencySymbol(guide.currencyPreference)}{guide.hourlyRate.toLocaleString()}
                               <span className="text-sm font-normal text-gray-500">/hour</span>
                             </span>
@@ -1115,12 +1115,12 @@ useEffect(() => {
                         )}
                         
                         {guide.dailyRate > 0 && (
-                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-100">
+                          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-100">
                             <div>
                               <span className="text-gray-700 font-medium">Daily Rate:</span>
                               <p className="text-sm text-gray-500">Full day guided tours (8+ hours)</p>
                             </div>
-                            <span className="text-2xl font-bold text-blue-600">
+                            <span className="text-2xl font-bold text-emerald-600">
                               {getCurrencySymbol(guide.currencyPreference)}{guide.dailyRate.toLocaleString()}
                               <span className="text-sm font-normal text-gray-500">/day</span>
                             </span>
@@ -1128,7 +1128,7 @@ useEffect(() => {
                         )}
                         
                         {guide.specialPackageRates && (
-                          <div className="p-3 bg-white rounded-lg border border-blue-100">
+                          <div className="p-3 bg-white rounded-lg border border-emerald-100">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-gray-700 font-medium">Special Packages:</span>
                             </div>
@@ -1154,7 +1154,7 @@ useEffect(() => {
                     {/* Availability */}
                     <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
                       <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                        <CalendarIcon className="text-blue-600 mr-2" size={20} />
+                        <CalendarIcon className="text-emerald-600 mr-2" size={20} />
                         Availability
                       </h3>
                       {guide.availableDates && guide.availableDates.length > 0 ? (
@@ -1166,7 +1166,7 @@ useEffect(() => {
                             {guide.availableDates.slice(0, 6).map((date, index) => (
                               <span
                                 key={index}
-                                className="bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm border border-blue-200 font-medium"
+                                className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded text-sm border border-emerald-200 font-medium"
                               >
                                 {new Date(date).toLocaleDateString()}
                               </span>
@@ -1212,7 +1212,7 @@ useEffect(() => {
                             <div className="space-y-3">
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Selected dates:</span>
-                                <span className="font-medium text-blue-700">{selectedDates.length} days</span>
+                                <span className="font-medium text-emerald-700">{selectedDates.length} days</span>
                               </div>
                               
                               <div className="flex justify-between items-center">
@@ -1225,7 +1225,7 @@ useEffect(() => {
                               <div className="border-t border-gray-200 pt-2">
                                 <div className="flex justify-between items-center">
                                   <span className="text-lg font-semibold text-gray-900">Total:</span>
-                                  <span className="text-2xl font-bold text-blue-600">
+                                  <span className="text-2xl font-bold text-emerald-600">
                                     {getCurrencySymbol(guide.currencyPreference)}
                                     {(selectedDates.length * (guide.dailyRate || guide.hourlyRate * 8 || 0)).toLocaleString()}
                                   </span>
@@ -1234,7 +1234,7 @@ useEffect(() => {
                               
                               <button
                                 onClick={handleBooking}
-                                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium mt-4 shadow-md"
+                                className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium mt-4 shadow-md"
                               >
                                 Confirm Booking
                               </button>
@@ -1284,14 +1284,14 @@ useEffect(() => {
                                 <div
                                   className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                                     msg.senderId === currentUser.uid
-                                      ? 'bg-blue-600 text-white'
+                                      ? 'bg-emerald-600 text-white'
                                       : 'bg-gray-200 text-gray-800'
                                   }`}
                                 >
                                   <p className="text-sm">{msg.content}</p>
                                   <div className={`text-xs mt-1 flex items-center ${
                                     msg.senderId === currentUser.uid 
-                                      ? 'text-blue-100' 
+                                      ? 'text-emerald-100' 
                                       : 'text-gray-500'
                                   }`}>
                                     {formatTime(msg.timestamp)}
@@ -1315,13 +1315,13 @@ useEffect(() => {
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             placeholder="Type your message..."
-                            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                             disabled={sending}
                           />
                           <button
                             type="submit"
                             disabled={sending || !message.trim()}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             {sending ? (
                               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1342,7 +1342,7 @@ useEffect(() => {
                         </p>
                         <button
                           onClick={onShowAuth}
-                          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                          className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
                         >
                           Login Now
                         </button>

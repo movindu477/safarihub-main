@@ -1,36 +1,36 @@
 import React from "react";
 
 // Import videos from src/assets
-import parksVideo from "../assets/parks.mp4";
-import sancVideo from "../assets/sanc.mp4";
-import beachVideo from "../assets/beach.mp4";
-import forestVideo from "../assets/forest.mp4";
-import campVideo from "../assets/camp.mp4";
+import parkImage from "../assets/park.avif";
+import sanImage from "../assets/san.jpg";
+import beachImage from "../assets/beach.avif";
+import forestImage from "../assets/forest.avif";
+import campImage from "../assets/camp.avif";
 
 export default function Section4() {
   const videos = [
     { 
-      src: parksVideo, 
+      src: parkImage, 
       title: "National Parks",
       link: "/national-parks"
     },
     { 
-      src: sancVideo, 
+      src: sanImage, 
       title: "Sanctuaries",
       link: "/sanctuaries"
     },
     { 
-      src: beachVideo, 
+      src: beachImage, 
       title: "Beaches",
       link: "/beaches"
     },
     { 
-      src: forestVideo, 
+      src: forestImage, 
       title: "Forest Reserves",
       link: "/forest-reserves"
     },
     { 
-      src: campVideo, 
+      src: campImage, 
       title: "Camp Sites",
       link: "/camp-sites"
     },
@@ -53,15 +53,13 @@ export default function Section4() {
             key={index}
             className="group relative w-full max-w-[400px] sm:max-w-[450px] lg:max-w-[500px] h-[250px] sm:h-[280px] lg:h-[300px] rounded-xl sm:rounded-2xl overflow-hidden shadow-lg sm:shadow-xl lg:shadow-2xl transform hover:scale-[1.02] transition-all duration-500 cursor-pointer"
           >
-            {/* Video Background */}
-            <video
+            {/* Image Background */}
+            <img
               src={item.src}
+              alt={item.title}
               className="absolute inset-0 w-full h-full object-cover"
-              autoPlay
-              loop
-              muted
-              playsInline
-            ></video>
+              loading="lazy"
+            />
 
             {/* Black Overlay - Responsive slides up on hover */}
             <div className="absolute bottom-0 left-0 w-full h-0 bg-black bg-opacity-80 group-hover:h-full transition-all duration-500 ease-in-out origin-bottom"></div>

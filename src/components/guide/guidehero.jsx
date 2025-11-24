@@ -20,7 +20,7 @@ export default function GuideHero() {
         <div className="space-y-4 sm:space-y-6 md:space-y-8">
           
           {/* Main Title */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black text-white leading-tight">
             Meet Your{" "}
             <span className="bg-gradient-to-r from-green-400 to-cyan-600 bg-clip-text text-transparent">
               Expert Guides
@@ -28,7 +28,7 @@ export default function GuideHero() {
           </h1>
 
           {/* Description */}
-          <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90 max-w-3xl mx-auto leading-relaxed font-light">
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed font-light">
             Connect with passionate local experts who bring destinations to life. 
             Discover hidden stories, cultural insights, and personalized experiences 
             that transform your journey into an unforgettable adventure.
@@ -62,22 +62,22 @@ export default function GuideHero() {
       {/* Mobile Optimization Styles */}
       <style jsx>{`
         @media (max-width: 640px) {
-          .text-3xl {
-            font-size: 2rem;
+          .text-2xl {
+            font-size: 1.8rem;
             line-height: 1.2;
           }
         }
 
         @media (max-width: 480px) {
-          .text-3xl {
-            font-size: 1.75rem;
+          .text-2xl {
+            font-size: 1.6rem;
             line-height: 1.2;
           }
         }
 
         @media (max-width: 380px) {
-          .text-3xl {
-            font-size: 1.5rem;
+          .text-2xl {
+            font-size: 1.4rem;
             line-height: 1.2;
           }
         }

@@ -435,19 +435,19 @@ const handleChatClick = (guide, e) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
+      <div className="container mx-auto px-4 py-12">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Professional Tour Guides</h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-emerald-900 mb-4">Professional Tour Guides</h1>
+          <p className="text-lg text-emerald-700 max-w-2xl mx-auto">
             Discover experienced tour guides for your Sri Lankan adventures. Filter by expertise, languages, and pricing to find your perfect guide.
           </p>
 
           {/* Current User Status Indicator */}
           {currentUser && (
-            <div className="mt-4 p-3 bg-white rounded-lg shadow-sm border border-gray-200 max-w-md mx-auto">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 p-3 bg-white/90 rounded-xl shadow-xl border border-emerald-100 max-w-md mx-auto backdrop-blur">
+              <p className="text-sm text-emerald-700">
                 <span className="font-semibold">Your Profile:</span>{' '}
                 {guides.find(g => g.isCurrentUser) ? (
                   <span className="text-green-600 font-medium">🟢 Listed - Other users can see your profile</span>
@@ -648,12 +648,13 @@ const handleChatClick = (guide, e) => {
                 onClick={() => handleProfileClick(guide)}
               >
                 {/* Profile Image Section */}
-                <div className="h-48 relative overflow-hidden">
+                <div className="h-48 relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700">
                   <ProfileImage guide={guide} />
+                  <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
                   
                   {/* Experience Badge */}
                   {guide.experience > 0 && (
-                    <div className="absolute top-3 right-3 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                    <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {guide.experience}+ years
                     </div>
                   )}
@@ -685,7 +686,7 @@ const handleChatClick = (guide, e) => {
                       {/* Quick Chat Button - Show for all users except current user */}
                       {!guide.isCurrentUser && (
                         <button 
-                          className="ml-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors shadow-lg"
+                          className="ml-2 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
                           onClick={(e) => handleChatClick(guide, e)}
                           title="Start Chat"
                         >
@@ -761,33 +762,7 @@ const handleChatClick = (guide, e) => {
                     </p>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 mt-4">
-                    <button 
-                      className="flex-1 bg-blue-500 text-white py-2.5 px-4 rounded-lg hover:bg-blue-600 transition-colors font-semibold text-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleProfileClick(guide);
-                      }}
-                    >
-                      {guide.isCurrentUser ? 'View Your Profile' : 'View Profile'}
-                    </button>
-                    {!guide.isCurrentUser && (
-                      <button 
-                        className="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (guide.contactPhone && guide.contactPhone !== 'Not provided') {
-                            const phoneNumber = guide.contactPhone.replace(/\D/g, '');
-                            const whatsappUrl = `https://wa.me/${phoneNumber}`;
-                            window.open(whatsappUrl, '_blank');
-                          }
-                        }}
-                      >
-                        📞 Call
-                      </button>
-                    )}
-                  </div>
+                  {/* Action Buttons Removed */}
                 </div>
               </div>
             ))}

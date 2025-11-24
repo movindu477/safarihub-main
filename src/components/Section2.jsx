@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 // Import image from src/assets
-import aboutImage from "../assets/about.avif";
+import aboutImage from "../assets/about.jpg";
 
 export default function Section2() {
   const [isVisible, setIsVisible] = useState(false);

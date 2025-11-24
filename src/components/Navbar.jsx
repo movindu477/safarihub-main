@@ -189,16 +189,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   ];
 
   const servicesItems = [
-    { icon: Map, label: "Find a Guide", onClick: handleGuideClick },
-    { icon: Compass, label: "Explore Destinations", onClick: handleDestinationClick },
-    { icon: Car, label: "Find a Jeep Driver", onClick: handleJeepDriverClick },
+    { icon: Map, label: "Find a Guide", onClick: handleGuideClick, path: "/guide" },
+    { icon: Compass, label: "Explore Destinations", onClick: handleDestinationClick, path: "/destination" },
+    { icon: Car, label: "Find a Jeep Driver", onClick: handleJeepDriverClick, path: "/driver" },
     { icon: ShoppingBag, label: "Rent Equipment", href: "#equipment" },
   ];
 
   // Navigation items
   const navItems = [
-    { label: "HOME", onClick: handleHomeClick },
-    { label: "ABOUT US", href: "#" },
+    { label: "HOME", onClick: handleHomeClick, path: "/" },
+    { label: "ABOUT US", onClick: () => navigate("/about"), path: "/about" },
   ];
 
   // Default user data if no user is logged in
@@ -223,6 +223,26 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     role: userData?.serviceType ? "Service Provider" : "Tourist"
   } : defaultUserData;
 
+  const normalizePath = (path) => {
+    if (!path) return "";
+    const trimmed = path === "/" ? "/" : path.replace(/\/+$/, "");
+    return trimmed || "/";
+  };
+
+  const isActivePath = (path) => {
+    if (!path) return false;
+    const current = normalizePath(location.pathname || "/");
+    const target = normalizePath(path);
+    if (target === "/") {
+      return current === "/";
+    }
+    return current === target || current.startsWith(`${target}/`);
+  };
+
+  const isServicesActive = servicesItems.some(
+    (item) => item.path && isActivePath(item.path)
+  );
+
   // Show loading state while checking authentication
   if (authLoading) {
     return (
@@ -244,10 +264,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   return (
     <>
       {/* Navbar - Bright Green */}
-      <nav className={`fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-emerald-300/30 transition-all duration-300 ${
+      <nav className={`fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-green-700/40 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-emerald-500 shadow-2xl shadow-emerald-900/40' 
-          : 'bg-emerald-500 shadow-2xl shadow-emerald-800/30'
+          ? 'bg-green-900 shadow-2xl shadow-black/40' 
+          : 'bg-green-900 shadow-2xl shadow-black/30'
       }`}>
         {/* Left side - Logo */}
         <div className="flex items-center space-x-3">
@@ -265,10 +285,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             <button
               key={item.label}
               onClick={item.onClick}
-              className="hover:text-emerald-200 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group"
+              className={`text-sm md:text-base font-medium px-3 py-1 rounded-xl transition-colors duration-300 cursor-pointer ${
+                isActivePath(item.path)
+                  ? "bg-green-800/70 text-emerald-100 border border-green-500/40 shadow-inner"
+                  : "text-gray-100 hover:text-white"
+              }`}
             >
               {item.label}
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-200 transition-all duration-300 group-hover:w-full"></span>
             </button>
           ))}
 
@@ -278,10 +301,15 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             onMouseEnter={() => setServicesDropdownOpen(true)}
             onMouseLeave={() => setServicesDropdownOpen(false)}
           >
-            <button className="hover:text-emerald-200 transition-colors duration-300 text-sm md:text-base font-medium hover:scale-105 transform relative group flex items-center gap-1">
+            <button
+              className={`text-sm md:text-base font-medium px-3 py-1 rounded-xl transition-colors duration-300 flex items-center gap-1 cursor-pointer ${
+                isServicesActive
+                  ? "bg-green-800/70 text-emerald-100 border border-green-500/40 shadow-inner"
+                  : "text-gray-100 hover:text-white"
+              }`}
+            >
               OUR SERVICES
               <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-200 transition-all duration-300 group-hover:w-full"></span>
             </button>
 
             {/* Invisible connecting bridge to prevent gap */}
@@ -293,7 +321,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             {/* Dropdown Menu */}
             {servicesDropdownOpen && (
               <div 
-                className="absolute top-full left-0 w-64 bg-emerald-600/95 backdrop-blur-xl rounded-xl shadow-2xl border border-emerald-400/30 overflow-hidden animate-fadeIn mt-2"
+                className="absolute top-full left-0 w-64 bg-green-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-green-700/40 overflow-hidden animate-fadeIn mt-2"
                 onMouseEnter={() => setServicesDropdownOpen(true)}
                 onMouseLeave={() => setServicesDropdownOpen(false)}
               >
@@ -304,10 +332,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                       <button
                         key={item.label}
                         onClick={item.onClick}
-                        className="flex items-center gap-3 px-4 py-3 text-white hover:bg-emerald-500 hover:text-white transition-all duration-300 group cursor-pointer w-full text-left"
+                        className={`flex items-center gap-3 px-4 py-3 text-white transition-all duration-300 group cursor-pointer w-full text-left ${
+                          item.path && isActivePath(item.path)
+                            ? "bg-green-800 text-emerald-100"
+                            : "hover:bg-green-800 hover:text-white"
+                        }`}
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
-                        <IconComponent className="h-4 w-4 text-emerald-200 group-hover:text-white" />
+                        <IconComponent className="h-4 w-4 text-gray-200 group-hover:text-white" />
                         <span className="font-medium text-sm">{item.label}</span>
                       </button>
                     );
@@ -431,7 +463,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                       if (item.onClick) item.onClick();
                       setMenuOpen(false);
                     }}
-                    className="block text-white hover:text-emerald-200 transition-all duration-300 py-5 border-b border-emerald-400/20 hover:border-emerald-300 font-medium text-xl w-full text-left animate-fadeInUp group"
+                    className={`block transition-all duration-300 py-5 border-b border-emerald-400/20 font-medium text-xl w-full text-left animate-fadeInUp group ${
+                      isActivePath(item.path)
+                        ? "text-emerald-100 bg-green-800/40"
+                        : "text-white hover:text-emerald-200 hover:border-emerald-300"
+                    }`}
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <span className="flex items-center">
@@ -441,10 +477,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                   </button>
                 ))}
 
-                <div className="border-b border-emerald-400/20">
+                <div className="border-b border-green-700/40">
                   <button
                     onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
-                    className="flex items-center justify-between w-full text-white hover:text-emerald-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group"
+                    className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group"
                     style={{ animationDelay: "200ms" }}
                   >
                     <span className="flex items-center">
@@ -455,7 +491,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                   </button>
 
                   {mobileServicesOpen && (
-                    <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-emerald-400/20 ml-2">
+                    <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-green-700/40 ml-2">
                       {servicesItems.map((item, index) => {
                         const IconComponent = item.icon;
                         return (
@@ -465,10 +501,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                               if (item.onClick) item.onClick();
                               setMenuOpen(false);
                             }}
-                            className="flex items-center gap-3 text-white hover:text-emerald-200 transition-all duration-300 py-4 border-b border-emerald-400/10 hover:border-emerald-300 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer"
+                            className={`flex items-center gap-3 transition-all duration-300 py-4 border-b border-green-800/40 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer ${
+                              item.path && isActivePath(item.path)
+                                ? "text-emerald-100 bg-green-800/40 border-green-600"
+                                : "text-white hover:text-gray-200 hover:border-green-600"
+                            }`}
                             style={{ animationDelay: `${index * 50 + 300}ms` }}
                           >
-                            <IconComponent className="h-4 w-4 text-emerald-300" />
+                            <IconComponent className="h-4 w-4 text-gray-200" />
                             {item.label}
                           </button>
                         );
