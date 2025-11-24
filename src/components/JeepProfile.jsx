@@ -763,19 +763,24 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       });
       setShowSuccessMessage(true);
       
-      // Auto-hide after 5 seconds
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-      }, 5000);
-      
       // Reset selected dates
       setSelectedDates([]);
       setIsBooking(false);
       
-      // Auto-refresh page after 3 seconds to show updated data
+      // Redirect to JeepProfile page after showing success message (3 seconds)
       setTimeout(() => {
-        console.log('🔄 Auto-refreshing page...');
-        window.location.reload(true);
+        console.log('🔄 Redirecting to JeepProfile page...');
+        setShowSuccessMessage(false);
+        setSuccessMessageData(null);
+        // Ensure we're on the correct route with driverId
+        if (driverId) {
+          navigate(`/jeepprofile?driverId=${driverId}`, { replace: true });
+        } else if (driver?.id) {
+          navigate(`/jeepprofile?driverId=${driver.id}`, { replace: true });
+        } else {
+          // If no driverId, go to driver listing page
+          navigate('/driver', { replace: true });
+        }
       }, 3000);
       
     } catch (error) {
@@ -1123,7 +1128,18 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               
               {/* Close Button */}
               <button
-                onClick={() => setShowSuccessMessage(false)}
+                onClick={() => {
+                  setShowSuccessMessage(false);
+                  setSuccessMessageData(null);
+                  // Ensure we're on the correct route
+                  if (driverId) {
+                    navigate(`/jeepprofile?driverId=${driverId}`, { replace: true });
+                  } else if (driver?.id) {
+                    navigate(`/jeepprofile?driverId=${driver.id}`, { replace: true });
+                  } else {
+                    navigate('/driver', { replace: true });
+                  }
+                }}
                 className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors font-semibold shadow-lg"
               >
                 Got it!
