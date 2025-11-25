@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageCircle, X, Clock, CheckCircle, MapPin, User, Check, X as XIcon } from 'lucide-react';
-import { updateBookingStatus } from '../App';
+import { updateBookingStatus, getBookingById } from '../App';
 
 const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMarkAsRead, currentUser }) => {
+  const [processingButtons, setProcessingButtons] = useState(new Set());
+  const [bookingStatuses, setBookingStatuses] = useState({});
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     try {
@@ -57,6 +59,78 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  // Fetch booking statuses for notifications
+  useEffect(() => {
+    const fetchBookingStatuses = async () => {
+      const statusPromises = notifications
+        .filter(n => n.type === 'booking' && n.bookingId)
+        .map(async (notification) => {
+          try {
+            const booking = await getBookingById(notification.bookingId);
+            return { notificationId: notification.id, booking };
+          } catch (error) {
+            console.error('Error fetching booking status:', error);
+            return { notificationId: notification.id, booking: null };
+          }
+        });
+
+      const results = await Promise.all(statusPromises);
+      const statusMap = {};
+      results.forEach(({ notificationId, booking }) => {
+        if (booking) {
+          statusMap[notificationId] = {
+            status: booking.status,
+            paymentStatus: booking.paymentStatus
+          };
+        }
+      });
+      setBookingStatuses(statusMap);
+    };
+
+    if (notifications.length > 0) {
+      fetchBookingStatuses();
+    }
+  }, [notifications]);
+
+  const isProcessing = (notificationId) => processingButtons.has(notificationId);
+  
+  const setProcessing = (notificationId, value) => {
+    setProcessingButtons(prev => {
+      const newSet = new Set(prev);
+      if (value) {
+        newSet.add(notificationId);
+      } else {
+        newSet.delete(notificationId);
+      }
+      return newSet;
+    });
+  };
+
+  // Check if notification is for customer receiving booking acceptance
+  const isCustomerBookingAccepted = (notification) => {
+    const bookingInfo = bookingStatuses[notification.id];
+    return notification.type === 'booking' && 
+           notification.bookingId && 
+           currentUser && 
+           notification.recipientId === currentUser.uid &&
+           notification.message && 
+           notification.message.toLowerCase().includes('accepted') &&
+           bookingInfo &&
+           bookingInfo.status === 'accepted' &&
+           bookingInfo.paymentStatus !== 'paid'; // Only show if not paid yet
+  };
+
+  // Check if notification is for provider receiving booking request
+  const isProviderBookingRequest = (notification) => {
+    const bookingInfo = bookingStatuses[notification.id];
+    return notification.type === 'booking' && 
+           notification.bookingId && 
+           currentUser && 
+           notification.recipientId === currentUser.uid &&
+           bookingInfo &&
+           bookingInfo.status === 'pending';
   };
 
   return (
@@ -149,12 +223,15 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                       </div>
                     )}
                     
-                    {/* Accept/Decline Buttons for Pending Bookings - Show for drivers/guides receiving booking requests */}
-                    {notification.type === 'booking' && notification.bookingId && currentUser && currentUser.uid === notification.recipientId && (
+                    {/* Accept/Decline Buttons for Providers (drivers/guides) receiving booking requests */}
+                    {isProviderBookingRequest(notification) && (
                       <div className="flex gap-2 mt-2">
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
+                            if (isProcessing(notification.id)) return;
+                            
+                            setProcessing(notification.id, true);
                             try {
                               // Provider (driver/guide) is accepting, so providerId is currentUser.uid, customerId is senderId
                               await updateBookingStatus(
@@ -170,16 +247,28 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                             } catch (error) {
                               console.error('Error accepting booking:', error);
                               alert('Failed to accept booking. Please try again.');
+                            } finally {
+                              setProcessing(notification.id, false);
                             }
                           }}
-                          className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          disabled={isProcessing(notification.id)}
+                          className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Check size={14} />
-                          Accept
+                          {isProcessing(notification.id) ? (
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          ) : (
+                            <>
+                              <Check size={14} />
+                              Accept
+                            </>
+                          )}
                         </button>
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
+                            if (isProcessing(notification.id)) return;
+                            
+                            setProcessing(notification.id, true);
                             try {
                               // Provider (driver/guide) is declining, so providerId is currentUser.uid, customerId is senderId
                               await updateBookingStatus(
@@ -195,12 +284,110 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                             } catch (error) {
                               console.error('Error declining booking:', error);
                               alert('Failed to decline booking. Please try again.');
+                            } finally {
+                              setProcessing(notification.id, false);
                             }
                           }}
-                          className="flex-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          disabled={isProcessing(notification.id)}
+                          className="flex-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <XIcon size={14} />
-                          Decline
+                          {isProcessing(notification.id) ? (
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          ) : (
+                            <>
+                              <XIcon size={14} />
+                              Decline
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Accept/Decline Buttons for Customers receiving booking accepted notifications */}
+                    {isCustomerBookingAccepted(notification) && (
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (isProcessing(notification.id)) return;
+                            
+                            setProcessing(notification.id, true);
+                            try {
+                              // Mark notification as read
+                              await onMarkAsRead(notification.id);
+                              
+                              // Get booking to check payment status
+                              const booking = await getBookingById(notification.bookingId);
+                              if (booking && booking.paymentStatus === 'paid') {
+                                alert('✅ Payment already completed for this booking.');
+                                setProcessing(notification.id, false);
+                                return;
+                              }
+                              
+                              // Redirect to payment page
+                              window.location.href = `/payment/${notification.bookingId}`;
+                            } catch (error) {
+                              console.error('Error processing payment redirect:', error);
+                              alert('Failed to redirect to payment page. Please try again.');
+                              setProcessing(notification.id, false);
+                            }
+                          }}
+                          disabled={isProcessing(notification.id)}
+                          className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isProcessing(notification.id) ? (
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          ) : (
+                            <>
+                              <Check size={14} />
+                              Accept & Pay
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (isProcessing(notification.id)) return;
+                            
+                            setProcessing(notification.id, true);
+                            try {
+                              // Customer is declining the accepted booking
+                              // Need to get booking to find provider info
+                              const booking = await getBookingById(notification.bookingId);
+                              if (!booking) {
+                                throw new Error('Booking not found');
+                              }
+                              
+                              // Update booking status to declined
+                              await updateBookingStatus(
+                                notification.bookingId,
+                                'declined',
+                                booking.driverId || booking.guideId, // providerId
+                                currentUser.uid, // customerId (the person declining)
+                                booking.driverName || booking.guideName || 'Service Provider', // providerName
+                                currentUser.displayName || 'Customer' // customerName
+                              );
+                              
+                              await onMarkAsRead(notification.id);
+                              alert('❌ Booking declined. The service provider has been notified.');
+                            } catch (error) {
+                              console.error('Error declining booking:', error);
+                              alert('Failed to decline booking. Please try again.');
+                            } finally {
+                              setProcessing(notification.id, false);
+                            }
+                          }}
+                          disabled={isProcessing(notification.id)}
+                          className="flex-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isProcessing(notification.id) ? (
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          ) : (
+                            <>
+                              <XIcon size={14} />
+                              Decline
+                            </>
+                          )}
                         </button>
                       </div>
                     )}

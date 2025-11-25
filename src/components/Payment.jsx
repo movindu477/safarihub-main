@@ -16,7 +16,8 @@ import {
 import { getDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { createNotification } from '../App';
+import { createNotification, markNotificationAsRead } from '../App';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   const { bookingId } = useParams();
@@ -46,12 +47,13 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Auto-redirect to home page when payment is successful
   useEffect(() => {
     if (paymentSuccess) {
-      console.log('✅ Payment successful, redirecting to home page in 3 seconds...');
+      console.log('✅ Payment successful, redirecting to home page in 2 seconds...');
       const redirectTimer = setTimeout(() => {
         console.log('🔄 Redirecting to home page now...');
         // Use window.location.href for reliable redirect (works in all environments including Vercel)
-        window.location.href = '/';
-      }, 3000);
+        // Use replace to prevent back button from going back to payment page
+        window.location.replace('/');
+      }, 2000);
       
       return () => {
         clearTimeout(redirectTimer);
@@ -78,6 +80,26 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
         // Check if already paid
         if (bookingData.paymentStatus === 'paid') {
+          // Mark all "accepted" booking notifications as read to prevent redirect loop
+          if (user && bookingData.customerId === user.uid) {
+            try {
+              const notificationsRef = collection(db, 'notifications');
+              const notificationsQuery = query(
+                notificationsRef,
+                where('bookingId', '==', bookingId),
+                where('recipientId', '==', bookingData.customerId),
+                where('read', '==', false)
+              );
+              const notificationsSnapshot = await getDocs(notificationsQuery);
+              const markReadPromises = notificationsSnapshot.docs.map(doc => 
+                markNotificationAsRead(doc.id)
+              );
+              await Promise.all(markReadPromises);
+              console.log('✅ Marked booking acceptance notifications as read (already paid)');
+            } catch (err) {
+              console.error('Error marking notifications as read:', err);
+            }
+          }
           setPaymentSuccess(true);
           setLoading(false);
           return;
@@ -223,6 +245,25 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
         bookingId: bookingId,
         relatedId: bookingId
       });
+
+      // Mark all "accepted" booking notifications as read to prevent redirect loop
+      try {
+        const notificationsRef = collection(db, 'notifications');
+        const notificationsQuery = query(
+          notificationsRef,
+          where('bookingId', '==', bookingId),
+          where('recipientId', '==', booking.customerId),
+          where('read', '==', false)
+        );
+        const notificationsSnapshot = await getDocs(notificationsQuery);
+        const markReadPromises = notificationsSnapshot.docs.map(doc => 
+          markNotificationAsRead(doc.id)
+        );
+        await Promise.all(markReadPromises);
+        console.log('✅ Marked booking acceptance notifications as read');
+      } catch (err) {
+        console.error('Error marking notifications as read:', err);
+      }
 
       setPaymentSuccess(true);
       

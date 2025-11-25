@@ -809,42 +809,8 @@ function App() {
         console.log(`📢 Received ${notifications.length} notifications`);
         setNotifications(notifications);
         
-        // Auto-redirect to payment page for new booking acceptance notifications
-        const unreadBookingAccepted = notifications.find(n => 
-          !n.read && 
-          !processedNotifications.has(n.id) && // Only process each notification once
-          n.type === 'booking' && 
-          n.bookingId && 
-          n.message && 
-          n.message.toLowerCase().includes('accepted')
-        );
-        
-        if (unreadBookingAccepted) {
-          // Mark as processed immediately to prevent multiple redirects
-          processedNotifications.add(unreadBookingAccepted.id);
-          
-          try {
-            // Check if booking is actually accepted
-            const booking = await getBookingById(unreadBookingAccepted.bookingId);
-            if (booking && booking.status === 'accepted' && booking.customerId === user.uid) {
-              // Check if we're not already on the payment page
-              if (!window.location.pathname.includes('/payment/')) {
-                console.log('🔄 Auto-redirecting to payment page for accepted booking');
-                // Small delay to ensure smooth transition
-                setTimeout(() => {
-                  // Use window.location for reliable navigation in production/Vercel
-                  const paymentUrl = `/payment/${unreadBookingAccepted.bookingId}`;
-                  // Force full navigation to ensure route is loaded
-                  window.location.href = paymentUrl;
-                }, 1000);
-              }
-            }
-          } catch (err) {
-            console.error('Error checking booking status:', err);
-            // Remove from processed set if there was an error so it can be retried
-            processedNotifications.delete(unreadBookingAccepted.id);
-          }
-        }
+        // NOTE: Auto-redirect removed - users will now see Accept/Decline buttons in notifications
+        // and can choose to go to payment page by clicking Accept
       });
       
       return () => {
