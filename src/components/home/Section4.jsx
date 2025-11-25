@@ -1,38 +1,64 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 // Import videos from src/assets
-import parkImage from "../assets/park.avif";
-import sanImage from "../assets/san.jpg";
-import beachImage from "../assets/beach.avif";
-import forestImage from "../assets/forest.avif";
-import campImage from "../assets/camp.avif";
+import parkImage from "../../assets/park.avif";
+import sanImage from "../../assets/san.jpg";
+import beachImage from "../../assets/beach.avif";
+import forestImage from "../../assets/forest.avif";
+import campImage from "../../assets/camp.avif";
+import cameraImage from "../../assets/camera1.avif";
 
 export default function Section4() {
+  const navigate = useNavigate();
+
+  const handleBoxClick = (sectionId) => {
+    // Navigate to destination page with hash fragment
+    navigate(`/destination#${sectionId}`);
+    
+    // Wait for navigation and page render, then scroll to section
+    setTimeout(() => {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest'
+        });
+      }
+    }, 500);
+  };
+
   const videos = [
     { 
       src: parkImage, 
       title: "National Parks",
-      link: "/national-parks"
+      sectionId: "national-parks"
     },
     { 
       src: sanImage, 
       title: "Sanctuaries",
-      link: "/sanctuaries"
+      sectionId: "sanctuaries"
     },
     { 
       src: beachImage, 
       title: "Beaches",
-      link: "/beaches"
+      sectionId: "beaches"
     },
     { 
       src: forestImage, 
       title: "Forest Reserves",
-      link: "/forest-reserves"
+      sectionId: "forest-reserves"
     },
     { 
       src: campImage, 
       title: "Camp Sites",
-      link: "/camp-sites"
+      sectionId: "camping-sites"
+    },
+    { 
+      src: cameraImage, 
+      title: "Gear Rentings",
+      sectionId: "gear-rentings"
     },
   ];
 
@@ -51,6 +77,7 @@ export default function Section4() {
         {videos.map((item, index) => (
           <div
             key={index}
+            onClick={() => handleBoxClick(item.sectionId)}
             className="group relative w-full max-w-[400px] sm:max-w-[450px] lg:max-w-[500px] h-[250px] sm:h-[280px] lg:h-[300px] rounded-xl sm:rounded-2xl overflow-hidden shadow-lg sm:shadow-xl lg:shadow-2xl transform hover:scale-[1.02] transition-all duration-500 cursor-pointer"
           >
             {/* Image Background */}
@@ -78,12 +105,15 @@ export default function Section4() {
                   {item.title}
                 </h3>
                 {/* Explore Now Button - Responsive sizing */}
-                <a
-                  href={item.link}
-                  className="bg-green-600 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-lg font-semibold hover:bg-green-700 transform hover:scale-105 transition-all duration-300 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-400 group-hover:delay-150 text-sm sm:text-base"
+                <button
+                  className="bg-green-600 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-lg font-semibold hover:bg-green-700 transform hover:scale-105 transition-all duration-300 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-400 group-hover:delay-150 text-sm sm:text-base cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBoxClick(item.sectionId);
+                  }}
                 >
                   Explore Now
-                </a>
+                </button>
               </div>
             </div>
           </div>

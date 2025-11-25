@@ -25,6 +25,7 @@ import lunuBackground from "../../assets/lunu.jpg";
 import kumanaBackground from "../../assets/kumana.jpg";
 import sinBackground from "../../assets/sin.avif";
 import knuckfoBackground from "../../assets/knuckfo.jpg";
+import camera1Background from "../../assets/camera1.avif";
 
 export default function Destination2() {
   const [filters, setFilters] = useState({
@@ -186,8 +187,8 @@ export default function Destination2() {
   );
 
   // Reusable Section Component
-  const DestinationSection = ({ title, description, items }) => (
-    <div className="mb-16">
+  const DestinationSection = ({ title, description, items, sectionId }) => (
+    <div id={sectionId} className="mb-16 scroll-mt-24">
       <div className="text-center mb-12">
         <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
           {title}
@@ -212,7 +213,7 @@ export default function Destination2() {
                 <p className="text-lg mb-6 opacity-90 max-w-md">
                   {item.description}
                 </p>
-                <button className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105">
+                <button className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer">
                   Explore All
                 </button>
               </div>
@@ -407,6 +408,7 @@ export default function Destination2() {
 
         {/* National Parks Section */}
         <DestinationSection
+          sectionId="national-parks"
           title="National Parks"
           description="Explore Sri Lanka's most famous national parks and discover unique wildlife experiences"
           items={[
@@ -425,6 +427,7 @@ export default function Destination2() {
 
         {/* Famous Beaches Section */}
         <DestinationSection
+          sectionId="beaches"
           title="Famous Beaches"
           description="Discover Sri Lanka's stunning coastline with pristine beaches and crystal-clear waters"
           items={[
@@ -443,6 +446,7 @@ export default function Destination2() {
 
         {/* Camping Sites Section */}
         <DestinationSection
+          sectionId="camping-sites"
           title="Camping Sites"
           description="Experience the great outdoors with amazing camping sites amidst nature's beauty"
           items={[
@@ -461,6 +465,7 @@ export default function Destination2() {
 
         {/* Wildlife Sanctuaries Section */}
         <DestinationSection
+          sectionId="sanctuaries"
           title="Wildlife Sanctuaries"
           description="Protecting Sri Lanka's diverse wildlife in their natural habitats"
           items={[
@@ -479,6 +484,7 @@ export default function Destination2() {
 
         {/* Forest Reserves Section */}
         <DestinationSection
+          sectionId="forest-reserves"
           title="Forest Reserves"
           description="Explore Sri Lanka's rich forest ecosystems and biodiversity hotspots"
           items={[
@@ -495,6 +501,25 @@ export default function Destination2() {
           ]}
         />
 
+        {/* Gear Rentings Section */}
+        <DestinationSection
+          sectionId="gear-rentings"
+          title="Gear Rentings"
+          description="Rent professional photography and adventure gear for your safari experience"
+          items={[
+            {
+              name: "Camera Equipment",
+              description: "Professional DSLR cameras, lenses, and photography accessories available for rent. Capture stunning wildlife moments with high-quality equipment perfect for safari photography.",
+              background: camera1Background
+            },
+            {
+              name: "Adventure Gear",
+              description: "Camping equipment, binoculars, and outdoor gear rentals. Everything you need for a comfortable and memorable safari adventure in Sri Lanka's wilderness.",
+              background: camera1Background
+            }
+          ]}
+        />
+
         {/* Active Filters Display */}
         {(filters.location || filters.safariType || filters.services.length > 0) && (
           <div className="mt-8 p-4 bg-white rounded-lg shadow-sm border">
@@ -505,7 +530,7 @@ export default function Destination2() {
                   return value.map(service => (
                     <span key={service} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
                       {service}
-                      <button onClick={() => handleServiceToggle(service)} className="text-green-600 hover:text-green-800">
+                      <button onClick={() => handleServiceToggle(service)} className="text-green-600 hover:text-green-800 cursor-pointer">
                         <X className="h-3 w-3" />
                       </button>
                     </span>
@@ -515,7 +540,7 @@ export default function Destination2() {
                   return (
                     <span key={key} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
                       {value}
-                      <button onClick={() => handleFilterChange(key, "")} className="text-green-600 hover:text-green-800">
+                      <button onClick={() => handleFilterChange(key, "")} className="text-green-600 hover:text-green-800 cursor-pointer">
                         <X className="h-3 w-3" />
                       </button>
                     </span>

@@ -2,7 +2,7 @@ import React from "react";
 import { FaFacebookF, FaTwitter, FaYoutube, FaLinkedinIn, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight } from "react-icons/fa";
 
 // Import logo from src/assets
-import logo from "../assets/logo.png";
+import logo from "../../assets/logo.png";
 
 export default function Footer() {
   // Quick links data for better maintainability
@@ -53,7 +53,7 @@ export default function Footer() {
           placeholder="Enter your email"
           className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:border-green-500 transition-colors"
         />
-        <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-300 text-sm whitespace-nowrap">
+        <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-300 text-sm whitespace-nowrap cursor-pointer">
           Subscribe
         </button>
       </div>

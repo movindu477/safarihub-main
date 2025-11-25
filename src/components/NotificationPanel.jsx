@@ -67,7 +67,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
           <h3 className="font-semibold text-lg">Notifications</h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-green-400 rounded-full transition-colors"
+            className="p-1 hover:bg-green-400 rounded-full transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -79,7 +79,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
           {notifications.filter(n => !n.read).length > 0 && (
             <button
               onClick={handleMarkAllAsRead}
-              className="text-green-200 hover:text-white text-xs underline"
+              className="text-green-200 hover:text-white text-xs underline cursor-pointer"
             >
               Mark all read
             </button>
@@ -172,7 +172,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                               alert('Failed to accept booking. Please try again.');
                             }
                           }}
-                          className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <Check size={14} />
                           Accept
@@ -197,7 +197,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                               alert('Failed to decline booking. Please try again.');
                             }
                           }}
-                          className="flex-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <XIcon size={14} />
                           Decline

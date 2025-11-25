@@ -1,5 +1,5 @@
 import React from "react";
-import jeepImage from "../assets/jeepori.jpg"; // Import from assets
+import jeepImage from "../../assets/jeepori.jpg"; // Import from assets
 
 export default function DriverHero() {
   return (

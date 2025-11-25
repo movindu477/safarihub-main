@@ -798,7 +798,7 @@ const handleChatClick = (guide, e) => {
         {/* Load More Button (if many results) */}
         {filteredGuides.length > 12 && (
           <div className="text-center mt-8">
-            <button className="px-8 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors font-semibold">
+            <button className="px-8 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors font-semibold cursor-pointer">
               Load More Guides ({filteredGuides.length - 12} remaining)
             </button>
           </div>

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 
 // Only import DestinationHero with correct relative path
 import DestinationHero from './destinationhero'
-import Navbar from '../Navbar'
+import Navbar from '../home/Navbar'
 import Destination2 from './DestinationSection2'
-import Footer from '../Footer'
+import Footer from '../home/Footer'
 
 // Firebase - use correct relative path to go up two levels to src
 import { auth } from '../../firebase'
@@ -25,6 +25,32 @@ function DestinationApp() {
     })
 
     return () => unsubscribe()
+  }, [])
+
+  // Handle smooth scrolling to sections based on hash
+  useEffect(() => {
+    const handleHashScroll = () => {
+      const hash = window.location.hash.replace('#', '')
+      if (hash) {
+        setTimeout(() => {
+          const element = document.getElementById(hash)
+          if (element) {
+            element.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'start',
+              inline: 'nearest'
+            })
+          }
+        }, 300) // Wait for page to render
+      }
+    }
+
+    // Check for hash on mount
+    handleHashScroll()
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashScroll)
+    return () => window.removeEventListener('hashchange', handleHashScroll)
   }, [])
 
   // Handle login navigation

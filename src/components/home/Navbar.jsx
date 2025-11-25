@@ -17,16 +17,15 @@ import {
   Map,
   Compass,
   Car,
-  ShoppingBag,
-  MessageCircle
+  ShoppingBag
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // Import images from src/assets
-import logo from "../assets/logo.png";
-import userImage from "../assets/user.png";
+import logo from "../../assets/logo.png";
+import userImage from "../../assets/user.png";
 
 export default function Navbar({ user, onLogout, onLogin, onRegister, onStartChat }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -354,28 +353,19 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleLoginClick}
-                className="bg-white hover:bg-emerald-100 text-emerald-700 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
+                className="bg-white hover:bg-emerald-100 text-emerald-700 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30 cursor-pointer"
               >
                 Login
               </button>
               <button
                 onClick={handleRegisterClick}
-                className="border-2 border-white text-white hover:bg-white hover:text-emerald-700 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm shadow-lg shadow-emerald-400/20"
+                className="border-2 border-white text-white hover:bg-white hover:text-emerald-700 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm shadow-lg shadow-emerald-400/20 cursor-pointer"
               >
                 Register
               </button>
             </div>
           ) : (
             <div className="flex items-center space-x-4">
-              {/* Messages Button */}
-              <button
-                onClick={() => onStartChat && onStartChat('messages', 'Messages')}
-                className="relative p-2 text-white hover:text-emerald-200 transition-colors duration-300 hover:bg-emerald-600 rounded-lg"
-                title="Messages"
-              >
-                <MessageCircle className="h-5 w-5" />
-              </button>
-              
               {/* User Profile */}
               <div className="relative">
                 <img
@@ -395,15 +385,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
         <div className="md:hidden flex items-center space-x-4">
           {currentUser ? (
             <div className="flex items-center space-x-2">
-              {/* Messages Button for Mobile */}
-              <button
-                onClick={() => onStartChat && onStartChat('messages', 'Messages')}
-                className="relative p-2 text-white hover:text-emerald-200 transition-colors duration-300"
-                title="Messages"
-              >
-                <MessageCircle className="h-5 w-5" />
-              </button>
-              
               {/* User Profile for Mobile */}
               <div className="relative">
                 <img
@@ -463,7 +444,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                       if (item.onClick) item.onClick();
                       setMenuOpen(false);
                     }}
-                    className={`block transition-all duration-300 py-5 border-b border-emerald-400/20 font-medium text-xl w-full text-left animate-fadeInUp group ${
+                    className={`block transition-all duration-300 py-5 border-b border-emerald-400/20 font-medium text-xl w-full text-left animate-fadeInUp group cursor-pointer ${
                       isActivePath(item.path)
                         ? "text-emerald-100 bg-green-800/40"
                         : "text-white hover:text-emerald-200 hover:border-emerald-300"
@@ -480,7 +461,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 <div className="border-b border-green-700/40">
                   <button
                     onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
-                    className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group"
+                    className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group cursor-pointer"
                     style={{ animationDelay: "200ms" }}
                   >
                     <span className="flex items-center">
@@ -524,13 +505,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                      style={{ animationDelay: "400ms" }}>
                   <button
                     onClick={handleLoginClick}
-                    className="w-full bg-white hover:bg-emerald-100 text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30"
+                    className="w-full bg-white hover:bg-emerald-100 text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30 cursor-pointer"
                   >
                     Login
                   </button>
                   <button
                     onClick={handleRegisterClick}
-                    className="w-full border-2 border-white text-white hover:bg-white hover:text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-emerald-400/20"
+                    className="w-full border-2 border-white text-white hover:bg-white hover:text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-emerald-400/20 cursor-pointer"
                   >
                     Register
                   </button>
@@ -539,19 +520,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
 
               {currentUser && (
                 <div className="space-y-3 pt-6 border-t border-emerald-400/20">
-                  {/* Messages Button in Mobile Menu */}
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onStartChat && onStartChat('messages', 'Messages');
-                    }}
-                    className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-emerald-600 transition-all duration-300 text-left animate-fadeInUp group"
-                    style={{ animationDelay: "400ms" }}
-                  >
-                    <MessageCircle className="h-5 w-5 text-emerald-200 group-hover:text-white" />
-                    <span className="font-medium text-lg text-white">Messages</span>
-                  </button>
-
                   {/* User Profile in Mobile Menu */}
                   <div
                     className="flex items-center space-x-3 py-4 animate-fadeInUp cursor-pointer group"
@@ -591,36 +559,47 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             onClick={() => setProfileOpen(false)}
           />
 
-          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-black text-white shadow-2xl border-l border-yellow-500/30 overflow-hidden z-50 animate-slideInRight">
-            <div className="absolute top-4 left-4 z-10">
-              <X
-                className="h-6 w-6 text-yellow-400 cursor-pointer hover:text-yellow-300 transition-colors duration-300 bg-yellow-500/20 rounded-full p-1 border border-yellow-500/30"
+          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-white shadow-2xl border-l-2 border-green-700/50 overflow-hidden z-50 animate-slideInRight">
+            {/* Close Button - Top Right */}
+            <div className="absolute top-4 right-4 z-10">
+              <button
                 onClick={() => setProfileOpen(false)}
-              />
+                className="group relative p-2 bg-green-800/80 hover:bg-green-700 rounded-full border border-green-600/50 hover:border-green-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-green-500/30 backdrop-blur-sm cursor-pointer"
+                aria-label="Close profile"
+              >
+                <X className="h-5 w-5 text-green-300 group-hover:text-green-100 transition-colors duration-300" />
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></span>
+              </button>
             </div>
 
-            <div className="h-full overflow-y-auto">
+            <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-green-700 scrollbar-track-gray-800">
               <div className="relative">
-                <div className="h-32 bg-gradient-to-r from-yellow-500 to-yellow-400"></div>
+                <div className="h-40 bg-gradient-to-br from-green-800 via-green-900 to-green-800 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-700/30 to-transparent"></div>
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-green-600/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-green-700/10 rounded-full -ml-24 -mb-24 blur-2xl"></div>
+                </div>
                 
-                <div className="px-6 pb-6 -mt-16">
-                  <div className="relative inline-block">
+                <div className="px-6 pb-6 -mt-20 relative z-10">
+                  <div className="relative inline-block group">
+                    <div className="absolute -inset-2 bg-gradient-to-r from-green-500 to-green-600 rounded-full opacity-75 blur-lg group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></div>
                     <img
                       src={userProfileData.avatar}
                       alt="User"
-                      className="h-24 w-24 rounded-full border-4 border-black bg-black shadow-lg shadow-yellow-500/30"
+                      className="relative h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900 shadow-2xl shadow-green-900/50 group-hover:scale-105 transition-transform duration-300"
                     />
-                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-yellow-400 rounded-full border-2 border-black shadow-sm"></div>
+                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-400 rounded-full border-2 border-gray-900 shadow-lg shadow-green-500/50 animate-pulse"></div>
                   </div>
 
-                  <div className="mt-4">
-                    <h2 className="text-2xl font-bold text-white">{userProfileData.name}</h2>
-                    <p className="text-yellow-200 text-sm mt-1">{userProfileData.email}</p>
+                  <div className="mt-4 animate-fadeInUp" style={{ animationDelay: "100ms" }}>
+                    <h2 className="text-2xl font-bold text-white group-hover:text-green-200 transition-colors duration-300">{userProfileData.name}</h2>
+                    <p className="text-green-300 text-sm mt-1">{userProfileData.email}</p>
                     <div className="flex flex-col gap-2 mt-3">
-                      <span className="bg-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold w-fit shadow-lg shadow-yellow-500/30">
+                      <span className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-1.5 rounded-full text-xs font-bold w-fit shadow-lg shadow-green-700/50 border border-green-500/30 hover:shadow-green-500/70 transition-all duration-300 hover:scale-105">
                         {userProfileData.membership}
                       </span>
-                      <span className="text-yellow-300 text-sm">
+                      <span className="text-green-400 text-sm flex items-center gap-2">
+                        <Calendar className="h-3 w-3" />
                         Member since {userProfileData.joinDate}
                       </span>
                     </div>
@@ -629,24 +608,30 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
               </div>
 
               {!loading && userData && (
-                <div className="px-6 py-4 border-y border-yellow-500/20 bg-gray-900">
-                  <h3 className="text-lg font-bold text-yellow-400 mb-3 flex items-center gap-2">
-                    <User className="h-5 w-5 text-yellow-400" />
+                <div className="px-6 py-5 border-y border-green-700/30 bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm animate-fadeInUp" style={{ animationDelay: "200ms" }}>
+                  <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2 group">
+                    <div className="p-1.5 bg-green-800/50 rounded-lg border border-green-600/30 group-hover:bg-green-700/50 transition-colors duration-300">
+                      <User className="h-4 w-4 text-green-300" />
+                    </div>
                     Profile Information
                   </h3>
                   <div className="space-y-3">
                     {userProfileData.phone !== "Not provided" && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <Phone className="h-4 w-4 text-yellow-400" />
-                        <span className="text-yellow-300">Phone: </span>
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                        <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
+                          <Phone className="h-3.5 w-3.5 text-green-400" />
+                        </div>
+                        <span className="text-green-300 font-medium">Phone: </span>
                         <span className="text-white">{userProfileData.phone}</span>
                       </div>
                     )}
                     
                     {userProfileData.location !== "Not specified" && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <MapPin className="h-4 w-4 text-yellow-400" />
-                        <span className="text-yellow-300">
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                        <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
+                          <MapPin className="h-3.5 w-3.5 text-green-400" />
+                        </div>
+                        <span className="text-green-300 font-medium">
                           {userProfileData.role === "Service Provider" ? "Location: " : "Country: "}
                         </span>
                         <span className="text-white">{userProfileData.location}</span>
@@ -654,9 +639,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                     )}
                     
                     {userProfileData.languages !== "Not specified" && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <Globe className="h-4 w-4 text-yellow-400" />
-                        <span className="text-yellow-300">
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                        <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
+                          <Globe className="h-3.5 w-3.5 text-green-400" />
+                        </div>
+                        <span className="text-green-300 font-medium">
                           {userProfileData.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
                         </span>
                         <span className="text-white">{userProfileData.languages}</span>
@@ -664,20 +651,24 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                     )}
                     
                     {userProfileData.experience && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <Award className="h-4 w-4 text-yellow-400" />
-                        <span className="text-yellow-300">Experience: </span>
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                        <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
+                          <Award className="h-3.5 w-3.5 text-green-400" />
+                        </div>
+                        <span className="text-green-300 font-medium">Experience: </span>
                         <span className="text-white">{userProfileData.experience} years</span>
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-3 text-sm">
-                      <User className="h-4 w-4 text-yellow-400" />
-                      <span className="text-yellow-300">Role: </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                      <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
+                        <User className="h-3.5 w-3.5 text-green-400" />
+                      </div>
+                      <span className="text-green-300 font-medium">Role: </span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-300 hover:scale-105 ${
                         userProfileData.role === "Service Provider" 
-                          ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/30" 
-                          : "bg-yellow-600 text-black shadow-lg shadow-yellow-600/30"
+                          ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-700/50 border border-green-500/30" 
+                          : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-600/50 border border-green-400/30"
                       }`}>
                         {userProfileData.role}
                       </span>
@@ -687,42 +678,45 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
               )}
 
               {loading && (
-                <div className="px-6 py-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto"></div>
-                  <p className="text-yellow-300 mt-2">Loading profile...</p>
+                <div className="px-6 py-8 text-center animate-fadeIn">
+                  <div className="relative inline-block">
+                    <div className="animate-spin rounded-full h-10 w-10 border-3 border-gray-700 border-t-green-500 mx-auto"></div>
+                    <div className="absolute inset-0 animate-ping rounded-full border-2 border-green-500/30"></div>
+                  </div>
+                  <p className="text-green-300 mt-3 font-medium">Loading profile...</p>
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-y border-yellow-500/20 bg-gray-900">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-400">12</div>
-                  <div className="text-xs text-yellow-300">Trips</div>
+              <div className="grid grid-cols-3 gap-3 px-6 py-5 border-y border-green-700/30 bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm animate-fadeInUp" style={{ animationDelay: "300ms" }}>
+                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30 hover:border-green-700/50 hover:bg-gray-800/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
+                  <div className="text-xl font-bold text-green-400 group-hover:text-green-300 transition-colors duration-300">12</div>
+                  <div className="text-xs text-green-300/80 mt-1">Trips</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-400">8</div>
-                  <div className="text-xs text-yellow-300">Favorites</div>
+                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30 hover:border-green-700/50 hover:bg-gray-800/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
+                  <div className="text-xl font-bold text-green-400 group-hover:text-green-300 transition-colors duration-300">8</div>
+                  <div className="text-xs text-green-300/80 mt-1">Favorites</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-400">2</div>
-                  <div className="text-xs text-yellow-300">Upcoming</div>
+                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30 hover:border-green-700/50 hover:bg-gray-800/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
+                  <div className="text-xl font-bold text-green-400 group-hover:text-green-300 transition-colors duration-300">2</div>
+                  <div className="text-xs text-green-300/80 mt-1">Upcoming</div>
                 </div>
               </div>
 
-              <div className="p-6 space-y-2 bg-black">
+              <div className="p-6 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp" style={{ animationDelay: "400ms" }}>
                 {profileMenuItems.map((item, index) => {
                   const IconComponent = item.icon;
                   return (
                     <a
                       key={item.label}
                       href={item.href}
-                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-yellow-500/20 transition-all duration-300 group cursor-pointer animate-fadeInUp border border-yellow-500/20 hover:border-yellow-400/50"
-                      style={{ animationDelay: `${index * 50 + 200}ms` }}
+                      className="flex items-center gap-4 p-3.5 rounded-xl hover:bg-green-800/30 transition-all duration-300 group cursor-pointer border border-gray-700/30 hover:border-green-600/50 hover:shadow-lg hover:shadow-green-900/30 hover:scale-[1.02] animate-fadeInUp"
+                      style={{ animationDelay: `${index * 50 + 500}ms` }}
                       onClick={() => setProfileOpen(false)}
                     >
-                      <div className="p-2 bg-yellow-500/20 rounded-lg group-hover:bg-yellow-500 group-hover:text-black transition-all duration-300 border border-yellow-500/30">
-                        <IconComponent className="h-5 w-5 text-yellow-400 group-hover:text-black" />
+                      <div className="p-2 bg-green-800/30 rounded-lg group-hover:bg-green-700/50 group-hover:scale-110 transition-all duration-300 border border-green-700/30 group-hover:border-green-500/50">
+                        <IconComponent className="h-5 w-5 text-green-400 group-hover:text-green-200 transition-colors duration-300" />
                       </div>
-                      <span className="font-medium text-yellow-300 group-hover:text-yellow-200">
+                      <span className="font-medium text-green-300 group-hover:text-green-100 transition-colors duration-300">
                         {item.label}
                       </span>
                     </a>
@@ -730,15 +724,15 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 })}
               </div>
 
-              <div className="px-6 py-4 border-t border-yellow-500/20 bg-gray-900 mt-auto">
+              <div className="px-6 py-5 border-t border-green-700/30 bg-gradient-to-b from-gray-900 to-black mt-auto animate-fadeInUp" style={{ animationDelay: "600ms" }}>
                 <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-red-600/40 text-red-400 hover:text-red-300 transition-all duration-300 w-full group border border-red-500/30 hover:border-red-400/50"
+                  className="flex items-center gap-4 p-3.5 rounded-xl hover:bg-red-600/40 text-red-400 hover:text-red-300 transition-all duration-300 w-full group border border-red-700/30 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-900/30 hover:scale-[1.02] cursor-pointer"
                 >
-                  <div className="p-2 bg-red-600/20 rounded-lg group-hover:bg-red-500 group-hover:text-white transition-all duration-300 border border-red-500/30">
-                    <LogOut className="h-5 w-5" />
+                  <div className="p-2 bg-red-700/20 rounded-lg group-hover:bg-red-600 group-hover:scale-110 transition-all duration-300 border border-red-600/30 group-hover:border-red-500/50">
+                    <LogOut className="h-5 w-5 group-hover:text-white transition-colors duration-300" />
                   </div>
-                  <span className="font-medium">Log Out</span>
+                  <span className="font-medium group-hover:text-red-200 transition-colors duration-300">Log Out</span>
                 </button>
               </div>
             </div>
@@ -748,8 +742,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
 
       <style jsx>{`
         @keyframes slideInRight {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
+          from { 
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to { 
+            transform: translateX(0);
+            opacity: 1;
+          }
         }
         @keyframes slideInLeft {
           from { transform: translateX(-100%); }
@@ -760,13 +760,41 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
           to { opacity: 1; }
         }
         @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { 
+            opacity: 0; 
+            transform: translateY(20px);
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0);
+          }
         }
-        .animate-slideInRight { animation: slideInRight 0.3s ease-out forwards; }
-        .animate-slideInLeft { animation: slideInLeft 0.3s ease-out forwards; }
-        .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
-        .animate-fadeInUp { animation: fadeInUp 0.4s ease-out forwards; opacity: 0; }
+        .animate-slideInRight { 
+          animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+        }
+        .animate-slideInLeft { 
+          animation: slideInLeft 0.3s ease-out forwards; 
+        }
+        .animate-fadeIn { 
+          animation: fadeIn 0.3s ease-out forwards; 
+        }
+        .animate-fadeInUp { 
+          animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+          opacity: 0;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: rgba(31, 41, 55, 0.5);
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: rgba(34, 197, 94, 0.5);
+          border-radius: 3px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background: rgba(34, 197, 94, 0.7);
+        }
       `}</style>
     </>
   );

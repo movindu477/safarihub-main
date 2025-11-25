@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 // Import image from src/assets
-import lankamap from "../assets/lankamapori.png";
+import lankamap from "../../assets/lankamapori.png";
 
 const LocationDot = ({ type, position, label, isHovered, onHover, onClick }) => {
   const dotColors = {
@@ -153,7 +153,7 @@ const LocationPopup = ({ location, position, onClose }) => {
           onClick={onClose}
           className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full 
             flex items-center justify-center text-xs font-bold hover:bg-red-600 transition-colors
-            shadow-lg z-10"
+            shadow-lg z-10 cursor-pointer"
         >
           ×
         </button>
@@ -369,7 +369,7 @@ export default function Section3() {
             </h3>
             <button 
               onClick={() => setActiveFilter("all")}
-              className={`text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all ${
+              className={`text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all cursor-pointer ${
                 activeFilter === "all" 
                   ? "bg-green-500 text-white" 
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -393,19 +393,19 @@ export default function Section3() {
           </div>
         </div>
 
-        {/* CTA Button */}
-        <div className="pt-2 sm:pt-4">
-          <a
-            href="#destinations"
+        {/* CTA Button - Matching Section2 Style */}
+        <div className="pt-2 sm:pt-4 flex justify-center lg:justify-start">
+          <button
             className="group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 
-            text-white font-semibold py-3 sm:py-4 px-6 sm:px-8 rounded-xl transition-all duration-300 
-            transform hover:scale-105 hover:shadow-xl sm:hover:shadow-2xl shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base cursor-pointer no-underline w-full sm:w-auto inline-block"
+            text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 
+            transform hover:scale-105 hover:shadow-2xl shadow-lg flex items-center justify-center gap-3
+            border border-green-500/30 cursor-pointer"
           >
             <span>Explore All Destinations</span>
-            <svg className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>
-          </a>
+          </button>
         </div>
       </div>
 

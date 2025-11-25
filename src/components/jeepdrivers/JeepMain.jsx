@@ -3,10 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { Bell, MessageCircle, X, Send, Check, CheckCheck, User } from "lucide-react";
-import Navbar from "./Navbar";
+import Navbar from "../home/Navbar";
 import JeepHero from "./JeepHero";
 import JeepSection2 from "./JeepSection2";
-import Footer from "./Footer";
+import Footer from "../home/Footer";
 
 // Import Firebase functions
 import { 
@@ -21,7 +21,7 @@ import {
   getOtherParticipant,
   markNotificationAsRead,
   getUserRole
-} from '../firebase';
+} from '../../firebase';
 
 // Chat Modal Component
 const ChatModal = ({ 

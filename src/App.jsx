@@ -38,23 +38,23 @@ import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLef
 import logo from "./assets/logo.png";
 
 // Import components
-import Navbar from "./components/Navbar";
-import Section1 from "./components/Section1";
-import Section2 from "./components/Section2";
-import Section3 from "./components/Section3";
-import Section4 from "./components/Section4";
-import Section5 from "./components/Section5";
-import Footer from "./components/Footer";
-import JeepDriversPage from "./components/JeepMain";
-import JeepProfile from "./components/JeepProfile";
+import Navbar from "./components/home/Navbar";
+import Section1 from "./components/home/Section1";
+import Section2 from "./components/home/Section2";
+import Section3 from "./components/home/Section3";
+import Section4 from "./components/home/Section4";
+import Section5 from "./components/home/Section5";
+import Footer from "./components/home/Footer";
+import JeepDriversPage from "./components/jeepdrivers/JeepMain";
+import JeepProfile from "./components/jeepdrivers/JeepProfile";
 import NotificationPanel from "./components/NotificationPanel";
 
 // Import Destination App
 import DestinationApp from "./components/destination/App";
 
 // Import Guide App
-import GuideApp from "./components/guide/App";
-import GuideProfile from "./components/guide/GuideProfile";
+import GuideApp from "./components/guides/App";
+import GuideProfile from "./components/guides/GuideProfile";
 
 
 // 🔥 Firebase Config
@@ -540,7 +540,7 @@ const ChatModal = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -607,7 +607,7 @@ const ChatModal = ({
             <button
               type="submit"
               disabled={!message.trim() || sending}
-              className="bg-yellow-500 text-white p-3 rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="bg-yellow-500 text-white p-3 rounded-full hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               {sending ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -677,7 +677,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
 
         <button
           onClick={handleBellClick}
-          className="relative bg-green-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-600"
+          className="relative bg-green-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-600 cursor-pointer"
         >
           <Bell className="h-6 w-6 text-white" />
           {notifications.filter(n => !n.read).length > 0 && (
@@ -747,14 +747,15 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
       />
       
       {/* Home Content with All Sections */}
-      <div className="pt--1">
-        <Section1 />
-        <Section2 />
-        <Section3 />
-        <Section4 />
-        <Section5 />
-        <Footer />
-      </div>
+      <div className="pt--1 space-y-1">
+  <Section1 />
+  <Section2 />
+  <Section3 />
+  <Section4 />
+  <Section5 />
+  <Footer />
+</div>
+
     </div>
   );
 };

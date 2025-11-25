@@ -19,10 +19,10 @@ import {
   CheckCheck, 
   User 
 } from 'lucide-react';
-import Navbar from '../Navbar.jsx';
+import Navbar from '../home/Navbar.jsx';
 import GuideHero from './guidehero.jsx';
-import GuideSection2 from './guidesection2.jsx';
-import Footer from '../Footer.jsx';
+import GuideSection2 from './GuideSection2.jsx';
+import Footer from '../home/Footer.jsx';
 
 // Firebase imports
 import { 

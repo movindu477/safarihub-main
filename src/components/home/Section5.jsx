@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 // Import image from src/assets
-import cameraImage from "../assets/camera.jpg";
+import cameraImage from "../../assets/camera.jpg";
 
 export default function Section5() {
   const [isVisible, setIsVisible] = useState(false);
@@ -89,7 +89,7 @@ export default function Section5() {
               <button className="group relative bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 
                 text-white font-semibold text-lg py-4 px-8 rounded-2xl 
                 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl 
-                flex items-center gap-3 overflow-hidden">
+                flex items-center gap-3 overflow-hidden cursor-pointer">
                 <span className="relative z-10">Explore Locations</span>
                 <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300 relative z-10" 
                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
