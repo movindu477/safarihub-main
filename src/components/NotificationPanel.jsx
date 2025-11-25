@@ -149,20 +149,20 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                       </div>
                     )}
                     
-                    {/* Accept/Decline Buttons for Pending Bookings - Only show for drivers receiving booking requests */}
+                    {/* Accept/Decline Buttons for Pending Bookings - Show for drivers/guides receiving booking requests */}
                     {notification.type === 'booking' && notification.bookingId && currentUser && currentUser.uid === notification.recipientId && (
                       <div className="flex gap-2 mt-2">
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
                             try {
-                              // Driver is accepting, so driverId is currentUser.uid, customerId is senderId
+                              // Provider (driver/guide) is accepting, so providerId is currentUser.uid, customerId is senderId
                               await updateBookingStatus(
                                 notification.bookingId,
                                 'accepted',
-                                currentUser.uid, // driverId (the person accepting)
+                                currentUser.uid, // providerId (the person accepting - driver or guide)
                                 notification.senderId, // customerId (the person who made the booking)
-                                currentUser.displayName || 'Driver', // driverName
+                                currentUser.displayName || 'Service Provider', // providerName
                                 notification.bookingData?.customerName || notification.senderName || 'Customer' // customerName
                               );
                               await onMarkAsRead(notification.id);
@@ -181,13 +181,13 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                           onClick={async (e) => {
                             e.stopPropagation();
                             try {
-                              // Driver is declining, so driverId is currentUser.uid, customerId is senderId
+                              // Provider (driver/guide) is declining, so providerId is currentUser.uid, customerId is senderId
                               await updateBookingStatus(
                                 notification.bookingId,
                                 'declined',
-                                currentUser.uid, // driverId (the person declining)
+                                currentUser.uid, // providerId (the person declining - driver or guide)
                                 notification.senderId, // customerId (the person who made the booking)
-                                currentUser.displayName || 'Driver', // driverName
+                                currentUser.displayName || 'Service Provider', // providerName
                                 notification.bookingData?.customerName || notification.senderName || 'Customer' // customerName
                               );
                               await onMarkAsRead(notification.id);

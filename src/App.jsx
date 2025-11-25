@@ -360,9 +360,20 @@ export const markNotificationAsRead = async (notificationId) => {
   }
 };
 
-// Booking Management
-export const updateBookingStatus = async (bookingId, status, driverId, customerId, driverName, customerName) => {
+// Booking Management - Works for both drivers and guides
+export const updateBookingStatus = async (bookingId, status, providerId, customerId, providerName, customerName) => {
   try {
+    // Get booking to check if it's a driver or guide booking
+    const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
+    if (!bookingDoc.exists()) {
+      throw new Error('Booking not found');
+    }
+    
+    const bookingData = bookingDoc.data();
+    const isGuideBooking = !!bookingData.guideId;
+    const serviceType = isGuideBooking ? 'guide' : 'driver';
+    const serviceProviderName = isGuideBooking ? 'guide' : 'driver';
+    
     // Update booking status
     await updateDoc(doc(db, 'bookings', bookingId), {
       status: status,
@@ -372,21 +383,21 @@ export const updateBookingStatus = async (bookingId, status, driverId, customerI
     
     // Create notification for customer
     const statusMessage = status === 'accepted' 
-      ? `Your booking with ${driverName} has been accepted!`
-      : `Your booking with ${driverName} has been declined.`;
+      ? `Your booking with ${providerName} has been accepted!`
+      : `Your booking with ${providerName} has been declined.`;
     
     await createNotification({
       type: 'booking',
       title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       message: statusMessage,
       recipientId: customerId,
-      senderId: driverId,
-      senderName: driverName,
+      senderId: providerId,
+      senderName: providerName,
       relatedId: bookingId,
       bookingId: bookingId
     });
     
-    console.log(`✅ Booking ${bookingId} status updated to ${status}`);
+    console.log(`✅ Booking ${bookingId} status updated to ${status} (${serviceType})`);
   } catch (error) {
     console.error('Error updating booking status:', error);
     throw error;

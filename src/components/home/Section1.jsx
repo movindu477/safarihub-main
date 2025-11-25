@@ -1,46 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 
-// Import images from src/assets
+// Import image from src/assets
 import back1 from "../../assets/back1.jpg";
-import back2 from "../../assets/back2ori.jpg";
-import back3 from "../../assets/back3ori.jpg";
-import back4 from "../../assets/back4ori2.avif";
 
 export default function Section1() {
-  // ✅ Use imported images
-  const images = [
-    back1,
-    back2,
-    back3,
-    back4,
-  ];
-
-  const [currentImage, setCurrentImage] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImage((prev) => (prev + 1) % images.length);
-    }, 5000); // Slide every 5 seconds
-    return () => clearInterval(interval);
-  }, [images.length]);
 
   return (
     <section className="relative w-full h-screen overflow-hidden">
-      {/* ✅ Background slideshow */}
-      {images.map((image, index) => (
-        <div
-          key={index}
-          className={`absolute top-0 left-0 w-full h-full transition-opacity duration-[2000ms] ease-in-out ${
-            index === currentImage ? "opacity-100" : "opacity-0"
-          }`}
-          style={{
-            backgroundImage: `url(${image})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-          }}
-        ></div>
-      ))}
+      {/* ✅ Background Image */}
+      <div
+        className="absolute top-0 left-0 w-full h-full"
+        style={{
+          backgroundImage: `url(${back1})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      ></div>
 
       {/* ✅ Content Section */}
       <div
@@ -55,15 +31,16 @@ export default function Section1() {
         "
       >
         {/* Title */}
-        <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight drop-shadow-lg">
-          Welcome to <span className="text-yellow-400">SafariHub</span>
+        <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight drop-shadow-lg">
+          Welcome to
+          <br />
+          <span className="text-green-500">SafariHub</span>
         </h1>
 
         {/* Description */}
-        <p className="text-base md:text-lg max-w-xl text-gray-100">
-          Discover breathtaking destinations, thrilling adventures, and
-          unforgettable experiences. SafariHub brings you closer to the wild
-          beauty of nature one journey at a time.
+        <p className="text-lg md:text-xl max-w-2xl text-gray-100 font-light leading-relaxed drop-shadow-md">
+          Discover breathtaking destinations, thrilling adventures, and unforgettable experiences. 
+          SafariHub brings you closer to the wild beauty of nature one journey at a time.
         </p>
       </div>
 

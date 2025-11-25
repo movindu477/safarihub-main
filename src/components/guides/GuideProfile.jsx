@@ -3,9 +3,13 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { 
   getFirestore, 
   doc, 
-  getDoc
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp
 } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../../firebase";
 import { 
   MapPin, 
   Star, 
@@ -41,7 +45,6 @@ import {
 
 // Initialize Firebase
 const db = getFirestore();
-const auth = getAuth();
 
 // Import the fixed ReviewSection component
 // import ReviewSection from "./ReviewSection";
@@ -391,6 +394,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   const [userRole, setUserRole] = useState("");
   const [conversationId, setConversationId] = useState(null);
   const [selectedDates, setSelectedDates] = useState([]);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessageData, setSuccessMessageData] = useState(null);
+  const [isBooking, setIsBooking] = useState(false);
   
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
@@ -599,22 +605,237 @@ useEffect(() => {
     });
   };
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
+    // Prevent double-clicks
+    if (isBooking) {
+      console.warn('⚠️ Booking already in progress, ignoring click');
+      return;
+    }
+    
+    console.log('🔵 handleBooking called');
+    console.log('🔵 Current state:', {
+      selectedDates: selectedDates.length,
+      currentUser: !!currentUser,
+      guide: !!guide,
+      guideId: guide?.id,
+      isBooking: isBooking
+    });
+    
     if (selectedDates.length === 0) {
+      console.warn('⚠️ No dates selected');
       alert('Please select at least one date for your booking.');
       return;
     }
     
-    const totalPrice = selectedDates.length * (guide.dailyRate || guide.hourlyRate * 8 || 0);
-    alert(`Booking confirmed for ${selectedDates.length} day(s)! Total: ${guide.currencyPreference || 'LKR'} ${totalPrice.toLocaleString()}`);
+    if (!currentUser) {
+      console.warn('⚠️ No current user');
+      alert('Please login to make a booking.');
+      return;
+    }
     
-    console.log('Booking details:', {
-      guideId: guide.id,
-      guideName: guide.guideName,
-      selectedDates: selectedDates.map(d => d.toISOString()),
-      totalPrice,
-      customerId: currentUser?.uid
-    });
+    if (!guide) {
+      console.warn('⚠️ No guide data');
+      alert('Guide information not available.');
+      return;
+    }
+      
+    // Verify guide has a valid ID
+    if (!guide.id) {
+      console.error('❌ Guide ID is missing:', guide);
+      alert('Guide information is incomplete. Please try again.');
+      return;
+    }
+      
+    console.log('✅ All pre-checks passed, starting booking process...');
+    setIsBooking(true);
+    
+    try {
+      // Get the authenticated user directly from Firebase Auth
+      const authUser = auth.currentUser;
+      
+      console.log('🔐 Auth check:', {
+        authUser: !!authUser,
+        authUserUid: authUser?.uid,
+        authUserEmail: authUser?.email,
+        currentUser: !!currentUser,
+        currentUserUid: currentUser?.uid
+      });
+      
+      if (!authUser) {
+        console.error('❌ No authenticated user found');
+        alert('Please login to make a booking. No authenticated user found.');
+        return;
+      }
+      
+      if (!authUser.uid) {
+        console.error('❌ No user ID found in auth user');
+        alert('Authentication error. Please try logging in again.');
+        return;
+      }
+      
+      // Calculate total price - use dailyRate or calculate from hourlyRate
+      const pricePerDay = guide.dailyRate || (guide.hourlyRate ? guide.hourlyRate * 8 : 0);
+      const totalPrice = selectedDates.length * pricePerDay;
+      const datesString = selectedDates.map(d => d.toLocaleDateString()).join(', ');
+      
+      // Get guide email
+      const guideEmail = guide.contactEmail || guide.email || '';
+      
+      // Validate guide ID
+      const guideIdString = String(guide.id || '');
+      if (!guideIdString || guideIdString === 'undefined' || guideIdString === 'null' || guideIdString.trim() === '') {
+        console.error('❌ Invalid guide ID:', guide.id);
+        alert('Invalid guide information. Please refresh the page and try again.');
+        return;
+      }
+      
+      // Create booking in Firestore
+      const bookingData = {
+        guideId: guideIdString, // Guide ID (similar to driverId)
+        guideName: guide.guideName || guide.fullName || 'Tour Guide',
+        guideEmail: guideEmail,
+        customerId: authUser.uid, // MUST match request.auth.uid
+        customerName: authUser.displayName || 'Customer',
+        customerEmail: authUser.email || '',
+        selectedDates: selectedDates.map(d => d.toISOString()), // Must be an array
+        datesString: datesString,
+        totalPrice: Number(totalPrice), // Must be a number
+        pricePerDay: Number(pricePerDay),
+        numberOfDays: Number(selectedDates.length),
+        serviceType: 'Tour Guide',
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      console.log('📝 Creating booking with data:', {
+        authUid: authUser.uid,
+        customerId: bookingData.customerId,
+        guideId: bookingData.guideId,
+        selectedDates: bookingData.selectedDates,
+        totalPrice: bookingData.totalPrice
+      });
+      
+      // Validate data types
+      const validatedBookingData = {
+        ...bookingData,
+        guideId: String(bookingData.guideId),
+        selectedDates: Array.isArray(bookingData.selectedDates) ? bookingData.selectedDates : [],
+        totalPrice: Number(bookingData.totalPrice)
+      };
+      
+      const bookingRef = collection(db, 'bookings');
+      const finalBookingData = validatedBookingData;
+      
+      try {
+        console.log('🚀 Attempting to create booking in Firestore...');
+        const bookingDoc = await addDoc(bookingRef, finalBookingData);
+        const bookingId = bookingDoc.id;
+        
+        console.log('✅ Booking created successfully with ID:', bookingId);
+        
+        // Create confirmation record
+        try {
+          const confirmationRef = collection(db, 'confirmations');
+          const confirmationData = {
+            bookingId: bookingId,
+            ...bookingData,
+            confirmationStatus: 'pending',
+            confirmedAt: serverTimestamp(),
+            confirmationType: 'booking_request'
+          };
+          await addDoc(confirmationRef, confirmationData);
+          console.log('✅ Confirmation record created');
+        } catch (confirmationError) {
+          console.warn('⚠️ Could not create confirmation record (non-critical):', confirmationError);
+        }
+        
+        // Create notification for guide
+        try {
+          const notificationData = {
+            type: 'booking',
+            title: 'New Booking Request',
+            message: `You have a new booking request from ${authUser.displayName || 'a customer'} for ${selectedDates.length} day(s). Dates: ${datesString}. Total: ${guide.currencyPreference || 'LKR'} ${totalPrice.toLocaleString()}`,
+            recipientId: guide.id, // Guide's user ID
+            senderId: authUser.uid, // Tourist's user ID
+            senderName: authUser.displayName || 'Customer',
+            senderEmail: authUser.email || '',
+            guideEmail: guideEmail,
+            relatedId: bookingId,
+            bookingId: bookingId,
+            bookingData: {
+              dates: datesString,
+              selectedDates: selectedDates.map(d => d.toISOString()),
+              numberOfDays: selectedDates.length,
+              totalPrice: totalPrice,
+              customerName: authUser.displayName || 'Customer',
+              customerEmail: authUser.email || '',
+              guideId: guide.id,
+              guideName: guide.guideName || guide.fullName || 'Tour Guide',
+              guideEmail: guideEmail,
+              pricePerDay: pricePerDay,
+              status: 'pending'
+            }
+          };
+          
+          await createNotification(notificationData);
+          console.log('✅ Notification created for guide');
+        } catch (notificationError) {
+          console.warn('⚠️ Could not create notification (non-critical):', notificationError);
+        }
+        
+        // Show success message
+        setSuccessMessageData({
+          guideName: guide.guideName || guide.fullName,
+          dates: datesString,
+          totalPrice: totalPrice,
+          numberOfDays: selectedDates.length,
+          bookingId: bookingId
+        });
+        setShowSuccessMessage(true);
+        
+        // Reset selected dates
+        setSelectedDates([]);
+        setIsBooking(false);
+        
+        // Redirect to GuideProfile page after showing success message (3 seconds)
+        setTimeout(() => {
+          console.log('🔄 Redirecting to GuideProfile page...');
+          setShowSuccessMessage(false);
+          setSuccessMessageData(null);
+          if (guideId) {
+            navigate(`/guide-profile/${guideId}`, { replace: true });
+          } else if (guide?.id) {
+            navigate(`/guide-profile/${guide.id}`, { replace: true });
+          } else {
+            navigate('/guide', { replace: true });
+          }
+        }, 3000);
+        
+      } catch (bookingError) {
+        console.error('❌ CRITICAL: Failed to create booking document:', bookingError);
+        throw bookingError;
+      }
+      
+    } catch (error) {
+      setIsBooking(false);
+      console.error('❌ Error creating booking:', error);
+      
+      setShowSuccessMessage(false);
+      setSuccessMessageData(null);
+      
+      let errorMessage = 'Failed to create booking. ';
+      
+      if (error.code === 'permission-denied') {
+        errorMessage = 'Unable to complete your booking request.\n\nThis may be due to:\n• Your session may have expired\n• Database permissions need to be updated\n\nPlease try:\n1. Log out and log back in\n2. Wait a few moments and try again\n\nIf the problem continues, please contact support.';
+      } else if (error.code === 'unavailable') {
+        errorMessage = 'Unable to connect to the server.\n\nPlease check your internet connection and try again.';
+      } else {
+        errorMessage = 'An unexpected error occurred while processing your booking.\n\nPlease try again. If the problem persists, please contact support.';
+      }
+      
+      alert(errorMessage);
+    }
   };
 
   const handleNotificationClick = async (notification) => {
@@ -783,6 +1004,84 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-gray-50">
+      {/* Success Message Animation */}
+      {showSuccessMessage && successMessageData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all animate-slideUp">
+            <div className="text-center">
+              {/* Success Icon Animation */}
+              <div className="mb-4 flex justify-center">
+                <div className="relative">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center animate-scaleIn">
+                    <CheckCircle className="w-12 h-12 text-green-600" />
+                  </div>
+                  <div className="absolute inset-0 bg-green-200 rounded-full animate-ping opacity-75"></div>
+                </div>
+              </div>
+              
+              {/* Success Message */}
+              <h2 className="text-2xl font-bold text-gray-900 mb-2 animate-fadeIn">
+                Booking Confirmed! 🎉
+              </h2>
+              <p className="text-gray-600 mb-2">
+                Your booking request has been successfully sent to the guide.
+              </p>
+              <p className="text-sm text-emerald-600 font-semibold mb-6">
+                The guide will receive a notification and can accept or decline your booking.
+              </p>
+              {successMessageData.bookingId && (
+                <p className="text-xs text-gray-500 mb-4">
+                  Booking ID: {successMessageData.bookingId.substring(0, 8)}...
+                </p>
+              )}
+              
+              {/* Booking Details */}
+              <div className="bg-emerald-50 rounded-xl p-4 mb-6 text-left space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Guide:</span>
+                  <span className="text-gray-900 font-semibold">{successMessageData.guideName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Dates:</span>
+                  <span className="text-gray-900 font-semibold">{successMessageData.dates}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Days:</span>
+                  <span className="text-gray-900 font-semibold">{successMessageData.numberOfDays} day(s)</span>
+                </div>
+                <div className="flex justify-between border-t border-emerald-200 pt-2 mt-2">
+                  <span className="text-gray-600 font-bold">Total:</span>
+                  <span className="text-emerald-600 font-bold text-lg">LKR {successMessageData.totalPrice.toLocaleString()}</span>
+                </div>
+              </div>
+              
+              {/* Info Message */}
+              <p className="text-sm text-gray-500 mb-4">
+                The guide will receive a notification and can accept or decline your booking.
+              </p>
+              
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setShowSuccessMessage(false);
+                  setSuccessMessageData(null);
+                  if (guideId) {
+                    navigate(`/guide-profile/${guideId}`, { replace: true });
+                  } else if (guide?.id) {
+                    navigate(`/guide-profile/${guide.id}`, { replace: true });
+                  } else {
+                    navigate('/guide', { replace: true });
+                  }
+                }}
+                className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors font-semibold shadow-lg cursor-pointer"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <ChatModal 
         isOpen={isChatModalOpen}
         onClose={() => setIsChatModalOpen(false)}
@@ -1275,9 +1574,14 @@ useEffect(() => {
                               
                               <button
                                 onClick={handleBooking}
-                                className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium mt-4 shadow-md"
+                                disabled={isBooking || selectedDates.length === 0}
+                                className={`w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium mt-4 shadow-md ${
+                                  isBooking || selectedDates.length === 0 
+                                    ? 'opacity-50 cursor-not-allowed' 
+                                    : 'cursor-pointer'
+                                }`}
                               >
-                                Confirm Booking
+                                {isBooking ? 'Processing...' : 'Confirm Booking'}
                               </button>
                             </div>
                           )}
