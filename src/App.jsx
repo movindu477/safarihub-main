@@ -832,7 +832,10 @@ function App() {
                 console.log('🔄 Auto-redirecting to payment page for accepted booking');
                 // Small delay to ensure smooth transition
                 setTimeout(() => {
-                  window.location.href = `/payment/${unreadBookingAccepted.bookingId}`;
+                  // Use window.location for reliable navigation in production/Vercel
+                  const paymentUrl = `/payment/${unreadBookingAccepted.bookingId}`;
+                  // Force full navigation to ensure route is loaded
+                  window.location.href = paymentUrl;
                 }, 1000);
               }
             }
@@ -901,7 +904,9 @@ function App() {
           // Check if user is the customer
           if (user && booking.customerId === user.uid) {
             console.log('🔄 Redirecting to payment page for accepted booking');
-            window.location.href = `/payment/${notification.bookingId}`;
+            // Use window.location for reliable navigation in production/Vercel
+            const paymentUrl = `/payment/${notification.bookingId}`;
+            window.location.href = paymentUrl;
             return;
           }
         }
@@ -931,6 +936,7 @@ function App() {
   if (showAuth) {
     return <Authentication onAuthSuccess={handleAuthSuccess} />;
   }
+
 
   return (
     <Router>
