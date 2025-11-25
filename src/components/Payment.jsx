@@ -379,10 +379,10 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Loading state
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
-          <Loader className="h-12 w-12 animate-spin text-green-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading payment details...</p>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
+          <Loader className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-green-500 mx-auto mb-3 sm:mb-4" />
+          <p className="text-sm sm:text-base text-gray-600">Loading payment details...</p>
         </div>
       </div>
     );
@@ -392,13 +392,13 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   if (error) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+        <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
+          <AlertCircle className="h-12 w-12 sm:h-16 sm:w-16 text-red-500 mx-auto mb-3 sm:mb-4" />
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Error</h2>
+          <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 break-words">{error}</p>
           <button
             onClick={() => navigate(-1)}
-            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors cursor-pointer font-semibold"
+            className="bg-green-500 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-green-600 transition-colors cursor-pointer font-semibold text-sm sm:text-base w-full sm:w-auto"
           >
             Go Back
           </button>
@@ -411,18 +411,18 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   if (paymentSuccess) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="mb-6">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="h-12 w-12 text-green-500" />
+        <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
+          <div className="mb-4 sm:mb-6">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+              <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
-            <p className="text-gray-600 mb-1">Your booking has been confirmed</p>
-            <p className="text-sm text-gray-500">Redirecting you back...</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-1">Your booking has been confirmed</p>
+            <p className="text-xs sm:text-sm text-gray-500">Redirecting you back...</p>
           </div>
           <div className="flex items-center justify-center gap-2 text-green-500">
-            <Loader className="h-5 w-5 animate-spin" />
-            <span className="text-sm">Processing redirect</span>
+            <Loader className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+            <span className="text-xs sm:text-sm">Processing redirect</span>
           </div>
         </div>
       </div>
@@ -432,9 +432,9 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   if (!booking) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No booking found</p>
+        <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
+          <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+          <p className="text-sm sm:text-base text-gray-600">No booking found</p>
         </div>
       </div>
     );
@@ -504,31 +504,32 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full my-8 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-5xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-2xl p-6 text-white">
+        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <Lock className="h-5 w-5" />
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold">Secure Payment</h1>
-                <p className="text-green-100 text-sm">Complete your booking payment</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-xl font-bold truncate">Secure Payment</h1>
+                <p className="text-green-100 text-xs sm:text-sm hidden sm:block">Complete your booking payment</p>
               </div>
             </div>
             <button
               onClick={() => navigate(-1)}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer flex-shrink-0 ml-2"
+              aria-label="Close"
             >
-              <X className="h-5 w-5" />
+              <X className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-3 sm:p-4 md:p-6">
           {/* Booking Form - Show only for Jeep bookings and if not completed */}
           {isJeepBooking && showBookingForm ? (
             <BookingForm
@@ -541,17 +542,17 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
               booking={booking}
             />
           ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Left Column - Booking Details & Payment Form */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-2 space-y-3 sm:space-y-4 order-2 lg:order-1">
               {/* Booking Summary */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  Booking Summary
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200">
+                <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
+                  <span>Booking Summary</span>
                 </h2>
                 
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-gray-400" />
                     <div>
@@ -585,10 +586,10 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
               </div>
 
               {/* Payment Method Selection */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Payment Method</h2>
+              <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
+                <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Payment Method</h2>
                 
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
                   <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
                     paymentMethod === 'card' ? 'border-green-500 bg-green-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
                   }`}>
@@ -673,14 +674,14 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
                 {/* Bank Transfer Info */}
                 {paymentMethod === 'bank' && (
-                  <div className="bg-gray-50 rounded-lg p-4 text-sm border border-gray-200">
-                    <p className="font-semibold mb-3 text-gray-900">Bank Transfer Details:</p>
-                    <div className="space-y-2 text-gray-700">
-                      <p><span className="font-medium">Account Name:</span> SafariHub Payments</p>
-                      <p><span className="font-medium">Account Number:</span> 1234567890</p>
-                      <p><span className="font-medium">Bank:</span> Commercial Bank of Ceylon</p>
-                      <p className="mt-3 pt-3 border-t border-gray-300">
-                        <span className="font-medium">Reference:</span> <span className="font-mono text-green-600">{bookingId}</span>
+                  <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-xs sm:text-sm border border-gray-200">
+                    <p className="font-semibold mb-2 sm:mb-3 text-gray-900">Bank Transfer Details:</p>
+                    <div className="space-y-1.5 sm:space-y-2 text-gray-700">
+                      <p className="break-words"><span className="font-medium">Account Name:</span> SafariHub Payments</p>
+                      <p className="break-all"><span className="font-medium">Account Number:</span> 1234567890</p>
+                      <p className="break-words"><span className="font-medium">Bank:</span> Commercial Bank of Ceylon</p>
+                      <p className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-300 break-all">
+                        <span className="font-medium">Reference:</span> <span className="font-mono text-green-600 text-[10px] sm:text-xs">{bookingId}</span>
                       </p>
                     </div>
                   </div>
@@ -689,11 +690,11 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
             </div>
 
             {/* Right Column - Payment Summary */}
-            <div className="lg:col-span-1">
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-5 sticky top-4">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Payment Summary</h2>
+            <div className="lg:col-span-1 order-1 lg:order-2">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-4 sm:p-5 lg:sticky lg:top-4">
+                <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Payment Summary</h2>
                 
-                <div className="space-y-3 mb-5 text-sm">
+                <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-5 text-xs sm:text-sm">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
                     <span className="font-medium">LKR {((booking.totalPrice || 0) / (booking.numberOfDays || 1)).toLocaleString()}</span>
@@ -706,8 +707,8 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-gray-900">Total</span>
                       <div className="flex items-center gap-1">
-                        <DollarSign className="h-5 w-5 text-green-500" />
-                        <span className="text-2xl font-bold text-green-600">
+                        <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                        <span className="text-lg sm:text-2xl font-bold text-green-600">
                           LKR {(booking.totalPrice || 0).toLocaleString()}
                         </span>
                       </div>
@@ -718,23 +719,25 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                 <button
                   onClick={handlePayment}
                   disabled={processing}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3.5 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                  className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-2.5 sm:py-3.5 rounded-lg text-sm sm:text-base font-semibold hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
                 >
                   {processing ? (
                     <>
-                      <Loader className="h-5 w-5 animate-spin" />
-                      Processing Payment...
+                      <Loader className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                      <span className="hidden sm:inline">Processing Payment...</span>
+                      <span className="sm:hidden">Processing...</span>
                     </>
                   ) : (
                     <>
-                      <Lock className="h-5 w-5" />
-                      Pay LKR {(booking.totalPrice || 0).toLocaleString()}
+                      <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="hidden sm:inline">Pay LKR {(booking.totalPrice || 0).toLocaleString()}</span>
+                      <span className="sm:hidden">Pay Now</span>
                     </>
                   )}
                 </button>
 
-                <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-500">
-                  <Shield className="h-4 w-4" />
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-3 sm:mt-4 text-[10px] sm:text-xs text-gray-500">
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span>256-bit SSL Encrypted</span>
                 </div>
               </div>
@@ -750,12 +753,12 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 // Booking Form Component
 function BookingForm({ formData, setFormData, formErrors, currentStep, setCurrentStep, onSubmit, booking }) {
   const steps = [
-    { number: 1, title: 'Personal Details', icon: User },
-    { number: 2, title: 'Safari Details', icon: Calendar },
-    { number: 3, title: 'Pickup & Drop-off', icon: Navigation },
-    { number: 4, title: 'Vehicle & Preferences', icon: Car },
-    { number: 5, title: 'Additional Requests', icon: Package },
-    { number: 6, title: 'Emergency Contact', icon: Phone }
+    { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
+    { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
+    { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
+    { number: 4, title: 'Vehicle & Preferences', shortTitle: 'Vehicle', icon: Car },
+    { number: 5, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
+    { number: 6, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
   ];
 
   const updateFormData = (field, value) => {
@@ -775,36 +778,37 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Step Indicator */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-start justify-between mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-3 sm:mx-0 px-3 sm:px-0">
         {steps.map((step, index) => {
           const Icon = step.icon;
           const isActive = currentStep === step.number;
           const isCompleted = currentStep > step.number;
           
           return (
-            <div key={step.number} className="flex items-center flex-1">
-              <div className="flex flex-col items-center flex-1">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all ${
+            <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
+              <div className="flex flex-col items-center w-full">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border-2 transition-all ${
                   isActive ? 'bg-green-500 border-green-500 text-white' :
                   isCompleted ? 'bg-green-100 border-green-500 text-green-600' :
                   'bg-gray-100 border-gray-300 text-gray-400'
                 }`}>
                   {isCompleted ? (
-                    <CheckCircle className="h-6 w-6" />
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                   ) : (
-                    <Icon className="h-6 w-6" />
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                   )}
                 </div>
-                <span className={`mt-2 text-xs font-medium ${
+                <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${
                   isActive ? 'text-green-600' : 'text-gray-500'
                 }`}>
-                  {step.title}
+                  <span className="hidden sm:inline">{step.title}</span>
+                  <span className="sm:hidden">{step.shortTitle}</span>
                 </span>
               </div>
               {index < steps.length - 1 && (
-                <div className={`h-0.5 w-full mx-2 -mt-6 ${
+                <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${
                   isCompleted ? 'bg-green-500' : 'bg-gray-200'
                 }`} />
               )}
@@ -814,25 +818,25 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
       </div>
 
       {/* Form Content */}
-      <div className="bg-gray-50 rounded-lg p-6 min-h-[500px]">
+      <div className="bg-gray-50 rounded-lg p-4 sm:p-6 min-h-[400px] sm:min-h-[500px]">
         {/* Step 1: Personal Details */}
         {currentStep === 1 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <User className="h-6 w-6 text-green-500" />
-              Personal Details
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <User className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
+              <span>Personal Details</span>
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                   Full Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.fullName}
                   onChange={(e) => updateFormData('fullName', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:outline-none focus:ring-2 ${
                     formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
                   }`}
                   placeholder="Enter your full name"
@@ -923,13 +927,13 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
 
         {/* Step 2: Safari Booking Details */}
         {currentStep === 2 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Calendar className="h-6 w-6 text-green-500" />
-              Safari Booking Details
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
+              <span>Safari Booking Details</span>
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   National Park <span className="text-red-500">*</span>
@@ -1004,13 +1008,13 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
 
         {/* Step 3: Pickup & Drop-off Information */}
         {currentStep === 3 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Navigation className="h-6 w-6 text-green-500" />
-              Pickup & Drop-off Information
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Navigation className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
+              <span className="break-words">Pickup & Drop-off Information</span>
             </h2>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <input
                   type="checkbox"
@@ -1025,7 +1029,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
               </div>
 
               {formData.needsHotelPickup && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-blue-50 p-3 sm:p-4 rounded-lg">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Hotel Name <span className="text-red-500">*</span>
@@ -1110,13 +1114,13 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
 
         {/* Step 4: Vehicle & Driver Preferences */}
         {currentStep === 4 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Car className="h-6 w-6 text-green-500" />
-              Vehicle & Driver Preferences
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Car className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
+              <span className="break-words">Vehicle & Driver Preferences</span>
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Jeep Type
@@ -1165,21 +1169,21 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
 
         {/* Step 5: Additional Requests/Add-ons */}
         {currentStep === 5 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Package className="h-6 w-6 text-green-500" />
-              Additional Requests / Add-Ons
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
+              <span className="break-words">Additional Requests / Add-Ons</span>
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+              <label className="flex items-center gap-2 cursor-pointer p-2.5 sm:p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
                 <input
                   type="checkbox"
                   checked={formData.needsBinoculars}
                   onChange={(e) => updateFormData('needsBinoculars', e.target.checked)}
-                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 rounded focus:ring-green-500 flex-shrink-0"
                 />
-                <span className="text-sm font-medium text-gray-700">Binoculars</span>
+                <span className="text-xs sm:text-sm font-medium text-gray-700">Binoculars</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
@@ -1245,7 +1249,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
               </label>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-4 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Passport Number (Optional)
@@ -1277,13 +1281,13 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
 
         {/* Step 6: Emergency Contact */}
         {currentStep === 6 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Phone className="h-6 w-6 text-green-500" />
-              Emergency Contact
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
+              <span>Emergency Contact</span>
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Emergency Contact Name <span className="text-red-500">*</span>
@@ -1321,11 +1325,11 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
       </div>
 
       {/* Navigation Buttons */}
-      <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+      <div className="flex justify-between items-center pt-3 sm:pt-4 border-t border-gray-200 gap-3">
         <button
           onClick={handlePrevious}
           disabled={currentStep === 1}
-          className="px-6 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer flex-1 sm:flex-none"
         >
           Previous
         </button>
@@ -1333,16 +1337,17 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
         {currentStep < steps.length ? (
           <button
             onClick={handleNext}
-            className="px-6 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors cursor-pointer"
+            className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors cursor-pointer flex-1 sm:flex-none"
           >
             Next
           </button>
         ) : (
           <button
             onClick={onSubmit}
-            className="px-6 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors cursor-pointer"
+            className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors cursor-pointer flex-1 sm:flex-none"
           >
-            Proceed to Payment
+            <span className="hidden sm:inline">Proceed to Payment</span>
+            <span className="sm:hidden">Proceed</span>
           </button>
         )}
       </div>
