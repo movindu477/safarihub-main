@@ -47,7 +47,7 @@ import {
 const db = getFirestore();
 
 // Import the fixed ReviewSection component
-// import ReviewSection from "./ReviewSection";
+import ReviewSection from "../ReviewSection";
 
 // Import Firebase functions from App
 import { 
@@ -1601,9 +1601,12 @@ useEffect(() => {
 
                 {/* Reviews Tab */}
                 {activeTab === 'reviews' && (
-                  <div className="text-center py-8">
-                    <p className="text-gray-600">Reviews functionality coming soon...</p>
-                  </div>
+                  <ReviewSection 
+                    guideId={guideId}
+                    currentUser={currentUser}
+                    userRole={userRole}
+                    onReviewAdded={handleReviewAdded}
+                  />
                 )}
 
                 {/* Chat Tab */}

@@ -5,17 +5,21 @@ import { Star, ThumbsUp, ThumbsDown, Flag, Edit, Trash2, User, AlertCircle, Chec
 import {
   addReview,
   updateDriverRating,
+  updateProviderRating,
   updateReview,
   deleteReview,
   getDriverReviews,
+  getProviderReviews,
   getUserReviewForDriver,
+  getUserReviewForProvider,
   likeReview,
   dislikeReview,
   reportReview,
-  getDriverReviewStats
+  getDriverReviewStats,
+  getProviderReviewStats
 } from '../reviewservice';
 
-const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
+const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded }) => {
   const [reviews, setReviews] = useState([]);
   const [userReview, setUserReview] = useState(null);
   const [rating, setRating] = useState(0);
@@ -27,16 +31,20 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // Determine provider ID and type
+  const providerId = driverId || guideId;
+  const providerType = driverId ? 'driver' : 'guide';
+
   // Load reviews and user's existing review
   useEffect(() => {
-    if (!driverId) {
-      console.error('❌ No driverId provided to ReviewSection');
-      setError('No driver ID provided');
+    if (!providerId) {
+      console.error('❌ No provider ID provided to ReviewSection');
+      setError('No provider ID provided');
       setLoading(false);
       return;
     }
 
-    console.log('📝 Setting up review section for driver:', driverId);
+    console.log('📝 Setting up review section for', providerType, ':', providerId);
     console.log('👤 Current user:', currentUser?.uid);
     setError('');
     setSuccess('');
@@ -46,7 +54,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
       if (currentUser) {
         try {
           console.log('🔍 Loading user review for:', currentUser.uid);
-          const userRev = await getUserReviewForDriver(driverId, currentUser.uid);
+          const userRev = await getUserReviewForProvider(providerId, currentUser.uid);
           console.log('📋 User review found:', userRev ? 'Yes' : 'No');
           setUserReview(userRev);
           
@@ -63,8 +71,8 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
     // Load review statistics
     const loadReviewStats = async () => {
       try {
-        console.log('📈 Loading review stats for driver:', driverId);
-        const stats = await getDriverReviewStats(driverId);
+        console.log('📈 Loading review stats for', providerType, ':', providerId);
+        const stats = await getProviderReviewStats(providerId);
         setReviewStats(stats);
         console.log('✅ Review stats loaded:', stats);
       } catch (err) {
@@ -77,7 +85,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
 
     // Real-time reviews listener
     console.log('🎯 Setting up real-time reviews listener');
-    const unsubscribe = getDriverReviews(driverId, (reviewsData) => {
+    const unsubscribe = getProviderReviews(providerId, (reviewsData) => {
       console.log(`🔄 Received ${reviewsData.length} reviews from server`);
       
       setReviews(reviewsData);
@@ -104,7 +112,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
       console.log('🔕 Cleaning up review section');
       unsubscribe();
     };
-  }, [driverId, currentUser]);
+  }, [providerId, currentUser]);
 
   // Calculate review statistics from current reviews
   const calculateReviewStats = (reviewsData) => {
@@ -169,8 +177,8 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
       return;
     }
 
-    if (!driverId) {
-      const errorMsg = 'No driver selected';
+    if (!providerId) {
+      const errorMsg = 'No provider selected';
       console.error('❌ Validation failed:', errorMsg);
       setError(errorMsg);
       return;
@@ -182,7 +190,8 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
     
     try {
       const reviewData = {
-        driverId,
+        [providerType === 'driver' ? 'driverId' : 'guideId']: providerId,
+        providerType,
         userId: currentUser.uid,
         userName: currentUser.displayName || 'Anonymous User',
         userPhoto: currentUser.photoURL || '',
@@ -205,8 +214,8 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
         setSuccess('Review submitted successfully!');
       }
 
-      // Update driver rating
-      await updateDriverRating(driverId);
+      // Update provider rating
+      await updateProviderRating(providerId, providerType);
       
       // Reset form only for new reviews
       if (!userReview) {
@@ -259,7 +268,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
     if (window.confirm('Are you sure you want to delete your review?')) {
       try {
         console.log('🗑️ Deleting review:', userReview.id);
-        await deleteReview(userReview.id, driverId);
+        await deleteReview(userReview.id, providerId, providerType);
         setUserReview(null);
         setRating(0);
         setReviewText('');
@@ -434,7 +443,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Customer Reviews</h2>
             <p className="text-gray-600 mt-1">
-              Read what other travelers say about this driver
+              Read what other travelers say about this {providerType === 'driver' ? 'driver' : 'guide'}
             </p>
           </div>
           
@@ -480,7 +489,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
         <nav className="flex -mb-px">
           <button
             onClick={() => setActiveTab('reviews')}
-            className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors ${
+            className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors cursor-pointer ${
               activeTab === 'reviews'
                 ? 'border-green-600 text-green-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -492,7 +501,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
           {canWriteReview && (
             <button
               onClick={() => setActiveTab('write')}
-              className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors ${
+              className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === 'write'
                   ? 'border-green-600 text-green-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -537,7 +546,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
                     key={star}
                     type="button"
                     onClick={() => setRating(star)}
-                    className="p-1 focus:outline-none transition-transform hover:scale-110"
+                    className="p-1 focus:outline-none transition-transform hover:scale-110 cursor-pointer"
                   >
                     <Star
                       size={32}
@@ -574,7 +583,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
                 onClick={() => {
                   console.log('Textarea clicked');
                 }}
-                placeholder="Share your experience with this driver... What did you like? What could be improved? Be specific about the service, vehicle condition, knowledge, and overall experience."
+                placeholder={`Share your experience with this ${providerType === 'driver' ? 'driver' : 'guide'}... What did you like? What could be improved? Be specific about the service, ${providerType === 'driver' ? 'vehicle condition, ' : ''}knowledge, and overall experience.`}
                 rows="6"
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none bg-white text-gray-900 placeholder-gray-400 transition-all duration-200 hover:border-emerald-300"
                 style={{ 
@@ -605,7 +614,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
               <button
                 type="submit"
                 disabled={!rating || !reviewText.trim() || reviewText.trim().length < 10 || submitting}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center"
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center cursor-pointer"
               >
                 {submitting ? (
                   <>
@@ -623,7 +632,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
                 <button
                   type="button"
                   onClick={handleDeleteReview}
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center"
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center cursor-pointer"
                 >
                   <Trash2 size={16} className="mr-2" />
                   Delete
@@ -637,7 +646,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
                   setError('');
                   setSuccess('');
                 }}
-                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium cursor-pointer"
               >
                 Cancel
               </button>
@@ -656,12 +665,12 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
               <Star className="h-12 w-12 text-gray-300 mx-auto mb-3" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No reviews yet</h3>
               <p className="text-gray-500 mb-4">
-                Be the first to share your experience with this driver!
+                Be the first to share your experience with this {providerType === 'driver' ? 'driver' : 'guide'}!
               </p>
               {canWriteReview && (
                 <button
                   onClick={() => setActiveTab('write')}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium cursor-pointer"
                 >
                   Write First Review
                 </button>
@@ -726,7 +735,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
                           setError('');
                           setSuccess('');
                         }}
-                        className="text-gray-400 hover:text-gray-600 transition-colors flex items-center"
+                        className="text-gray-400 hover:text-gray-600 transition-colors flex items-center cursor-pointer"
                         title="Edit your review"
                       >
                         <Edit size={16} className="mr-1" />
@@ -743,7 +752,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
                       <button
                         onClick={() => handleLikeReview(review.id)}
                         disabled={!currentUser}
-                        className={`flex items-center space-x-1 text-sm ${
+                        className={`flex items-center space-x-1 text-sm cursor-pointer ${
                           review.likedBy?.includes(currentUser?.uid) 
                             ? 'text-green-600 font-medium' 
                             : 'text-gray-500 hover:text-green-600'
@@ -756,7 +765,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
                       <button
                         onClick={() => handleDislikeReview(review.id)}
                         disabled={!currentUser}
-                        className={`flex items-center space-x-1 text-sm ${
+                        className={`flex items-center space-x-1 text-sm cursor-pointer ${
                           review.dislikedBy?.includes(currentUser?.uid) 
                             ? 'text-red-600 font-medium' 
                             : 'text-gray-500 hover:text-red-600'
@@ -770,7 +779,7 @@ const ReviewSection = ({ driverId, currentUser, userRole, onReviewAdded }) => {
                     {currentUser && currentUser.uid !== review.userId && (
                       <button
                         onClick={() => handleReportReview(review.id, review.userName)}
-                        className="text-gray-400 hover:text-red-600 transition-colors flex items-center text-sm"
+                        className="text-gray-400 hover:text-red-600 transition-colors flex items-center text-sm cursor-pointer"
                         title="Report this review"
                       >
                         <Flag size={14} className="mr-1" />

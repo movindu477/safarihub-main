@@ -77,26 +77,30 @@ service cloud.firestore {
       allow read: if true;
       
       // Users can create reviews if authenticated and userId matches
+      // Support both driverId (for jeep drivers) and guideId (for tour guides)
       allow create: if request.auth != null
         && request.auth.uid == request.data.userId
+        && request.data.rating is number
         && request.data.rating >= 1
         && request.data.rating <= 5
+        && request.data.comment is string
         && request.data.comment.size() >= 10
-        && request.data.driverId != null;
+        && (request.data.driverId != null || request.data.guideId != null);
       
       // Users can update reviews:
       // 1. Owner can update their own review content (rating, comment, etc.)
-      // 2. Anyone can update likes/dislikes (for like/dislike functionality)
+      // 2. Allow updates for like/dislike functionality
       allow update: if request.auth != null && (
         // Owner updating their own review
         (request.auth.uid == resource.data.userId
+          && request.data.rating is number
           && request.data.rating >= 1
           && request.data.rating <= 5
+          && request.data.comment is string
           && request.data.comment.size() >= 10)
         ||
-        // Like/dislike updates - allow if only updating interaction fields
-        (request.data.diff(resource.data).affectedKeys()
-          .hasOnly(['likes', 'dislikes', 'likedBy', 'dislikedBy', 'lastUpdated']))
+        // Allow like/dislike updates from any authenticated user
+        (request.data.likes is number || request.data.dislikes is number || request.data.likedBy is list || request.data.dislikedBy is list)
       );
       
       // Users can delete their own reviews

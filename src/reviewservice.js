@@ -23,16 +23,21 @@ const db = getFirestore();
 // Enhanced Firebase review functions with better error handling
 export const addReview = async (reviewData) => {
   try {
+    // Support both driverId and guideId
+    const providerId = reviewData.driverId || reviewData.guideId;
+    const providerType = reviewData.providerType || (reviewData.driverId ? 'driver' : 'guide');
+    
     console.log('🚀 Starting review submission with data:', {
-      driverId: reviewData.driverId,
+      providerId,
+      providerType,
       userId: reviewData.userId,
       rating: reviewData.rating,
       commentLength: reviewData.comment?.length
     });
 
     // Validate review data before submission
-    if (!reviewData.driverId) {
-      throw new Error('Missing driver ID');
+    if (!providerId) {
+      throw new Error('Missing provider ID (driverId or guideId)');
     }
     
     if (!reviewData.userId) {
@@ -53,7 +58,7 @@ export const addReview = async (reviewData) => {
     console.log('🔍 Checking for existing reviews...');
     const existingReviewQuery = query(
       collection(db, 'reviews'),
-      where('driverId', '==', reviewData.driverId),
+      where(providerType === 'driver' ? 'driverId' : 'guideId', '==', providerId),
       where('userId', '==', reviewData.userId)
     );
     
@@ -67,6 +72,8 @@ export const addReview = async (reviewData) => {
       
       await updateDoc(doc(db, 'reviews', existingDoc.id), {
         ...reviewData,
+        [providerType === 'driver' ? 'driverId' : 'guideId']: providerId,
+        providerType,
         lastUpdated: serverTimestamp()
       });
       console.log('✅ Successfully updated existing review');
@@ -76,7 +83,8 @@ export const addReview = async (reviewData) => {
     // Create new review with validated data
     console.log('➕ Creating new review...');
     const reviewDataWithTimestamp = {
-      driverId: reviewData.driverId,
+      [providerType === 'driver' ? 'driverId' : 'guideId']: providerId,
+      providerType,
       userId: reviewData.userId,
       userName: reviewData.userName || 'Anonymous User',
       userPhoto: reviewData.userPhoto || '',
@@ -97,7 +105,8 @@ export const addReview = async (reviewData) => {
     console.log('✅ Successfully created new review with unique ID:', docRef.id);
     console.log('📋 Review data saved:', {
       id: docRef.id,
-      driverId: reviewDataWithTimestamp.driverId,
+      providerId,
+      providerType,
       userId: reviewDataWithTimestamp.userId,
       rating: reviewDataWithTimestamp.rating,
       commentLength: reviewDataWithTimestamp.comment.length
@@ -116,17 +125,22 @@ export const addReview = async (reviewData) => {
 };
 
 export const updateDriverRating = async (driverId) => {
+  return updateProviderRating(driverId, 'driver');
+};
+
+export const updateProviderRating = async (providerId, providerType = 'driver') => {
   try {
-    if (!driverId) {
-      console.error('❌ No driverId provided for rating update');
+    if (!providerId) {
+      console.error('❌ No provider ID provided for rating update');
       return;
     }
 
-    console.log('⭐ Updating driver rating for:', driverId);
+    console.log(`⭐ Updating ${providerType} rating for:`, providerId);
     
+    const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
     const reviewsQuery = query(
       collection(db, 'reviews'),
-      where('driverId', '==', driverId)
+      where(fieldName, '==', providerId)
     );
     
     const querySnapshot = await getDocs(reviewsQuery);
@@ -142,24 +156,24 @@ export const updateDriverRating = async (driverId) => {
       const averageRating = totalRating / allReviews.length;
       const roundedRating = Math.round(averageRating * 10) / 10;
       
-      await updateDoc(doc(db, 'serviceProviders', driverId), {
+      await updateDoc(doc(db, 'serviceProviders', providerId), {
         rating: roundedRating,
         totalReviews: allReviews.length,
         lastRatingUpdate: serverTimestamp()
       });
       
-      console.log('✅ Updated driver rating:', roundedRating);
+      console.log(`✅ Updated ${providerType} rating:`, roundedRating);
     } else {
       // Reset rating if no reviews
-      await updateDoc(doc(db, 'serviceProviders', driverId), {
+      await updateDoc(doc(db, 'serviceProviders', providerId), {
         rating: 0,
         totalReviews: 0,
         lastRatingUpdate: serverTimestamp()
       });
-      console.log('✅ Reset driver rating to 0 (no reviews)');
+      console.log(`✅ Reset ${providerType} rating to 0 (no reviews)`);
     }
   } catch (error) {
-    console.error('❌ Error updating driver rating:', error);
+    console.error(`❌ Error updating ${providerType} rating:`, error);
   }
 };
 
@@ -187,15 +201,15 @@ export const updateReview = async (reviewId, reviewData) => {
   }
 };
 
-export const deleteReview = async (reviewId, driverId) => {
+export const deleteReview = async (reviewId, providerId, providerType = 'driver') => {
   try {
     console.log('🗑️ Deleting review:', reviewId);
     await deleteDoc(doc(db, 'reviews', reviewId));
     console.log('✅ Successfully deleted review:', reviewId);
     
-    // Update driver rating after deletion
-    if (driverId) {
-      await updateDriverRating(driverId);
+    // Update provider rating after deletion
+    if (providerId) {
+      await updateProviderRating(providerId, providerType);
     }
   } catch (error) {
     console.error('❌ Error in deleteReview function:', error);
@@ -204,17 +218,22 @@ export const deleteReview = async (reviewId, driverId) => {
 };
 
 export const getDriverReviews = (driverId, callback) => {
-  if (!driverId) {
-    console.error('❌ No driverId provided for reviews query');
+  return getProviderReviews(driverId, callback, 'driver');
+};
+
+export const getProviderReviews = (providerId, callback, providerType = 'driver') => {
+  if (!providerId) {
+    console.error('❌ No provider ID provided for reviews query');
     callback([]);
     return () => {};
   }
 
-  console.log('🔍 Setting up reviews listener for driver:', driverId);
+  console.log(`🔍 Setting up reviews listener for ${providerType}:`, providerId);
 
+  const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
   const reviewsQuery = query(
     collection(db, 'reviews'),
-    where('driverId', '==', driverId),
+    where(fieldName, '==', providerId),
     orderBy('timestamp', 'desc')
   );
 
@@ -247,7 +266,7 @@ export const getDriverReviews = (driverId, callback) => {
           userEmail: data.userEmail || ''
         };
       });
-      console.log(`📊 Processed ${reviews.length} reviews for driver ${driverId}`);
+      console.log(`📊 Processed ${reviews.length} reviews for ${providerType} ${providerId}`);
       callback(reviews);
     }, 
     (error) => {
@@ -261,17 +280,22 @@ export const getDriverReviews = (driverId, callback) => {
 };
 
 export const getUserReviewForDriver = async (driverId, userId) => {
+  return getUserReviewForProvider(driverId, userId, 'driver');
+};
+
+export const getUserReviewForProvider = async (providerId, userId, providerType = 'driver') => {
   try {
-    if (!driverId || !userId) {
-      console.error('❌ Missing driverId or userId for review query');
+    if (!providerId || !userId) {
+      console.error('❌ Missing provider ID or userId for review query');
       return null;
     }
 
-    console.log('🔍 Checking user review for driver:', driverId, 'user:', userId);
+    console.log(`🔍 Checking user review for ${providerType}:`, providerId, 'user:', userId);
     
+    const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
     const reviewsQuery = query(
       collection(db, 'reviews'),
-      where('driverId', '==', driverId),
+      where(fieldName, '==', providerId),
       where('userId', '==', userId)
     );
     
@@ -405,9 +429,13 @@ export const reportReview = async (reviewId, reporterId, reason) => {
 };
 
 export const getDriverReviewStats = async (driverId) => {
+  return getProviderReviewStats(driverId, 'driver');
+};
+
+export const getProviderReviewStats = async (providerId, providerType = 'driver') => {
   try {
-    if (!driverId) {
-      console.error('❌ No driverId provided for stats');
+    if (!providerId) {
+      console.error('❌ No provider ID provided for stats');
       return {
         totalReviews: 0,
         averageRating: 0,
@@ -415,9 +443,10 @@ export const getDriverReviewStats = async (driverId) => {
       };
     }
 
+    const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
     const reviewsQuery = query(
       collection(db, 'reviews'),
-      where('driverId', '==', driverId)
+      where(fieldName, '==', providerId)
     );
     
     const querySnapshot = await getDocs(reviewsQuery);
@@ -445,7 +474,7 @@ export const getDriverReviewStats = async (driverId) => {
       }
     });
 
-    console.log(`📈 Review stats: ${reviews.length} reviews, avg ${averageRating.toFixed(1)}`);
+    console.log(`📈 Review stats for ${providerType}: ${reviews.length} reviews, avg ${averageRating.toFixed(1)}`);
     
     return {
       totalReviews: reviews.length,
