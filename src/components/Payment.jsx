@@ -11,7 +11,18 @@ import {
   AlertCircle,
   Loader,
   Lock,
-  Shield
+  Shield,
+  Mail,
+  Phone,
+  Globe,
+  Users,
+  Navigation,
+  Car,
+  Languages,
+  Camera,
+  Package,
+  FileText,
+  UserCircle
 } from 'lucide-react';
 import { getDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -35,6 +46,48 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
     cardName: ''
   });
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [showBookingForm, setShowBookingForm] = useState(true);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formErrors, setFormErrors] = useState({});
+  const [formData, setFormData] = useState({
+    // Personal Details
+    fullName: '',
+    email: '',
+    phone: '',
+    country: '',
+    numberOfPassengers: 1,
+    specialAssistance: '',
+    // Safari Booking Details
+    nationalPark: '',
+    safariType: 'Morning Safari',
+    preferredTime: '',
+    duration: '',
+    // Pickup & Drop-off
+    pickupLocation: '',
+    hotelName: '',
+    hotelAddress: '',
+    roomNumber: '',
+    dropoffLocation: '',
+    needsHotelPickup: true,
+    // Vehicle & Driver Preferences
+    jeepType: 'Standard Jeep',
+    driverLanguage: 'English',
+    needsNaturalist: false,
+    // Additional Requests
+    needsBinoculars: false,
+    needsCamera: false,
+    needsChildSeat: false,
+    needsWater: false,
+    needsSnacks: false,
+    needsPhotographyPackage: false,
+    parkEntranceIncluded: false,
+    // Documents
+    passportNumber: '',
+    parkTicketProof: '',
+    // Emergency Contact
+    emergencyContactName: '',
+    emergencyContactPhone: ''
+  });
 
   // Auth state listener
   useEffect(() => {
@@ -112,10 +165,54 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
           return;
         }
 
-        setBooking({
+        const bookingInfo = {
           id: snapshot.id,
           ...bookingData
-        });
+        };
+        setBooking(bookingInfo);
+        
+        // Initialize form data from booking and user
+        if (user) {
+          setFormData(prev => ({
+            ...prev,
+            fullName: bookingData.fullName || user.displayName || '',
+            email: bookingData.email || user.email || '',
+            phone: bookingData.phone || '',
+            country: bookingData.country || '',
+            numberOfPassengers: bookingData.numberOfPassengers || 1,
+            specialAssistance: bookingData.specialAssistance || '',
+            nationalPark: bookingData.nationalPark || '',
+            safariType: bookingData.safariType || 'Morning Safari',
+            preferredTime: bookingData.preferredTime || '',
+            duration: bookingData.duration || '',
+            pickupLocation: bookingData.pickupLocation || '',
+            hotelName: bookingData.hotelName || '',
+            hotelAddress: bookingData.hotelAddress || '',
+            roomNumber: bookingData.roomNumber || '',
+            dropoffLocation: bookingData.dropoffLocation || '',
+            needsHotelPickup: bookingData.needsHotelPickup !== undefined ? bookingData.needsHotelPickup : true,
+            jeepType: bookingData.jeepType || 'Standard Jeep',
+            driverLanguage: bookingData.driverLanguage || 'English',
+            needsNaturalist: bookingData.needsNaturalist || false,
+            needsBinoculars: bookingData.needsBinoculars || false,
+            needsCamera: bookingData.needsCamera || false,
+            needsChildSeat: bookingData.needsChildSeat || false,
+            needsWater: bookingData.needsWater || false,
+            needsSnacks: bookingData.needsSnacks || false,
+            needsPhotographyPackage: bookingData.needsPhotographyPackage || false,
+            parkEntranceIncluded: bookingData.parkEntranceIncluded || false,
+            passportNumber: bookingData.passportNumber || '',
+            parkTicketProof: bookingData.parkTicketProof || '',
+            emergencyContactName: bookingData.emergencyContactName || '',
+            emergencyContactPhone: bookingData.emergencyContactPhone || ''
+          }));
+          
+          // Check if booking details are already completed
+          if (bookingData.bookingDetailsCompleted) {
+            setShowBookingForm(false);
+          }
+        }
+        
         setLoading(false);
       } else {
         setError('Booking not found');
@@ -211,14 +308,16 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
       
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Real-time update: Update booking status to 'paid' in Firestore
+      // Real-time update: Update booking status to 'paid' in Firestore with all form data
       const bookingRef = doc(db, 'bookings', bookingId);
       await updateDoc(bookingRef, {
+        ...formData, // Include all booking form data
         paymentStatus: 'paid',
         status: 'confirmed', // Change booking status to confirmed
         paidAt: serverTimestamp(),
         paidAtTimestamp: Date.now(),
         paymentMethod: paymentMethod,
+        bookingDetailsCompleted: true,
         updatedAt: serverTimestamp()
       });
 
@@ -342,10 +441,71 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   }
 
   const serviceType = booking.guideId ? 'Tour Guide' : 'Jeep Driver';
+  const isJeepBooking = !booking.guideId;
+
+  // Validate form data
+  const validateForm = () => {
+    const errors = {};
+    
+    if (isJeepBooking && showBookingForm) {
+      // Personal Details
+      if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
+      if (!formData.email.trim()) errors.email = 'Email is required';
+      if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+      if (!formData.country.trim()) errors.country = 'Country is required';
+      if (!formData.numberOfPassengers || formData.numberOfPassengers < 1) {
+        errors.numberOfPassengers = 'Number of passengers must be at least 1';
+      }
+      
+      // Safari Booking Details
+      if (!formData.nationalPark.trim()) errors.nationalPark = 'National park is required';
+      if (!formData.safariType) errors.safariType = 'Safari type is required';
+      if (!formData.preferredTime.trim()) errors.preferredTime = 'Preferred time is required';
+      
+      // Pickup & Drop-off
+      if (formData.needsHotelPickup) {
+        if (!formData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
+        if (!formData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
+      }
+      if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
+      if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
+      
+      // Emergency Contact
+      if (!formData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
+      if (!formData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Handle form submission and proceed to payment
+  const handleFormSubmit = async () => {
+    if (!validateForm()) {
+      alert('Please fill in all required fields correctly.');
+      return;
+    }
+
+    try {
+      // Update booking with form data
+      const bookingRef = doc(db, 'bookings', bookingId);
+      await updateDoc(bookingRef, {
+        ...formData,
+        bookingDetailsCompleted: true,
+        updatedAt: serverTimestamp()
+      });
+      
+      setShowBookingForm(false);
+    } catch (err) {
+      console.error('Error saving booking details:', err);
+      alert('Failed to save booking details. Please try again.');
+    }
+  };
+
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-8">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full my-8 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-2xl p-6 text-white">
           <div className="flex items-center justify-between">
@@ -369,6 +529,18 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
         {/* Content */}
         <div className="p-6">
+          {/* Booking Form - Show only for Jeep bookings and if not completed */}
+          {isJeepBooking && showBookingForm ? (
+            <BookingForm
+              formData={formData}
+              setFormData={setFormData}
+              formErrors={formErrors}
+              currentStep={currentStep}
+              setCurrentStep={setCurrentStep}
+              onSubmit={handleFormSubmit}
+              booking={booking}
+            />
+          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Booking Details & Payment Form */}
             <div className="lg:col-span-2 space-y-4">
@@ -568,7 +740,611 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
               </div>
             </div>
           </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Booking Form Component
+function BookingForm({ formData, setFormData, formErrors, currentStep, setCurrentStep, onSubmit, booking }) {
+  const steps = [
+    { number: 1, title: 'Personal Details', icon: User },
+    { number: 2, title: 'Safari Details', icon: Calendar },
+    { number: 3, title: 'Pickup & Drop-off', icon: Navigation },
+    { number: 4, title: 'Vehicle & Preferences', icon: Car },
+    { number: 5, title: 'Additional Requests', icon: Package },
+    { number: 6, title: 'Emergency Contact', icon: Phone }
+  ];
+
+  const updateFormData = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleNext = () => {
+    if (currentStep < steps.length) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Step Indicator */}
+      <div className="flex items-center justify-between mb-6">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = currentStep === step.number;
+          const isCompleted = currentStep > step.number;
+          
+          return (
+            <div key={step.number} className="flex items-center flex-1">
+              <div className="flex flex-col items-center flex-1">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all ${
+                  isActive ? 'bg-green-500 border-green-500 text-white' :
+                  isCompleted ? 'bg-green-100 border-green-500 text-green-600' :
+                  'bg-gray-100 border-gray-300 text-gray-400'
+                }`}>
+                  {isCompleted ? (
+                    <CheckCircle className="h-6 w-6" />
+                  ) : (
+                    <Icon className="h-6 w-6" />
+                  )}
+                </div>
+                <span className={`mt-2 text-xs font-medium ${
+                  isActive ? 'text-green-600' : 'text-gray-500'
+                }`}>
+                  {step.title}
+                </span>
+              </div>
+              {index < steps.length - 1 && (
+                <div className={`h-0.5 w-full mx-2 -mt-6 ${
+                  isCompleted ? 'bg-green-500' : 'bg-gray-200'
+                }`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Form Content */}
+      <div className="bg-gray-50 rounded-lg p-6 min-h-[500px]">
+        {/* Step 1: Personal Details */}
+        {currentStep === 1 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <User className="h-6 w-6 text-green-500" />
+              Personal Details
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.fullName}
+                  onChange={(e) => updateFormData('fullName', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                  placeholder="Enter your full name"
+                />
+                {formErrors.fullName && <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => updateFormData('email', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                  placeholder="your.email@example.com"
+                />
+                {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => updateFormData('phone', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                  placeholder="+94 77 123 4567"
+                />
+                {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country of Residence <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => updateFormData('country', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                  placeholder="e.g., United States, United Kingdom"
+                />
+                {formErrors.country && <p className="text-red-500 text-xs mt-1">{formErrors.country}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Passengers <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={formData.numberOfPassengers}
+                  onChange={(e) => updateFormData('numberOfPassengers', parseInt(e.target.value) || 1)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                />
+                {formErrors.numberOfPassengers && <p className="text-red-500 text-xs mt-1">{formErrors.numberOfPassengers}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Special Assistance (Optional)
+                </label>
+                <textarea
+                  value={formData.specialAssistance}
+                  onChange={(e) => updateFormData('specialAssistance', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  rows="3"
+                  placeholder="Any special requirements or assistance needed"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Safari Booking Details */}
+        {currentStep === 2 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Calendar className="h-6 w-6 text-green-500" />
+              Safari Booking Details
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  National Park <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.nationalPark}
+                  onChange={(e) => updateFormData('nationalPark', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                >
+                  <option value="">Select National Park</option>
+                  <option value="Yala National Park">Yala National Park</option>
+                  <option value="Udawalawe National Park">Udawalawe National Park</option>
+                  <option value="Wilpattu National Park">Wilpattu National Park</option>
+                  <option value="Minneriya National Park">Minneriya National Park</option>
+                  <option value="Kaudulla National Park">Kaudulla National Park</option>
+                  <option value="Bundala National Park">Bundala National Park</option>
+                  <option value="Kumana National Park">Kumana National Park</option>
+                </select>
+                {formErrors.nationalPark && <p className="text-red-500 text-xs mt-1">{formErrors.nationalPark}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Safari Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.safariType}
+                  onChange={(e) => updateFormData('safariType', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                >
+                  <option value="Morning Safari">Morning Safari</option>
+                  <option value="Evening Safari">Evening Safari</option>
+                  <option value="Full-day Safari">Full-day Safari</option>
+                </select>
+                {formErrors.safariType && <p className="text-red-500 text-xs mt-1">{formErrors.safariType}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Preferred Date & Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.preferredTime}
+                  onChange={(e) => updateFormData('preferredTime', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.preferredTime ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                />
+                {formErrors.preferredTime && <p className="text-red-500 text-xs mt-1">{formErrors.preferredTime}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Duration (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.duration}
+                  onChange={(e) => updateFormData('duration', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., 4 hours, Half day"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Pickup & Drop-off Information */}
+        {currentStep === 3 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Navigation className="h-6 w-6 text-green-500" />
+              Pickup & Drop-off Information
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <input
+                  type="checkbox"
+                  id="needsHotelPickup"
+                  checked={formData.needsHotelPickup}
+                  onChange={(e) => updateFormData('needsHotelPickup', e.target.checked)}
+                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                />
+                <label htmlFor="needsHotelPickup" className="text-sm font-medium text-gray-700">
+                  Do you need hotel pickup?
+                </label>
+              </div>
+
+              {formData.needsHotelPickup && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Hotel Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.hotelName}
+                      onChange={(e) => updateFormData('hotelName', e.target.value)}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                        formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                      }`}
+                      placeholder="Hotel name"
+                    />
+                    {formErrors.hotelName && <p className="text-red-500 text-xs mt-1">{formErrors.hotelName}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Room Number (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.roomNumber}
+                      onChange={(e) => updateFormData('roomNumber', e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="Room number"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Hotel Address <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={formData.hotelAddress}
+                      onChange={(e) => updateFormData('hotelAddress', e.target.value)}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                        formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                      }`}
+                      rows="2"
+                      placeholder="Hotel address"
+                    />
+                    {formErrors.hotelAddress && <p className="text-red-500 text-xs mt-1">{formErrors.hotelAddress}</p>}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pickup Location <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.pickupLocation}
+                  onChange={(e) => updateFormData('pickupLocation', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                  placeholder="Pickup location or address"
+                />
+                {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Drop-off Location <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.dropoffLocation}
+                  onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                  placeholder="Drop-off location or address"
+                />
+                {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Vehicle & Driver Preferences */}
+        {currentStep === 4 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Car className="h-6 w-6 text-green-500" />
+              Vehicle & Driver Preferences
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Jeep Type
+                </label>
+                <select
+                  value={formData.jeepType}
+                  onChange={(e) => updateFormData('jeepType', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="Standard Jeep">Standard Jeep</option>
+                  <option value="Luxury Jeep">Luxury Jeep</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Driver Language Preference
+                </label>
+                <select
+                  value={formData.driverLanguage}
+                  onChange={(e) => updateFormData('driverLanguage', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="English">English</option>
+                  <option value="Sinhala">Sinhala</option>
+                  <option value="Tamil">Tamil</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.needsNaturalist}
+                    onChange={(e) => updateFormData('needsNaturalist', e.target.checked)}
+                    className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Request for a naturalist/guide with the jeep (optional)
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Additional Requests/Add-ons */}
+        {currentStep === 5 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Package className="h-6 w-6 text-green-500" />
+              Additional Requests / Add-Ons
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={formData.needsBinoculars}
+                  onChange={(e) => updateFormData('needsBinoculars', e.target.checked)}
+                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Binoculars</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={formData.needsCamera}
+                  onChange={(e) => updateFormData('needsCamera', e.target.checked)}
+                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Camera Hire</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={formData.needsChildSeat}
+                  onChange={(e) => updateFormData('needsChildSeat', e.target.checked)}
+                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Child Seat</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={formData.needsWater}
+                  onChange={(e) => updateFormData('needsWater', e.target.checked)}
+                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Water Bottles</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={formData.needsSnacks}
+                  onChange={(e) => updateFormData('needsSnacks', e.target.checked)}
+                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Snacks / Meals</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={formData.needsPhotographyPackage}
+                  onChange={(e) => updateFormData('needsPhotographyPackage', e.target.checked)}
+                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Photography Package</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={formData.parkEntranceIncluded}
+                  onChange={(e) => updateFormData('parkEntranceIncluded', e.target.checked)}
+                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Park entrance tickets included in booking
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Passport Number (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.passportNumber}
+                  onChange={(e) => updateFormData('passportNumber', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="For national park registration"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Park Ticket Proof (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.parkTicketProof}
+                  onChange={(e) => updateFormData('parkTicketProof', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Reference number if purchased separately"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 6: Emergency Contact */}
+        {currentStep === 6 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Phone className="h-6 w-6 text-green-500" />
+              Emergency Contact
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Emergency Contact Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.emergencyContactName}
+                  onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                  placeholder="Full name"
+                />
+                {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Emergency Contact Phone <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={formData.emergencyContactPhone}
+                  onChange={(e) => updateFormData('emergencyContactPhone', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                    formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  }`}
+                  placeholder="+94 77 123 4567"
+                />
+                {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation Buttons */}
+      <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+        <button
+          onClick={handlePrevious}
+          disabled={currentStep === 1}
+          className="px-6 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+        >
+          Previous
+        </button>
+        
+        {currentStep < steps.length ? (
+          <button
+            onClick={handleNext}
+            className="px-6 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors cursor-pointer"
+          >
+            Next
+          </button>
+        ) : (
+          <button
+            onClick={onSubmit}
+            className="px-6 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors cursor-pointer"
+          >
+            Proceed to Payment
+          </button>
+        )}
       </div>
     </div>
   );

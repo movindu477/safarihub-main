@@ -765,7 +765,7 @@ useEffect(() => {
             bookingId: bookingId,
             bookingData: {
               dates: datesString,
-              selectedDates: selectedDates.map(d => d.toISOString()),
+      selectedDates: selectedDates.map(d => d.toISOString()),
               numberOfDays: selectedDates.length,
               totalPrice: totalPrice,
               customerName: authUser.displayName || 'Customer',
