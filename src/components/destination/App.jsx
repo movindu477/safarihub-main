@@ -11,9 +11,12 @@ import Footer from '../home/Footer'
 import { auth } from '../../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 
-function DestinationApp() {
+// Import GlobalNotificationBell from App.jsx
+import { GlobalNotificationBell } from '../../App'
+
+function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) {
   // State Management
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(propUser || null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
@@ -26,6 +29,13 @@ function DestinationApp() {
 
     return () => unsubscribe()
   }, [])
+
+  // Update user when prop changes
+  useEffect(() => {
+    if (propUser !== undefined) {
+      setUser(propUser)
+    }
+  }, [propUser])
 
   // Handle smooth scrolling to sections based on hash
   useEffect(() => {
@@ -66,7 +76,23 @@ function DestinationApp() {
   // Handle logout
   const handleLogout = () => {
     setUser(null)
-    // The actual logout is handled in Navbar component
+    if (onLogout) {
+      onLogout()
+    }
+  }
+
+  // Handle notification click
+  const handleNotificationClick = async (notification) => {
+    if (onNotificationClick) {
+      await onNotificationClick(notification)
+    }
+  }
+
+  // Handle mark as read
+  const handleMarkAsRead = async (notificationId) => {
+    if (onMarkAsRead) {
+      await onMarkAsRead(notificationId)
+    }
   }
 
   // Handle start chat (if needed)
@@ -86,6 +112,14 @@ function DestinationApp() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Global Notification Bell (Bottom Right) */}
+      <GlobalNotificationBell 
+        user={user}
+        notifications={notifications}
+        onNotificationClick={handleNotificationClick}
+        onMarkAsRead={handleMarkAsRead}
+      />
+      
       {/* Main Content */}
       <main className="relative">
         <Navbar 

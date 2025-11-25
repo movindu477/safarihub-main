@@ -55,6 +55,7 @@ import DestinationApp from "./components/destination/App";
 // Import Guide App
 import GuideApp from "./components/guides/App";
 import GuideProfile from "./components/guides/GuideProfile";
+import Payment from "./components/Payment";
 
 
 // 🔥 Firebase Config
@@ -802,9 +803,45 @@ function App() {
     if (user) {
       console.log(`🔔 Setting up notifications listener for user: ${user.uid}`);
       
-      const unsubscribe = getUserNotifications(user.uid, (notifications) => {
+      const processedNotifications = new Set(); // Track processed notifications to prevent multiple redirects
+      
+      const unsubscribe = getUserNotifications(user.uid, async (notifications) => {
         console.log(`📢 Received ${notifications.length} notifications`);
         setNotifications(notifications);
+        
+        // Auto-redirect to payment page for new booking acceptance notifications
+        const unreadBookingAccepted = notifications.find(n => 
+          !n.read && 
+          !processedNotifications.has(n.id) && // Only process each notification once
+          n.type === 'booking' && 
+          n.bookingId && 
+          n.message && 
+          n.message.toLowerCase().includes('accepted')
+        );
+        
+        if (unreadBookingAccepted) {
+          // Mark as processed immediately to prevent multiple redirects
+          processedNotifications.add(unreadBookingAccepted.id);
+          
+          try {
+            // Check if booking is actually accepted
+            const booking = await getBookingById(unreadBookingAccepted.bookingId);
+            if (booking && booking.status === 'accepted' && booking.customerId === user.uid) {
+              // Check if we're not already on the payment page
+              if (!window.location.pathname.includes('/payment/')) {
+                console.log('🔄 Auto-redirecting to payment page for accepted booking');
+                // Small delay to ensure smooth transition
+                setTimeout(() => {
+                  window.location.href = `/payment/${unreadBookingAccepted.bookingId}`;
+                }, 1000);
+              }
+            }
+          } catch (err) {
+            console.error('Error checking booking status:', err);
+            // Remove from processed set if there was an error so it can be retried
+            processedNotifications.delete(unreadBookingAccepted.id);
+          }
+        }
       });
       
       return () => {
@@ -854,6 +891,23 @@ function App() {
     // Mark notification as read
     if (!notification.read) {
       await markNotificationAsRead(notification.id);
+    }
+    
+    // Auto-redirect to payment page if booking is accepted
+    if (notification.type === 'booking' && notification.bookingId) {
+      try {
+        const booking = await getBookingById(notification.bookingId);
+        if (booking && booking.status === 'accepted' && notification.message && notification.message.toLowerCase().includes('accepted')) {
+          // Check if user is the customer
+          if (user && booking.customerId === user.uid) {
+            console.log('🔄 Redirecting to payment page for accepted booking');
+            window.location.href = `/payment/${notification.bookingId}`;
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error checking booking status:', err);
+      }
     }
     
     console.log('Notification click handled by global system:', notification);
@@ -958,6 +1012,17 @@ function App() {
               notifications={notifications}
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
+            />
+          } 
+        />
+        {/* Payment Route */}
+        <Route 
+          path="/payment/:bookingId" 
+          element={
+            <Payment 
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
             />
           } 
         />
@@ -1156,10 +1221,16 @@ function Authentication({ onAuthSuccess }) {
       
       if (role === "tourist") {
         collectionName = "tourists";
+        // Handle custom language if "other" was selected
+        let finalLanguage = language || "english";
+        if (language?.startsWith('other:')) {
+          finalLanguage = language.replace('other:', '').trim() || "english";
+        }
+        
         userData = {
           ...userData,
           country: country?.trim() || "",
-          preferredLanguage: language || "english",
+          preferredLanguage: finalLanguage,
           bookings: [],
           favorites: [],
         };
@@ -1769,16 +1840,49 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               Preferred Language
             </label>
             <select
-              value={formData.language}
-              onChange={(e) => handlers.setLanguage(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+              value={formData.language?.startsWith('other:') ? 'other' : formData.language}
+              onChange={(e) => {
+                if (e.target.value === 'other') {
+                  handlers.setLanguage('other:');
+                } else {
+                  handlers.setLanguage(e.target.value);
+                }
+              }}
+              className="w-full px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs cursor-pointer"
+              style={{ 
+                backgroundColor: '#111827',
+                color: '#ffffff'
+              }}
             >
-              <option value="english">English</option>
-              <option value="sinhala">Sinhala</option>
-              <option value="tamil">Tamil</option>
-              <option value="hindi">Hindi</option>
-              <option value="other">Other</option>
+              <option value="english" style={{ backgroundColor: '#111827', color: '#ffffff' }}>English</option>
+              <option value="sinhala" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Sinhala</option>
+              <option value="tamil" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Tamil</option>
+              <option value="hindi" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Hindi</option>
+              <option value="french" style={{ backgroundColor: '#111827', color: '#ffffff' }}>French</option>
+              <option value="german" style={{ backgroundColor: '#111827', color: '#ffffff' }}>German</option>
+              <option value="spanish" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Spanish</option>
+              <option value="chinese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Chinese</option>
+              <option value="japanese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Japanese</option>
+              <option value="korean" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Korean</option>
+              <option value="arabic" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Arabic</option>
+              <option value="portuguese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Portuguese</option>
+              <option value="italian" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Italian</option>
+              <option value="russian" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Russian</option>
+              <option value="other" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Other</option>
             </select>
+            {(formData.language === 'other' || formData.language?.startsWith('other:')) && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={formData.language?.startsWith('other:') ? formData.language.replace('other:', '') : ''}
+                  onChange={(e) => {
+                    handlers.setLanguage(`other:${e.target.value}`);
+                  }}
+                  placeholder="Please specify your language"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                />
+              </div>
+            )}
           </div>
         )}
 
