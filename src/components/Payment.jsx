@@ -43,6 +43,22 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
     return () => unsubscribe();
   }, [propUser]);
 
+  // Auto-redirect to home page when payment is successful
+  useEffect(() => {
+    if (paymentSuccess) {
+      console.log('✅ Payment successful, redirecting to home page in 3 seconds...');
+      const redirectTimer = setTimeout(() => {
+        console.log('🔄 Redirecting to home page now...');
+        // Use window.location.href for reliable redirect (works in all environments including Vercel)
+        window.location.href = '/';
+      }, 3000);
+      
+      return () => {
+        clearTimeout(redirectTimer);
+      };
+    }
+  }, [paymentSuccess]);
+
   // Real-time booking listener
   useEffect(() => {
     if (!bookingId) return;
@@ -210,10 +226,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
       setPaymentSuccess(true);
       
-      // Auto-redirect to jeep main page after 3 seconds
-      setTimeout(() => {
-        window.location.href = '/driver';
-      }, 3000);
+      // Redirect is handled by useEffect when paymentSuccess becomes true
 
     } catch (err) {
       console.error('Payment error:', err);
