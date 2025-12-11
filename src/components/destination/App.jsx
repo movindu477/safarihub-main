@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 // Only import DestinationHero with correct relative path
 import DestinationHero from './destinationhero'
@@ -36,6 +36,27 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
       setUser(propUser)
     }
   }, [propUser])
+
+  // Scroll to top when page loads or navigates (including back button)
+  const location = useLocation()
+  useEffect(() => {
+    // Scroll to top on mount and when location changes
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [location.pathname])
+
+  // Also handle popstate (back/forward button)
+  useEffect(() => {
+    const handlePopState = () => {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+      }, 0)
+    }
+    
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
 
   // Handle smooth scrolling to sections based on hash
   useEffect(() => {

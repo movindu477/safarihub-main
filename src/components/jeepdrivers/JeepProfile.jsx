@@ -37,7 +37,12 @@ import {
   Trash2,
   Flag,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Navigation,
+  Package,
+  UserCircle,
+  Globe,
+  FileText
 } from "lucide-react";
 
 // Initialize Firebase
@@ -62,7 +67,7 @@ import {
 } from "../../App";
 
 // Calendar Component for Date Selection
-const DatePickerCalendar = ({ selectedDates, onDateSelect }) => {
+const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType, onDateTypeChange }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   const getDaysInMonth = (date) => {
@@ -180,18 +185,687 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect }) => {
       {selectedDates.length > 0 && (
         <div className="mt-4 p-4 bg-emerald-50 rounded-xl border-2 border-emerald-200">
           <h4 className="font-bold text-emerald-800 mb-3">Selected Dates:</h4>
-          <div className="flex flex-wrap gap-2">
-            {selectedDates.map((date, index) => (
-              <span 
-                key={index}
-                className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md"
-              >
-                {date.toLocaleDateString()}
-              </span>
-            ))}
+          <div className="space-y-2">
+            {selectedDates.map((date, index) => {
+              const dateString = date.toDateString();
+              const dateType = selectedDatesWithType?.[dateString] || 'full-day';
+              return (
+                <div key={index} className="flex items-center justify-between bg-white p-2 rounded-lg border border-emerald-200">
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      {date.toLocaleDateString()}
+                    </span>
+                    <span className="ml-2 text-xs text-emerald-600 font-semibold">
+                      ({dateType === 'half-day' ? 'Half Day' : 'Full Day'})
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
+                      }}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                        dateType === 'half-day'
+                          ? 'bg-emerald-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Half Day
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
+                      }}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                        dateType === 'full-day'
+                          ? 'bg-emerald-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Full Day
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// Booking Form Modal Component
+const BookingFormModal = ({ 
+  isOpen, 
+  onClose, 
+  formData, 
+  setFormData, 
+  formErrors, 
+  setFormErrors,
+  currentStep, 
+  setCurrentStep,
+  onSubmit,
+  driver,
+  selectedDates,
+  selectedDatesWithType,
+  onDateTypeChange
+}) => {
+  const steps = [
+    { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
+    { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
+    { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
+    { number: 4, title: 'Vehicle & Preferences', shortTitle: 'Vehicle', icon: Car },
+    { number: 5, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
+    { number: 6, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
+  ];
+
+  const updateFormData = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleNext = () => {
+    if (currentStep < steps.length) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const validateStep = () => {
+    const errors = {};
+    
+    if (currentStep === 1) {
+      if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
+      if (!formData.email.trim()) errors.email = 'Email is required';
+      if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+      if (!formData.country.trim()) errors.country = 'Country is required';
+      if (!formData.numberOfPassengers || formData.numberOfPassengers < 1) {
+        errors.numberOfPassengers = 'Number of passengers must be at least 1';
+      }
+    } else if (currentStep === 2) {
+      if (!formData.nationalPark.trim()) errors.nationalPark = 'National park is required';
+      if (!formData.safariType) errors.safariType = 'Safari type is required';
+      if (!formData.preferredTime.trim()) errors.preferredTime = 'Preferred time is required';
+    } else if (currentStep === 3) {
+      if (formData.needsHotelPickup) {
+        if (!formData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
+        if (!formData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
+      }
+      if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
+      if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
+    } else if (currentStep === 6) {
+      if (!formData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
+      if (!formData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-4xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-xl font-bold truncate">Booking Details</h1>
+                <p className="text-emerald-100 text-xs sm:text-sm hidden sm:block">Complete your booking information</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer flex-shrink-0 ml-2"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5 sm:h-6 sm:w-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Step Indicator */}
+        <div className="p-4 sm:p-6 border-b border-gray-200">
+          <div className="flex items-start justify-between overflow-x-auto pb-2">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = currentStep === step.number;
+              const isCompleted = currentStep > step.number;
+              
+              return (
+                <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
+                  <div className="flex flex-col items-center w-full">
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                      isActive ? 'bg-emerald-500 border-emerald-500 text-white' :
+                      isCompleted ? 'bg-emerald-100 border-emerald-500 text-emerald-600' :
+                      'bg-gray-100 border-gray-300 text-gray-400'
+                    }`}>
+                      {isCompleted ? (
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                      ) : (
+                        <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                      )}
+                    </div>
+                    <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${
+                      isActive ? 'text-emerald-600' : 'text-gray-500'
+                    }`}>
+                      <span className="hidden sm:inline">{step.title}</span>
+                      <span className="sm:hidden">{step.shortTitle}</span>
+                    </span>
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${
+                      isCompleted ? 'bg-emerald-500' : 'bg-gray-200'
+                    }`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Form Content - I'll use the same form fields from Payment.jsx but in a more compact modal format */}
+        <div className="p-4 sm:p-6">
+          {/* Step 1: Personal Details */}
+          {currentStep === 1 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <User className="h-5 w-5 text-emerald-500" />
+                Personal Details
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.fullName}
+                    onChange={(e) => updateFormData('fullName', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                    placeholder="Enter your full name"
+                  />
+                  {formErrors.fullName && <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => updateFormData('email', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                    placeholder="your.email@example.com"
+                  />
+                  {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => updateFormData('phone', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                    placeholder="+94 77 123 4567"
+                  />
+                  {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Country of Residence <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.country}
+                    onChange={(e) => updateFormData('country', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                    placeholder="e.g., United States"
+                  />
+                  {formErrors.country && <p className="text-red-500 text-xs mt-1">{formErrors.country}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Number of Passengers <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={formData.numberOfPassengers}
+                    onChange={(e) => updateFormData('numberOfPassengers', parseInt(e.target.value) || 1)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                  />
+                  {formErrors.numberOfPassengers && <p className="text-red-500 text-xs mt-1">{formErrors.numberOfPassengers}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Special Assistance (Optional)
+                  </label>
+                  <textarea
+                    value={formData.specialAssistance}
+                    onChange={(e) => updateFormData('specialAssistance', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    rows="3"
+                    placeholder="Any special requirements"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Safari Booking Details */}
+          {currentStep === 2 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-emerald-500" />
+                Safari Booking Details
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    National Park <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.nationalPark}
+                    onChange={(e) => updateFormData('nationalPark', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                  >
+                    <option value="">Select National Park</option>
+                    <option value="Yala National Park">Yala National Park</option>
+                    <option value="Udawalawe National Park">Udawalawe National Park</option>
+                    <option value="Wilpattu National Park">Wilpattu National Park</option>
+                    <option value="Minneriya National Park">Minneriya National Park</option>
+                    <option value="Kaudulla National Park">Kaudulla National Park</option>
+                    <option value="Bundala National Park">Bundala National Park</option>
+                    <option value="Kumana National Park">Kumana National Park</option>
+                  </select>
+                  {formErrors.nationalPark && <p className="text-red-500 text-xs mt-1">{formErrors.nationalPark}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Safari Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.safariType}
+                    onChange={(e) => updateFormData('safariType', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                  >
+                    <option value="Morning Safari">Morning Safari</option>
+                    <option value="Evening Safari">Evening Safari</option>
+                    <option value="Full-day Safari">Full-day Safari</option>
+                  </select>
+                  {formErrors.safariType && <p className="text-red-500 text-xs mt-1">{formErrors.safariType}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Preferred Date & Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={formData.preferredTime}
+                    onChange={(e) => updateFormData('preferredTime', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.preferredTime ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                  />
+                  {formErrors.preferredTime && <p className="text-red-500 text-xs mt-1">{formErrors.preferredTime}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Duration (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.duration}
+                    onChange={(e) => updateFormData('duration', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="e.g., 4 hours"
+                  />
+                </div>
+              </div>
+
+              {/* Selected Dates with Half Day/Full Day */}
+              {selectedDates.length > 0 && (
+                <div className="mt-4 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <h3 className="font-semibold text-gray-900 mb-3">Selected Dates & Type:</h3>
+                  <div className="space-y-2">
+                    {selectedDates.map((date, index) => {
+                      const dateString = date.toDateString();
+                      const dateType = selectedDatesWithType[dateString] || 'full-day';
+                      return (
+                        <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-emerald-200">
+                          <span className="text-sm font-medium text-gray-700">
+                {date.toLocaleDateString()}
+              </span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
+                              }}
+                              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                                dateType === 'half-day'
+                                  ? 'bg-emerald-600 text-white shadow-md'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              Half Day
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
+                              }}
+                              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                                dateType === 'full-day'
+                                  ? 'bg-emerald-600 text-white shadow-md'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              Full Day
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Pickup & Drop-off - Similar structure, abbreviated for space */}
+          {currentStep === 3 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Navigation className="h-5 w-5 text-emerald-500" />
+                Pickup & Drop-off Information
+              </h2>
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.needsHotelPickup}
+                    onChange={(e) => updateFormData('needsHotelPickup', e.target.checked)}
+                    className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Do you need hotel pickup?</span>
+                </label>
+                {formData.needsHotelPickup && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Hotel Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.hotelName}
+                        onChange={(e) => updateFormData('hotelName', e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                          formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                        }`}
+                      />
+                      {formErrors.hotelName && <p className="text-red-500 text-xs mt-1">{formErrors.hotelName}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Hotel Address <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.hotelAddress}
+                        onChange={(e) => updateFormData('hotelAddress', e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                          formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                        }`}
+                      />
+                      {formErrors.hotelAddress && <p className="text-red-500 text-xs mt-1">{formErrors.hotelAddress}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Room Number (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.roomNumber}
+                        onChange={(e) => updateFormData('roomNumber', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pickup Location <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.pickupLocation}
+                    onChange={(e) => updateFormData('pickupLocation', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                  />
+                  {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Drop-off Location <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.dropoffLocation}
+                    onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                  />
+                  {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Vehicle & Driver Preferences - Abbreviated */}
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Car className="h-5 w-5 text-emerald-500" />
+                Vehicle & Driver Preferences
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Jeep Type</label>
+                  <select
+                    value={formData.jeepType}
+                    onChange={(e) => updateFormData('jeepType', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="Standard Jeep">Standard Jeep</option>
+                    <option value="Luxury Jeep">Luxury Jeep</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Driver Language</label>
+                  <select
+                    value={formData.driverLanguage}
+                    onChange={(e) => updateFormData('driverLanguage', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="English">English</option>
+                    <option value="Sinhala">Sinhala</option>
+                    <option value="Tamil">Tamil</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.needsNaturalist}
+                      onChange={(e) => updateFormData('needsNaturalist', e.target.checked)}
+                      className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Request for a naturalist/guide with the jeep (optional)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Additional Requests - Abbreviated */}
+          {currentStep === 5 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Package className="h-5 w-5 text-emerald-500" />
+                Additional Requests / Add-Ons
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {[
+                  { key: 'needsBinoculars', label: 'Binoculars' },
+                  { key: 'needsCamera', label: 'Camera Hire' },
+                  { key: 'needsChildSeat', label: 'Child Seat' },
+                  { key: 'needsWater', label: 'Water Bottles' },
+                  { key: 'needsSnacks', label: 'Snacks / Meals' },
+                  { key: 'needsPhotographyPackage', label: 'Photography Package' },
+                  { key: 'parkEntranceIncluded', label: 'Park Entrance Tickets' }
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={formData[key]}
+                      onChange={(e) => updateFormData(key, e.target.checked)}
+                      className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">{label}</span>
+                  </label>
+            ))}
+          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Passport Number (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.passportNumber}
+                    onChange={(e) => updateFormData('passportNumber', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Park Ticket Proof (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.parkTicketProof}
+                    onChange={(e) => updateFormData('parkTicketProof', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+        </div>
+      )}
+
+          {/* Step 6: Emergency Contact */}
+          {currentStep === 6 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Phone className="h-5 w-5 text-emerald-500" />
+                Emergency Contact
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contact Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.emergencyContactName}
+                    onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                  />
+                  {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contact Phone <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.emergencyContactPhone}
+                    onChange={(e) => updateFormData('emergencyContactPhone', e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                      formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    }`}
+                  />
+                  {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation Buttons */}
+        <div className="p-4 sm:p-6 border-t border-gray-200 flex justify-between items-center gap-3">
+          <button
+            onClick={handlePrevious}
+            disabled={currentStep === 1}
+            className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-1 sm:flex-none"
+          >
+            Previous
+          </button>
+          
+          {currentStep < steps.length ? (
+            <button
+              onClick={() => {
+                if (validateStep()) {
+                  handleNext();
+                }
+              }}
+              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 transition-colors flex-1 sm:flex-none"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              onClick={onSubmit}
+              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 transition-colors flex-1 sm:flex-none"
+            >
+              Confirm Booking
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -400,9 +1074,52 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [userRole, setUserRole] = useState("");
   const [conversationId, setConversationId] = useState(null);
   const [selectedDates, setSelectedDates] = useState([]);
+  const [selectedDatesWithType, setSelectedDatesWithType] = useState({}); // {dateString: 'half-day' | 'full-day'}
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessageData, setSuccessMessageData] = useState(null);
   const [isBooking, setIsBooking] = useState(false);
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formErrors, setFormErrors] = useState({});
+  const [bookingFormData, setBookingFormData] = useState({
+    // Personal Details
+    fullName: '',
+    email: '',
+    phone: '',
+    country: '',
+    numberOfPassengers: 1,
+    specialAssistance: '',
+    // Safari Booking Details
+    nationalPark: '',
+    safariType: 'Morning Safari',
+    preferredTime: '',
+    duration: '',
+    // Pickup & Drop-off
+    pickupLocation: '',
+    hotelName: '',
+    hotelAddress: '',
+    roomNumber: '',
+    dropoffLocation: '',
+    needsHotelPickup: true,
+    // Vehicle & Driver Preferences
+    jeepType: 'Standard Jeep',
+    driverLanguage: 'English',
+    needsNaturalist: false,
+    // Additional Requests
+    needsBinoculars: false,
+    needsCamera: false,
+    needsChildSeat: false,
+    needsWater: false,
+    needsSnacks: false,
+    needsPhotographyPackage: false,
+    parkEntranceIncluded: false,
+    // Documents
+    passportNumber: '',
+    parkTicketProof: '',
+    // Emergency Contact
+    emergencyContactName: '',
+    emergencyContactPhone: ''
+  });
   
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
@@ -411,6 +1128,26 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const searchParams = new URLSearchParams(location.search);
   const driverId = searchParams.get('driverId');
   const openChat = searchParams.get('openChat');
+
+  // Scroll to top when page loads or navigates (including back button)
+  useEffect(() => {
+    // Scroll to top on mount and when location changes
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname, driverId]);
+
+  // Also handle popstate (back/forward button)
+  useEffect(() => {
+    const handlePopState = () => {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }, 0);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // Reset state when driverId changes (navigating to different driver or going back)
   useEffect(() => {
@@ -466,13 +1203,78 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       );
       
       if (isSelected) {
+        // Remove date and its type
+        const newTypes = {...selectedDatesWithType};
+        delete newTypes[date.toDateString()];
+        setSelectedDatesWithType(newTypes);
         return prev.filter(selectedDate => 
           selectedDate.toDateString() !== date.toDateString()
         );
       } else {
+        // Add date with default 'full-day'
+        setSelectedDatesWithType(prev => ({
+          ...prev,
+          [date.toDateString()]: 'full-day'
+        }));
         return [...prev, date].sort((a, b) => a - b);
       }
     });
+  };
+
+  const handleDateTypeChange = (dateString, type) => {
+    setSelectedDatesWithType(prev => ({
+      ...prev,
+      [dateString]: type
+    }));
+  };
+
+  // Calculate total price based on selected dates and their types (half-day vs full-day)
+  const calculateTotalPrice = () => {
+    if (!driver || selectedDates.length === 0) return 0;
+    const dailyPrice = driver.pricePerDay || 0;
+    let total = 0;
+    selectedDates.forEach(date => {
+      const dateString = date.toDateString();
+      const dateType = selectedDatesWithType[dateString] || 'full-day';
+      total += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
+    });
+    return total;
+  };
+
+  // Validate booking form
+  const validateBookingForm = () => {
+    const errors = {};
+    
+    if (!bookingFormData.fullName.trim()) errors.fullName = 'Full name is required';
+    if (!bookingFormData.email.trim()) errors.email = 'Email is required';
+    if (!bookingFormData.phone.trim()) errors.phone = 'Phone number is required';
+    if (!bookingFormData.country.trim()) errors.country = 'Country is required';
+    if (!bookingFormData.numberOfPassengers || bookingFormData.numberOfPassengers < 1) {
+      errors.numberOfPassengers = 'Number of passengers must be at least 1';
+    }
+    if (!bookingFormData.nationalPark.trim()) errors.nationalPark = 'National park is required';
+    if (!bookingFormData.safariType) errors.safariType = 'Safari type is required';
+    if (!bookingFormData.preferredTime.trim()) errors.preferredTime = 'Preferred time is required';
+    if (bookingFormData.needsHotelPickup) {
+      if (!bookingFormData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
+      if (!bookingFormData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
+    }
+    if (!bookingFormData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
+    if (!bookingFormData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
+    if (!bookingFormData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
+    if (!bookingFormData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleBookingFormSubmit = () => {
+    if (!validateBookingForm()) {
+      alert('Please fill in all required fields correctly.');
+      return;
+    }
+    setShowBookingForm(false);
+    handleBooking();
   };
 
   const handleBooking = async () => {
@@ -557,8 +1359,24 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         console.warn('⚠️ Could not verify user role:', roleCheckError);
       }
       
-      const totalPrice = selectedDates.length * (driver.pricePerDay || 0);
-      const datesString = selectedDates.map(d => d.toLocaleDateString()).join(', ');
+      // Calculate total price based on half-day/full-day
+      let totalPrice = 0;
+      selectedDates.forEach(date => {
+        const dateString = date.toDateString();
+        const dateType = selectedDatesWithType[dateString] || 'full-day';
+        const dailyPrice = driver.pricePerDay || 0;
+        totalPrice += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
+      });
+      
+      const datesString = selectedDates.map(d => {
+        const dateType = selectedDatesWithType[d.toDateString()] || 'full-day';
+        return `${d.toLocaleDateString()} (${dateType === 'half-day' ? 'Half Day' : 'Full Day'})`;
+      }).join(', ');
+      
+      const datesWithTypes = selectedDates.map(d => ({
+        date: d.toISOString(),
+        type: selectedDatesWithType[d.toDateString()] || 'full-day'
+      }));
       
       // Get driver email from driver data (could be contactEmail, email, or from auth)
       const driverEmail = driver.contactEmail || driver.email || '';
@@ -571,22 +1389,25 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         return;
       }
       
-      // Create booking in Firestore
+      // Create booking in Firestore with all form data
       // Ensure all fields match Firestore rules requirements exactly
       const bookingData = {
         driverId: driverIdString, // Must be a string
         driverName: driver.fullName || driver.driverName || 'Driver',
         driverEmail: driverEmail, // Store driver email in booking
         customerId: authUser.uid, // MUST match request.auth.uid
-        customerName: authUser.displayName || 'Customer',
-        customerEmail: authUser.email || '',
+        customerName: bookingFormData.fullName || authUser.displayName || 'Customer',
+        customerEmail: bookingFormData.email || authUser.email || '',
         selectedDates: selectedDates.map(d => d.toISOString()), // Must be an array
+        datesWithTypes: datesWithTypes, // Array of {date, type}
         datesString: datesString,
-        totalPrice: Number(totalPrice), // Must be a number
+        totalPrice: Number(totalPrice.toFixed(2)), // Must be a number
         pricePerDay: Number(driver.pricePerDay || 0),
         numberOfDays: Number(selectedDates.length),
         serviceType: driver.serviceType || 'Jeep Driver',
         status: 'pending',
+        // Include all booking form data
+        ...bookingFormData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -716,24 +1537,47 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       // Create comprehensive notification for driver with all booking details
       // Wrap in try-catch so notification failure doesn't break the booking
       try {
+        // Create detailed message with all booking information
+        const notificationMessage = `New booking from ${bookingFormData.fullName || authUser.displayName || 'Customer'}:
+        
+📅 Dates: ${datesString}
+👥 Passengers: ${bookingFormData.numberOfPassengers}
+📍 Park: ${bookingFormData.nationalPark}
+🚗 Safari: ${bookingFormData.safariType}
+💰 Total: LKR ${totalPrice.toLocaleString()}
+
+📞 Contact: ${bookingFormData.phone}
+📧 Email: ${bookingFormData.email}
+🌍 Country: ${bookingFormData.country}
+
+🚗 Vehicle: ${bookingFormData.jeepType}
+🗣️ Language: ${bookingFormData.driverLanguage}
+📍 Pickup: ${bookingFormData.pickupLocation}
+📍 Drop-off: ${bookingFormData.dropoffLocation}${bookingFormData.needsHotelPickup ? `\n🏨 Hotel: ${bookingFormData.hotelName}, ${bookingFormData.hotelAddress}` : ''}
+
+📝 Special Requests: ${bookingFormData.specialAssistance || 'None'}
+🆘 Emergency Contact: ${bookingFormData.emergencyContactName} - ${bookingFormData.emergencyContactPhone}`;
+
         const notificationData = {
           type: 'booking',
           title: 'New Booking Request',
-          message: `You have a new booking request from ${authUser.displayName || 'a customer'} for ${selectedDates.length} day(s). Dates: ${datesString}. Total: LKR ${totalPrice.toLocaleString()}`,
+          message: notificationMessage,
           recipientId: driver.id, // Driver's user ID (from serviceProviders collection)
           senderId: authUser.uid, // Tourist's user ID
-          senderName: authUser.displayName || 'Customer', // Tourist's name
-          senderEmail: authUser.email || '', // Tourist's email
+          senderName: bookingFormData.fullName || authUser.displayName || 'Customer', // Tourist's name
+          senderEmail: bookingFormData.email || authUser.email || '', // Tourist's email
           driverEmail: driverEmail, // Driver's email stored in booking
           relatedId: bookingId,
           bookingId: bookingId,
           bookingData: {
+            ...bookingFormData,
             dates: datesString, // Formatted dates string for display
             selectedDates: selectedDates.map(d => d.toISOString()), // ISO date strings
+            datesWithTypes: datesWithTypes,
             numberOfDays: selectedDates.length,
             totalPrice: totalPrice,
-            customerName: authUser.displayName || 'Customer',
-            customerEmail: authUser.email || '',
+            customerName: bookingFormData.fullName || authUser.displayName || 'Customer',
+            customerEmail: bookingFormData.email || authUser.email || '',
             driverId: driver.id,
             driverName: driver.fullName || driver.driverName || 'Driver',
             driverEmail: driverEmail,
@@ -763,8 +1607,43 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       });
       setShowSuccessMessage(true);
       
-      // Reset selected dates
+      // Reset selected dates and form
       setSelectedDates([]);
+      setSelectedDatesWithType({});
+      setShowBookingForm(false);
+      setCurrentStep(1);
+      setBookingFormData({
+        fullName: '',
+        email: '',
+        phone: '',
+        country: '',
+        numberOfPassengers: 1,
+        specialAssistance: '',
+        nationalPark: '',
+        safariType: 'Morning Safari',
+        preferredTime: '',
+        duration: '',
+        pickupLocation: '',
+        hotelName: '',
+        hotelAddress: '',
+        roomNumber: '',
+        dropoffLocation: '',
+        needsHotelPickup: true,
+        jeepType: 'Standard Jeep',
+        driverLanguage: 'English',
+        needsNaturalist: false,
+        needsBinoculars: false,
+        needsCamera: false,
+        needsChildSeat: false,
+        needsWater: false,
+        needsSnacks: false,
+        needsPhotographyPackage: false,
+        parkEntranceIncluded: false,
+        passportNumber: '',
+        parkTicketProof: '',
+        emergencyContactName: '',
+        emergencyContactPhone: ''
+      });
       setIsBooking(false);
       
       // Redirect to JeepProfile page after showing success message (3 seconds)
@@ -1155,6 +2034,22 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         conversationId={chatConversationId}
         otherUser={chatOtherUser}
         currentUser={currentUser}
+      />
+      
+      <BookingFormModal
+        isOpen={showBookingForm}
+        onClose={() => setShowBookingForm(false)}
+        formData={bookingFormData}
+        setFormData={setBookingFormData}
+        formErrors={formErrors}
+        setFormErrors={setFormErrors}
+        currentStep={currentStep}
+        setCurrentStep={setCurrentStep}
+        onSubmit={handleBookingFormSubmit}
+        driver={driver}
+        selectedDates={selectedDates}
+        selectedDatesWithType={selectedDatesWithType}
+        onDateTypeChange={handleDateTypeChange}
       />
       
       <GlobalNotificationBell 
@@ -1595,6 +2490,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         <DatePickerCalendar 
                           selectedDates={selectedDates}
                           onDateSelect={handleDateSelect}
+                          selectedDatesWithType={selectedDatesWithType}
+                          onDateTypeChange={handleDateTypeChange}
                         />
                       </div>
 
@@ -1611,7 +2508,26 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             <div className="space-y-3">
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Selected dates:</span>
-                                <span className="font-medium text-green-700">{selectedDates.length} days</span>
+                                <span className="font-medium text-green-700">{selectedDates.length} day(s)</span>
+                              </div>
+                              
+                              {/* Show breakdown of dates and their types */}
+                              <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                {selectedDates.map((date, index) => {
+                                  const dateString = date.toDateString();
+                                  const dateType = selectedDatesWithType[dateString] || 'full-day';
+                                  const dayPrice = dateType === 'half-day' ? (driver.pricePerDay || 0) * 0.6 : (driver.pricePerDay || 0);
+                                  return (
+                                    <div key={index} className="flex justify-between items-center text-sm">
+                                      <span className="text-gray-600">
+                                        {date.toLocaleDateString()} ({dateType === 'half-day' ? 'Half Day' : 'Full Day'})
+                                      </span>
+                                      <span className="font-medium text-gray-900">
+                                        LKR {dayPrice.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                               
                               <div className="flex justify-between items-center">
@@ -1623,7 +2539,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 <div className="flex justify-between items-center">
                                   <span className="text-lg font-semibold text-gray-900">Total:</span>
                                   <span className="text-2xl font-bold text-green-600">
-                                    LKR {(selectedDates.length * (driver.pricePerDay || 0)).toLocaleString()}
+                                    LKR {calculateTotalPrice().toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                   </span>
                                 </div>
                               </div>
@@ -1632,33 +2548,23 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  console.log('🔵 Confirm Booking button clicked');
-                                  console.log('🔵 Button state:', {
-                                    selectedDates: selectedDates.length,
-                                    currentUser: !!currentUser,
-                                    driver: !!driver,
-                                    isBooking: isBooking
-                                  });
-                                  if (!isBooking) {
-                                    handleBooking().catch((error) => {
-                                      console.error('❌ Unhandled error in handleBooking:', error);
-                                      setIsBooking(false);
-                                      alert('An unexpected error occurred. Please check the console (F12) for details.');
-                                    });
+                                  if (selectedDates.length === 0) {
+                                    alert('Please select at least one date for your booking.');
+                                    return;
                                   }
+                                  if (!currentUser) {
+                                    alert('Please login to make a booking.');
+                                    return;
+                                  }
+                                  setShowBookingForm(true);
                                 }}
                                 className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium mt-4 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                                disabled={selectedDates.length === 0 || isBooking}
+                                disabled={selectedDates.length === 0}
                               >
-                                {isBooking ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                                    Processing...
-                                  </>
-                                ) : selectedDates.length === 0 ? (
+                                {selectedDates.length === 0 ? (
                                   'Select Dates First'
                                 ) : (
-                                  'Confirm Booking'
+                                  'Continue to Booking Details'
                                 )}
                               </button>
                             </div>

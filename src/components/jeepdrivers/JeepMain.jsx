@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { Bell, MessageCircle, X, Send, Check, CheckCheck, User } from "lucide-react";
@@ -423,6 +423,7 @@ const getUserNotifications = (userId, callback) => {
 
 export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   
   // Chat modal state
@@ -442,6 +443,78 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
       unsubscribeAuth();
     };
   }, []);
+
+  // Scroll to top when page loads or navigates (including back button)
+  useEffect(() => {
+    // Check if we should scroll to a specific driver card
+    const shouldScrollToDriver = sessionStorage.getItem('scrollToDriver') === 'true';
+    const lastViewedDriverId = sessionStorage.getItem('lastViewedDriverId');
+    
+    if (shouldScrollToDriver && lastViewedDriverId && location.pathname === '/driver') {
+      // First scroll to top
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      
+      // Then scroll to the specific driver card after a short delay
+      setTimeout(() => {
+        const driverCard = document.getElementById(`driver-card-${lastViewedDriverId}`);
+        if (driverCard) {
+          driverCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight the card briefly
+          driverCard.style.transition = 'box-shadow 0.3s ease';
+          driverCard.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.5)';
+          setTimeout(() => {
+            driverCard.style.boxShadow = '';
+          }, 2000);
+        }
+        // Clear the flag
+        sessionStorage.removeItem('scrollToDriver');
+        sessionStorage.removeItem('lastViewedDriverId');
+      }, 100);
+    } else {
+      // Normal scroll to top
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [location.pathname]);
+
+  // Also handle popstate (back/forward button)
+  useEffect(() => {
+    const handlePopState = () => {
+      setTimeout(() => {
+        // Check if we should scroll to a specific driver card
+        const shouldScrollToDriver = sessionStorage.getItem('scrollToDriver') === 'true';
+        const lastViewedDriverId = sessionStorage.getItem('lastViewedDriverId');
+        
+        if (shouldScrollToDriver && lastViewedDriverId && location.pathname === '/driver') {
+          // First scroll to top
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          
+          // Then scroll to the specific driver card
+          setTimeout(() => {
+            const driverCard = document.getElementById(`driver-card-${lastViewedDriverId}`);
+            if (driverCard) {
+              driverCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              // Highlight the card briefly
+              driverCard.style.transition = 'box-shadow 0.3s ease';
+              driverCard.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.5)';
+              setTimeout(() => {
+                driverCard.style.boxShadow = '';
+              }, 2000);
+            }
+            // Clear the flag
+            sessionStorage.removeItem('scrollToDriver');
+            sessionStorage.removeItem('lastViewedDriverId');
+          }, 100);
+        } else {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+      }, 0);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [location.pathname]);
 
   // Handle notification click
   const handleNotificationClick = async (notification) => {

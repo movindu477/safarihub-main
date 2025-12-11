@@ -257,12 +257,18 @@ const JeepSection2 = ({ currentUser }) => {
 
   // Handle profile box click
   const handleProfileClick = (jeep) => {
+    // Save the driver ID to sessionStorage so we can scroll to it when coming back
+    sessionStorage.setItem('lastViewedDriverId', jeep.id);
+    sessionStorage.setItem('scrollToDriver', 'true');
     navigate(`/jeepprofile?driverId=${jeep.id}`);
   };
 
   // Handle chat button click
   const handleChatClick = (jeep, e) => {
     e.stopPropagation();
+    // Save the driver ID to sessionStorage so we can scroll to it when coming back
+    sessionStorage.setItem('lastViewedDriverId', jeep.id);
+    sessionStorage.setItem('scrollToDriver', 'true');
     navigate(`/jeepprofile?driverId=${jeep.id}&openChat=true`);
   };
 
@@ -609,7 +615,8 @@ const JeepSection2 = ({ currentUser }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredJeeps.slice(0, 12).map((jeep, index) => (
               <div 
-                key={jeep.id} 
+                key={jeep.id}
+                id={`driver-card-${jeep.id}`}
                 className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
                 onClick={() => handleProfileClick(jeep)}
               >

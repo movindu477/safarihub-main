@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -56,6 +56,7 @@ import DestinationApp from "./components/destination/App";
 import GuideApp from "./components/guides/App";
 import GuideProfile from "./components/guides/GuideProfile";
 import Payment from "./components/Payment";
+import AboutUs from "./components/home/AboutUs";
 
 
 // 🔥 Firebase Config
@@ -708,6 +709,27 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
+  const location = useLocation();
+
+  // Scroll to top when page loads or navigates (including back button)
+  useEffect(() => {
+    // Scroll to top on mount and when location changes
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
+
+  // Also handle popstate (back/forward button)
+  useEffect(() => {
+    const handlePopState = () => {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }, 0);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // Handle notification click - OPEN CHAT MODAL
   const handleNotificationClick = async (notification) => {
@@ -846,11 +868,23 @@ function App() {
     }
   };
 
-  const handleAuthSuccess = () => {
+  const [returnToPath, setReturnToPath] = useState(null);
+
+  const handleAuthSuccess = (returnPath) => {
     setShowAuth(false);
+    if (returnPath && returnPath !== '/login' && returnPath !== '/register') {
+      // Redirect to the previous page after successful login
+      setTimeout(() => {
+        window.location.href = returnPath;
+      }, 500);
+    }
+    setReturnToPath(null);
   };
 
   const handleShowAuth = () => {
+    // Save current location before showing auth
+    const currentPath = window.location.pathname;
+    setReturnToPath(currentPath);
     setShowAuth(true);
   };
 
@@ -900,12 +934,40 @@ function App() {
   }
 
   if (showAuth) {
-    return <Authentication onAuthSuccess={handleAuthSuccess} />;
+    return <Authentication onAuthSuccess={handleAuthSuccess} returnToPath={returnToPath} />;
   }
 
 
+  // Scroll to top component - handles route changes and back/forward button
+  const ScrollToTop = () => {
+    const { pathname } = useLocation();
+    
+    useEffect(() => {
+      // Scroll to top on route change
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, [pathname]);
+    
+    useEffect(() => {
+      // Handle back/forward button navigation
+      const handlePopState = () => {
+        // Small delay to ensure page has rendered
+        setTimeout(() => {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }, 0);
+      };
+      
+      window.addEventListener('popstate', handlePopState);
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }, []);
+    
+    return null;
+  };
+
   return (
     <Router>
+      <ScrollToTop />
       <Routes>
         <Route 
           path="/" 
@@ -998,6 +1060,20 @@ function App() {
             />
           } 
         />
+        {/* About Us Route */}
+        <Route 
+          path="/about" 
+          element={
+            <AboutUs 
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          } 
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
@@ -1035,7 +1111,7 @@ const isValidSriLankanPhone = (phone) => {
 };
 
 // Authentication Component
-function Authentication({ onAuthSuccess }) {
+function Authentication({ onAuthSuccess, returnToPath }) {
   const [screen, setScreen] = useState("login");
   const [role, setRole] = useState(null);
   const [msg, setMsg] = useState("");
@@ -1060,7 +1136,7 @@ function Authentication({ onAuthSuccess }) {
   const [serviceType, setServiceType] = useState("Jeep Driver");
   const [vehicleType, setVehicleType] = useState("");
   const [pricePerDay, setPricePerDay] = useState("");
-  const [destinations, setDestinations] = useState([]);
+  const [destinations, setDestinations] = useState("");
   const [languages, setLanguages] = useState([]);
   const [specialSkills, setSpecialSkills] = useState([]);
   const [certifications, setCertifications] = useState([]);
@@ -1099,7 +1175,7 @@ function Authentication({ onAuthSuccess }) {
     setServiceType("Jeep Driver");
     setVehicleType("");
     setPricePerDay("");
-    setDestinations([]);
+    setDestinations("");
     setLanguages([]);
     setSpecialSkills([]);
     setCertifications([]);
@@ -1241,9 +1317,11 @@ function Authentication({ onAuthSuccess }) {
           };
         } else {
           // For Jeep Driver and other services
+          // Convert single destination to array format for Firestore compatibility
+          const destinationsArray = destinations ? [destinations] : [];
           userData = {
             ...userData,
-            destinations: destinations || [],
+            destinations: destinationsArray,
             languages: languages || [],
             specialSkills: specialSkills || [],
             certifications: certifications || [],
@@ -1330,7 +1408,7 @@ function Authentication({ onAuthSuccess }) {
       await signInWithEmailAndPassword(auth, email, password);
       setMsg("✅ Welcome back! Redirecting...");
       setTimeout(() => {
-        onAuthSuccess();
+        onAuthSuccess(returnToPath);
       }, 1000);
     } catch (error) {
       let errorMessage = "❌ Login failed! ";
@@ -1368,7 +1446,7 @@ function Authentication({ onAuthSuccess }) {
               <img
                 src={logo}
                 alt="SafariHub Logo"
-                className="h-16 w-auto object-contain mx-auto mb-4"
+                className="h-24 sm:h-28 md:h-32 w-auto object-contain mx-auto mb-4"
               />
               <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
               <p className="text-gray-300 mt-2">Sign in to continue your adventure</p>
@@ -1488,7 +1566,9 @@ function Authentication({ onAuthSuccess }) {
               formData={{ 
                 email, fullName, password, confirm, country, phone, language,
                 locationBase, experience, languagesSpoken, serviceType,
-                vehicleType, pricePerDay, destinations, languages, 
+                vehicleType, pricePerDay, 
+                destinations: typeof destinations === 'string' ? destinations : (destinations && destinations.length > 0 ? destinations[0] : ""), // Convert array to string for single select
+                languages, 
                 specialSkills, certifications, description,
                 availableDates, specialQualifications, areasOfExpertise,
                 verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
@@ -1522,37 +1602,59 @@ const UserTypeSelection = ({ onSelect, logo }) => (
       <img
         src={logo}
         alt="SafariHub Logo"
-        className="h-12 w-auto object-contain mx-auto mb-4"
+        className="h-24 sm:h-28 md:h-32 w-auto object-contain mx-auto mb-4"
       />
       <h2 className="text-xl font-bold text-white">Join SafariHub</h2>
       <p className="text-gray-300 text-sm mt-1">Choose your adventure type</p>
     </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <button
         onClick={() => onSelect('tourist')}
-        className="bg-white/5 hover:bg-white/10 border border-white/10 hover:border-yellow-400 rounded-xl p-4 text-center transition-all duration-200"
+        className="group relative bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:via-green-500/20 hover:to-teal-500/20 border border-emerald-500/30 hover:border-emerald-400/60 rounded-2xl p-6 text-center transition-all duration-300 transform hover:-translate-y-1 hover:scale-[1.02] shadow-lg hover:shadow-2xl hover:shadow-emerald-500/20 backdrop-blur-sm overflow-hidden"
       >
-        <div className="w-12 h-12 bg-yellow-400/20 rounded-full flex items-center justify-center mx-auto mb-3">
-          <span className="text-xl">🧳</span>
+        {/* Animated background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 via-green-500/0 to-teal-500/0 group-hover:from-emerald-500/10 group-hover:via-green-500/10 group-hover:to-teal-500/10 transition-all duration-300"></div>
+        
+        {/* Icon with gradient background and emoji */}
+        <div className="relative mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:shadow-emerald-400/50 group-hover:scale-110 transition-all duration-300">
+          <span className="text-3xl">🧳</span>
         </div>
-        <h3 className="text-lg font-bold text-white mb-1">Tourist</h3>
-        <p className="text-gray-300 text-xs">
-          Explore amazing destinations
-        </p>
+        
+        {/* Content */}
+        <div className="relative z-10">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-100 transition-colors duration-300">Tourist</h3>
+          <p className="text-gray-300 text-sm group-hover:text-gray-200 transition-colors duration-300">
+            Explore amazing destinations
+          </p>
+        </div>
+        
+        {/* Hover effect border */}
+        <div className="absolute inset-0 rounded-2xl border-2 border-emerald-400/0 group-hover:border-emerald-400/50 transition-all duration-300"></div>
       </button>
 
       <button
         onClick={() => onSelect('provider')}
-        className="bg-white/5 hover:bg-white/10 border border-white/10 hover:border-yellow-400 rounded-xl p-4 text-center transition-all duration-200"
+        className="group relative bg-gradient-to-br from-yellow-500/10 via-amber-500/10 to-orange-500/10 hover:from-yellow-500/20 hover:via-amber-500/20 hover:to-orange-500/20 border border-yellow-500/30 hover:border-yellow-400/60 rounded-2xl p-6 text-center transition-all duration-300 transform hover:-translate-y-1 hover:scale-[1.02] shadow-lg hover:shadow-2xl hover:shadow-yellow-500/20 backdrop-blur-sm overflow-hidden"
       >
-        <div className="w-12 h-12 bg-yellow-400/20 rounded-full flex items-center justify-center mx-auto mb-3">
-          <span className="text-xl">🚙</span>
+        {/* Animated background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/0 via-amber-500/0 to-orange-500/0 group-hover:from-yellow-500/10 group-hover:via-amber-500/10 group-hover:to-orange-500/10 transition-all duration-300"></div>
+        
+        {/* Icon with gradient background and emoji */}
+        <div className="relative mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/30 group-hover:shadow-yellow-400/50 group-hover:scale-110 transition-all duration-300">
+          <span className="text-3xl">🚙</span>
         </div>
-        <h3 className="text-lg font-bold text-white mb-1">Service Provider</h3>
-        <p className="text-gray-300 text-xs">
-          Offer your services
-        </p>
+        
+        {/* Content */}
+        <div className="relative z-10">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-100 transition-colors duration-300">Service Provider</h3>
+          <p className="text-gray-300 text-sm group-hover:text-gray-200 transition-colors duration-300">
+            Offer your services
+          </p>
+        </div>
+        
+        {/* Hover effect border */}
+        <div className="absolute inset-0 rounded-2xl border-2 border-yellow-400/0 group-hover:border-yellow-400/50 transition-all duration-300"></div>
       </button>
     </div>
   </div>
@@ -1885,7 +1987,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               {formData.serviceType === "Jeep Driver" && (
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    🚙 Vehicle Type
+                    Vehicle Type
                   </label>
                   <select
                     value={formData.vehicleType}
@@ -1905,7 +2007,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-white font-medium text-xs">
-                  📅 Experience (Years) *
+                  Experience (Years) *
                 </label>
                 <input
                   type="number"
@@ -1923,7 +2025,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               {formData.serviceType === "Jeep Driver" && (
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    💰 Price per Day (LKR)
+                    Price per Day (LKR)
                   </label>
                   <input
                     type="number"
@@ -1943,7 +2045,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 {/* Special Qualifications (Multi-select) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    🎓 Special Qualifications
+                    Special Qualifications
                   </label>
                   <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
                     {specialQualifications.map(qualification => (
@@ -1966,7 +2068,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 {/* Areas of Expertise (Multi-select) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    🗺️ Areas of Expertise
+                    Areas of Expertise
                   </label>
                   <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
                     {areasOfExpertise.map(area => (
@@ -1989,7 +2091,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 {/* Verification Documents (Multi-select) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    📄 Verification Documents
+                    Verification Documents
                   </label>
                   <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
                     {verificationDocuments.map(doc => (
@@ -2013,7 +2115,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="flex items-center gap-2 text-white font-medium text-xs">
-                      💰 Hourly Rate
+                      Hourly Rate
                     </label>
                     <input
                       type="number"
@@ -2027,7 +2129,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
                   <div className="space-y-1">
                     <label className="flex items-center gap-2 text-white font-medium text-xs">
-                      💰 Daily Rate
+                      Daily Rate
                     </label>
                     <input
                       type="number"
@@ -2043,7 +2145,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="flex items-center gap-2 text-white font-medium text-xs">
-                      💰 Special Package Rates
+                      Special Package Rates
                     </label>
                     <input
                       type="text"
@@ -2056,7 +2158,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
                   <div className="space-y-1">
                     <label className="flex items-center gap-2 text-white font-medium text-xs">
-                      💵 Currency Preference
+                      Currency Preference
                     </label>
                     <select
                       value={formData.currencyPreference}
@@ -2075,33 +2177,33 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             {/* Jeep Driver Specific Fields */}
             {!isTourGuide && (
               <>
-                {/* Destinations (Multi-select) */}
+                {/* Destination (Single-select for Jeep Driver - one park only) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    🗺️ Destinations Covered
+                    National Park / Destination *
                   </label>
-                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                  <select
+                    value={formData.destinations || ""}
+                    onChange={(e) => handlers.setDestinations(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                  >
+                    <option value="">Select Your National Park</option>
                     {destinations.map(destination => (
-                      <div key={destination} className="flex items-center mb-1">
-                        <input
-                          type="checkbox"
-                          id={`dest-${destination}`}
-                          checked={formData.destinations?.includes(destination) || false}
-                          onChange={(e) => handleMultiSelectChange('destinations', destination)}
-                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`dest-${destination}`} className="text-white text-xs">
-                          {destination}
-                        </label>
-                      </div>
+                      <option key={destination} value={destination} className="bg-gray-800">
+                        {destination}
+                      </option>
                     ))}
-                  </div>
+                  </select>
+                  <p className="text-gray-400 text-[10px] mt-1">
+                    Jeep drivers operate at one park location
+                  </p>
                 </div>
 
                 {/* Languages Spoken (Multi-select) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    🌐 Languages Spoken
+                    Languages Spoken
                   </label>
                   <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
                     {languages.map(language => (
@@ -2124,7 +2226,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 {/* Special Skills (Multi-select) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    🎯 Special Skills
+                    Special Skills
                   </label>
                   <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
                     {specialSkills.map(skill => (
@@ -2147,7 +2249,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 {/* Certifications (Multi-select) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    📜 Certifications
+                    Certifications
                   </label>
                   <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
                     {certifications.map(cert => (
@@ -2172,7 +2274,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             {/* Description */}
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
-                📝 {isTourGuide ? 'Service Description' : 'Service Description'}
+                {isTourGuide ? 'Service Description' : 'Service Description'}
               </label>
               <textarea
                 value={formData.description}

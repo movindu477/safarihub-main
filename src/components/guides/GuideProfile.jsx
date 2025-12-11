@@ -405,6 +405,26 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   const searchParams = new URLSearchParams(location.search);
   const openChat = searchParams.get('openChat');
 
+  // Scroll to top when page loads or navigates (including back button)
+  useEffect(() => {
+    // Scroll to top on mount and when location changes
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname, guideId]);
+
+  // Also handle popstate (back/forward button)
+  useEffect(() => {
+    const handlePopState = () => {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }, 0);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };

@@ -46,48 +46,6 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
     cardName: ''
   });
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [showBookingForm, setShowBookingForm] = useState(true);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formErrors, setFormErrors] = useState({});
-  const [formData, setFormData] = useState({
-    // Personal Details
-    fullName: '',
-    email: '',
-    phone: '',
-    country: '',
-    numberOfPassengers: 1,
-    specialAssistance: '',
-    // Safari Booking Details
-    nationalPark: '',
-    safariType: 'Morning Safari',
-    preferredTime: '',
-    duration: '',
-    // Pickup & Drop-off
-    pickupLocation: '',
-    hotelName: '',
-    hotelAddress: '',
-    roomNumber: '',
-    dropoffLocation: '',
-    needsHotelPickup: true,
-    // Vehicle & Driver Preferences
-    jeepType: 'Standard Jeep',
-    driverLanguage: 'English',
-    needsNaturalist: false,
-    // Additional Requests
-    needsBinoculars: false,
-    needsCamera: false,
-    needsChildSeat: false,
-    needsWater: false,
-    needsSnacks: false,
-    needsPhotographyPackage: false,
-    parkEntranceIncluded: false,
-    // Documents
-    passportNumber: '',
-    parkTicketProof: '',
-    // Emergency Contact
-    emergencyContactName: '',
-    emergencyContactPhone: ''
-  });
 
   // Auth state listener
   useEffect(() => {
@@ -170,49 +128,6 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
           ...bookingData
         };
         setBooking(bookingInfo);
-        
-        // Initialize form data from booking and user
-        if (user) {
-          setFormData(prev => ({
-            ...prev,
-            fullName: bookingData.fullName || user.displayName || '',
-            email: bookingData.email || user.email || '',
-            phone: bookingData.phone || '',
-            country: bookingData.country || '',
-            numberOfPassengers: bookingData.numberOfPassengers || 1,
-            specialAssistance: bookingData.specialAssistance || '',
-            nationalPark: bookingData.nationalPark || '',
-            safariType: bookingData.safariType || 'Morning Safari',
-            preferredTime: bookingData.preferredTime || '',
-            duration: bookingData.duration || '',
-            pickupLocation: bookingData.pickupLocation || '',
-            hotelName: bookingData.hotelName || '',
-            hotelAddress: bookingData.hotelAddress || '',
-            roomNumber: bookingData.roomNumber || '',
-            dropoffLocation: bookingData.dropoffLocation || '',
-            needsHotelPickup: bookingData.needsHotelPickup !== undefined ? bookingData.needsHotelPickup : true,
-            jeepType: bookingData.jeepType || 'Standard Jeep',
-            driverLanguage: bookingData.driverLanguage || 'English',
-            needsNaturalist: bookingData.needsNaturalist || false,
-            needsBinoculars: bookingData.needsBinoculars || false,
-            needsCamera: bookingData.needsCamera || false,
-            needsChildSeat: bookingData.needsChildSeat || false,
-            needsWater: bookingData.needsWater || false,
-            needsSnacks: bookingData.needsSnacks || false,
-            needsPhotographyPackage: bookingData.needsPhotographyPackage || false,
-            parkEntranceIncluded: bookingData.parkEntranceIncluded || false,
-            passportNumber: bookingData.passportNumber || '',
-            parkTicketProof: bookingData.parkTicketProof || '',
-            emergencyContactName: bookingData.emergencyContactName || '',
-            emergencyContactPhone: bookingData.emergencyContactPhone || ''
-          }));
-          
-          // Check if booking details are already completed
-          if (bookingData.bookingDetailsCompleted) {
-            setShowBookingForm(false);
-          }
-        }
-        
         setLoading(false);
       } else {
         setError('Booking not found');
@@ -443,64 +358,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   const serviceType = booking.guideId ? 'Tour Guide' : 'Jeep Driver';
   const isJeepBooking = !booking.guideId;
 
-  // Validate form data
-  const validateForm = () => {
-    const errors = {};
-    
-    if (isJeepBooking && showBookingForm) {
-      // Personal Details
-      if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
-      if (!formData.email.trim()) errors.email = 'Email is required';
-      if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-      if (!formData.country.trim()) errors.country = 'Country is required';
-      if (!formData.numberOfPassengers || formData.numberOfPassengers < 1) {
-        errors.numberOfPassengers = 'Number of passengers must be at least 1';
-      }
-      
-      // Safari Booking Details
-      if (!formData.nationalPark.trim()) errors.nationalPark = 'National park is required';
-      if (!formData.safariType) errors.safariType = 'Safari type is required';
-      if (!formData.preferredTime.trim()) errors.preferredTime = 'Preferred time is required';
-      
-      // Pickup & Drop-off
-      if (formData.needsHotelPickup) {
-        if (!formData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
-        if (!formData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
-      }
-      if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
-      if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
-      
-      // Emergency Contact
-      if (!formData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
-      if (!formData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  // Handle form submission and proceed to payment
-  const handleFormSubmit = async () => {
-    if (!validateForm()) {
-      alert('Please fill in all required fields correctly.');
-      return;
-    }
-
-    try {
-      // Update booking with form data
-      const bookingRef = doc(db, 'bookings', bookingId);
-      await updateDoc(bookingRef, {
-        ...formData,
-        bookingDetailsCompleted: true,
-        updatedAt: serverTimestamp()
-      });
-      
-      setShowBookingForm(false);
-    } catch (err) {
-      console.error('Error saving booking details:', err);
-      alert('Failed to save booking details. Please try again.');
-    }
-  };
+  // Payment page - no form validation needed, booking details are already in Firestore
 
 
   return (
@@ -530,18 +388,6 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
         {/* Content */}
         <div className="p-3 sm:p-4 md:p-6">
-          {/* Booking Form - Show only for Jeep bookings and if not completed */}
-          {isJeepBooking && showBookingForm ? (
-            <BookingForm
-              formData={formData}
-              setFormData={setFormData}
-              formErrors={formErrors}
-              currentStep={currentStep}
-              setCurrentStep={setCurrentStep}
-              onSubmit={handleFormSubmit}
-              booking={booking}
-            />
-          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Left Column - Booking Details & Payment Form */}
             <div className="lg:col-span-2 space-y-3 sm:space-y-4 order-2 lg:order-1">
@@ -743,7 +589,6 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
               </div>
             </div>
           </div>
-          )}
         </div>
       </div>
     </div>

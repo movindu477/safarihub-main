@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { 
   collection,
@@ -432,6 +432,7 @@ const getGuideUserNotifications = (userId, callback) => {
 
 export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   
   // Chat modal state
@@ -451,6 +452,78 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
       unsubscribeAuth();
     };
   }, []);
+
+  // Scroll to top when page loads or navigates (including back button)
+  useEffect(() => {
+    // Check if we should scroll to a specific guide card
+    const shouldScrollToGuide = sessionStorage.getItem('scrollToGuide') === 'true';
+    const lastViewedGuideId = sessionStorage.getItem('lastViewedGuideId');
+    
+    if (shouldScrollToGuide && lastViewedGuideId && location.pathname === '/guide') {
+      // First scroll to top
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      
+      // Then scroll to the specific guide card after a short delay
+      setTimeout(() => {
+        const guideCard = document.getElementById(`guide-card-${lastViewedGuideId}`);
+        if (guideCard) {
+          guideCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight the card briefly
+          guideCard.style.transition = 'box-shadow 0.3s ease';
+          guideCard.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.5)';
+          setTimeout(() => {
+            guideCard.style.boxShadow = '';
+          }, 2000);
+        }
+        // Clear the flag
+        sessionStorage.removeItem('scrollToGuide');
+        sessionStorage.removeItem('lastViewedGuideId');
+      }, 100);
+    } else {
+      // Normal scroll to top
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [location.pathname]);
+
+  // Also handle popstate (back/forward button)
+  useEffect(() => {
+    const handlePopState = () => {
+      setTimeout(() => {
+        // Check if we should scroll to a specific guide card
+        const shouldScrollToGuide = sessionStorage.getItem('scrollToGuide') === 'true';
+        const lastViewedGuideId = sessionStorage.getItem('lastViewedGuideId');
+        
+        if (shouldScrollToGuide && lastViewedGuideId && location.pathname === '/guide') {
+          // First scroll to top
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          
+          // Then scroll to the specific guide card
+          setTimeout(() => {
+            const guideCard = document.getElementById(`guide-card-${lastViewedGuideId}`);
+            if (guideCard) {
+              guideCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              // Highlight the card briefly
+              guideCard.style.transition = 'box-shadow 0.3s ease';
+              guideCard.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.5)';
+              setTimeout(() => {
+                guideCard.style.boxShadow = '';
+              }, 2000);
+            }
+            // Clear the flag
+            sessionStorage.removeItem('scrollToGuide');
+            sessionStorage.removeItem('lastViewedGuideId');
+          }, 100);
+        } else {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+      }, 0);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [location.pathname]);
 
   // Handle notification click
   const handleNotificationClick = async (notification) => {

@@ -276,6 +276,10 @@ const handleProfileClick = (guide) => {
   // Store the guide data in sessionStorage to pass to the profile page
   sessionStorage.setItem('currentGuideData', JSON.stringify(guide));
   
+  // Save the guide ID to sessionStorage so we can scroll to it when coming back
+  sessionStorage.setItem('lastViewedGuideId', guide.id);
+  sessionStorage.setItem('scrollToGuide', 'true');
+  
   // Navigate to guide profile - FIXED NAVIGATION
   navigate(`/guide-profile/${guide.id}`);
 };
@@ -287,6 +291,11 @@ const handleChatClick = (guide, e) => {
   
   // Store guide data and navigate with chat parameter
   sessionStorage.setItem('currentGuideData', JSON.stringify(guide));
+  
+  // Save the guide ID to sessionStorage so we can scroll to it when coming back
+  sessionStorage.setItem('lastViewedGuideId', guide.id);
+  sessionStorage.setItem('scrollToGuide', 'true');
+  
   navigate(`/guide-profile/${guide.id}?openChat=true`);
 };
 
@@ -643,7 +652,8 @@ const handleChatClick = (guide, e) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredGuides.slice(0, 12).map((guide, index) => (
               <div 
-                key={guide.id} 
+                key={guide.id}
+                id={`guide-card-${guide.id}`}
                 className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
                 onClick={() => handleProfileClick(guide)}
               >
