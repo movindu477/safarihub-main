@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Filter, 
   MapPin, 
@@ -28,6 +29,27 @@ import knuckfoBackground from "../../assets/knuckfo.jpg";
 import camera1Background from "../../assets/camera1.avif";
 
 export default function Destination2() {
+  const navigate = useNavigate();
+
+  // Destination ID mapping function
+  const getDestinationId = (name) => {
+    const idMap = {
+      'Yala National Park': 'yala-national-park',
+      'Wilpattu National Park': 'wilpattu-national-park',
+      'Mirissa Beach': 'mirissa-beach',
+      'Unawatuna Beach': 'unawatuna-beach',
+      'Horton Plains': 'horton-plains',
+      'Knuckles Mountain Range': 'knuckles-mountain-range',
+      'Lunugamvehera': 'lunugamvehera',
+      'Kumana Wildlife': 'kumana-wildlife',
+      'Sinharaja Forest Reserve': 'sinharaja-forest-reserve',
+      'Knuckles Forest Reserve': 'knuckles-forest-reserve',
+      'Camera Equipment': 'camera-equipment',
+      'Adventure Gear': 'adventure-gear'
+    };
+    return idMap[name] || name.toLowerCase().replace(/\s+/g, '-');
+  };
+
   const [filters, setFilters] = useState({
     location: "",
     safariType: "",
@@ -213,7 +235,10 @@ export default function Destination2() {
                 <p className="text-lg mb-6 opacity-90 max-w-md">
                   {item.description}
                 </p>
-                <button className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer">
+                <button 
+                  onClick={() => navigate(`/destination/${getDestinationId(item.name)}`)}
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
+                >
                   Explore All
                 </button>
               </div>

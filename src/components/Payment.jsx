@@ -27,7 +27,7 @@ import {
 import { getDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { createNotification, markNotificationAsRead } from '../App';
+import { createNotification, markNotificationAsRead, ScrollToTopButton } from '../App';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function Payment({ user: propUser, onLogout, onShowAuth }) {
@@ -362,7 +362,9 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <>
+      <ScrollToTopButton />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-5xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
@@ -591,7 +593,8 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

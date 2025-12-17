@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import { ScrollToTopButton } from '../../App';
 
 const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
@@ -78,6 +79,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
 
   return (
     <div className="min-h-screen bg-white">
+      <ScrollToTopButton />
       <Navbar 
         user={user} 
         onLogout={onLogout} 

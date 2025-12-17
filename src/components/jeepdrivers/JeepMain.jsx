@@ -23,6 +23,9 @@ import {
   getUserRole
 } from '../../firebase';
 
+// Import ScrollToTopButton from App.jsx
+import { ScrollToTopButton } from '../../App';
+
 // Chat Modal Component
 const ChatModal = ({ 
   isOpen, 
@@ -599,6 +602,8 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
+      
+      <ScrollToTopButton />
       
       <Navbar 
         user={user} 

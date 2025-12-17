@@ -60,7 +60,8 @@ import {
   getConversationById,
   getOtherParticipant,
   markNotificationAsRead,
-  GlobalNotificationBell
+  GlobalNotificationBell,
+  ScrollToTopButton
 } from "../../App";
 
 // Calendar Component for Date Selection
@@ -1116,6 +1117,8 @@ useEffect(() => {
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={onMarkAsRead}
       />
+      
+      <ScrollToTopButton />
       
       <div className="bg-white/80 backdrop-blur-md shadow-lg border-b border-emerald-100/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -11,8 +11,8 @@ import Footer from '../home/Footer'
 import { auth } from '../../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 
-// Import GlobalNotificationBell from App.jsx
-import { GlobalNotificationBell } from '../../App'
+// Import GlobalNotificationBell and ScrollToTopButton from App.jsx
+import { GlobalNotificationBell, ScrollToTopButton } from '../../App'
 
 function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) {
   // State Management
@@ -140,6 +140,8 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
+      
+      <ScrollToTopButton />
       
       {/* Main Content */}
       <main className="relative">

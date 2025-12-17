@@ -1,0 +1,449 @@
+// Centralized Destination Store
+// Single source of truth for all destination data
+
+// Import local images
+import yalaBackground from '../assets/yala.avif';
+import wilpattuBackground from '../assets/wilpattu.avif';
+import mirissaBackground from '../assets/mirissa.avif';
+import unaBackground from '../assets/una.avif';
+import hortBackground from '../assets/hort.avif';
+import knuckBackground from '../assets/knuck.avif';
+import kumanaBackground from '../assets/kumana.jpg';
+import lunuBackground from '../assets/lunu.jpg';
+import sinBackground from '../assets/sin.avif';
+import camera1Background from '../assets/camera1.avif';
+
+/**
+ * All destinations data
+ * Each destination must have:
+ * - id: unique identifier (used in URLs)
+ * - name: display name
+ * - coordinates: { lat, lng } for maps
+ * - location: human-readable location
+ */
+const destinations = {
+  'yala-national-park': {
+    id: 'yala-national-park',
+    name: 'Yala National Park',
+    description: 'Home to the highest density of leopards in the world. Experience thrilling jeep safaris and witness diverse wildlife in their natural habitat.',
+    fullDescription: `Yala National Park is one of Sri Lanka's premier wildlife destinations, spanning over 979 square kilometers. It's world-renowned for having the highest density of leopards globally, making it a hotspot for wildlife enthusiasts and photographers.
+
+The park features diverse ecosystems including dry monsoon forests, scrub jungles, freshwater lakes, and lagoons. With over 44 species of mammals and 215 species of birds, Yala offers an unparalleled safari experience.
+
+Best visited during the dry season (February to June), the park provides excellent opportunities to spot the elusive Sri Lankan leopard, elephants, sloth bears, spotted deer, wild boar, and numerous bird species including peacocks and painted storks.`,
+    location: 'Southern Province, Sri Lanka',
+    coordinates: { lat: 6.2853, lng: 81.3397 },
+    bestTimeToVisit: 'February to June (Dry Season)',
+    area: '979 km²',
+    established: '1938',
+    backgroundImage: yalaBackground,
+    images: [yalaBackground, yalaBackground, yalaBackground],
+    animals: [
+      {
+        name: 'Sri Lankan Leopard',
+        image: yalaBackground,
+        description: 'The apex predator of Yala and the park’s most iconic species.',
+        // Approximate count: around 25 individuals recorded in Block I (entire park may host more)
+        populationEstimate: 25,
+        abundance: 'High density; sightings are relatively frequent compared to most leopard habitats.'
+      },
+      {
+        name: 'Asian Elephant',
+        image: yalaBackground,
+        description: 'Family groups and lone bulls roam freely between scrub jungle and open grasslands.',
+        // Approximate estimate: 300–350 individuals; using 300 as a conservative display value
+        populationEstimate: 300,
+        abundance: 'Common, especially near waterholes and lakes during the dry season (estimated 300–350 elephants in the park).'
+      },
+      {
+        name: 'Sloth Bear',
+        image: yalaBackground,
+        description: 'A shaggy, nocturnal bear often seen foraging near termite mounds.',
+        abundance: 'Uncommon but regularly recorded on early morning and late afternoon safaris.'
+      },
+      {
+        name: 'Spotted Deer (Chital)',
+        image: yalaBackground,
+        description: 'Graceful deer that form large herds and are a primary prey species for leopards.',
+        abundance: 'Very common throughout open areas and forest edges.'
+      },
+      {
+        name: 'Water Buffalo',
+        image: yalaBackground,
+        description: 'Powerful wild buffalo frequently seen wallowing in villus and marshy areas.',
+        abundance: 'Common around wetlands and open water.'
+      },
+      {
+        name: 'Mugger Crocodile',
+        image: yalaBackground,
+        description: 'Large freshwater crocodile basking on riverbanks and lake shores.',
+        abundance: 'Common in freshwater lakes, rivers, and ponds.'
+      },
+      {
+        name: 'Saltwater Crocodile',
+        image: yalaBackground,
+        description: 'Massive crocodile inhabiting coastal lagoons and brackish water.',
+        abundance: 'Locally common in coastal and estuarine areas of the park.'
+      },
+      {
+        name: 'Indian Peafowl (Peacock)',
+        image: yalaBackground,
+        description: 'Sri Lanka’s national bird, famous for its dramatic courtship displays.',
+        abundance: 'Very common along roadsides, open scrub, and grasslands.'
+      }
+    ],
+    accommodations: [
+      {
+        name: 'Yala Safari Lodge',
+        distance: '2 km from entrance',
+        price: '$150-250/night',
+        rating: 4.8,
+        image: yalaBackground,
+        amenities: ['Luxury Tents', 'Safari Packages', 'Restaurant', 'Pool', 'WiFi'],
+        description: 'Premium safari lodge with exclusive access'
+      },
+      {
+        name: 'Yala Village Hotel',
+        distance: '5 km from entrance',
+        price: '$80-120/night',
+        rating: 4.4,
+        image: yalaBackground,
+        amenities: ['AC Rooms', 'Restaurant', 'Bar', 'Garden', 'Free WiFi'],
+        description: 'Comfortable mid-range hotel with great value'
+      }
+    ],
+    tips: [
+      'Book safari slots in advance, especially during peak season (February to June)',
+      'Early morning (6-10 AM) and late afternoon (3-7 PM) are the best times for wildlife spotting',
+      'Wear neutral colors (beige, khaki, olive) to blend with the environment',
+      'Bring binoculars and a good camera with zoom lens for photography',
+      'Carry sufficient water, sunscreen, and insect repellent'
+    ],
+    mapZoom: 12,
+    mapEmbedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14185.313161698377!2d81.46158493853646!3d6.463982517866302!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae5d3a62ffb9359%3A0x3bb623d70b5a3314!2sYala%20National%20Park!5e1!3m2!1sen!2slk!4v1765894171601!5m2!1sen!2slk'
+  },
+  'wilpattu-national-park': {
+    id: 'wilpattu-national-park',
+    name: 'Wilpattu National Park',
+    description: "Sri Lanka's largest national park known for its natural lakes and rich biodiversity.",
+    fullDescription: `Wilpattu National Park is Sri Lanka's largest and one of its oldest national parks, covering approximately 1,317 square kilometers. The name "Wilpattu" translates to "Land of Lakes," referring to the unique feature of about 50 natural lakes (villu) scattered throughout the park.
+
+This pristine wilderness is characterized by dense forests, open grasslands, and these remarkable villu that attract wildlife throughout the year. The park provides an authentic safari experience with fewer crowds compared to other popular parks.`,
+    location: 'North Western Province, Sri Lanka',
+    coordinates: { lat: 8.4500, lng: 80.0333 },
+    bestTimeToVisit: 'May to September (Dry Season)',
+    area: '1,317 km²',
+    established: '1905',
+    backgroundImage: wilpattuBackground,
+    images: [wilpattuBackground, wilpattuBackground, wilpattuBackground],
+    animals: [
+      { name: 'Sri Lankan Leopard', image: wilpattuBackground, description: 'Elusive big cats roaming the vast wilderness' },
+      { name: 'Sloth Bear', image: wilpattuBackground, description: 'Commonly seen foraging for termites' },
+      { name: 'Spotted Deer', image: wilpattuBackground, description: 'Large herds near water sources' },
+      { name: 'Water Buffalo', image: wilpattuBackground, description: 'Wild buffalo herds in wetland areas' }
+    ],
+    accommodations: [
+      {
+        name: 'Wilpattu Safari Camp',
+        distance: '2.5 km from entrance',
+        price: '$120-200/night',
+        rating: 4.7,
+        image: wilpattuBackground,
+        amenities: ['Tented Camp', 'Safari Guides', 'Meals', 'Campfire'],
+        description: 'Authentic camping experience near the park'
+      }
+    ],
+    tips: [
+      'Best visited during dry season (May-September) when animals gather at water sources',
+      'The park is less crowded than Yala, offering a more intimate experience',
+      'Bring insect repellent - mosquitoes can be abundant near lakes'
+    ],
+    mapZoom: 11
+  },
+  'mirissa-beach': {
+    id: 'mirissa-beach',
+    name: 'Mirissa Beach',
+    description: 'Famous for its golden sands, whale watching opportunities, and vibrant nightlife.',
+    fullDescription: `Mirissa is a small town on the south coast of Sri Lanka, located in the Matara District. It's one of the country's most popular beach destinations, known for its stunning golden sands, turquoise waters, and laid-back atmosphere.
+
+The beach is famous for being one of the best whale watching destinations in the world, with opportunities to see blue whales, sperm whales, and dolphins between November and April.`,
+    location: 'Southern Province, Sri Lanka',
+    coordinates: { lat: 5.9493, lng: 80.4552 },
+    bestTimeToVisit: 'November to April',
+    area: 'Coastal Area',
+    established: 'Tourist Destination',
+    backgroundImage: mirissaBackground,
+    images: [mirissaBackground, mirissaBackground, mirissaBackground],
+    animals: [
+      { name: 'Blue Whale', image: mirissaBackground, description: 'World\'s largest mammal, seen on whale watching tours' },
+      { name: 'Dolphins', image: mirissaBackground, description: 'Spinner and bottlenose dolphins in large pods' },
+      { name: 'Sea Turtles', image: mirissaBackground, description: 'Multiple species nesting on nearby beaches' }
+    ],
+    accommodations: [
+      {
+        name: 'Paradise Beach Club',
+        distance: 'Beachfront',
+        price: '$80-150/night',
+        rating: 4.6,
+        image: mirissaBackground,
+        amenities: ['Beach Access', 'Pool', 'Restaurant', 'Bar', 'WiFi'],
+        description: 'Beachfront resort with stunning ocean views'
+      }
+    ],
+    tips: [
+      'Best whale watching season is November to April',
+      'Book whale watching tours early morning (6-7 AM) for better sightings',
+      'Wear reef-safe sunscreen to protect marine life'
+    ],
+    mapZoom: 14
+  },
+  'unawatuna-beach': {
+    id: 'unawatuna-beach',
+    name: 'Unawatuna Beach',
+    description: 'A beautiful crescent-shaped bay with calm turquoise waters.',
+    fullDescription: 'A beautiful crescent-shaped bay with calm turquoise waters. Ideal for snorkeling, diving, and enjoying spectacular sunsets in a tropical paradise.',
+    location: 'Southern Province, Sri Lanka',
+    coordinates: { lat: 5.9939, lng: 80.2397 },
+    bestTimeToVisit: 'Year Round',
+    area: 'Coastal Area',
+    established: 'Tourist Destination',
+    backgroundImage: unaBackground,
+    images: [unaBackground, unaBackground, unaBackground],
+    animals: [
+      { name: 'Tropical Fish', image: unaBackground, description: 'Colorful reef fish for snorkeling' },
+      { name: 'Sea Turtles', image: unaBackground, description: 'Sea turtles in the coral reef' }
+    ],
+    accommodations: [
+      {
+        name: 'Unawatuna Beach Resort',
+        distance: 'Beachfront',
+        price: '$60-100/night',
+        rating: 4.5,
+        image: unaBackground,
+        amenities: ['Beach Access', 'Restaurant', 'WiFi'],
+        description: 'Beachfront accommodation'
+      }
+    ],
+    tips: ['Perfect for snorkeling and diving', 'Great sunset views'],
+    mapZoom: 15
+  },
+  'horton-plains': {
+    id: 'horton-plains',
+    name: 'Horton Plains',
+    description: 'A beautiful highland plateau offering breathtaking views and unique camping experiences.',
+    fullDescription: 'A beautiful highland plateau offering breathtaking views and unique camping experiences. Perfect for hiking and witnessing World\'s End viewpoint.',
+    location: 'Central Province, Sri Lanka',
+    coordinates: { lat: 6.8022, lng: 80.8081 },
+    bestTimeToVisit: 'December to March',
+    area: '31.6 km²',
+    established: '1969',
+    backgroundImage: hortBackground,
+    images: [hortBackground, hortBackground, hortBackground],
+    animals: [
+      { name: 'Sambar Deer', image: hortBackground, description: 'Largest deer species in Sri Lanka' },
+      { name: 'Highland Birds', image: hortBackground, description: 'Various endemic bird species' }
+    ],
+    accommodations: [
+      {
+        name: 'Horton Plains Guest House',
+        distance: 'Near entrance',
+        price: '$40-80/night',
+        rating: 4.3,
+        image: hortBackground,
+        amenities: ['Basic Rooms', 'Restaurant'],
+        description: 'Simple accommodation near the plains'
+      }
+    ],
+    tips: ['Start early for World\'s End before clouds set in', 'Wear warm clothing', 'Bring water for hiking'],
+    mapZoom: 13
+  },
+  'knuckles-mountain-range': {
+    id: 'knuckles-mountain-range',
+    name: 'Knuckles Mountain Range',
+    description: 'A UNESCO World Heritage site with diverse ecosystems.',
+    fullDescription: 'A UNESCO World Heritage site with diverse ecosystems. Ideal for adventure camping, trekking, and exploring pristine mountain landscapes.',
+    location: 'Central Province, Sri Lanka',
+    coordinates: { lat: 7.3833, lng: 80.7667 },
+    bestTimeToVisit: 'December to April',
+    area: '234 km²',
+    established: 'UNESCO World Heritage',
+    backgroundImage: knuckBackground,
+    images: [knuckBackground, knuckBackground, knuckBackground],
+    animals: [
+      { name: 'Endemic Birds', image: knuckBackground, description: 'Many endemic bird species' },
+      { name: 'Mountain Wildlife', image: knuckBackground, description: 'Diverse mountain ecosystem' }
+    ],
+    accommodations: [
+      {
+        name: 'Knuckles Mountain Lodge',
+        distance: 'Base of range',
+        price: '$50-90/night',
+        rating: 4.4,
+        image: knuckBackground,
+        amenities: ['Mountain Views', 'Guided Tours'],
+        description: 'Lodge at the base of the range'
+      }
+    ],
+    tips: ['Requires good fitness for trekking', 'Hire a local guide', 'Check weather conditions'    ],
+    mapZoom: 12
+  },
+  'lunugamvehera': {
+    id: 'lunugamvehera',
+    name: 'Lunugamvehera',
+    description: 'An important elephant corridor connecting Yala and Uda Walawe national parks.',
+    fullDescription: 'An important elephant corridor connecting Yala and Uda Walawe national parks. Home to elephants, deer, and various bird species in a dry zone habitat.',
+    location: 'Southern Province, Sri Lanka',
+    coordinates: { lat: 6.3167, lng: 81.3167 },
+    bestTimeToVisit: 'Year Round',
+    area: '235 km²',
+    established: '1995',
+    backgroundImage: lunuBackground,
+    images: [lunuBackground, lunuBackground, lunuBackground],
+    animals: [
+      { name: 'Asian Elephant', image: lunuBackground, description: 'Large herds crossing the corridor' },
+      { name: 'Spotted Deer', image: lunuBackground, description: 'Common throughout the sanctuary' }
+    ],
+    accommodations: [
+      {
+        name: 'Lunugamvehera Lodge',
+        distance: 'Near entrance',
+        price: '$50-90/night',
+        rating: 4.2,
+        image: lunuBackground,
+        amenities: ['Basic Rooms', 'Restaurant'],
+        description: 'Simple accommodation near the sanctuary'
+      }
+    ],
+    tips: ['Great for elephant watching', 'Best visited early morning'],
+    mapZoom: 13
+  },
+  'kumana-wildlife': {
+    id: 'kumana-wildlife',
+    name: 'Kumana Wildlife',
+    description: 'Famous for its bird sanctuary and mangrove swamps.',
+    fullDescription: 'Famous for its bird sanctuary and mangrove swamps. A paradise for birdwatchers with over 200 species including migratory birds during nesting season.',
+    location: 'Eastern Province, Sri Lanka',
+    coordinates: { lat: 6.5167, lng: 81.6500 },
+    bestTimeToVisit: 'May to July',
+    area: '357 km²',
+    established: '1970',
+    backgroundImage: kumanaBackground,
+    images: [kumanaBackground, kumanaBackground, kumanaBackground],
+    animals: [
+      { name: 'Migratory Birds', image: kumanaBackground, description: 'Over 200 bird species' },
+      { name: 'Water Birds', image: kumanaBackground, description: 'Various waterfowl and waders' }
+    ],
+    accommodations: [
+      {
+        name: 'Kumana Bird Lodge',
+        distance: 'Near entrance',
+        price: '$60-100/night',
+        rating: 4.3,
+        image: kumanaBackground,
+        amenities: ['Bird Watching Tours', 'Basic Rooms'],
+        description: 'Lodge focused on bird watching'
+      }
+    ],
+    tips: ['Bring binoculars for bird watching', 'Visit during nesting season'],
+    mapZoom: 13
+  },
+  'sinharaja-forest-reserve': {
+    id: 'sinharaja-forest-reserve',
+    name: 'Sinharaja Forest Reserve',
+    description: 'A UNESCO World Heritage site and biodiversity hotspot.',
+    fullDescription: 'A UNESCO World Heritage site and biodiversity hotspot. Home to numerous endemic species, rare birds, and lush tropical rainforest vegetation.',
+    location: 'Sabaragamuwa & Southern Provinces, Sri Lanka',
+    coordinates: { lat: 6.4167, lng: 80.5000 },
+    bestTimeToVisit: 'December to April',
+    area: '111.87 km²',
+    established: '1988 (UNESCO)',
+    backgroundImage: sinBackground,
+    images: [sinBackground, sinBackground, sinBackground],
+    animals: [
+      { name: 'Endemic Birds', image: sinBackground, description: 'Many rare endemic bird species' },
+      { name: 'Forest Wildlife', image: sinBackground, description: 'Diverse rainforest ecosystem' }
+    ],
+    accommodations: [
+      {
+        name: 'Sinharaja Rainforest Lodge',
+        distance: 'Edge of forest',
+        price: '$70-120/night',
+        rating: 4.5,
+        image: sinBackground,
+        amenities: ['Guided Tours', 'Eco Lodge'],
+        description: 'Eco-friendly lodge near the forest'
+      }
+    ],
+    tips: ['Requires guide for entry', 'Wear appropriate footwear', 'Be prepared for rain'],
+    mapZoom: 12
+  },
+  'knuckles-forest-reserve': {
+    id: 'knuckles-forest-reserve',
+    name: 'Knuckles Forest Reserve',
+    description: 'Part of the Knuckles Mountain Range with montane forests.',
+    fullDescription: 'Part of the Knuckles Mountain Range with montane forests, waterfalls, and diverse flora and fauna. Perfect for eco-tourism and nature photography.',
+    location: 'Central Province, Sri Lanka',
+    coordinates: { lat: 7.3833, lng: 80.7667 },
+    bestTimeToVisit: 'December to April',
+    area: '234 km²',
+    established: 'UNESCO World Heritage',
+    backgroundImage: knuckBackground,
+    images: [knuckBackground, knuckBackground, knuckBackground],
+    animals: [
+      { name: 'Mountain Birds', image: knuckBackground, description: 'Highland bird species' },
+      { name: 'Forest Wildlife', image: knuckBackground, description: 'Diverse mountain ecosystem' }
+    ],
+    accommodations: [
+      {
+        name: 'Knuckles Mountain Lodge',
+        distance: 'Base of range',
+        price: '$50-90/night',
+        rating: 4.4,
+        image: knuckBackground,
+        amenities: ['Mountain Views', 'Guided Tours'],
+        description: 'Lodge at the base of the range'
+      }
+    ],
+    tips: ['Requires good fitness for trekking', 'Hire a local guide', 'Check weather conditions'],
+    mapZoom: 12
+  }
+};
+
+/**
+ * Map destination IDs to their names as stored in Firestore
+ * Used for querying service providers by destination
+ */
+export const destinationNameMap = {
+  'yala-national-park': 'Yala National Park',
+  'wilpattu-national-park': 'Wilpattu National Park',
+  'mirissa-beach': 'Mirissa Beach',
+  'unawatuna-beach': 'Unawatuna Beach',
+  'horton-plains': 'Horton Plains',
+  'knuckles-mountain-range': 'Knuckles Mountain Range',
+  'lunugamvehera': 'Lunugamvehera',
+  'kumana-wildlife': 'Kumana Wildlife',
+  // Use the same naming as provider registration / filters
+  'sinharaja-forest-reserve': 'Sinharaja Forest',
+  'knuckles-forest-reserve': 'Knuckles Forest Reserve'
+};
+
+/**
+ * Get destination by ID
+ * @param {string} destinationId - The destination ID
+ * @returns {object|null} - Destination data or null if not found
+ */
+export const getDestinationById = (destinationId) => {
+  return destinations[destinationId] || null;
+};
+
+/**
+ * Get all destinations
+ * @returns {object} - All destinations
+ */
+export const getAllDestinations = () => {
+  return destinations;
+};
+
+// Export default destinations object
+export default destinations;
+

@@ -38,6 +38,9 @@ import {
   markNotificationAsRead
 } from '../../firebase';
 
+// Import ScrollToTopButton from App.jsx
+import { ScrollToTopButton } from '../../App';
+
 // Chat Modal Component
 const ChatModal = ({ 
   isOpen, 
@@ -608,6 +611,8 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
+      
+      <ScrollToTopButton />
       
       <Navbar 
         user={user} 

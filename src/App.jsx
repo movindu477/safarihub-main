@@ -32,7 +32,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, Bell, X, Send, Check, CheckCheck, MessageCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, Bell, X, Send, Check, CheckCheck, MessageCircle, ArrowUp } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
@@ -51,6 +51,7 @@ import NotificationPanel from "./components/NotificationPanel";
 
 // Import Destination App
 import DestinationApp from "./components/destination/App";
+import DestinationDetails from "./components/destination/DestinationDetails";
 
 // Import Guide App
 import GuideApp from "./components/guides/App";
@@ -635,6 +636,51 @@ const ChatModal = ({
   );
 };
 
+// Global Scroll to Top Button Component (Available on all pages)
+export const ScrollToTopButton = () => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const toggleVisibility = () => {
+      // Show button when page is scrolled down 300px
+      if (window.pageYOffset > 300) {
+        setIsVisible(true);
+      } else {
+        setIsVisible(false);
+      }
+    };
+
+    window.addEventListener('scroll', toggleVisibility);
+
+    return () => {
+      window.removeEventListener('scroll', toggleVisibility);
+    };
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
+
+  return (
+    <div 
+      className={`fixed bottom-6 left-6 z-50 transition-all duration-300 ${
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
+      }`}
+    >
+      <button
+        onClick={scrollToTop}
+        className="bg-green-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-600 cursor-pointer"
+        aria-label="Scroll to top"
+      >
+        <ArrowUp className="h-6 w-6 text-white" />
+      </button>
+    </div>
+  );
+};
+
 // Global Notification Bell Component (Available on all pages)
 export const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -772,6 +818,8 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={onMarkAsRead}
       />
+      
+      <ScrollToTopButton />
       
       <Navbar 
         user={user} 
@@ -1008,7 +1056,20 @@ function App() {
             />
           } 
         />
-        {/* Destination Route */}
+        {/* Destination Routes - Specific routes first */}
+        <Route 
+          path="/destination/:destinationId" 
+          element={
+            <DestinationDetails 
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          } 
+        />
         <Route 
           path="/destination" 
           element={
