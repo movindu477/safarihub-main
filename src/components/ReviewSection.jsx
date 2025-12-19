@@ -54,7 +54,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
       if (currentUser) {
         try {
           console.log('🔍 Loading user review for:', currentUser.uid);
-          const userRev = await getUserReviewForProvider(providerId, currentUser.uid);
+          const userRev = await getUserReviewForProvider(providerId, currentUser.uid, providerType);
           console.log('📋 User review found:', userRev ? 'Yes' : 'No');
           setUserReview(userRev);
           
@@ -72,7 +72,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
     const loadReviewStats = async () => {
       try {
         console.log('📈 Loading review stats for', providerType, ':', providerId);
-        const stats = await getProviderReviewStats(providerId);
+        const stats = await getProviderReviewStats(providerId, providerType);
         setReviewStats(stats);
         console.log('✅ Review stats loaded:', stats);
       } catch (err) {
@@ -106,13 +106,13 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
 
       // Update review stats based on actual server data
       calculateReviewStats(reviewsData);
-    });
+    }, providerType);
 
     return () => {
       console.log('🔕 Cleaning up review section');
       unsubscribe();
     };
-  }, [providerId, currentUser]);
+  }, [providerId, providerType, currentUser]);
 
   // Calculate review statistics from current reviews
   const calculateReviewStats = (reviewsData) => {
@@ -413,12 +413,12 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
     <div className="space-y-6">
       {/* Success Message */}
       {success && (
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 shadow-lg animate-pulse">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center">
-            <CheckCircle className="h-6 w-6 text-green-500 mr-3" />
+            <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
             <div>
-              <p className="text-green-800 font-bold text-base">{success}</p>
-              <p className="text-green-600 text-sm mt-1">Your review is now visible to all users!</p>
+              <p className="text-green-800 font-semibold text-sm">{success}</p>
+              <p className="text-green-700 text-xs mt-1">Your review is now visible to all users.</p>
             </div>
           </div>
         </div>
@@ -689,14 +689,10 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
                 <div 
                   key={review.id}
                   id={`review-${review.id}`}
-                  className={`bg-white rounded-lg border-2 p-6 transition-all duration-300 ${
+                  className={`bg-white rounded-lg border p-6 ${
                     currentUser?.uid === review.userId 
-                      ? 'border-emerald-300 bg-emerald-50/30 shadow-md' 
+                      ? 'border-emerald-300 bg-emerald-50/40' 
                       : 'border-gray-200'
-                  } ${
-                    index === 0 && currentUser?.uid === review.userId
-                      ? 'animate-pulse border-emerald-400'
-                      : ''
                   }`}
                 >
                   <div className="flex items-start justify-between mb-4">

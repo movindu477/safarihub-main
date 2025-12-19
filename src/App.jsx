@@ -38,6 +38,7 @@ import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLef
 import logo from "./assets/logo.png";
 
 // Import components
+import SplashScreen from "./components/SplashScreen";
 import Navbar from "./components/home/Navbar";
 import Section1 from "./components/home/Section1";
 import Section2 from "./components/home/Section2";
@@ -848,6 +849,12 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Handle splash screen completion
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+  };
 
   // Auth state listener
   useEffect(() => {
@@ -970,6 +977,11 @@ function App() {
     await markNotificationAsRead(notificationId);
   };
 
+  // Show splash screen on first load
+  if (showSplash) {
+    return <SplashScreen onLoadingComplete={handleSplashComplete} />;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -1044,9 +1056,9 @@ function App() {
           } 
         />
         <Route 
-          path="/jeepprofile" 
+          path="/jeep" 
           element={
-            <JeepProfile 
+            <JeepDriversPage 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1055,6 +1067,19 @@ function App() {
               onMarkAsRead={handleMarkAsRead}
             />
           } 
+        />
+        <Route
+          path="/jeep-profile/:jeepId"
+          element={
+            <JeepProfile
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          }
         />
         {/* Destination Routes - Specific routes first */}
         <Route 

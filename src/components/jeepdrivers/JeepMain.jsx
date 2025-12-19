@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { Bell, MessageCircle, X, Send, Check, CheckCheck, User } from "lucide-react";
+import { MessageCircle, X, Send, Check, CheckCheck, User } from "lucide-react";
 import Navbar from "../home/Navbar";
 import JeepHero from "./JeepHero";
 import JeepSection2 from "./JeepSection2";
@@ -23,8 +23,8 @@ import {
   getUserRole
 } from '../../firebase';
 
-// Import ScrollToTopButton from App.jsx
-import { ScrollToTopButton } from '../../App';
+// Import shared notification bell + scroll-to-top from App.jsx
+import { GlobalNotificationBell, ScrollToTopButton } from '../../App';
 
 // Chat Modal Component
 const ChatModal = ({ 
@@ -226,172 +226,6 @@ const ChatModal = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-};
-
-// Global Notification Bell for Bottom Right Corner
-const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showNotifications && !event.target.closest('.notification-container')) {
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showNotifications]);
-
-  const handleBellClick = () => {
-    setShowNotifications(!showNotifications);
-  };
-
-  const handleNotificationItemClick = async (notification) => {
-    // Mark as read when clicked
-    if (!notification.read && onMarkAsRead) {
-      await onMarkAsRead(notification.id);
-    }
-    
-    onNotificationClick(notification);
-    setShowNotifications(false);
-  };
-
-  const handleMarkAllAsRead = async () => {
-    const unreadNotifications = notifications.filter(n => !n.read);
-    for (const notification of unreadNotifications) {
-      await onMarkAsRead(notification.id);
-    }
-  };
-
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      const now = new Date();
-      const diffInHours = (now - date) / (1000 * 60 * 60);
-      
-      if (diffInHours < 1) {
-        const minutes = Math.floor(diffInHours * 60);
-        return minutes < 1 ? 'Just now' : `${minutes}m ago`;
-      } else if (diffInHours < 24) {
-        return `${Math.floor(diffInHours)}h ago`;
-      } else {
-        return date.toLocaleDateString();
-      }
-    } catch (error) {
-      return 'Recently';
-    }
-  };
-
-  if (!user) return null;
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 notification-container">
-      <div className="relative">
-        {/* Notification Panel - Positioned ABOVE the button */}
-        {showNotifications && (
-          <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-h-96 overflow-y-auto">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">Notifications</h3>
-                </div>
-                <div className="flex justify-between items-center mt-1">
-                  <p className="text-yellow-100 text-sm">
-                    {notifications.filter(n => !n.read).length} unread
-                  </p>
-                  {notifications.filter(n => !n.read).length > 0 && (
-                    <button
-                      onClick={handleMarkAllAsRead}
-                      className="text-yellow-200 hover:text-white text-xs underline"
-                    >
-                      Mark all read
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Notifications List */}
-              <div className="max-h-80 overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p>No notifications yet</p>
-                    <p className="text-sm mt-1">Notifications will appear here</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        onClick={() => handleNotificationItemClick(notification)}
-                        className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${
-                          notification.read ? 'bg-white' : 'bg-blue-50'
-                        }`}
-                      >
-                        <div className="flex items-start space-x-3">
-                          <div className="flex-shrink-0">
-                            <MessageCircle className="h-4 w-4 text-blue-500" />
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className={`font-medium text-sm ${
-                                notification.read ? 'text-gray-600' : 'text-gray-900'
-                              }`}>
-                                {notification.senderName || 'User'}
-                              </p>
-                              <div className="flex items-center space-x-1 text-xs text-gray-500">
-                                <span>{formatTime(notification.timestamp)}</span>
-                              </div>
-                            </div>
-                            
-                            <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                              {notification.message || 'New notification'}
-                            </p>
-                            
-                            <div className="flex items-center justify-between">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                <MessageCircle className="h-3 w-3 mr-1" />
-                                <span className="capitalize">
-                                  {notification.type || 'message'}
-                                </span>
-                              </span>
-                              
-                              {!notification.read && (
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Notification Bell Button */}
-        <button
-          onClick={handleBellClick}
-          className="relative bg-green-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-600"
-        >
-          <Bell className="h-6 w-6 text-white" />
-          {notifications.filter(n => !n.read).length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-              {notifications.filter(n => !n.read).length}
-            </span>
-          )}
-        </button>
       </div>
     </div>
   );

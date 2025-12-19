@@ -422,8 +422,7 @@ export const destinationNameMap = {
   'knuckles-mountain-range': 'Knuckles Mountain Range',
   'lunugamvehera': 'Lunugamvehera',
   'kumana-wildlife': 'Kumana Wildlife',
-  // Use the same naming as provider registration / filters
-  'sinharaja-forest-reserve': 'Sinharaja Forest',
+  'sinharaja-forest-reserve': 'Sinharaja Forest Reserve',
   'knuckles-forest-reserve': 'Knuckles Forest Reserve'
 };
 

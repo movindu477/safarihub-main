@@ -61,8 +61,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
       console.log('✅ Payment successful, redirecting to home page in 2 seconds...');
       const redirectTimer = setTimeout(() => {
         console.log('🔄 Redirecting to home page now...');
-        // Use window.location.href for reliable redirect (works in all environments including Vercel)
-        // Use replace to prevent back button from going back to payment page
+
         window.location.replace('/');
       }, 2000);
       

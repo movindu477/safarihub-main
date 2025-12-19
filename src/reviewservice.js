@@ -231,10 +231,10 @@ export const getProviderReviews = (providerId, callback, providerType = 'driver'
   console.log(`🔍 Setting up reviews listener for ${providerType}:`, providerId);
 
   const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
+  // Keep Firestore query simple (no composite index needed) and sort on the client
   const reviewsQuery = query(
     collection(db, 'reviews'),
-    where(fieldName, '==', providerId),
-    orderBy('timestamp', 'desc')
+    where(fieldName, '==', providerId)
   );
 
   const unsubscribe = onSnapshot(reviewsQuery, 
@@ -265,6 +265,13 @@ export const getProviderReviews = (providerId, callback, providerType = 'driver'
           userPhoto: data.userPhoto || '',
           userEmail: data.userEmail || ''
         };
+      });
+
+      // Sort newest first by timestamp (client-side)
+      reviews.sort((a, b) => {
+        const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return tb - ta;
       });
       console.log(`📊 Processed ${reviews.length} reviews for ${providerType} ${providerId}`);
       callback(reviews);

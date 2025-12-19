@@ -895,11 +895,23 @@ useEffect(() => {
   const handleSendMessage = async (e) => {
     e.preventDefault();
     
-    if (!message.trim() || !currentUser || !guideId || !conversationId || sending) return;
+    if (!message.trim() || !currentUser || !guideId || sending) return;
 
     setSending(true);
     
     try {
+      // Ensure we have a conversation ID (create if missing)
+      let convId = conversationId;
+      if (!convId) {
+        convId = await createOrGetConversation(
+          currentUser.uid,
+          guideId,
+          currentUser.displayName || 'User',
+          guide?.guideName || guide?.fullName || 'Tour Guide'
+        );
+        setConversationId(convId);
+      }
+
       const messageData = {
         content: message.trim(),
         senderId: currentUser.uid,
@@ -908,7 +920,7 @@ useEffect(() => {
         timestamp: new Date()
       };
 
-      await sendMessage(conversationId, messageData);
+      await sendMessage(convId, messageData);
 
       await createNotification({
         type: 'message',
@@ -917,8 +929,8 @@ useEffect(() => {
         recipientId: guideId,
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
-        relatedId: conversationId,
-        conversationId: conversationId
+        relatedId: convId,
+        conversationId: convId
       });
 
       setMessage("");
@@ -996,7 +1008,7 @@ useEffect(() => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading guide profile...</p>
@@ -1024,25 +1036,20 @@ useEffect(() => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-gray-50">
-      {/* Success Message Animation */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Booking Success Message */}
       {showSuccessMessage && successMessageData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all animate-slideUp">
-            <div className="text-center">
-              {/* Success Icon Animation */}
-              <div className="mb-4 flex justify-center">
-                <div className="relative">
-                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center animate-scaleIn">
-                    <CheckCircle className="w-12 h-12 text-green-600" />
-                  </div>
-                  <div className="absolute inset-0 bg-green-200 rounded-full animate-ping opacity-75"></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-10 h-10 text-green-600" />
                 </div>
               </div>
               
-              {/* Success Message */}
-              <h2 className="text-2xl font-bold text-gray-900 mb-2 animate-fadeIn">
-                Booking Confirmed! 🎉
+              <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                Booking Confirmed
               </h2>
               <p className="text-gray-600 mb-2">
                 Your booking request has been successfully sent to the guide.
@@ -1075,11 +1082,6 @@ useEffect(() => {
                   <span className="text-emerald-600 font-bold text-lg">LKR {successMessageData.totalPrice.toLocaleString()}</span>
                 </div>
               </div>
-              
-              {/* Info Message */}
-              <p className="text-sm text-gray-500 mb-4">
-                The guide will receive a notification and can accept or decline your booking.
-              </p>
               
               {/* Close Button */}
               <button
@@ -1120,7 +1122,7 @@ useEffect(() => {
       
       <ScrollToTopButton />
       
-      <div className="bg-white/80 backdrop-blur-md shadow-lg border-b border-emerald-100/50">
+      <div className="bg-white shadow-sm border-b border-emerald-100/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center">
@@ -1131,7 +1133,7 @@ useEffect(() => {
                 <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" />
                 Back to Guides
               </button>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-700 to-emerald-900 bg-clip-text text-transparent">Tour Guide Profile</h1>
+              <h1 className="text-3xl font-bold text-emerald-800">Tour Guide Profile</h1>
             </div>
           </div>
         </div>
@@ -1141,17 +1143,14 @@ useEffect(() => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-emerald-100/50 p-8 sticky top-8 transition-all duration-300 hover:shadow-emerald-200/20">
+            <div className="bg-white rounded-2xl shadow-lg border border-emerald-100 p-8 sticky top-8">
               {/* Profile Header */}
               <div className="text-center mb-8">
-                <div className="relative inline-block">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full blur-xl opacity-30"></div>
-                  <img
-                    src={guide.imageUrl || "/api/placeholder/120/120"}
-                    alt={guide.guideName}
-                    className="relative w-36 h-36 rounded-full object-cover border-4 border-emerald-500 mx-auto mb-5 shadow-2xl shadow-emerald-500/30 ring-4 ring-emerald-100"
-                  />
-                </div>
+                <img
+                  src={guide.imageUrl || "/api/placeholder/120/120"}
+                  alt={guide.guideName}
+                  className="w-32 h-32 rounded-full object-cover border-4 border-emerald-500 mx-auto mb-5 shadow-md"
+                />
                 <h2 className="text-2xl font-bold text-gray-900 mb-1">{guide.guideName}</h2>
                 <p className="text-emerald-600 font-medium mb-4">Professional Tour Guide</p>
                 

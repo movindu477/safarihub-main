@@ -21,30 +21,21 @@ import {
   Thermometer,
   Lightbulb,
   AlertCircle,
-  Calendar
+  Calendar,
+  TruckIcon,
+  UserCircle
 } from 'lucide-react';
-import { collection, query, where, limit, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase';
 import Navbar from '../home/Navbar';
 import Footer from '../home/Footer';
 import { GlobalNotificationBell, ScrollToTopButton } from '../../App';
+import { getFirestore, collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 // ✅ Centralized imports - single source of truth
 import { destinationNameMap, getDestinationById } from '../../data/destinations';
+import { getWeatherByCoordinates } from '../../data/weatherService';
 
-// Map each destination ID to a guide expertise category from registration form
-const guideExpertiseByDestinationId = {
-  'yala-national-park': 'National Parks',
-  'wilpattu-national-park': 'National Parks',
-  'horton-plains': 'Camping Sites',
-  'knuckles-mountain-range': 'Mountain Regions',
-  'knuckles-forest-reserve': 'Mountain Regions',
-  'lunugamvehera': 'National Parks',
-  'kumana-wildlife': 'Wildlife Sanctuaries',
-  'sinharaja-forest-reserve': 'Forest Reserves',
-  'mirissa-beach': 'Beaches & Coastal Areas',
-  'unawatuna-beach': 'Beaches & Coastal Areas'
-};
+// Initialize Firestore
+const db = getFirestore();
 
 // Simple animated counter for population numbers
 function AnimatedCounter({ value, duration = 1500 }) {
@@ -78,6 +69,40 @@ function AnimatedCounter({ value, duration = 1500 }) {
   return <span>{displayValue.toLocaleString()}</span>;
 }
 
+// Helper function to get weather icon based on weather condition
+const getWeatherIcon = (weatherMain, size = 16) => {
+  const iconProps = { className: `h-${size} w-${size}` };
+  
+  switch (weatherMain?.toLowerCase()) {
+    case 'clear':
+      return <Sun {...iconProps} className={`h-${size} w-${size} text-amber-500`} />;
+    case 'clouds':
+      return <Cloud {...iconProps} className={`h-${size} w-${size} text-gray-500`} />;
+    case 'rain':
+    case 'drizzle':
+      return <CloudRain {...iconProps} className={`h-${size} w-${size} text-blue-500`} />;
+    case 'thunderstorm':
+      return <CloudRain {...iconProps} className={`h-${size} w-${size} text-purple-500`} />;
+    case 'snow':
+      return <Cloud {...iconProps} className={`h-${size} w-${size} text-blue-300`} />;
+    case 'mist':
+    case 'fog':
+    case 'haze':
+      return <Cloud {...iconProps} className={`h-${size} w-${size} text-gray-400`} />;
+    default:
+      return <Sun {...iconProps} className={`h-${size} w-${size} text-amber-500`} />;
+  }
+};
+
+// Helper function to format date
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
+};
+
 export default function DestinationDetails({ user, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) {
   const { destinationId } = useParams();
   const navigate = useNavigate();
@@ -87,8 +112,13 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
   const [mapZoom, setMapZoom] = useState(12);
   const [jeepDrivers, setJeepDrivers] = useState([]);
   const [tourGuides, setTourGuides] = useState([]);
-  const [providersLoading, setProvidersLoading] = useState(false);
-  const [providersError, setProvidersError] = useState(null);
+  const [loadingProviders, setLoadingProviders] = useState(true);
+  
+  // Weather state
+  const [weather, setWeather] = useState(null);
+  const [forecast, setForecast] = useState(null);
+  const [loadingWeather, setLoadingWeather] = useState(true);
+  const [weatherError, setWeatherError] = useState(null);
   
   // Early return if no destinationId (AFTER all hooks)
   if (!destinationId) {
@@ -109,8 +139,6 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
 
   // ✅ Get destination from centralized store
   const destination = getDestinationById(destinationId);
-  const firestoreDestinationName = destinationNameMap[destinationId] || destination?.name || '';
-  const guideExpertise = guideExpertiseByDestinationId[destinationId] || '';
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -119,142 +147,81 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
     }
   }, [destinationId, destination]);
 
-  // Load related jeep drivers & guides for this destination
+  // Fetch jeep drivers and tour guides for this destination
   useEffect(() => {
-    if (!destinationId || !firestoreDestinationName) return;
+    const fetchServiceProviders = async () => {
+      if (!destination) return;
 
-    let isCancelled = false;
-
-    const loadProviders = async () => {
+      setLoadingProviders(true);
       try {
-        setProvidersLoading(true);
-        setProvidersError(null);
+        const destinationName = destination.name;
+        const providersRef = collection(db, 'serviceProviders');
 
-        const serviceProvidersRef = collection(db, 'serviceProviders');
+        // Fetch Jeep Drivers
+        const jeepDriversQuery = query(
+          providersRef,
+          where('serviceType', '==', 'Jeep Driver'),
+          where('destinations', 'array-contains', destinationName),
+          limit(6)
+        );
+        const jeepDriversSnapshot = await getDocs(jeepDriversQuery);
+        const jeepDriversData = jeepDriversSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setJeepDrivers(jeepDriversData);
 
-        const [jeepSnapshot, guideSnapshot] = await Promise.all([
-          getDocs(
-            query(
-              serviceProvidersRef,
-              where('serviceType', '==', 'Jeep Driver'),
-              limit(50)
-            )
-          ),
-          getDocs(
-            query(
-              serviceProvidersRef,
-              where('serviceType', '==', 'Tour Guide'),
-              limit(50)
-            )
-          )
-        ]);
+        // Fetch Tour Guides
+        const tourGuidesQuery = query(
+          providersRef,
+          where('serviceType', '==', 'Tour Guide'),
+          where('areasOfExpertise', 'array-contains', destinationName),
+          limit(6)
+        );
+        const tourGuidesSnapshot = await getDocs(tourGuidesQuery);
+        const tourGuidesData = tourGuidesSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setTourGuides(tourGuidesData);
 
-        if (isCancelled) return;
-
-        const normalizedDestinationName = firestoreDestinationName.toLowerCase();
-
-        // Transform and filter jeep drivers
-        const allJeeps = jeepSnapshot.docs.map((docSnap) => {
-          const data = docSnap.data();
-          const destinations = Array.isArray(data.destinations)
-            ? data.destinations
-            : data.destinations
-            ? [data.destinations]
-            : [];
-
-          return {
-            id: docSnap.id,
-            driverName: data.fullName || data.driverName || 'Safari Driver',
-            imageUrl: data.profilePicture || data.imageUrl || '',
-            location: data.location || data.baseLocation || 'Sri Lanka',
-            rating:
-              typeof data.rating === 'number'
-                ? data.rating
-                : typeof data.rating === 'string'
-                ? parseFloat(data.rating) || 0
-                : 0,
-            totalReviews: data.totalReviews || 0,
-            pricePerDay: data.pricePerDay || data.price || data.dailyRate || 0,
-            vehicleType: data.vehicleType || 'Standard Safari Jeep',
-            experience: data.experienceYears || data.experience || 0,
-            destinations
-          };
-        });
-
-        const filteredJeeps = allJeeps
-          .filter((jeep) =>
-            jeep.destinations.some(
-              (dest) =>
-                typeof dest === 'string' &&
-                dest.toLowerCase().includes(normalizedDestinationName)
-            )
-          )
-          .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-          .slice(0, 4);
-
-        // Transform and filter tour guides
-        const allGuides = guideSnapshot.docs.map((docSnap) => {
-          const data = docSnap.data();
-          const areasOfExpertise = Array.isArray(data.areasOfExpertise)
-            ? data.areasOfExpertise
-            : data.areasOfExpertise
-            ? [data.areasOfExpertise]
-            : [];
-
-          return {
-            id: docSnap.id,
-            guideName: data.fullName || data.guideName || 'Tour Guide',
-            imageUrl: data.profilePicture || data.imageUrl || '',
-            location: data.location || data.baseLocation || 'Sri Lanka',
-            rating:
-              typeof data.rating === 'number'
-                ? data.rating
-                : typeof data.rating === 'string'
-                ? parseFloat(data.rating) || 0
-                : 0,
-            totalReviews: data.totalReviews || 0,
-            hourlyRate: data.hourlyRate || 0,
-            dailyRate: data.dailyRate || 0,
-            currencyPreference: data.currencyPreference || 'LKR',
-            areasOfExpertise
-          };
-        });
-
-        const normalizedExpertise = guideExpertise.toLowerCase();
-
-        const filteredGuides = allGuides
-          .filter((guide) =>
-            !normalizedExpertise
-              ? true
-              : guide.areasOfExpertise.some(
-                  (area) =>
-                    typeof area === 'string' &&
-                    area.toLowerCase().includes(normalizedExpertise)
-                )
-          )
-          .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-          .slice(0, 4);
-
-        setJeepDrivers(filteredJeeps);
-        setTourGuides(filteredGuides);
       } catch (error) {
-        console.error('Error loading related providers:', error);
-        if (!isCancelled) {
-          setProvidersError('Failed to load related jeep drivers and guides.');
-        }
+        console.error('Error fetching service providers:', error);
       } finally {
-        if (!isCancelled) {
-          setProvidersLoading(false);
-        }
+        setLoadingProviders(false);
       }
     };
 
-    loadProviders();
+    fetchServiceProviders();
+  }, [destination]);
 
-    return () => {
-      isCancelled = true;
+  // Fetch weather data when destination changes
+  useEffect(() => {
+    const fetchWeather = async () => {
+      if (!destination || !destination.coordinates) {
+        setLoadingWeather(false);
+        return;
+      }
+
+      setLoadingWeather(true);
+      setWeatherError(null);
+
+      try {
+        const { lat, lng } = destination.coordinates;
+        const weatherData = await getWeatherByCoordinates(lat, lng);
+        
+        setWeather(weatherData.current);
+        setForecast(weatherData.forecast);
+      } catch (error) {
+        console.error('Error fetching weather:', error);
+        setWeatherError('Unable to load weather data. Please try again later.');
+      } finally {
+        setLoadingWeather(false);
+      }
     };
-  }, [destinationId, firestoreDestinationName, guideExpertise]);
+
+    fetchWeather();
+  }, [destination, destinationId]);
 
   if (!destination) {
     return (
@@ -604,249 +571,206 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
         </div>
       </section>
 
-      {/* Nearby Accommodations Section */}
-      {destination.accommodations && destination.accommodations.length > 0 && (
-        <section className="py-20 md:py-24 bg-gray-50">
+      {/* Available Service Providers Section */}
+      <section className="py-20 md:py-24 bg-gradient-to-b from-gray-50 to-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 tracking-tight">
-                Nearby Accommodations
+              Available Service Providers
               </h2>
               <p className="text-base text-gray-600 max-w-xl mx-auto">
-                Find the perfect place to stay during your visit
+              Professional jeep drivers and tour guides ready to assist your visit
               </p>
             </div>
 
+          {loadingProviders ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading service providers...</p>
+            </div>
+          ) : (
+            <div className="space-y-12">
+              {/* Jeep Drivers */}
+              {jeepDrivers.length > 0 && (
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <TruckIcon className="h-6 w-6 mr-2 text-green-600" />
+                    Jeep Drivers
+                  </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {destination.accommodations.map((accommodation, index) => (
-                <div key={index} className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className="relative h-48">
+                    {jeepDrivers.map((driver) => (
+                      <div 
+                        key={driver.id} 
+                        className="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                        onClick={() => navigate(`/jeep-profile/${driver.id}`)}
+                      >
+                        <div className="relative h-48 overflow-hidden">
                     <img
-                      src={accommodation.image}
-                      alt={accommodation.name}
-                      className="w-full h-full object-cover"
+                            src={driver.profilePicture || driver.imageUrl || '/api/placeholder/400/300'}
+                            alt={driver.fullName || 'Jeep Driver'}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
-                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                          <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg">
                       <Star className="h-4 w-4 text-amber-500 fill-current" />
-                      <span className="text-sm font-semibold text-gray-900">{accommodation.rating}</span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {driver.rating ? driver.rating.toFixed(1) : '0.0'}
+                            </span>
                     </div>
                   </div>
                   <div className="p-6">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{accommodation.name}</h3>
+                          <h4 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-green-600 transition-colors">
+                            {driver.fullName || 'Jeep Driver'}
+                          </h4>
                     <div className="flex items-center text-sm text-gray-600 mb-3">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      <span>{accommodation.distance}</span>
+                            <MapPin className="h-4 w-4 mr-1 text-gray-500" />
+                            <span>{driver.location || driver.baseLocation || 'Sri Lanka'}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{accommodation.description}</p>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {accommodation.amenities.slice(0, 3).map((amenity, idx) => (
-                        <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                          {amenity}
+                          <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                            {driver.description || driver.bio || 'Experienced jeep driver'}
+                          </p>
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                            <span className="text-lg font-bold text-green-600">
+                              {driver.currencyPreference === 'USD' ? '$' : 'LKR '}
+                              {driver.dailyRate || driver.hourlyRate || 'Contact'}
+                              {driver.dailyRate ? '/day' : driver.hourlyRate ? '/hr' : ''}
                         </span>
+                            <button 
+                              className="text-green-600 hover:text-green-700 font-medium text-sm transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/jeep-profile/${driver.id}`);
+                              }}
+                            >
+                              View Profile →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                       ))}
                     </div>
+                  <div className="text-center mt-8">
+                    <button
+                      onClick={() => {
+                        navigate('/jeep');
+                        // Scroll to jeep drivers section after navigation
+                        setTimeout(() => {
+                          const section = document.getElementById('jeep-drivers-section');
+                          if (section) {
+                            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }, 100);
+                      }}
+                      className="inline-flex items-center text-green-600 hover:text-green-700 font-medium transition-colors"
+                    >
+                      View All Jeep Drivers
+                      <ArrowLeft className="ml-2 rotate-180" size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tour Guides */}
+              {tourGuides.length > 0 && (
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <UserCircle className="h-6 w-6 mr-2 text-green-600" />
+                    Tour Guides
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {tourGuides.map((guide) => (
+                      <div 
+                        key={guide.id} 
+                        className="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                        onClick={() => navigate(`/guide-profile/${guide.id}`)}
+                      >
+                        <div className="relative h-48 overflow-hidden">
+                          <img
+                            src={guide.profilePicture || guide.imageUrl || '/api/placeholder/400/300'}
+                            alt={guide.fullName || guide.guideName || 'Tour Guide'}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                          <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg">
+                            <Star className="h-4 w-4 text-amber-500 fill-current" />
+                            <span className="text-sm font-semibold text-gray-900">
+                              {guide.rating ? guide.rating.toFixed(1) : '0.0'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          <h4 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-green-600 transition-colors">
+                            {guide.fullName || guide.guideName || 'Tour Guide'}
+                          </h4>
+                          <div className="flex items-center text-sm text-gray-600 mb-3">
+                            <MapPin className="h-4 w-4 mr-1 text-gray-500" />
+                            <span>{guide.location || guide.baseLocation || 'Sri Lanka'}</span>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                            {guide.description || guide.bio || 'Experienced tour guide'}
+                          </p>
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <span className="text-lg font-semibold text-gray-900">{accommodation.price}</span>
-                      <button className="text-green-600 hover:text-green-700 font-medium text-sm">
-                        View Details
+                            <span className="text-lg font-bold text-green-600">
+                              {guide.currencyPreference === 'USD' ? '$' : 'LKR '}
+                              {guide.dailyRate || guide.hourlyRate || 'Contact'}
+                              {guide.dailyRate ? '/day' : guide.hourlyRate ? '/hr' : ''}
+                            </span>
+                            <button 
+                              className="text-green-600 hover:text-green-700 font-medium text-sm transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/guide-profile/${guide.id}`);
+                              }}
+                            >
+                              View Profile →
                       </button>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      )}
+                  <div className="text-center mt-8">
+                    <button
+                      onClick={() => navigate('/guide')}
+                      className="inline-flex items-center text-green-600 hover:text-green-700 font-medium transition-colors"
+                    >
+                      View All Tour Guides
+                      <ArrowLeft className="ml-2 rotate-180" size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
-      {/* Related Jeep Drivers & Tour Guides */}
-      <section className="py-20 md:py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 tracking-tight">
-              Local Jeep Drivers & Tour Guides
-            </h2>
-            <p className="text-base text-gray-600 max-w-xl mx-auto">
-              Connect with trusted local experts who operate in and around {destination.name}.
-            </p>
-          </div>
-
-          {providersError && (
-            <div className="mb-6 text-center text-sm text-red-600">
-              {providersError}
+              {/* No providers found message */}
+              {jeepDrivers.length === 0 && tourGuides.length === 0 && (
+                <div className="text-center py-12">
+                  <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    No Service Providers Available
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Currently, there are no registered jeep drivers or tour guides for this destination.
+                  </p>
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={() => navigate('/jeep')}
+                      className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    >
+                      Browse All Jeep Drivers
+                    </button>
+                    <button
+                      onClick={() => navigate('/guide')}
+                      className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    >
+                      Browse All Tour Guides
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Jeep Drivers Column */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                  <Users className="h-5 w-5 text-green-600" />
-                  Jeep Drivers
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => navigate('/driver')}
-                  className="text-sm font-medium text-green-600 hover:text-green-700"
-                >
-                  View all drivers
-                </button>
-              </div>
-
-              {providersLoading && jeepDrivers.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-gray-500 text-sm">
-                  Loading jeep drivers...
-                </div>
-              ) : jeepDrivers.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  No jeep drivers have registered for this destination yet.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {jeepDrivers.map((driver) => (
-                    <button
-                      key={driver.id}
-                      type="button"
-                      onClick={() => navigate(`/jeepprofile?driverId=${driver.id}`)}
-                      className="w-full text-left bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-4 flex items-center gap-4 transition-colors"
-                    >
-                      <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                        {driver.imageUrl ? (
-                          <img
-                            src={driver.imageUrl}
-                            alt={driver.driverName}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
-                            JD
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
-                            {driver.driverName}
-                          </p>
-                          {driver.rating > 0 && (
-                            <div className="flex items-center gap-1 text-xs text-amber-600">
-                              <Star className="h-4 w-4 fill-current" />
-                              <span>{driver.rating.toFixed(1)}</span>
-                              <span className="text-gray-400">
-                                ({driver.totalReviews || 0})
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          <span>{driver.location}</span>
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{driver.experience || 0} years experience</span>
-                        </p>
-                      </div>
-                      {driver.pricePerDay > 0 && (
-                        <div className="text-right text-sm font-semibold text-gray-900">
-                          LKR {driver.pricePerDay.toLocaleString()}
-                          <span className="block text-xs text-gray-500">per day</span>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Tour Guides Column */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  Tour Guides
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => navigate('/guide')}
-                  className="text-sm font-medium text-green-600 hover:text-green-700"
-                >
-                  View all guides
-                </button>
-              </div>
-
-              {providersLoading && tourGuides.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-gray-500 text-sm">
-                  Loading tour guides...
-                </div>
-              ) : tourGuides.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  No tour guides specializing in this destination type have registered yet.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {tourGuides.map((guide) => (
-                    <button
-                      key={guide.id}
-                      type="button"
-                      onClick={() => navigate(`/guide-profile/${guide.id}`)}
-                      className="w-full text-left bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-4 flex items-center gap-4 transition-colors"
-                    >
-                      <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                        {guide.imageUrl ? (
-                          <img
-                            src={guide.imageUrl}
-                            alt={guide.guideName}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
-                            TG
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
-                            {guide.guideName}
-                          </p>
-                          {guide.rating > 0 && (
-                            <div className="flex items-center gap-1 text-xs text-amber-600">
-                              <Star className="h-4 w-4 fill-current" />
-                              <span>{guide.rating.toFixed(1)}</span>
-                              <span className="text-gray-400">
-                                ({guide.totalReviews || 0})
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          <span>{guide.location}</span>
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{guide.experience || 0} years experience</span>
-                        </p>
-                      </div>
-                      {(guide.dailyRate || guide.hourlyRate) > 0 && (
-                        <div className="text-right text-sm font-semibold text-gray-900">
-                          {guide.currencyPreference || 'LKR'}{' '}
-                          {(guide.dailyRate || guide.hourlyRate || 0).toLocaleString()}
-                          <span className="block text-xs text-gray-500">
-                            {guide.dailyRate ? 'per day' : 'per hour'}
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
       {/* Weather Section */}
       <section className="py-20 md:py-24 bg-white">
@@ -856,79 +780,131 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               Weather Information
             </h2>
             <p className="text-base text-gray-600 max-w-xl mx-auto">
-              Seasonal information and weather patterns for {destination.name}
+              Live weather data and forecast for {destination.name}
             </p>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Current Weather Display */}
-              <div className="bg-white rounded-xl p-6 border border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Conditions</h3>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <Sun className="h-16 w-16 text-amber-500" />
-                    <div>
-                      <p className="text-4xl font-bold text-gray-900">28°C</p>
-                      <p className="text-gray-600 capitalize">Clear Sky</p>
+          {loadingWeather ? (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="ml-4 text-gray-600">Loading weather data...</p>
+              </div>
+            </div>
+          ) : weatherError ? (
+            <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl border border-red-100 p-8 md:p-12">
+              <div className="flex items-center justify-center py-12">
+                <AlertCircle className="h-12 w-12 text-red-500 mr-4" />
+                <div>
+                  <p className="text-red-700 font-semibold">{weatherError}</p>
+                  <p className="text-red-600 text-sm mt-1">Please check your internet connection</p>
+                </div>
+              </div>
+            </div>
+          ) : weather && (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Current Weather Display */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Conditions</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      {getWeatherIcon(weather.weather?.[0]?.main, 16)}
+                      <div>
+                        <p className="text-4xl font-bold text-gray-900">
+                          {Math.round(weather.main?.temp || 0)}°C
+                        </p>
+                        <p className="text-gray-600 capitalize">
+                          {weather.weather?.[0]?.description || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <Droplet className="h-5 w-5 text-blue-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Humidity</p>
+                        <p className="font-semibold text-gray-900">{weather.main?.humidity || 0}%</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Wind className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Wind Speed</p>
+                        <p className="font-semibold text-gray-900">
+                          {weather.wind?.speed ? `${weather.wind.speed.toFixed(1)} m/s` : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Thermometer className="h-5 w-5 text-red-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Feels Like</p>
+                        <p className="font-semibold text-gray-900">
+                          {Math.round(weather.main?.feels_like || 0)}°C
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Cloud className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="text-xs text-gray-500">Cloudiness</p>
+                        <p className="font-semibold text-gray-900">{weather.clouds?.all || 0}%</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <Droplet className="h-5 w-5 text-blue-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">Humidity</p>
-                      <p className="font-semibold text-gray-900">75%</p>
+
+                {/* Best Time to Visit */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Best Time to Visit</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-gray-900">{destination.bestTimeToVisit}</p>
+                        <p className="text-sm text-gray-600">Ideal weather conditions during this period</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Wind className="h-5 w-5 text-gray-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">Wind Speed</p>
-                      <p className="font-semibold text-gray-900">3.5 m/s</p>
+                    <div className="pt-3 border-t border-gray-200">
+                      <p className="text-sm text-gray-600">
+                        Check seasonal weather patterns and plan your visit accordingly for the best experience.
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Best Time to Visit */}
-              <div className="bg-white rounded-xl p-6 border border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Best Time to Visit</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-gray-900">{destination.bestTimeToVisit}</p>
-                      <p className="text-sm text-gray-600">Ideal weather conditions during this period</p>
-                    </div>
-                  </div>
-                  <div className="pt-3 border-t border-gray-200">
-                    <p className="text-sm text-gray-600">
-                      Check seasonal weather patterns and plan your visit accordingly for the best experience.
-                    </p>
+              {/* 5-Day Forecast */}
+              {forecast && forecast.list && (
+                <div className="mt-8 pt-8 border-t border-blue-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-6">5-Day Forecast</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    {forecast.list
+                      .filter((item, index) => index % 8 === 0) // Get one forecast per day (every 8th item = 24 hours)
+                      .slice(0, 5) // Limit to 5 days
+                      .map((day, index) => (
+                        <div key={index} className="bg-white rounded-lg border-2 border-gray-200 p-5 text-center hover:border-blue-300 transition-colors">
+                          <p className="font-semibold text-gray-900 text-sm mb-1">
+                            {index === 0 ? 'Today' : formatDate(day.dt_txt)}
+                          </p>
+                          <div className="flex justify-center mb-4">
+                            {getWeatherIcon(day.weather?.[0]?.main, 8)}
+                          </div>
+                          <p className="text-2xl font-semibold text-gray-900 mb-1">
+                            {Math.round(day.main?.temp || 0)}°C
+                          </p>
+                          <p className="text-xs text-gray-500 capitalize">
+                            {day.weather?.[0]?.description || 'N/A'}
+                          </p>
+                        </div>
+                      ))}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
-
-            {/* 5-Day Forecast Placeholder */}
-            <div className="mt-8 pt-8 border-t border-blue-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">5-Day Forecast</h3>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {[1, 2, 3, 4, 5].map((day) => (
-                  <div key={day} className="bg-white rounded-lg border-2 border-gray-200 p-5 text-center">
-                    <p className="font-semibold text-gray-900 text-sm mb-1">Day {day}</p>
-                    <div className="flex justify-center mb-4">
-                      <Sun className="h-8 w-8 text-amber-500" />
-                    </div>
-                    <p className="text-2xl font-semibold text-gray-900 mb-1">28°C</p>
-                    <p className="text-xs text-gray-500">Clear</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </section>
 

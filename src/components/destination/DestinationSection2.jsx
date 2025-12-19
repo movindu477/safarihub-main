@@ -239,7 +239,7 @@ export default function Destination2() {
                   onClick={() => navigate(`/destination/${getDestinationId(item.name)}`)}
                   className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
                 >
-                  Explore All
+                  Explore {item.name.split(' ')[0]}
                 </button>
               </div>
             </div>

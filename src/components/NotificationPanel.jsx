@@ -197,29 +197,120 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                       </div>
                     </div>
                     
-                    <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                    <p
+                      className={`text-sm text-gray-600 mb-2 ${
+                        notification.type === 'booking' && notification.bookingData
+                          ? 'whitespace-pre-line'
+                          : 'line-clamp-2'
+                      }`}
+                    >
                       {notification.message || 'New notification'}
                     </p>
                     
-                    {/* Booking Details - Show sender name and selected dates */}
+                    {/* Booking Details - show full booking info to related driver/guide */}
                     {notification.type === 'booking' && notification.bookingData && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-2 mb-2 text-xs">
-                        <p className="text-green-800 font-semibold mb-1">
-                          <strong>From:</strong> {notification.senderName || notification.bookingData.customerName || 'Customer'}
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-2 text-xs space-y-1.5">
+                        <p className="text-green-900 font-semibold">
+                          <strong>Customer:</strong> {notification.bookingData.customerName || notification.senderName || 'Customer'}
                         </p>
                         <p className="text-green-800">
-                          <strong>Selected Dates:</strong> {notification.bookingData.dates || (notification.bookingData.selectedDates ? notification.bookingData.selectedDates.map((d, idx) => {
-                            try {
-                              const date = new Date(d);
-                              return date.toLocaleDateString();
-                            } catch {
-                              return d;
-                            }
-                          }).join(', ') : 'N/A')}
+                          <strong>Dates:</strong>{' '}
+                          {notification.bookingData.dates ||
+                            (notification.bookingData.selectedDates
+                              ? notification.bookingData.selectedDates
+                                  .map((d) => {
+                                    try {
+                                      const date = new Date(d);
+                                      return date.toLocaleDateString();
+                                    } catch {
+                                      return d;
+                                    }
+                                  })
+                                  .join(', ')
+                              : 'N/A')}
                         </p>
                         <p className="text-green-800">
-                          <strong>Days:</strong> {notification.bookingData.numberOfDays} • <strong>Total:</strong> LKR {notification.bookingData.totalPrice?.toLocaleString() || '0'}
+                          <strong>Days:</strong> {notification.bookingData.numberOfDays || 0}
+                          {' · '}
+                          <strong>Total:</strong>{' '}
+                          {notification.bookingData.totalPrice != null
+                            ? `LKR ${Number(notification.bookingData.totalPrice).toLocaleString()}`
+                            : 'N/A'}
                         </p>
+                        {notification.bookingData.numberOfPassengers != null && (
+                          <p className="text-green-800">
+                            <strong>Passengers:</strong> {notification.bookingData.numberOfPassengers}
+                          </p>
+                        )}
+                        {notification.bookingData.nationalPark && (
+                          <p className="text-green-800">
+                            <strong>Park:</strong> {notification.bookingData.nationalPark}
+                          </p>
+                        )}
+                        {notification.bookingData.safariType && (
+                          <p className="text-green-800">
+                            <strong>Safari:</strong> {notification.bookingData.safariType}
+                          </p>
+                        )}
+                        {notification.bookingData.jeepType && (
+                          <p className="text-green-800">
+                            <strong>Jeep Type:</strong> {notification.bookingData.jeepType}
+                          </p>
+                        )}
+                        {notification.bookingData.driverLanguage && (
+                          <p className="text-green-800">
+                            <strong>Preferred Language:</strong> {notification.bookingData.driverLanguage}
+                          </p>
+                        )}
+                        {(notification.bookingData.pickupLocation ||
+                          notification.bookingData.dropoffLocation) && (
+                          <p className="text-green-800">
+                            {notification.bookingData.pickupLocation && (
+                              <>
+                                <strong>Pickup:</strong> {notification.bookingData.pickupLocation}
+                              </>
+                            )}
+                            {notification.bookingData.dropoffLocation && (
+                              <>
+                                {' · '}
+                                <strong>Drop-off:</strong> {notification.bookingData.dropoffLocation}
+                              </>
+                            )}
+                          </p>
+                        )}
+                        {notification.bookingData.needsHotelPickup &&
+                          (notification.bookingData.hotelName ||
+                            notification.bookingData.hotelAddress) && (
+                            <p className="text-green-800">
+                              <strong>Hotel:</strong>{' '}
+                              {notification.bookingData.hotelName || 'N/A'}
+                              {notification.bookingData.hotelAddress
+                                ? `, ${notification.bookingData.hotelAddress}`
+                                : ''}
+                            </p>
+                          )}
+                        {(notification.bookingData.specialAssistance ||
+                          notification.bookingData.emergencyContactName ||
+                          notification.bookingData.emergencyContactPhone) && (
+                          <p className="text-green-800">
+                            {notification.bookingData.specialAssistance && (
+                              <>
+                                <strong>Special Requests:</strong>{' '}
+                                {notification.bookingData.specialAssistance}
+                                <br />
+                              </>
+                            )}
+                            {notification.bookingData.emergencyContactName && (
+                              <>
+                                <strong>Emergency Contact:</strong>{' '}
+                                {notification.bookingData.emergencyContactName}
+                                {notification.bookingData.emergencyContactPhone
+                                  ? ` - ${notification.bookingData.emergencyContactPhone}`
+                                  : ''}
+                              </>
+                            )}
+                          </p>
+                        )}
                       </div>
                     )}
                     
