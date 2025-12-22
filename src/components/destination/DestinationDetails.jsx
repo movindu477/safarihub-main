@@ -32,7 +32,7 @@ import { getFirestore, collection, query, where, getDocs, limit } from 'firebase
 
 // ✅ Centralized imports - single source of truth
 import { destinationNameMap, getDestinationById } from '../../data/destinations';
-import { getWeatherByCoordinates } from '../../data/weatherService';
+import { getCurrentWeather, getForecastWeather } from '../../data/weatherService';
 
 // Initialize Firestore
 const db = getFirestore();
@@ -127,7 +127,15 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Invalid Destination</h2>
           <button
-            onClick={() => navigate('/destination')}
+            onClick={() => {
+              navigate('/destination');
+              setTimeout(() => {
+                const section = document.getElementById('destinations-section');
+                if (section) {
+                  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 100);
+            }}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
           >
             Back to Destinations
@@ -197,21 +205,20 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
 
   // Fetch weather data when destination changes
   useEffect(() => {
-    const fetchWeather = async () => {
-      if (!destination || !destination.coordinates) {
-        setLoadingWeather(false);
-        return;
-      }
+    if (!destination?.coordinates) return;
 
-      setLoadingWeather(true);
-      setWeatherError(null);
-
+    const loadWeather = async () => {
       try {
+        setLoadingWeather(true);
+        setWeatherError(null);
+
         const { lat, lng } = destination.coordinates;
-        const weatherData = await getWeatherByCoordinates(lat, lng);
-        
-        setWeather(weatherData.current);
-        setForecast(weatherData.forecast);
+
+        const current = await getCurrentWeather(lat, lng);
+        const forecastData = await getForecastWeather(lat, lng);
+
+        setWeather(current);
+        setForecast(forecastData);
       } catch (error) {
         console.error('Error fetching weather:', error);
         setWeatherError('Unable to load weather data. Please try again later.');
@@ -220,8 +227,8 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
       }
     };
 
-    fetchWeather();
-  }, [destination, destinationId]);
+    loadWeather();
+  }, [destinationId]);
 
   if (!destination) {
     return (
@@ -229,7 +236,15 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Destination Not Found</h2>
           <button
-            onClick={() => navigate('/destination')}
+            onClick={() => {
+              navigate('/destination');
+              setTimeout(() => {
+                const section = document.getElementById('destinations-section');
+                if (section) {
+                  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 100);
+            }}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
           >
             Back to Destinations
@@ -293,7 +308,15 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 md:pb-16">
           <button
-            onClick={() => navigate('/destination')}
+            onClick={() => {
+              navigate('/destination');
+              setTimeout(() => {
+                const section = document.getElementById('destinations-section');
+                if (section) {
+                  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 100);
+            }}
             className="mb-8 inline-flex items-center text-white/80 hover:text-white transition-colors text-sm font-medium"
           >
             <ArrowLeft className="mr-2" size={18} />
@@ -366,7 +389,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                 {destination.id === 'yala-national-park' && (
                   <div className="mt-6 pt-4 border-t border-gray-200">
                     <a
-                      href="https://yalasrilanka.lk/"
+                      href="https://www.yalasrilanka.lk/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
@@ -429,14 +452,14 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                     {destination.animals[selectedAnimal].description}
                   </p>
 
-                  {/* Animated population counter when we have a numeric estimate */}
+                  {/* Population estimate display */}
                   {destination.animals[selectedAnimal].populationEstimate && (
                     <div className="mt-3 flex items-baseline gap-2">
                       <p className="text-xs uppercase tracking-wide text-emerald-200">
                         Estimated population
                       </p>
                       <p className="text-2xl md:text-3xl font-semibold text-white">
-                        <AnimatedCounter value={destination.animals[selectedAnimal].populationEstimate} />
+                        {destination.animals[selectedAnimal].populationEstimate}
                       </p>
                     </div>
                   )}
@@ -731,7 +754,16 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
             </div>
                   <div className="text-center mt-8">
                     <button
-                      onClick={() => navigate('/guide')}
+                      onClick={() => {
+                        navigate('/guide');
+                        // Scroll to guides section after navigation
+                        setTimeout(() => {
+                          const section = document.getElementById('guides-section');
+                          if (section) {
+                            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }, 100);
+                      }}
                       className="inline-flex items-center text-green-600 hover:text-green-700 font-medium transition-colors"
                     >
                       View All Tour Guides

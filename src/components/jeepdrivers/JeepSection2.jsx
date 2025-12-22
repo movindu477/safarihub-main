@@ -260,7 +260,7 @@ const JeepSection2 = ({ currentUser }) => {
     // Save the driver ID to sessionStorage so we can scroll to it when coming back
     sessionStorage.setItem('lastViewedDriverId', jeep.id);
     sessionStorage.setItem('scrollToDriver', 'true');
-    navigate(`/jeepprofile?driverId=${jeep.id}`);
+    navigate(`/jeep-profile/${jeep.id}`);
   };
 
   // Handle chat button click
@@ -269,7 +269,7 @@ const JeepSection2 = ({ currentUser }) => {
     // Save the driver ID to sessionStorage so we can scroll to it when coming back
     sessionStorage.setItem('lastViewedDriverId', jeep.id);
     sessionStorage.setItem('scrollToDriver', 'true');
-    navigate(`/jeepprofile?driverId=${jeep.id}&openChat=true`);
+    navigate(`/jeep-profile/${jeep.id}?openChat=true`);
   };
 
   // Clear filters completely

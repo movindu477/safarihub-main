@@ -3,6 +3,14 @@
 
 // Import local images
 import yalaBackground from '../assets/yala.avif';
+import yala1 from '../assets/yala1.jpg';
+import yala2 from '../assets/yala2.webp';
+import yala3 from '../assets/yala3.jpg';
+import yala4 from '../assets/yala4.webp';
+import yala5 from '../assets/yala5.jpg';
+import yala6 from '../assets/yala6.jpg';
+import yala7 from '../assets/yala7.jpg';
+import yala8 from '../assets/yala8.jpg';
 import wilpattuBackground from '../assets/wilpattu.avif';
 import mirissaBackground from '../assets/mirissa.avif';
 import unaBackground from '../assets/una.avif';
@@ -41,55 +49,59 @@ Best visited during the dry season (February to June), the park provides excelle
     animals: [
       {
         name: 'Sri Lankan Leopard',
-        image: yalaBackground,
+        image: yala1,
         description: 'The apex predator of Yala and the park’s most iconic species.',
-        // Approximate count: around 25 individuals recorded in Block I (entire park may host more)
-        populationEstimate: 25,
-        abundance: 'High density; sightings are relatively frequent compared to most leopard habitats.'
+        populationEstimate: '250–300',
+        abundance: 'One of the highest leopard densities in the world. Block 1 alone hosts ~25–40 individuals.'
       },
       {
-        name: 'Asian Elephant',
-        image: yalaBackground,
+        name: 'Sri Lankan Elephant',
+        image: yala2,
         description: 'Family groups and lone bulls roam freely between scrub jungle and open grasslands.',
-        // Approximate estimate: 300–350 individuals; using 300 as a conservative display value
-        populationEstimate: 300,
-        abundance: 'Common, especially near waterholes and lakes during the dry season (estimated 300–350 elephants in the park).'
+        populationEstimate: '250–350',
+        abundance: 'Common, seasonal movement inside the park. Seen frequently near water sources during dry season.'
       },
       {
-        name: 'Sloth Bear',
-        image: yalaBackground,
+        name: 'Sri Lankan Sloth Bear',
+        image: yala3,
         description: 'A shaggy, nocturnal bear often seen foraging near termite mounds.',
-        abundance: 'Uncommon but regularly recorded on early morning and late afternoon safaris.'
+        populationEstimate: '30–50',
+        abundance: 'Rare but established. Mostly nocturnal, sightings are occasional.'
       },
       {
-        name: 'Spotted Deer (Chital)',
-        image: yalaBackground,
-        description: 'Graceful deer that form large herds and are a primary prey species for leopards.',
-        abundance: 'Very common throughout open areas and forest edges.'
-      },
-      {
-        name: 'Water Buffalo',
-        image: yalaBackground,
+        name: 'Wild Water Buffalo',
+        image: yala4,
         description: 'Powerful wild buffalo frequently seen wallowing in villus and marshy areas.',
-        abundance: 'Common around wetlands and open water.'
+        populationEstimate: '400–600',
+        abundance: 'Common near wetlands. Both wild and feral individuals present.'
+      },
+      {
+        name: 'Sambar Deer',
+        image: yala5,
+        description: 'Largest deer species in the park, often found in forested areas.',
+        populationEstimate: '800–1,200',
+        abundance: 'Common. Largest deer species in the park.'
       },
       {
         name: 'Mugger Crocodile',
-        image: yalaBackground,
+        image: yala6,
         description: 'Large freshwater crocodile basking on riverbanks and lake shores.',
-        abundance: 'Common in freshwater lakes, rivers, and ponds.'
+        populationEstimate: '150–200',
+        abundance: 'Common. Seen in lakes and reservoirs.'
       },
       {
-        name: 'Saltwater Crocodile',
-        image: yalaBackground,
-        description: 'Massive crocodile inhabiting coastal lagoons and brackish water.',
-        abundance: 'Locally common in coastal and estuarine areas of the park.'
-      },
-      {
-        name: 'Indian Peafowl (Peacock)',
-        image: yalaBackground,
+        name: 'Indian Peafowl',
+        image: yala7,
         description: 'Sri Lanka’s national bird, famous for its dramatic courtship displays.',
-        abundance: 'Very common along roadsides, open scrub, and grasslands.'
+        populationEstimate: '10,000+',
+        abundance: 'Extremely common. National bird of Sri Lanka.'
+      },
+      {
+        name: 'Wild Boar',
+        image: yala8,
+        description: 'Important prey species found throughout the park.',
+        populationEstimate: '2,000–3,000',
+        abundance: 'Common. Important prey species.'
       }
     ],
     accommodations: [

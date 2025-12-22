@@ -658,10 +658,13 @@ app.get('/api/driver/conversations/:driverId', (req, res) => {
   res.json(driverConversations);
 });
 
-// Serve React app for all other routes
-app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, 'dist', 'index.html'));
-});
+// Serve React app for all other routes (PRODUCTION ONLY)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, 'dist', 'index.html'));
+  });
+}
+
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

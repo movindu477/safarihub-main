@@ -849,11 +849,18 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
-  const [showSplash, setShowSplash] = useState(true);
+  
+  // Check if splash screen should be shown (only on first visit, not if user is logged in)
+  const [showSplash, setShowSplash] = useState(() => {
+    // Check if splash was already shown
+    const splashShown = localStorage.getItem('safarihub_splash_shown');
+    return !splashShown;
+  });
 
   // Handle splash screen completion
   const handleSplashComplete = () => {
     setShowSplash(false);
+    localStorage.setItem('safarihub_splash_shown', 'true');
   };
 
   // Auth state listener
@@ -863,6 +870,12 @@ function App() {
       
       setUser(user);
       setLoading(false);
+      
+      // Hide splash if user is logged in (user already saw it or is returning)
+      if (user) {
+        setShowSplash(false);
+        localStorage.setItem('safarihub_splash_shown', 'true');
+      }
       
       if (!user) {
         setNotifications([]);
