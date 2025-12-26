@@ -22,6 +22,7 @@ import Navbar from '../home/Navbar.jsx';
 import GuideHero from './guidehero.jsx';
 import GuideSection2 from './GuideSection2.jsx';
 import Footer from '../home/Footer.jsx';
+import ChatList from '../ChatList';
 
 // Firebase imports
 import { 
@@ -276,6 +277,7 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
+  const [showChatList, setShowChatList] = useState(false);
 
   // Auth state listener
   useEffect(() => {
@@ -453,7 +455,16 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
         onLogin={onLogin || onShowAuth} 
         onRegister={onRegister || onShowAuth} 
         onLogout={onLogout} 
+        onOpenChatList={() => setShowChatList(true)}
       />
+      
+      {/* Chat List Modal */}
+      {showChatList && currentUser && (
+        <ChatList
+          user={currentUser}
+          onClose={() => setShowChatList(false)}
+      />
+      )}
       <GuideHero />
       <div className="h-1 bg-black"></div>
       <GuideSection2 currentUser={user} />

@@ -60,6 +60,10 @@ import GuideProfile from "./components/guides/GuideProfile";
 import Payment from "./components/Payment";
 import AboutUs from "./components/home/AboutUs";
 
+// Import Chat components
+import Chat from "./components/Chat";
+import ChatList from "./components/ChatList";
+
 
 // 🔥 Firebase Config
 const firebaseConfig = {
@@ -93,10 +97,10 @@ export const getUserRole = async (userId) => {
   try {
     const touristDoc = await getDoc(doc(db, 'tourists', userId));
     if (touristDoc.exists()) return 'tourist';
-    
+
     const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
     if (providerDoc.exists()) return 'provider';
-    
+
     return null;
   } catch (error) {
     console.error('Error getting user role:', error);
@@ -132,7 +136,7 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-      
+
       console.log(`✅ New conversation created: ${conversationId}`);
     } else {
       console.log(`✅ Existing conversation found: ${conversationId}`);
@@ -163,7 +167,7 @@ export const getConversationById = async (conversationId) => {
 
 export const getOtherParticipant = (conversation, currentUserId) => {
   if (!conversation || !conversation.participantIds) return null;
-  
+
   const otherParticipantId = conversation.participantIds.find(id => id !== currentUserId);
   return {
     id: otherParticipantId,
@@ -181,7 +185,7 @@ export const getUserConversations = (userId, callback) => {
       orderBy('lastMessageTimestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(userConversationsQuery, 
+    const unsubscribe = onSnapshot(userConversationsQuery,
       (snapshot) => {
         const conversations = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -200,7 +204,7 @@ export const getUserConversations = (userId, callback) => {
   } catch (error) {
     console.error('Error getting conversations:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -210,7 +214,7 @@ export const getMessages = (conversationId, callback) => {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
     const messagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
 
-    const unsubscribe = onSnapshot(messagesQuery, 
+    const unsubscribe = onSnapshot(messagesQuery,
       (snapshot) => {
         const messages = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -229,14 +233,14 @@ export const getMessages = (conversationId, callback) => {
   } catch (error) {
     console.error('Error getting messages:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
 export const sendMessage = async (conversationId, messageData) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-    
+
     const messageDoc = await addDoc(messagesRef, {
       ...messageData,
       timestamp: serverTimestamp(),
@@ -300,6 +304,391 @@ export const markMessageAsDelivered = async (conversationId, messageId) => {
   }
 };
 
+// =========================
+// Chatting Collection Functions (New - Efficient Storage)
+// =========================
+// Creates a unique chat ID by sorting user IDs
+export const getChatId = (user1Id, user2Id) => {
+  return [user1Id, user2Id].sort().join('_');
+};
+
+// Create or get chat in chatting collection
+export const createOrGetChat = async (user1Id, user2Id, user1Name, user2Name) => {
+  try {
+    const chatId = getChatId(user1Id, user2Id);
+    const chatRef = doc(db, 'chatting', chatId);
+
+    // Try to get existing chat (this might fail if we don't have read permission, but that's okay)
+    let chatDoc = null;
+    try {
+      chatDoc = await getDoc(chatRef);
+    } catch (readError) {
+      console.warn('Could not read chat document (might not exist):', readError);
+      // Continue to create the chat
+    }
+
+    if (!chatDoc || !chatDoc.exists()) {
+      // Get user roles (with error handling)
+      let user1Role = 'tourist';
+      let user2Role = 'provider';
+
+      try {
+        const role1 = await getUserRole(user1Id);
+        if (role1) user1Role = role1;
+      } catch (roleError) {
+        console.warn('Could not get role for user1, using default:', roleError);
+      }
+
+      try {
+        const role2 = await getUserRole(user2Id);
+        if (role2) user2Role = role2;
+      } catch (roleError) {
+        console.warn('Could not get role for user2, using default:', roleError);
+      }
+
+      // Ensure participantIds is a proper array and sorted (must match chatId format)
+      const participantIds = [user1Id, user2Id].sort();
+
+      // Verify chatId matches the sorted participantIds
+      const expectedChatId = participantIds.join('_');
+      if (expectedChatId !== chatId) {
+        console.error(`❌ ChatId mismatch! Expected: ${expectedChatId}, Got: ${chatId}`);
+        throw new Error('ChatId does not match participantIds');
+      }
+
+      const chatData = {
+        chatId: chatId,
+        participantIds: participantIds,
+        participantNames: {
+          [user1Id]: user1Name || 'User',
+          [user2Id]: user2Name || 'User'
+        },
+        participantRoles: {
+          [user1Id]: user1Role,
+          [user2Id]: user2Role
+        },
+        lastMessage: '',
+        lastMessageTime: serverTimestamp(),
+        lastMessageTimestamp: Date.now(),
+        lastMessageSender: null,
+        unreadCount: {
+          [user1Id]: 0,
+          [user2Id]: 0
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      console.log('📝 Attempting to create chat with data:', {
+        chatId,
+        participantIds,
+        user1Id,
+        user2Id,
+        user1Role,
+        user2Role
+      });
+
+      await setDoc(chatRef, chatData);
+
+      console.log(`✅ New chat created: ${chatId}`);
+    } else {
+      console.log(`✅ Existing chat found: ${chatId}`);
+    }
+
+    return chatId;
+  } catch (error) {
+    console.error('❌ Error creating chat:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+};
+
+// Get user chats from chatting collection
+export const getUserChats = (userId, callback) => {
+  try {
+    const chatsRef = collection(db, 'chatting');
+
+    // Query without orderBy to avoid index requirements, sort client-side
+    const userChatsQuery = query(
+      chatsRef,
+      where('participantIds', 'array-contains', userId)
+    );
+
+    const unsubscribe = onSnapshot(userChatsQuery,
+      (snapshot) => {
+        const chats = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        // Sort by last message timestamp (most recent first)
+        chats.sort((a, b) => {
+          const getTimestamp = (chat) => {
+            if (chat.lastMessageTimestamp) return chat.lastMessageTimestamp;
+            if (chat.lastMessageTime?.toMillis) return chat.lastMessageTime.toMillis();
+            if (chat.lastMessageTime?.seconds) return chat.lastMessageTime.seconds * 1000;
+            if (chat.updatedAt?.toMillis) return chat.updatedAt.toMillis();
+            if (chat.updatedAt?.seconds) return chat.updatedAt.seconds * 1000;
+            return 0;
+          };
+          return getTimestamp(b) - getTimestamp(a);
+        });
+
+        console.log(`📨 Loaded ${chats.length} chats for user ${userId}`);
+        callback(chats);
+      },
+      (error) => {
+        console.error('Error in chats snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error getting chats:', error);
+    callback([]);
+    return () => { };
+  }
+};
+
+// Get messages from chatting collection
+export const getChatMessages = (chatId, callback) => {
+  try {
+    const messagesRef = collection(db, 'chatting', chatId, 'messages');
+    const messagesQuery = query(messagesRef, orderBy('timestampValue', 'asc'));
+
+    const unsubscribe = onSnapshot(messagesQuery,
+      (snapshot) => {
+        const messages = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`📬 Received ${messages.length} messages for chat ${chatId}`);
+        callback(messages);
+      },
+      (error) => {
+        console.error('Error in chat messages snapshot:', error);
+        callback([]);
+      }
+    );
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error getting chat messages:', error);
+    callback([]);
+    return () => { };
+  }
+};
+
+// Send message to chatting collection
+export const sendChatMessage = async (chatId, messageData) => {
+  if (!chatId) {
+    throw new Error('Chat ID is required');
+  }
+
+  if (!messageData || !messageData.content || !messageData.senderId || !messageData.receiverId) {
+    throw new Error('Invalid message data: content, senderId, and receiverId are required');
+  }
+
+  try {
+    console.log(`📤 Attempting to send message to chat: ${chatId}`);
+
+    // Ensure chat document exists first
+    const chatRef = doc(db, 'chatting', chatId);
+    const chatDoc = await getDoc(chatRef);
+
+    let receiverName = 'User';
+    let senderName = messageData.senderName || 'User';
+
+    if (!chatDoc.exists()) {
+      console.warn(`⚠️ Chat ${chatId} doesn't exist, creating it...`);
+      // Create chat document if it doesn't exist
+      let user1Role = 'tourist';
+      let user2Role = 'provider';
+
+      try {
+        const role1 = await getUserRole(messageData.senderId);
+        if (role1) user1Role = role1;
+      } catch (roleError) {
+        console.warn('Could not get role for sender, using default:', roleError);
+      }
+
+      try {
+        const role2 = await getUserRole(messageData.receiverId);
+        if (role2) user2Role = role2;
+      } catch (roleError) {
+        console.warn('Could not get role for receiver, using default:', roleError);
+      }
+
+      // Try to get receiver name
+      try {
+        const receiverTouristDoc = await getDoc(doc(db, 'tourists', messageData.receiverId));
+        if (receiverTouristDoc.exists()) {
+          receiverName = receiverTouristDoc.data().fullName || 'User';
+        } else {
+          const receiverProviderDoc = await getDoc(doc(db, 'serviceProviders', messageData.receiverId));
+          if (receiverProviderDoc.exists()) {
+            receiverName = receiverProviderDoc.data().fullName || 'User';
+          }
+        }
+      } catch (nameError) {
+        console.warn('Could not fetch receiver name:', nameError);
+      }
+
+      // Ensure participantIds is sorted (important for chatId consistency)
+      const participantIds = [messageData.senderId, messageData.receiverId].sort();
+
+      await setDoc(chatRef, {
+        chatId: chatId,
+        participantIds: participantIds,
+        participantNames: {
+          [messageData.senderId]: senderName,
+          [messageData.receiverId]: receiverName
+        },
+        participantRoles: {
+          [messageData.senderId]: user1Role,
+          [messageData.receiverId]: user2Role
+        },
+        lastMessage: '',
+        lastMessageTime: serverTimestamp(),
+        lastMessageTimestamp: Date.now(),
+        lastMessageSender: null,
+        unreadCount: {
+          [messageData.senderId]: 0,
+          [messageData.receiverId]: 0
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      console.log(`✅ Created chat document: ${chatId}`);
+    } else {
+      // Get receiver name from existing chat
+      const chatData = chatDoc.data();
+      receiverName = chatData.participantNames?.[messageData.receiverId] || 'User';
+    }
+
+    // Now send the message
+    const messagesRef = collection(db, 'chatting', chatId, 'messages');
+
+    const messageDoc = await addDoc(messagesRef, {
+      content: messageData.content,
+      senderId: messageData.senderId,
+      senderName: senderName,
+      receiverId: messageData.receiverId,
+      timestamp: serverTimestamp(),
+      timestampValue: Date.now(),
+      read: false,
+      delivered: false
+    });
+
+    console.log(`✅ Message document created: ${messageDoc.id}`);
+
+    // Update chat last message and unread count
+    const updatedChatDoc = await getDoc(chatRef);
+    if (updatedChatDoc.exists()) {
+      const chatData = updatedChatDoc.data();
+      const receiverId = messageData.receiverId;
+
+      // Get current unreadCount object or create new one
+      const currentUnreadCount = chatData.unreadCount || {};
+      const receiverUnreadCount = currentUnreadCount[receiverId] || 0;
+
+      // Build update data with proper nested structure
+      const updateData = {
+        lastMessage: messageData.content,
+        lastMessageTime: serverTimestamp(),
+        lastMessageTimestamp: Date.now(),
+        lastMessageSender: messageData.senderId,
+        updatedAt: serverTimestamp(),
+        unreadCount: {
+          ...currentUnreadCount,
+          [receiverId]: receiverUnreadCount + 1
+        }
+      };
+
+      await updateDoc(chatRef, updateData);
+      console.log(`✅ Updated chat document: ${chatId}`);
+    }
+
+    // ALWAYS create notification for the recipient (works for both online and offline users)
+    try {
+      await createNotification({
+        type: 'message',
+        title: 'New Message',
+        message: `You have a new message from ${senderName}: "${messageData.content.substring(0, 50)}${messageData.content.length > 50 ? '...' : ''}"`,
+        recipientId: messageData.receiverId,
+        senderId: messageData.senderId,
+        senderName: senderName,
+        relatedId: chatId,
+        conversationId: chatId,
+        chatId: chatId,
+        messageId: messageDoc.id
+      });
+      console.log(`✅ Notification created for ${receiverName} (${messageData.receiverId})`);
+    } catch (notifError) {
+      // Log but don't fail the message send if notification fails
+      console.error('⚠️ Failed to create notification (message still sent):', notifError);
+    }
+
+    console.log(`✅ Message sent successfully to chat ${chatId}`);
+    return messageDoc.id;
+  } catch (error) {
+    console.error('❌ Error sending chat message:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+};
+
+// Mark chat messages as read
+export const markChatMessagesAsRead = async (chatId, userId) => {
+  try {
+    const messagesRef = collection(db, 'chatting', chatId, 'messages');
+    const unreadMessagesQuery = query(
+      messagesRef,
+      where('senderId', '!=', userId),
+      where('read', '==', false)
+    );
+
+    const snapshot = await getDocs(unreadMessagesQuery);
+    const updatePromises = snapshot.docs.map(doc =>
+      updateDoc(doc.ref, {
+        read: true,
+        readAt: serverTimestamp(),
+        readTimestamp: Date.now()
+      })
+    );
+
+    await Promise.all(updatePromises);
+
+    // Reset unread count for this user
+    const chatRef = doc(db, 'chatting', chatId);
+    const chatDoc = await getDoc(chatRef);
+    if (chatDoc.exists()) {
+      const chatData = chatDoc.data();
+      const currentUnreadCount = chatData.unreadCount || {};
+      await updateDoc(chatRef, {
+        unreadCount: {
+          ...currentUnreadCount,
+          [userId]: 0
+        },
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    console.log(`✅ Marked ${snapshot.docs.length} messages as read in chat ${chatId}`);
+  } catch (error) {
+    console.error('Error marking chat messages as read:', error);
+  }
+};
+
 // Notification Management
 export const getUserNotifications = (userId, callback) => {
   try {
@@ -310,7 +699,7 @@ export const getUserNotifications = (userId, callback) => {
       orderBy('timestampValue', 'desc')
     );
 
-    const unsubscribe = onSnapshot(notificationsQuery, 
+    const unsubscribe = onSnapshot(notificationsQuery,
       (snapshot) => {
         const notifications = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -329,7 +718,7 @@ export const getUserNotifications = (userId, callback) => {
   } catch (error) {
     console.error('Error getting notifications:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -342,7 +731,7 @@ export const createNotification = async (notificationData) => {
       timestamp: serverTimestamp(),
       timestampValue: Date.now()
     });
-    
+
     console.log(`✅ Notification created for user ${notificationData.recipientId}`);
     return notificationDoc.id;
   } catch (error) {
@@ -372,24 +761,24 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
     if (!bookingDoc.exists()) {
       throw new Error('Booking not found');
     }
-    
+
     const bookingData = bookingDoc.data();
     const isGuideBooking = !!bookingData.guideId;
     const serviceType = isGuideBooking ? 'guide' : 'driver';
     const serviceProviderName = isGuideBooking ? 'guide' : 'driver';
-    
+
     // Update booking status
     await updateDoc(doc(db, 'bookings', bookingId), {
       status: status,
       updatedAt: serverTimestamp(),
       statusUpdatedAt: serverTimestamp()
     });
-    
+
     // Create notification for customer
-    const statusMessage = status === 'accepted' 
+    const statusMessage = status === 'accepted'
       ? `Your booking with ${providerName} has been accepted!`
       : `Your booking with ${providerName} has been declined.`;
-    
+
     await createNotification({
       type: 'booking',
       title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
@@ -400,7 +789,7 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
       relatedId: bookingId,
       bookingId: bookingId
     });
-    
+
     console.log(`✅ Booking ${bookingId} status updated to ${status} (${serviceType})`);
   } catch (error) {
     console.error('Error updating booking status:', error);
@@ -426,12 +815,12 @@ export const getBookingById = async (bookingId) => {
 
 
 // Chat Modal Component
-const ChatModal = ({ 
-  isOpen, 
-  onClose, 
-  conversationId, 
-  otherUser, 
-  currentUser 
+const ChatModal = ({
+  isOpen,
+  onClose,
+  conversationId,
+  otherUser,
+  currentUser
 }) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
@@ -456,11 +845,11 @@ const ChatModal = ({
     const unsubscribe = getMessages(conversationId, (messagesData) => {
       console.log(`📬 Received ${messagesData.length} messages`);
       setMessages(messagesData);
-      
+
       // Mark messages as read and delivered
       if (currentUser) {
         markMessagesAsRead(conversationId, currentUser.uid);
-        
+
         // Mark own messages as delivered
         messagesData.forEach(msg => {
           if (msg.senderId === currentUser.uid && !msg.delivered) {
@@ -482,7 +871,7 @@ const ChatModal = ({
 
     try {
       setSending(true);
-      
+
       const messageData = {
         content: message.trim(),
         senderId: currentUser.uid,
@@ -492,7 +881,7 @@ const ChatModal = ({
       };
 
       console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
-      
+
       // Send the message
       await sendMessage(conversationId, messageData);
 
@@ -523,10 +912,10 @@ const ChatModal = ({
     if (!timestamp) return '';
     try {
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit',
-        hour12: true 
+        hour12: true
       });
     } catch (error) {
       return '';
@@ -577,16 +966,14 @@ const ChatModal = ({
                   className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                      msg.senderId === currentUser?.uid
-                        ? 'bg-yellow-500 text-white rounded-br-none'
-                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                    }`}
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${msg.senderId === currentUser?.uid
+                      ? 'bg-yellow-500 text-white rounded-br-none'
+                      : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                      }`}
                   >
                     <p className="text-sm">{msg.content}</p>
-                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
-                    }`}>
+                    <div className={`flex items-center space-x-2 mt-1 text-xs ${msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
+                      }`}>
                       <span>{formatTime(msg.timestamp)}</span>
                       {msg.senderId === currentUser?.uid && (
                         <span className="flex items-center space-x-1">
@@ -666,10 +1053,9 @@ export const ScrollToTopButton = () => {
   };
 
   return (
-    <div 
-      className={`fixed bottom-6 left-6 z-50 transition-all duration-300 ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
-      }`}
+    <div
+      className={`fixed bottom-6 left-6 z-50 transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
+        }`}
     >
       <button
         onClick={scrollToTop}
@@ -725,7 +1111,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
       <div className="relative">
         {showNotifications && (
           <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
-            <NotificationPanel 
+            <NotificationPanel
               notifications={notifications}
               onClose={() => setShowNotifications(false)}
               onNotificationClick={handleNotificationItemClick}
@@ -754,7 +1140,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
 // Home Page Component
 const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const [showChatModal, setShowChatModal] = useState(false);
-  const [chatConversationId, setChatConversationId] = useState(null);
+  const [showChatList, setShowChatList] = useState(false);
   const [chatOtherUser, setChatOtherUser] = useState(null);
   const location = useLocation();
 
@@ -771,7 +1157,7 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       }, 0);
     };
-    
+
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
@@ -781,23 +1167,111 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
   // Handle notification click - OPEN CHAT MODAL
   const handleNotificationClick = async (notification) => {
     console.log('🔘 Notification clicked:', notification);
-    
+
     // Mark notification as read
     if (!notification.read) {
       await onMarkAsRead(notification.id);
     }
-    
-    if (notification.type === 'message' && notification.conversationId) {
-      // Open chat modal with the conversation
-      const conversation = await getConversationById(notification.conversationId);
-      if (conversation && user) {
-        const otherUser = getOtherParticipant(conversation, user.uid);
-        if (otherUser) {
-          setChatConversationId(notification.conversationId);
-          setChatOtherUser(otherUser);
-          setShowChatModal(true);
-          console.log(`💬 Opening chat with ${otherUser.name}`);
+
+    if (notification.type === 'message' && (notification.conversationId || notification.chatId || notification.relatedId)) {
+      try {
+        // Get chat/conversation ID
+        const chatId = notification.chatId || notification.conversationId || notification.relatedId;
+
+        // Try chatting collection first (new system)
+        try {
+          const chatDoc = await getDoc(doc(db, 'chatting', chatId));
+          if (chatDoc.exists() && user) {
+            const chatData = chatDoc.data();
+            const otherId = chatData.participantIds?.find(id => id !== user.uid);
+            if (otherId) {
+              // Get other user's name from chat data
+              const otherName = chatData.participantNames?.[otherId] || notification.senderName || 'User';
+
+              // Try to get photo from user collections
+              let photo = '';
+              try {
+                const touristDoc = await getDoc(doc(db, 'tourists', otherId));
+                if (touristDoc.exists()) {
+                  photo = touristDoc.data().profilePicture || '';
+                } else {
+                  const providerDoc = await getDoc(doc(db, 'serviceProviders', otherId));
+                  if (providerDoc.exists()) {
+                    photo = providerDoc.data().profilePicture || '';
+                  }
+                }
+              } catch (photoError) {
+                console.warn('Error fetching photo:', photoError);
+              }
+
+              setChatOtherUser({
+                id: otherId,
+                name: otherName,
+                photo: photo,
+                role: chatData.participantRoles?.[otherId] || 'user'
+              });
+              setShowChatModal(true);
+              console.log(`💬 Opening chat with ${otherName}`);
+              return;
+            }
+          }
+        } catch (chatError) {
+          console.warn('Chat not found in chatting collection, trying conversations:', chatError);
         }
+
+        // Fallback: Try conversations collection (legacy)
+        try {
+          const conversation = await getConversationById(chatId);
+          if (conversation && user) {
+            const otherUser = getOtherParticipant(conversation, user.uid);
+            if (otherUser) {
+              setChatOtherUser({
+                id: otherUser.id,
+                name: otherUser.name,
+                photo: '',
+                role: otherUser.role
+              });
+              setShowChatModal(true);
+              console.log(`💬 Opening chat with ${otherUser.name}`);
+              return;
+            }
+          }
+        } catch (convError) {
+          console.warn('Conversation not found:', convError);
+        }
+
+        // Last resort: Use senderId from notification
+        if (notification.senderId && notification.senderId !== user.uid) {
+          // Fetch sender info
+          let senderData = null;
+          try {
+            const senderDoc = await getDoc(doc(db, 'tourists', notification.senderId));
+            if (senderDoc.exists()) {
+              senderData = senderDoc.data();
+            } else {
+              const providerDoc = await getDoc(doc(db, 'serviceProviders', notification.senderId));
+              if (providerDoc.exists()) {
+                senderData = providerDoc.data();
+              }
+            }
+          } catch (senderError) {
+            console.warn('Error fetching sender data:', senderError);
+          }
+
+          if (senderData || notification.senderName) {
+            setChatOtherUser({
+              id: notification.senderId,
+              name: notification.senderName || senderData?.fullName || 'User',
+              photo: senderData?.profilePicture || '',
+              role: senderData?.serviceType === 'Tour Guide' ? 'guide' :
+                senderData?.serviceType === 'Jeep Driver' ? 'driver' : 'user'
+            });
+            setShowChatModal(true);
+            console.log(`💬 Opening chat with ${notification.senderName || 'User'}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error opening chat from notification:', error);
       }
     }
   };
@@ -805,39 +1279,53 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
   return (
     <div className="min-h-screen bg-white">
       {/* Chat Modal */}
-      <ChatModal 
-        isOpen={showChatModal}
-        onClose={() => setShowChatModal(false)}
-        conversationId={chatConversationId}
-        otherUser={chatOtherUser}
-        currentUser={user}
-      />
-      
-      <GlobalNotificationBell 
+      {showChatModal && chatOtherUser && user && (
+        <Chat
+          user={user}
+          otherUserId={chatOtherUser.id}
+          otherUserName={chatOtherUser.name}
+          otherUserPhoto={chatOtherUser.photo}
+          onClose={() => {
+            setShowChatModal(false);
+            setChatOtherUser(null);
+          }}
+        />
+      )}
+
+      <GlobalNotificationBell
         user={user}
         notifications={notifications}
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={onMarkAsRead}
       />
-      
+
       <ScrollToTopButton />
-      
-      <Navbar 
-        user={user} 
-        onLogout={onLogout} 
+
+      <Navbar
+        user={user}
+        onLogout={onLogout}
         onLogin={onShowAuth}
         onRegister={onShowAuth}
+        onOpenChatList={() => setShowChatList(true)}
       />
-      
+
+      {/* Chat List Modal */}
+      {showChatList && user && (
+        <ChatList
+          user={user}
+          onClose={() => setShowChatList(false)}
+        />
+      )}
+
       {/* Home Content with All Sections */}
       <div className="pt--1 space-y-1">
-  <Section1 />
-  <Section2 />
-  <Section3 />
-  <Section4 />
-  <Section5 />
-  <Footer />
-</div>
+        <Section1 />
+        <Section2 />
+        <Section3 />
+        <Section4 />
+        <Section5 />
+        <Footer />
+      </div>
 
     </div>
   );
@@ -849,7 +1337,7 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
-  
+
   // Check if splash screen should be shown (only on first visit, not if user is logged in)
   const [showSplash, setShowSplash] = useState(() => {
     // Check if splash was already shown
@@ -865,24 +1353,43 @@ function App() {
 
   // Auth state listener
   useEffect(() => {
+    // Set a timeout to ensure loading eventually completes (max 10 seconds)
+    const loadingTimeout = setTimeout(() => {
+      console.warn('⚠️ Auth check taking too long, setting loading to false');
+      setLoading(false);
+      setShowSplash(false);
+      localStorage.setItem('safarihub_splash_shown', 'true');
+    }, 10000);
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
-      
+
+      // Clear the timeout since auth resolved
+      clearTimeout(loadingTimeout);
+
       setUser(user);
       setLoading(false);
-      
+
       // Hide splash if user is logged in (user already saw it or is returning)
       if (user) {
         setShowSplash(false);
         localStorage.setItem('safarihub_splash_shown', 'true');
       }
-      
+
       if (!user) {
         setNotifications([]);
       }
+    }, (error) => {
+      // Handle auth errors
+      console.error('❌ Auth state error:', error);
+      clearTimeout(loadingTimeout);
+      setLoading(false);
+      setShowSplash(false);
+      localStorage.setItem('safarihub_splash_shown', 'true');
     });
-    
+
     return () => {
+      clearTimeout(loadingTimeout);
       console.log('🔴 Cleaning up auth listener');
       unsubscribeAuth();
     };
@@ -892,17 +1399,17 @@ function App() {
   useEffect(() => {
     if (user) {
       console.log(`🔔 Setting up notifications listener for user: ${user.uid}`);
-      
+
       const processedNotifications = new Set(); // Track processed notifications to prevent multiple redirects
-      
+
       const unsubscribe = getUserNotifications(user.uid, async (notifications) => {
         console.log(`📢 Received ${notifications.length} notifications`);
         setNotifications(notifications);
-        
+
         // NOTE: Auto-redirect removed - users will now see Accept/Decline buttons in notifications
         // and can choose to go to payment page by clicking Accept
       });
-      
+
       return () => {
         console.log(`🔴 Unsubscribing from notifications for user: ${user.uid}`);
         unsubscribe();
@@ -915,19 +1422,19 @@ function App() {
   const handleLogout = async () => {
     try {
       console.log('🔄 Starting logout...');
-      
+
       // Force immediate UI update
       setUser(null);
       setNotifications([]);
-      
+
       await signOut(auth);
-      
+
       // Force navigation
       setTimeout(() => {
         window.history.replaceState(null, '', '/');
         window.dispatchEvent(new PopStateEvent('popstate'));
       }, 100);
-      
+
     } catch (error) {
       console.error('Logout error:', error);
       // Still reset state
@@ -958,12 +1465,12 @@ function App() {
 
   const handleNotificationClick = async (notification) => {
     console.log('🔘 Global notification clicked:', notification);
-    
+
     // Mark notification as read
     if (!notification.read) {
       await markNotificationAsRead(notification.id);
     }
-    
+
     // Auto-redirect to payment page if booking is accepted
     if (notification.type === 'booking' && notification.bookingId) {
       try {
@@ -982,13 +1489,38 @@ function App() {
         console.error('Error checking booking status:', err);
       }
     }
-    
+
     console.log('Notification click handled by global system:', notification);
   };
 
   const handleMarkAsRead = async (notificationId) => {
     await markNotificationAsRead(notificationId);
   };
+
+  // Auto-hide splash after max 5 seconds (safety timeout)
+  useEffect(() => {
+    if (showSplash) {
+      const splashTimeout = setTimeout(() => {
+        console.warn('⚠️ Splash screen timeout, hiding automatically');
+        setShowSplash(false);
+        localStorage.setItem('safarihub_splash_shown', 'true');
+      }, 5000);
+      return () => clearTimeout(splashTimeout);
+    }
+  }, [showSplash]);
+
+  // Auto-resolve loading after max 10 seconds (safety timeout)
+  useEffect(() => {
+    if (loading) {
+      const loadingTimeout = setTimeout(() => {
+        console.warn('⚠️ Loading timeout, setting loading to false');
+        setLoading(false);
+        setShowSplash(false);
+        localStorage.setItem('safarihub_splash_shown', 'true');
+      }, 10000);
+      return () => clearTimeout(loadingTimeout);
+    }
+  }, [loading]);
 
   // Show splash screen on first load
   if (showSplash) {
@@ -1014,12 +1546,12 @@ function App() {
   // Scroll to top component - handles route changes and back/forward button
   const ScrollToTop = () => {
     const { pathname } = useLocation();
-    
+
     useEffect(() => {
       // Scroll to top on route change
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }, [pathname]);
-    
+
     useEffect(() => {
       // Handle back/forward button navigation
       const handlePopState = () => {
@@ -1028,13 +1560,13 @@ function App() {
           window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         }, 0);
       };
-      
+
       window.addEventListener('popstate', handlePopState);
       return () => {
         window.removeEventListener('popstate', handlePopState);
       };
     }, []);
-    
+
     return null;
   };
 
@@ -1042,10 +1574,10 @@ function App() {
     <Router>
       <ScrollToTop />
       <Routes>
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
-            <HomePage 
+            <HomePage
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1053,12 +1585,12 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          } 
+          }
         />
-        <Route 
-          path="/driver" 
+        <Route
+          path="/driver"
           element={
-            <JeepDriversPage 
+            <JeepDriversPage
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1066,12 +1598,12 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          } 
+          }
         />
-        <Route 
-          path="/jeep" 
+        <Route
+          path="/jeep"
           element={
-            <JeepDriversPage 
+            <JeepDriversPage
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1079,7 +1611,7 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          } 
+          }
         />
         <Route
           path="/jeep-profile/:jeepId"
@@ -1095,10 +1627,10 @@ function App() {
           }
         />
         {/* Destination Routes - Specific routes first */}
-        <Route 
-          path="/destination/:destinationId" 
+        <Route
+          path="/destination/:destinationId"
           element={
-            <DestinationDetails 
+            <DestinationDetails
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1106,12 +1638,12 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          } 
+          }
         />
-        <Route 
-          path="/destination" 
+        <Route
+          path="/destination"
           element={
-            <DestinationApp 
+            <DestinationApp
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1119,13 +1651,13 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          } 
+          }
         />
         {/* Guide Route */}
-        <Route 
-          path="/guide" 
+        <Route
+          path="/guide"
           element={
-            <GuideApp 
+            <GuideApp
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1133,12 +1665,12 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          } 
+          }
         />
-        <Route 
-          path="/guide-profile/:guideId" 
+        <Route
+          path="/guide-profile/:guideId"
           element={
-            <GuideProfile 
+            <GuideProfile
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1146,24 +1678,24 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          } 
+          }
         />
         {/* Payment Route */}
-        <Route 
-          path="/payment/:bookingId" 
+        <Route
+          path="/payment/:bookingId"
           element={
-            <Payment 
+            <Payment
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
             />
-          } 
+          }
         />
         {/* About Us Route */}
-        <Route 
-          path="/about" 
+        <Route
+          path="/about"
           element={
-            <AboutUs 
+            <AboutUs
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1171,7 +1703,7 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          } 
+          }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -1182,28 +1714,28 @@ function App() {
 // Phone number formatting utility
 const formatPhoneNumber = (phone) => {
   if (!phone) return "";
-  
+
   let cleaned = phone.replace(/\D/g, '');
-  
+
   if (cleaned.startsWith('94')) {
     return `+${cleaned}`;
   }
-  
+
   if (cleaned.startsWith('0')) {
     return `+94${cleaned.substring(1)}`;
   }
-  
+
   if (!cleaned.startsWith('+')) {
     return `+94${cleaned}`;
   }
-  
+
   return phone;
 };
 
 // Phone number validation
 const isValidSriLankanPhone = (phone) => {
   if (!phone) return false;
-  
+
   const formatted = formatPhoneNumber(phone);
   const sriLankanRegex = /^\+94[0-9]{9}$/;
   return sriLankanRegex.test(formatted);
@@ -1309,7 +1841,7 @@ function Authentication({ onAuthSuccess, returnToPath }) {
   // Register Function
   const handleRegister = async (e) => {
     e.preventDefault();
-    
+
     console.log("🔄 Starting registration process...");
     console.log("Role:", role);
     console.log("Form data:", {
@@ -1317,39 +1849,39 @@ function Authentication({ onAuthSuccess, returnToPath }) {
       destinations, languages, specialSkills, certifications, specialQualifications,
       areasOfExpertise, verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
     });
-    
+
     // Basic validation
     if (!email || !fullName || !password) {
       setMsg("❌ Please fill in all required fields");
       return;
     }
-    
+
     if (password !== confirm) {
       setMsg("❌ Passwords do not match!");
       return;
     }
-    
+
     if (password.length < 6) {
       setMsg("❌ Password must be at least 6 characters!");
       return;
     }
-    
+
     // Phone validation for service providers
     if (role === 'provider' && phone && !isValidSriLankanPhone(phone)) {
       setMsg("❌ Please enter a valid Sri Lankan phone number (e.g., +94701234567)");
       return;
     }
-    
+
     setBusy(true);
     setMsg("⏳ Creating your account...");
-    
+
     try {
       console.log("Creating user with email:", email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
-      
+
       console.log("✅ User created with UID:", uid);
-      
+
       // Format phone number for storage
       const formattedPhone = phone ? formatPhoneNumber(phone) : "";
 
@@ -1365,7 +1897,7 @@ function Authentication({ onAuthSuccess, returnToPath }) {
       };
 
       let collectionName = "";
-      
+
       if (role === "tourist") {
         collectionName = "tourists";
         // Handle custom language if "other" was selected
@@ -1373,7 +1905,7 @@ function Authentication({ onAuthSuccess, returnToPath }) {
         if (language?.startsWith('other:')) {
           finalLanguage = language.replace('other:', '').trim() || "english";
         }
-        
+
         userData = {
           ...userData,
           country: country?.trim() || "",
@@ -1383,7 +1915,7 @@ function Authentication({ onAuthSuccess, returnToPath }) {
         };
       } else {
         collectionName = "serviceProviders";
-        
+
         // Base provider data
         userData = {
           ...userData,
@@ -1446,41 +1978,41 @@ function Authentication({ onAuthSuccess, returnToPath }) {
           const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
           const snap = await uploadBytes(storageRef, profileFile);
           photoURL = await getDownloadURL(snap.ref);
-          
+
           await setDoc(doc(db, collectionName, uid), {
             profilePicture: photoURL,
             updatedAt: serverTimestamp(),
           }, { merge: true });
-          
-          await updateProfile(userCredential.user, { 
-            displayName: fullName, 
-            photoURL: photoURL 
+
+          await updateProfile(userCredential.user, {
+            displayName: fullName,
+            photoURL: photoURL
           });
-          
+
           console.log("✅ Profile picture uploaded successfully");
         } catch (uploadError) {
           console.error("❌ Profile image upload failed:", uploadError);
           // Continue without profile picture
         }
       } else {
-        await updateProfile(userCredential.user, { 
-          displayName: fullName 
+        await updateProfile(userCredential.user, {
+          displayName: fullName
         });
       }
 
       setMsg("🎉 Account created successfully! Redirecting to login...");
       setBusy(false);
-      
+
       setTimeout(() => {
         signOut(auth);
         setScreen("login");
         resetForm();
       }, 2000);
-      
+
     } catch (error) {
       console.error("❌ Registration error:", error);
       let errorMessage = "❌ Registration failed! ";
-      
+
       if (error.code === 'auth/email-already-in-use') {
         errorMessage += "Email is already registered.";
       } else if (error.code === 'auth/invalid-email') {
@@ -1492,7 +2024,7 @@ function Authentication({ onAuthSuccess, returnToPath }) {
       } else {
         errorMessage += `Error: ${error.message}`;
       }
-      
+
       setMsg(errorMessage);
       setBusy(false);
     }
@@ -1511,7 +2043,7 @@ function Authentication({ onAuthSuccess, returnToPath }) {
       }, 1000);
     } catch (error) {
       let errorMessage = "❌ Login failed! ";
-      
+
       if (error.code === 'auth/invalid-credential') {
         errorMessage += "Invalid email or password.";
       } else if (error.code === 'auth/user-not-found') {
@@ -1521,7 +2053,7 @@ function Authentication({ onAuthSuccess, returnToPath }) {
       } else {
         errorMessage += "Please try again.";
       }
-      
+
       setMsg(errorMessage);
     } finally {
       setBusy(false);
@@ -1621,11 +2153,10 @@ function Authentication({ onAuthSuccess, returnToPath }) {
             </form>
 
             {msg && (
-              <div className={`mt-4 p-3 rounded-xl text-center text-sm font-medium ${
-                msg.includes("❌") 
-                  ? "bg-red-500/20 text-red-300 border border-red-500/30" 
-                  : "bg-green-500/20 text-green-300 border border-green-500/30"
-              }`}>
+              <div className={`mt-4 p-3 rounded-xl text-center text-sm font-medium ${msg.includes("❌")
+                ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                : "bg-green-500/20 text-green-300 border border-green-500/30"
+                }`}>
                 {msg}
               </div>
             )}
@@ -1659,20 +2190,20 @@ function Authentication({ onAuthSuccess, returnToPath }) {
           {!role ? (
             <UserTypeSelection onSelect={setRole} logo={logo} />
           ) : (
-            <RegistrationForm 
+            <RegistrationForm
               role={role}
               serviceType={serviceType}
-              formData={{ 
+              formData={{
                 email, fullName, password, confirm, country, phone, language,
                 locationBase, experience, languagesSpoken, serviceType,
-                vehicleType, pricePerDay, 
+                vehicleType, pricePerDay,
                 destinations: typeof destinations === 'string' ? destinations : (destinations && destinations.length > 0 ? destinations[0] : ""), // Convert array to string for single select
-                languages, 
+                languages,
                 specialSkills, certifications, description,
                 availableDates, specialQualifications, areasOfExpertise,
                 verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
               }}
-              handlers={{ 
+              handlers={{
                 setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone: handlePhoneChange, setLanguage,
                 setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
                 setVehicleType, setPricePerDay, setDestinations, setLanguages,
@@ -1714,12 +2245,12 @@ const UserTypeSelection = ({ onSelect, logo }) => (
       >
         {/* Animated background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 via-green-500/0 to-teal-500/0 group-hover:from-emerald-500/10 group-hover:via-green-500/10 group-hover:to-teal-500/10 transition-all duration-300"></div>
-        
+
         {/* Icon with gradient background and emoji */}
         <div className="relative mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:shadow-emerald-400/50 group-hover:scale-110 transition-all duration-300">
           <span className="text-3xl">🧳</span>
         </div>
-        
+
         {/* Content */}
         <div className="relative z-10">
           <h3 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-100 transition-colors duration-300">Tourist</h3>
@@ -1727,7 +2258,7 @@ const UserTypeSelection = ({ onSelect, logo }) => (
             Explore amazing destinations
           </p>
         </div>
-        
+
         {/* Hover effect border */}
         <div className="absolute inset-0 rounded-2xl border-2 border-emerald-400/0 group-hover:border-emerald-400/50 transition-all duration-300"></div>
       </button>
@@ -1738,12 +2269,12 @@ const UserTypeSelection = ({ onSelect, logo }) => (
       >
         {/* Animated background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/0 via-amber-500/0 to-orange-500/0 group-hover:from-yellow-500/10 group-hover:via-amber-500/10 group-hover:to-orange-500/10 transition-all duration-300"></div>
-        
+
         {/* Icon with gradient background and emoji */}
         <div className="relative mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/30 group-hover:shadow-yellow-400/50 group-hover:scale-110 transition-all duration-300">
           <span className="text-3xl">🚙</span>
         </div>
-        
+
         {/* Content */}
         <div className="relative z-10">
           <h3 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-100 transition-colors duration-300">Service Provider</h3>
@@ -1751,7 +2282,7 @@ const UserTypeSelection = ({ onSelect, logo }) => (
             Offer your services
           </p>
         </div>
-        
+
         {/* Hover effect border */}
         <div className="absolute inset-0 rounded-2xl border-2 border-yellow-400/0 group-hover:border-yellow-400/50 transition-all duration-300"></div>
       </button>
@@ -1769,13 +2300,13 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
   const serviceTypes = [
     "Jeep Driver",
-    "Tour Guide", 
+    "Tour Guide",
     "Renting"
   ];
 
   const vehicleTypes = [
     "Standard Safari Jeep",
-    "Luxury Safari Jeep", 
+    "Luxury Safari Jeep",
     "Open Roof Jeep",
     "4x4 Modified Jeep"
   ];
@@ -1796,7 +2327,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
   const specialSkills = [
     "Wildlife photography knowledge",
-    "Birdwatching expertise", 
+    "Birdwatching expertise",
     "Family-friendly tours",
     "Private tours",
     "Full-day safari",
@@ -1850,10 +2381,10 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   // Phone input helper text
   const getPhoneHelperText = () => {
     if (!formData.phone) return "Enter your Sri Lankan phone number";
-    
+
     const formatted = formData.phone.startsWith('+') ? formData.phone : `+94${formData.phone.replace(/^0/, '')}`;
     const isValid = /^\+94[0-9]{9}$/.test(formatted);
-    
+
     if (isValid) {
       return "✓ Valid Sri Lankan number";
     } else {
@@ -1867,7 +2398,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
     const updatedArray = currentArray.includes(value)
       ? currentArray.filter(item => item !== value)
       : [...currentArray, value];
-    
+
     handlers[`set${field.charAt(0).toUpperCase() + field.slice(1)}`](updatedArray);
   };
 
@@ -2022,7 +2553,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 }
               }}
               className="w-full px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs cursor-pointer"
-              style={{ 
+              style={{
                 backgroundColor: '#111827',
                 color: '#ffffff'
               }}
@@ -2426,13 +2957,12 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
       </form>
 
       {msg && (
-        <div className={`mt-3 p-2 rounded text-center text-xs font-medium ${
-          msg.includes("❌") 
-            ? "bg-red-500/20 text-red-300 border border-red-500/30" 
-            : msg.includes("⏳")
+        <div className={`mt-3 p-2 rounded text-center text-xs font-medium ${msg.includes("❌")
+          ? "bg-red-500/20 text-red-300 border border-red-500/30"
+          : msg.includes("⏳")
             ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
             : "bg-green-500/20 text-green-300 border border-green-500/30"
-        }`}>
+          }`}>
           {msg}
         </div>
       )}

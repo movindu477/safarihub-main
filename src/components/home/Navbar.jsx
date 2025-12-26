@@ -17,7 +17,8 @@ import {
   Map,
   Compass,
   Car,
-  ShoppingBag
+  ShoppingBag,
+  MessageCircle
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -27,7 +28,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import userImage from "../../assets/user.png";
 
-export default function Navbar({ user, onLogout, onLogin, onRegister, onStartChat }) {
+export default function Navbar({ user, onLogout, onLogin, onRegister, onStartChat, onOpenChatList }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [userData, setUserData] = useState(null);
@@ -366,6 +367,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             </div>
           ) : (
             <div className="flex items-center space-x-4">
+              {/* Chat Button */}
+              {onOpenChatList && (
+                <button
+                  onClick={onOpenChatList}
+                  className="relative p-2 text-white hover:text-emerald-200 hover:bg-emerald-800/40 rounded-full transition-all duration-300"
+                  title="Messages"
+                >
+                  <MessageCircle className="h-6 w-6" />
+                </button>
+              )}
               {/* User Profile */}
               <div className="relative">
                 <img
@@ -385,6 +396,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
         <div className="md:hidden flex items-center space-x-4">
           {currentUser ? (
             <div className="flex items-center space-x-2">
+              {/* Chat Button for Mobile */}
+              {onOpenChatList && (
+                <button
+                  onClick={onOpenChatList}
+                  className="relative p-2 text-white hover:text-emerald-200 hover:bg-emerald-800/40 rounded-full transition-all duration-300"
+                  title="Messages"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                </button>
+              )}
               {/* User Profile for Mobile */}
               <div className="relative">
                 <img

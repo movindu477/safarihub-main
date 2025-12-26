@@ -3,200 +3,269 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --------------------------
-    // Conversations
-    // --------------------------
+    // =========================
+    // Conversations (chat) - Legacy
+    // =========================
     match /conversations/{conversationId} {
-      // Allow read if user is in participantIds array
+      // Only participants can read the conversation
       allow read: if request.auth != null 
+        && resource.data.participantIds is list
         && request.auth.uid in resource.data.participantIds;
 
-      // Allow create if user is in participantIds array
+      // Create conversation: exactly 2 participants and caller must be one of them
       allow create: if request.auth != null 
-        && request.auth.uid in request.data.participantIds
-        && request.data.participantIds.size() == 2;
+        && request.resource.data.participantIds is list
+        && request.resource.data.participantIds.size() == 2
+        && request.auth.uid in request.resource.data.participantIds;
 
-      // Allow update if user is in participantIds array
-      allow update: if request.auth != null 
-        && request.auth.uid in resource.data.participantIds;
-
-      // Allow delete if user is in participantIds array
-      allow delete: if request.auth != null 
+      // Only participants can update / delete
+      allow update, delete: if request.auth != null
+        && resource.data.participantIds is list
         && request.auth.uid in resource.data.participantIds;
     }
 
+    // Messages inside a conversation – only participants can read/write
     match /conversations/{conversationId}/messages/{messageId} {
       allow read, write: if request.auth != null 
         && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId))
           .data.participantIds;
     }
 
-    // --------------------------
-    // LEGACY MESSAGES (fixed)
-    // --------------------------
+    // =========================
+    // Chatting Collection (New - Efficient Message Storage)
+    // =========================
+    // Structure: chatting/{userId1}_{userId2} (sorted IDs for unique conversation)
+    match /chatting/{chatId} {
+      // Only participants can read the chat (document must exist)
+      // Note: getDoc on non-existent documents doesn't trigger this rule
+      allow read: if request.auth != null
+        && resource.data.participantIds is list
+        && request.auth.uid in resource.data.participantIds;
+
+      // Create chat: user must be one of the participants
+      // The participantIds array should be sorted to match the chatId format
+      allow create: if request.auth != null
+        && request.resource.data.participantIds is list
+        && request.resource.data.participantIds.size() == 2
+        && request.auth.uid in request.resource.data.participantIds
+        && request.resource.data.chatId == chatId;
+
+      // Only participants can update (last message, timestamps, etc.)
+      allow update: if request.auth != null
+        && resource.data.participantIds is list
+        && request.auth.uid in resource.data.participantIds;
+
+      // Only participants can delete
+      allow delete: if request.auth != null
+        && resource.data.participantIds is list
+        && request.auth.uid in resource.data.participantIds;
+    }
+
+    // Messages inside chatting collection
+    match /chatting/{chatId}/messages/{messageId} {
+      // Helper function to check if user is participant by checking parent chat document
+      function isParticipant() {
+        // Get the parent chat document
+        let chatDoc = get(/databases/$(database)/documents/chatting/$(chatId));
+        return request.auth != null
+          && chatDoc.data.participantIds is list
+          && request.auth.uid in chatDoc.data.participantIds;
+      }
+
+      // Only participants can read messages
+      allow read: if isParticipant();
+
+      // Only participants can create messages - verify sender is authenticated user
+      allow create: if request.auth != null
+        && isParticipant()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.receiverId != null
+        && request.resource.data.content is string;
+
+      // Only participants can update messages (for read receipts, etc.)
+      allow update: if isParticipant()
+        && (resource.data.senderId == request.auth.uid 
+            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt', 'readTimestamp', 'delivered', 'deliveredAt']));
+
+      // Only message sender can delete their own messages
+      allow delete: if isParticipant()
+        && resource.data.senderId == request.auth.uid;
+    }
+
+    // =========================
+    // Legacy messages (kept for backward compat)
+    // =========================
     match /messages/{messageId} {
       // Only allow a user to write their own message
       allow create: if request.auth != null
-        && request.auth.uid == request.data.userId;
+        && request.auth.uid == request.resource.data.userId;
 
+      // Only owner can read / update / delete
       allow read, update, delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
     }
 
-    // --------------------------
+    // =========================
     // Notifications
-    // --------------------------
+    // =========================
     match /notifications/{notificationId} {
-      // Users can read notifications sent to them (recipientId) or sent by them
+      // Users can read notifications sent to or from them (supports legacy userId)
       allow read: if request.auth != null 
         && (resource.data.recipientId == request.auth.uid 
             || resource.data.senderId == request.auth.uid
             || resource.data.userId == request.auth.uid);
 
-      // Authenticated users can create notifications
+      // Any authenticated user can create a notification (booking, message, etc.)
       allow create: if request.auth != null;
       
-      // Users can update their own notifications (mark as read, etc.)
+      // Receiver (or legacy userId) can update (mark as read, etc.)
       allow update: if request.auth != null
         && (resource.data.recipientId == request.auth.uid
-            || resource.data.senderId == request.auth.uid
             || resource.data.userId == request.auth.uid);
       
-      // Users can delete notifications sent to them or sent by them
+      // Receiver (or legacy userId) can delete their own notifications
       allow delete: if request.auth != null
         && (resource.data.recipientId == request.auth.uid
-            || resource.data.senderId == request.auth.uid
             || resource.data.userId == request.auth.uid);
     }
 
-    // --------------------------
-    // Reviews
-    // --------------------------
+    // =========================
+    // Helper functions for Reviews / Bookings
+    // =========================
+    function isValidReviewData() {
+      return request.resource.data.rating is number
+             && request.resource.data.rating >= 1
+             && request.resource.data.rating <= 5
+             && request.resource.data.comment is string
+             && request.resource.data.comment.size() >= 10;
+    }
+
+    // Document has either a driverId or a guideId (provider)
+    function hasProviderId() {
+      return request.resource.data.driverId != null
+             || request.resource.data.guideId != null;
+    }
+
+    // =========================
+    // Reviews (user → driver/guide)
+    // =========================
     match /reviews/{reviewId} {
       // Anyone can read reviews
       allow read: if true;
       
-      // Users can create reviews if authenticated and userId matches
-      // Support both driverId (for jeep drivers) and guideId (for tour guides)
+      // Create: logged-in user, valid rating/comment, and either driverId or guideId
       allow create: if request.auth != null
-        && request.auth.uid == request.data.userId
-        && request.data.rating is number
-        && request.data.rating >= 1
-        && request.data.rating <= 5
-        && request.data.comment is string
-        && request.data.comment.size() >= 10
-        && (request.data.driverId != null || request.data.guideId != null);
+        && request.auth.uid == request.resource.data.userId
+        && isValidReviewData()
+        && hasProviderId();
       
-      // Users can update reviews:
-      // 1. Owner can update their own review content (rating, comment, etc.)
-      // 2. Allow updates for like/dislike functionality
+      // Update:
+      //  - owner can edit rating/comment
+      //  - any user can update like/dislike fields only
       allow update: if request.auth != null && (
-        // Owner updating their own review
+        // Owner editing full content
         (request.auth.uid == resource.data.userId
-          && request.data.rating is number
-          && request.data.rating >= 1
-          && request.data.rating <= 5
-          && request.data.comment is string
-          && request.data.comment.size() >= 10)
+          && isValidReviewData())
         ||
-        // Allow like/dislike updates from any authenticated user
-        (request.data.likes is number || request.data.dislikes is number || request.data.likedBy is list || request.data.dislikedBy is list)
+        // Like/dislike / reaction updates only
+        (request.resource.data.diff(resource.data).changedKeys()
+          .hasOnly(['likes', 'dislikes', 'likedBy', 'dislikedBy', 'lastUpdated']))
       );
       
-      // Users can delete their own reviews
+      // Only owner can delete
       allow delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
     }
 
-    // --------------------------
+    // =========================
     // Reported Reviews
-    // --------------------------
+    // =========================
     match /reportedReviews/{reportId} {
-      // Only admins can read reports (for now, allow authenticated users to create)
+      // Allow authenticated users (you can tighten this to admins later)
       allow read: if request.auth != null;
       
-      // Authenticated users can report reviews
+      // Authenticated user can report a review
       allow create: if request.auth != null
-        && request.auth.uid == request.data.reporterId
-        && request.data.reason.size() >= 5
-        && request.data.reviewId != null;
+        && request.auth.uid == request.resource.data.reporterId
+        && request.resource.data.reviewId != null
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 5;
     }
 
-    // --------------------------
-    // Bookings Collection - Stores booking requests from tourists to jeep drivers
-    // --------------------------
+    // =========================
+    // Bookings (customer ↔ driver/guide)
+    // =========================
     match /bookings/{bookingId} {
-      // Tourists (customers) can create bookings
-      // Allow any authenticated user to create bookings (temporary for testing)
-      allow create: if request.auth != null;
+      // Customer creates booking; must reference a driver or guide and have dates/price
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.customerId
+        && hasProviderId()
+        && request.resource.data.selectedDates is list
+        && request.resource.data.totalPrice is number;
 
-      // Customers can read their own bookings
-      // Drivers can read bookings for their services
+      // Customer can see own bookings; provider (driver or guide) can see bookings for them
       allow read: if request.auth != null
         && (request.auth.uid == resource.data.customerId
-            || request.auth.uid == resource.data.driverId);
+            || request.auth.uid == resource.data.driverId
+            || request.auth.uid == resource.data.guideId);
 
-      // Drivers can update bookings (accept/decline)
-      // Customers can update their own bookings (cancel)
+      // Provider can change status; customer can cancel/modify their own booking
       allow update: if request.auth != null
-        && (request.auth.uid == resource.data.driverId
-            || request.auth.uid == resource.data.customerId);
+        && (request.auth.uid == resource.data.customerId
+            || request.auth.uid == resource.data.driverId
+            || request.auth.uid == resource.data.guideId);
 
-      // Only customers can delete their own bookings
+      // Only customer can delete their own booking
       allow delete: if request.auth != null
         && request.auth.uid == resource.data.customerId;
     }
 
-    // --------------------------
-    // Confirmations Collection - Tracks booking confirmations
-    // --------------------------
+    // =========================
+    // Confirmations
+    // =========================
     match /confirmations/{confirmationId} {
-      // Anyone authenticated can create confirmations (for booking tracking)
+      // Any authenticated user can create a confirmation record
       allow create: if request.auth != null;
       
-      // Users can read confirmations related to their bookings
-      allow read: if request.auth != null
+      // Customer or provider involved can read/update/delete
+      allow read, update, delete: if request.auth != null
         && (request.auth.uid == resource.data.customerId
-            || request.auth.uid == resource.data.driverId);
-      
-      // Users can update their own confirmations
-      allow update: if request.auth != null
-        && (request.auth.uid == resource.data.customerId
-            || request.auth.uid == resource.data.driverId);
-      
-      // Users can delete their own confirmations
-      allow delete: if request.auth != null
-        && (request.auth.uid == resource.data.customerId
-            || request.auth.uid == resource.data.driverId);
+            || request.auth.uid == resource.data.driverId
+            || request.auth.uid == resource.data.guideId);
     }
-
-    // --------------------------
-    // Tourists (profile)
-    // --------------------------
+      
+    // =========================
+    // Tourists (profile) - FIXED: Allow authenticated users to read
+    // =========================
     match /tourists/{touristId} {
-      allow read, write: if request.auth != null
+      // Allow authenticated users to read profiles (needed for chat to get names/photos)
+      allow read: if request.auth != null;
+      
+      // Only owner can write
+      allow write: if request.auth != null
         && request.auth.uid == touristId;
     }
 
-    // --------------------------
-    // Service Providers (fixed)
-    // --------------------------
+    // =========================
+    // Service Providers (drivers & guides)
+    // =========================
     match /serviceProviders/{providerId} {
+      // Public profiles are readable by anyone
       allow read: if true;
 
-      allow create: if request.auth != null
-        && request.auth.uid == providerId;
-
-      allow update, delete: if request.auth != null
+      // Provider manages their own profile
+      allow create, update, delete: if request.auth != null
         && request.auth.uid == providerId;
     }
 
-    // --------------------------
+    // =========================
     // Online Status
-    // --------------------------
+    // =========================
     match /onlineStatus/{userId} {
+      // Any logged-in user can read online status
       allow read: if request.auth != null;
 
+      // User can update only their own status
       allow write: if request.auth != null
         && request.auth.uid == userId;
     }

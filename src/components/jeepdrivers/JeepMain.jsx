@@ -7,6 +7,7 @@ import Navbar from "../home/Navbar";
 import JeepHero from "./JeepHero";
 import JeepSection2 from "./JeepSection2";
 import Footer from "../home/Footer";
+import ChatList from "../ChatList";
 
 // Import Firebase functions
 import { 
@@ -267,6 +268,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
+  const [showChatList, setShowChatList] = useState(false);
 
   // Auth state listener
   useEffect(() => {
@@ -444,7 +446,16 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
         onLogin={onLogin || onShowAuth} 
         onRegister={onRegister || onShowAuth} 
         onLogout={onLogout} 
+        onOpenChatList={() => setShowChatList(true)}
       />
+      
+      {/* Chat List Modal */}
+      {showChatList && currentUser && (
+        <ChatList
+          user={currentUser}
+          onClose={() => setShowChatList(false)}
+      />
+      )}
       <JeepHero />
       <div className="h-1 bg-black"></div>
       <JeepSection2 currentUser={user} />

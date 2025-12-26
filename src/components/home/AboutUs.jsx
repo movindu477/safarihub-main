@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { 
   Heart, 
@@ -14,10 +14,12 @@ import {
 } from 'lucide-react';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import ChatList from '../ChatList';
 import { ScrollToTopButton } from '../../App';
 
 const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
+  const [showChatList, setShowChatList] = useState(false);
 
   // Scroll to top when page loads
   useEffect(() => {
@@ -85,7 +87,16 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
         onLogout={onLogout} 
         onLogin={onShowAuth}
         onRegister={onShowAuth}
+        onOpenChatList={() => setShowChatList(true)}
       />
+      
+      {/* Chat List Modal */}
+      {showChatList && user && (
+        <ChatList
+          user={user}
+          onClose={() => setShowChatList(false)}
+      />
+      )}
 
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 text-white pt-24 pb-20 overflow-hidden">

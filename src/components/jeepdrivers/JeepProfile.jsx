@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { 
-  getFirestore, 
-  doc, 
+import {
+  getFirestore,
+  doc,
   getDoc,
   collection,
   addDoc,
@@ -10,15 +10,15 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../App";
-import { 
-  MapPin, 
-  Star, 
-  Phone, 
-  Mail, 
-  Clock, 
-  Shield, 
-  Award, 
-  Languages, 
+import {
+  MapPin,
+  Star,
+  Phone,
+  Mail,
+  Clock,
+  Shield,
+  Award,
+  Languages,
   Calendar,
   MessageCircle,
   ArrowLeft,
@@ -52,16 +52,19 @@ const db = getFirestore();
 // Import the fixed ReviewSection component
 import ReviewSection from "../ReviewSection";
 
+// Import Chat component
+import Chat from "../Chat";
+
 // Import Firebase functions from App
-import { 
-  createOrGetConversation, 
-  sendMessage, 
-  getMessages, 
-  markMessagesAsRead, 
+import {
+  // createOrGetConversation, // Removed - using Chat component instead
+  // sendMessage, // Removed - using Chat component instead
+  // getMessages, // Removed - using Chat component instead
+  // markMessagesAsRead, // Removed - using Chat component instead
   createNotification,
   getUserNotifications,
-  getConversationById,
-  getOtherParticipant,
+  // getConversationById, // Removed - using Chat component instead
+  // getOtherParticipant, // Removed - using Chat component instead
   markNotificationAsRead,
   GlobalNotificationBell,
   ScrollToTopButton
@@ -70,25 +73,25 @@ import {
 // Calendar Component for Date Selection
 const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType, onDateTypeChange }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  
+
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    
+
     const days = [];
     // Add empty cells for days before the first day of the month
     const startDay = firstDay.getDay();
     for (let i = 0; i < startDay; i++) {
       days.push(null);
     }
-    
+
     // Add all days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
     }
-    
+
     return days;
   };
 
@@ -102,7 +105,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
 
   const isDateSelected = (date) => {
     if (!date) return false;
-    return selectedDates.some(selectedDate => 
+    return selectedDates.some(selectedDate =>
       selectedDate.toDateString() === date.toDateString()
     );
   };
@@ -125,7 +128,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <button 
+        <button
           onClick={() => navigateMonth(-1)}
           className="p-2 hover:bg-gray-100 rounded-full transition-colors"
         >
@@ -134,14 +137,14 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
         <h3 className="font-semibold text-gray-900">
           {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
         </h3>
-        <button 
+        <button
           onClick={() => navigateMonth(1)}
           className="p-2 hover:bg-gray-100 rounded-full transition-colors"
         >
           <ArrowLeft size={16} className="rotate-180" />
         </button>
       </div>
-      
+
       <div className="grid grid-cols-7 gap-1 mb-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
@@ -149,17 +152,17 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
           </div>
         ))}
       </div>
-      
+
       <div className="grid grid-cols-7 gap-1">
         {days.map((day, index) => {
           if (!day) {
             return <div key={`empty-${index}`} className="h-8"></div>;
           }
-          
+
           const selected = isDateSelected(day);
           const isToday = day.toDateString() === new Date().toDateString();
           const isPast = isDatePast(day);
-          
+
           return (
             <button
               key={day.toString()}
@@ -167,8 +170,8 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
               disabled={isPast}
               className={`
                 h-8 text-sm rounded-lg transition-all
-                ${selected 
-                  ? 'bg-emerald-600 text-white font-medium shadow-lg' 
+                ${selected
+                  ? 'bg-emerald-600 text-white font-medium shadow-lg'
                   : isPast
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : isToday
@@ -182,7 +185,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
           );
         })}
       </div>
-      
+
       {selectedDates.length > 0 && (
         <div className="mt-4 p-4 bg-emerald-50 rounded-xl border-2 border-emerald-200">
           <h4 className="font-bold text-emerald-800 mb-3">Selected Dates:</h4>
@@ -206,11 +209,10 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
                         e.stopPropagation();
                         if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
                       }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                        dateType === 'half-day'
-                          ? 'bg-emerald-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${dateType === 'half-day'
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
                     >
                       Half Day
                     </button>
@@ -219,11 +221,10 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
                         e.stopPropagation();
                         if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
                       }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                        dateType === 'full-day'
-                          ? 'bg-emerald-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${dateType === 'full-day'
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
                     >
                       Full Day
                     </button>
@@ -239,14 +240,14 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
 };
 
 // Booking Form Modal Component
-const BookingFormModal = ({ 
-  isOpen, 
-  onClose, 
-  formData, 
-  setFormData, 
-  formErrors, 
+const BookingFormModal = ({
+  isOpen,
+  onClose,
+  formData,
+  setFormData,
+  formErrors,
   setFormErrors,
-  currentStep, 
+  currentStep,
   setCurrentStep,
   onSubmit,
   driver,
@@ -281,7 +282,7 @@ const BookingFormModal = ({
 
   const validateStep = () => {
     const errors = {};
-    
+
     if (currentStep === 1) {
       if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
       if (!formData.email.trim()) errors.email = 'Email is required';
@@ -305,7 +306,7 @@ const BookingFormModal = ({
       if (!formData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
       if (!formData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -344,32 +345,29 @@ const BookingFormModal = ({
               const Icon = step.icon;
               const isActive = currentStep === step.number;
               const isCompleted = currentStep > step.number;
-              
+
               return (
                 <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
                   <div className="flex flex-col items-center w-full">
-                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 transition-all ${
-                      isActive ? 'bg-emerald-500 border-emerald-500 text-white' :
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 transition-all ${isActive ? 'bg-emerald-500 border-emerald-500 text-white' :
                       isCompleted ? 'bg-emerald-100 border-emerald-500 text-emerald-600' :
-                      'bg-gray-100 border-gray-300 text-gray-400'
-                    }`}>
+                        'bg-gray-100 border-gray-300 text-gray-400'
+                      }`}>
                       {isCompleted ? (
                         <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                       ) : (
                         <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                       )}
                     </div>
-                    <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${
-                      isActive ? 'text-emerald-600' : 'text-gray-500'
-                    }`}>
+                    <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${isActive ? 'text-emerald-600' : 'text-gray-500'
+                      }`}>
                       <span className="hidden sm:inline">{step.title}</span>
                       <span className="sm:hidden">{step.shortTitle}</span>
                     </span>
                   </div>
                   {index < steps.length - 1 && (
-                    <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${
-                      isCompleted ? 'bg-emerald-500' : 'bg-gray-200'
-                    }`} />
+                    <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${isCompleted ? 'bg-emerald-500' : 'bg-gray-200'
+                      }`} />
                   )}
                 </div>
               );
@@ -395,9 +393,8 @@ const BookingFormModal = ({
                     type="text"
                     value={formData.fullName}
                     onChange={(e) => updateFormData('fullName', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                     placeholder="Enter your full name"
                   />
                   {formErrors.fullName && <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>}
@@ -410,9 +407,8 @@ const BookingFormModal = ({
                     type="email"
                     value={formData.email}
                     onChange={(e) => updateFormData('email', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                     placeholder="your.email@example.com"
                   />
                   {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
@@ -425,9 +421,8 @@ const BookingFormModal = ({
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => updateFormData('phone', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                     placeholder="+94 77 123 4567"
                   />
                   {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
@@ -440,9 +435,8 @@ const BookingFormModal = ({
                     type="text"
                     value={formData.country}
                     onChange={(e) => updateFormData('country', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                     placeholder="e.g., United States"
                   />
                   {formErrors.country && <p className="text-red-500 text-xs mt-1">{formErrors.country}</p>}
@@ -457,9 +451,8 @@ const BookingFormModal = ({
                     max="20"
                     value={formData.numberOfPassengers}
                     onChange={(e) => updateFormData('numberOfPassengers', parseInt(e.target.value) || 1)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                   />
                   {formErrors.numberOfPassengers && <p className="text-red-500 text-xs mt-1">{formErrors.numberOfPassengers}</p>}
                 </div>
@@ -494,9 +487,8 @@ const BookingFormModal = ({
                   <select
                     value={formData.nationalPark}
                     onChange={(e) => updateFormData('nationalPark', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                   >
                     <option value="">Select National Park</option>
                     <option value="Yala National Park">Yala National Park</option>
@@ -516,9 +508,8 @@ const BookingFormModal = ({
                   <select
                     value={formData.safariType}
                     onChange={(e) => updateFormData('safariType', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                   >
                     <option value="Morning Safari">Morning Safari</option>
                     <option value="Evening Safari">Evening Safari</option>
@@ -534,9 +525,8 @@ const BookingFormModal = ({
                     type="datetime-local"
                     value={formData.preferredTime}
                     onChange={(e) => updateFormData('preferredTime', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.preferredTime ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.preferredTime ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                   />
                   {formErrors.preferredTime && <p className="text-red-500 text-xs mt-1">{formErrors.preferredTime}</p>}
                 </div>
@@ -565,8 +555,8 @@ const BookingFormModal = ({
                       return (
                         <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-emerald-200">
                           <span className="text-sm font-medium text-gray-700">
-                {date.toLocaleDateString()}
-              </span>
+                            {date.toLocaleDateString()}
+                          </span>
                           <div className="flex gap-2">
                             <button
                               type="button"
@@ -574,11 +564,10 @@ const BookingFormModal = ({
                                 e.stopPropagation();
                                 if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
                               }}
-                              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                                dateType === 'half-day'
-                                  ? 'bg-emerald-600 text-white shadow-md'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
+                              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${dateType === 'half-day'
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
                             >
                               Half Day
                             </button>
@@ -588,11 +577,10 @@ const BookingFormModal = ({
                                 e.stopPropagation();
                                 if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
                               }}
-                              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                                dateType === 'full-day'
-                                  ? 'bg-emerald-600 text-white shadow-md'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
+                              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${dateType === 'full-day'
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
                             >
                               Full Day
                             </button>
@@ -633,9 +621,8 @@ const BookingFormModal = ({
                         type="text"
                         value={formData.hotelName}
                         onChange={(e) => updateFormData('hotelName', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                          formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                        }`}
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
                       />
                       {formErrors.hotelName && <p className="text-red-500 text-xs mt-1">{formErrors.hotelName}</p>}
                     </div>
@@ -647,9 +634,8 @@ const BookingFormModal = ({
                         type="text"
                         value={formData.hotelAddress}
                         onChange={(e) => updateFormData('hotelAddress', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                          formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                        }`}
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
                       />
                       {formErrors.hotelAddress && <p className="text-red-500 text-xs mt-1">{formErrors.hotelAddress}</p>}
                     </div>
@@ -674,9 +660,8 @@ const BookingFormModal = ({
                     type="text"
                     value={formData.pickupLocation}
                     onChange={(e) => updateFormData('pickupLocation', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                   />
                   {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
                 </div>
@@ -688,9 +673,8 @@ const BookingFormModal = ({
                     type="text"
                     value={formData.dropoffLocation}
                     onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                   />
                   {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
                 </div>
@@ -770,8 +754,8 @@ const BookingFormModal = ({
                     />
                     <span className="text-sm font-medium text-gray-700">{label}</span>
                   </label>
-            ))}
-          </div>
+                ))}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Passport Number (Optional)</label>
@@ -792,8 +776,8 @@ const BookingFormModal = ({
                   />
                 </div>
               </div>
-        </div>
-      )}
+            </div>
+          )}
 
           {/* Step 6: Emergency Contact */}
           {currentStep === 6 && (
@@ -811,9 +795,8 @@ const BookingFormModal = ({
                     type="text"
                     value={formData.emergencyContactName}
                     onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                   />
                   {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
                 </div>
@@ -825,9 +808,8 @@ const BookingFormModal = ({
                     type="tel"
                     value={formData.emergencyContactPhone}
                     onChange={(e) => updateFormData('emergencyContactPhone', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                      formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                    }`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                      }`}
                   />
                   {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
                 </div>
@@ -845,7 +827,7 @@ const BookingFormModal = ({
           >
             Previous
           </button>
-          
+
           {currentStep < steps.length ? (
             <button
               onClick={() => {
@@ -871,210 +853,25 @@ const BookingFormModal = ({
   );
 };
 
-// Chat Modal Component
-const ChatModal = ({ 
-  isOpen, 
-  onClose, 
-  conversationId, 
-  otherUser, 
-  currentUser 
-}) => {
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    if (!conversationId || !isOpen) return;
-
-    const unsubscribe = getMessages(conversationId, (messagesData) => {
-      setMessages(messagesData);
-      
-      if (currentUser) {
-        markMessagesAsRead(conversationId, currentUser.uid);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [conversationId, isOpen, currentUser]);
-
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!message.trim() || !conversationId || sending || !currentUser || !otherUser) return;
-
-    try {
-      setSending(true);
-      
-      const messageData = {
-        content: message.trim(),
-        senderId: currentUser.uid,
-        senderName: currentUser.displayName || 'User',
-        receiverId: otherUser.id,
-        timestamp: new Date()
-      };
-
-      await sendMessage(conversationId, messageData);
-
-      await createNotification({
-        type: 'message',
-        title: 'New Message',
-        message: `You have a new message from ${currentUser.displayName || 'a user'}: "${message.trim()}"`,
-        recipientId: otherUser.id,
-        senderId: currentUser.uid,
-        senderName: currentUser.displayName || 'User',
-        conversationId: conversationId,
-        relatedId: conversationId
-      });
-
-      setMessage('');
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true 
-      });
-    } catch (error) {
-      return '';
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-t-xl">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <User className="h-5 w-5" />
-              </div>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">{otherUser?.name || 'User'}</h3>
-              <p className="text-emerald-100 text-sm">
-                {otherUser?.role === 'tourist' ? 'Tourist' : 'Service Provider'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <MessageCircle className="h-12 w-12 mb-3 text-gray-300" />
-              <p className="text-lg font-medium">No messages yet</p>
-              <p className="text-sm">Start a conversation with {otherUser?.name || 'this user'}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                      msg.senderId === currentUser?.uid
-                        ? 'bg-emerald-600 text-white rounded-br-none shadow-lg'
-                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-md'
-                    }`}
-                  >
-                    <p className="text-sm">{msg.content}</p>
-                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-emerald-100' : 'text-gray-500'
-                    }`}>
-                      <span>{formatTime(msg.timestamp)}</span>
-                      {msg.senderId === currentUser?.uid && (
-                        <span className="flex items-center space-x-1">
-                          {msg.read ? (
-                            <CheckCheck size={12} className="text-emerald-300" title="Read" />
-                          ) : msg.delivered ? (
-                            <CheckCheck size={12} className="text-gray-300" title="Delivered" />
-                          ) : (
-                            <Check size={12} className="text-gray-300" title="Sent" />
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
-          <div className="flex space-x-3">
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              disabled={sending}
-            />
-            <button
-              type="submit"
-              disabled={!message.trim() || sending}
-              className="bg-emerald-600 text-white p-3 rounded-full hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
-            >
-              {sending ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+// Old ChatModal component removed - using Chat component instead
 
 const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { jeepId } = useParams(); // Get jeepId from URL parameter
-  const messagesEndRef = useRef(null);
-  
+  // const messagesEndRef = useRef(null); // Removed - using Chat component instead
+
   const [driver, setDriver] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState([]);
-  const [sending, setSending] = useState(false);
+  // Old chat state removed - using Chat component instead
+  // const [message, setMessage] = useState("");
+  // const [messages, setMessages] = useState([]);
+  // const [sending, setSending] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState("");
-  const [conversationId, setConversationId] = useState(null);
+  // const [conversationId, setConversationId] = useState(null);
   const [selectedDates, setSelectedDates] = useState([]);
   const [selectedDatesWithType, setSelectedDatesWithType] = useState({}); // {dateString: 'half-day' | 'full-day'}
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -1122,7 +919,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     emergencyContactName: '',
     emergencyContactPhone: ''
   });
-  
+
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
@@ -1144,7 +941,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       }, 0);
     };
-    
+
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
@@ -1156,42 +953,44 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     // Reset component state when driverId changes or is cleared
     setError("");
     setActiveTab("overview");
-    setMessage("");
-    setMessages([]);
-    setConversationId(null);
+    // setMessage("");
+    // setMessages([]);
+    // setConversationId(null);
     setSelectedDates([]);
     setIsChatModalOpen(false);
     setChatConversationId(null);
     setChatOtherUser(null);
   }, [driverId]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Old scrollToBottom and messages useEffect removed - using Chat component instead
 
+  // Handle opening chat from URL parameter
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    if (openChat === 'true' && driverId && currentUser) {
+    if (openChat === 'true' && driverId && currentUser && driver) {
       setActiveTab('chat');
-      initializeConversation();
+      // Open chat modal instead of initializing old conversation
+      setChatOtherUser({
+        id: driver.id,
+        name: driver.fullName || 'Driver',
+        photo: driver.profilePicture || driver.imageUrl || '',
+        role: 'driver'
+      });
+      setIsChatModalOpen(true);
     }
-  }, [openChat, driverId, currentUser]);
+  }, [openChat, driverId, currentUser, driver]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
-    
+
     try {
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
       const now = new Date();
       const diff = now.getTime() - date.getTime();
-      
+
       if (diff < 60000) return 'Just now';
       if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
       if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-      
+
       return date.toLocaleDateString();
     } catch (error) {
       return 'Recently';
@@ -1200,16 +999,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
   const handleDateSelect = (date) => {
     setSelectedDates(prev => {
-      const isSelected = prev.some(selectedDate => 
+      const isSelected = prev.some(selectedDate =>
         selectedDate.toDateString() === date.toDateString()
       );
-      
+
       if (isSelected) {
         // Remove date and its type
-        const newTypes = {...selectedDatesWithType};
+        const newTypes = { ...selectedDatesWithType };
         delete newTypes[date.toDateString()];
         setSelectedDatesWithType(newTypes);
-        return prev.filter(selectedDate => 
+        return prev.filter(selectedDate =>
           selectedDate.toDateString() !== date.toDateString()
         );
       } else {
@@ -1246,7 +1045,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   // Validate booking form
   const validateBookingForm = () => {
     const errors = {};
-    
+
     if (!bookingFormData.fullName.trim()) errors.fullName = 'Full name is required';
     if (!bookingFormData.email.trim()) errors.email = 'Email is required';
     if (!bookingFormData.phone.trim()) errors.phone = 'Phone number is required';
@@ -1265,7 +1064,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     if (!bookingFormData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
     if (!bookingFormData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
     if (!bookingFormData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -1285,7 +1084,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       console.warn('⚠️ Booking already in progress, ignoring click');
       return;
     }
-    
+
     console.log('🔵 handleBooking called');
     console.log('🔵 Current state:', {
       selectedDates: selectedDates.length,
@@ -1294,40 +1093,40 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       driverId: driver?.id,
       isBooking: isBooking
     });
-    
+
     if (selectedDates.length === 0) {
       console.warn('⚠️ No dates selected');
       alert('Please select at least one date for your booking.');
       return;
     }
-    
+
     if (!currentUser) {
       console.warn('⚠️ No current user');
       alert('Please login to make a booking.');
       return;
     }
-    
+
     if (!driver) {
       console.warn('⚠️ No driver data');
       alert('Driver information not available.');
       return;
     }
-      
-      // Verify driver has a valid ID
-      if (!driver.id) {
-        console.error('❌ Driver ID is missing:', driver);
-        alert('Driver information is incomplete. Please try again.');
-        return;
-      }
-      
+
+    // Verify driver has a valid ID
+    if (!driver.id) {
+      console.error('❌ Driver ID is missing:', driver);
+      alert('Driver information is incomplete. Please try again.');
+      return;
+    }
+
     console.log('✅ All pre-checks passed, starting booking process...');
     setIsBooking(true);
-    
+
     try {
       // Get the authenticated user directly from Firebase Auth
       // This ensures we have the most up-to-date auth state
       const authUser = auth.currentUser;
-      
+
       console.log('🔐 Auth check:', {
         authUser: !!authUser,
         authUserUid: authUser?.uid,
@@ -1335,20 +1134,20 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         currentUser: !!currentUser,
         currentUserUid: currentUser?.uid
       });
-      
+
       if (!authUser) {
         console.error('❌ No authenticated user found');
         alert('Please login to make a booking. No authenticated user found.');
         return;
       }
-      
+
       // Verify we have a valid user ID
       if (!authUser.uid) {
         console.error('❌ No user ID found in auth user');
         alert('Authentication error. Please try logging in again.');
         return;
       }
-      
+
       // Verify user is logged in as tourist (optional check, but helpful for debugging)
       try {
         const touristDoc = await getDoc(doc(db, 'tourists', authUser.uid));
@@ -1360,7 +1159,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       } catch (roleCheckError) {
         console.warn('⚠️ Could not verify user role:', roleCheckError);
       }
-      
+
       // Calculate total price based on half-day/full-day
       let totalPrice = 0;
       selectedDates.forEach(date => {
@@ -1369,20 +1168,20 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         const dailyPrice = driver.pricePerDay || 0;
         totalPrice += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
       });
-      
+
       const datesString = selectedDates.map(d => {
         const dateType = selectedDatesWithType[d.toDateString()] || 'full-day';
         return `${d.toLocaleDateString()} (${dateType === 'half-day' ? 'Half Day' : 'Full Day'})`;
       }).join(', ');
-      
+
       const datesWithTypes = selectedDates.map(d => ({
         date: d.toISOString(),
         type: selectedDatesWithType[d.toDateString()] || 'full-day'
       }));
-      
+
       // Get driver email from driver data (could be contactEmail, email, or from auth)
       const driverEmail = driver.contactEmail || driver.email || '';
-      
+
       // Validate driver ID before proceeding
       const driverIdString = String(driver.id || '');
       if (!driverIdString || driverIdString === 'undefined' || driverIdString === 'null' || driverIdString.trim() === '') {
@@ -1390,7 +1189,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         alert('Invalid driver information. Please refresh the page and try again.');
         return;
       }
-      
+
       // Create booking in Firestore with all form data
       // Ensure all fields match Firestore rules requirements exactly
       const bookingData = {
@@ -1413,7 +1212,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
-      
+
       // Log booking data for debugging
       console.log('📝 Creating booking with data:', {
         authUid: authUser.uid,
@@ -1433,7 +1232,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         totalPriceIsNumber: typeof bookingData.totalPrice === 'number',
         fullBookingData: bookingData
       });
-      
+
       // Create the booking document in Firestore 'bookings' collection
       // This is the critical operation - if this fails, the whole booking fails
       console.log('🔐 Pre-booking validation:', {
@@ -1455,7 +1254,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           totalPrice: bookingData.totalPrice !== null && bookingData.totalPrice !== undefined
         }
       });
-      
+
       // Double-check data types before sending
       const validatedBookingData = {
         ...bookingData,
@@ -1463,15 +1262,15 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         selectedDates: Array.isArray(bookingData.selectedDates) ? bookingData.selectedDates : [],
         totalPrice: Number(bookingData.totalPrice) // Ensure it's a number
       };
-      
+
       console.log('✅ Validated booking data:', validatedBookingData);
-      
+
       const bookingRef = collection(db, 'bookings');
       let bookingId;
-      
+
       // Store bookingData in outer scope for error handling
       const finalBookingData = validatedBookingData;
-      
+
       try {
         console.log('🚀 Attempting to create booking in Firestore...');
         console.log('🚀 Data being sent:', {
@@ -1484,16 +1283,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           match: authUser.uid === finalBookingData.customerId,
           fullData: JSON.stringify(finalBookingData, null, 2)
         });
-        
+
         // Final validation before sending
         if (authUser.uid !== finalBookingData.customerId) {
           throw new Error('Customer ID mismatch! Auth UID: ' + authUser.uid + ', Customer ID: ' + finalBookingData.customerId);
         }
-        
+
         console.log('✅ Validation passed, creating document...');
         const bookingDoc = await addDoc(bookingRef, finalBookingData);
         bookingId = bookingDoc.id;
-        
+
         console.log('✅ Booking created successfully with ID:', bookingId);
         console.log('📦 Booking stored in Firestore:', {
           collection: 'bookings',
@@ -1518,7 +1317,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         });
         throw bookingError; // Re-throw to be caught by outer catch block
       }
-      
+
       // Also create a confirmation record in a 'confirmations' subcollection for better tracking
       try {
         const confirmationRef = collection(db, 'confirmations');
@@ -1535,7 +1334,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         console.warn('⚠️ Could not create confirmation record (non-critical):', confirmationError);
         // Don't fail the booking if confirmation record fails
       }
-      
+
       // Create comprehensive notification for driver with all booking details
       // Wrap in try-catch so notification failure doesn't break the booking
       try {
@@ -1587,7 +1386,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             status: 'pending'
           }
         };
-        
+
         const notificationId = await createNotification(notificationData);
         console.log('✅ Notification created for driver:', {
           notificationId: notificationId,
@@ -1598,7 +1397,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         console.warn('⚠️ Could not create notification (non-critical):', notificationError);
         // Don't fail the booking if notification fails - booking is already created
       }
-      
+
       // Show success animation with booking ID
       setSuccessMessageData({
         driverName: driver.fullName,
@@ -1608,7 +1407,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         bookingId: bookingId
       });
       setShowSuccessMessage(true);
-      
+
       // Reset selected dates and form
       setSelectedDates([]);
       setSelectedDatesWithType({});
@@ -1647,7 +1446,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         emergencyContactPhone: ''
       });
       setIsBooking(false);
-      
+
       // Redirect to JeepProfile page after showing success message (3 seconds)
       setTimeout(() => {
         console.log('🔄 Redirecting to JeepProfile page...');
@@ -1663,7 +1462,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           navigate('/driver', { replace: true });
         }
       }, 3000);
-      
+
     } catch (error) {
       setIsBooking(false);
       console.error('❌ Error creating booking:', error);
@@ -1671,16 +1470,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       console.error('❌ Error message:', error.message);
       console.error('❌ Error stack:', error.stack);
       console.error('❌ Full error:', JSON.stringify(error, null, 2));
-      
+
       // Hide any success message that might have been shown
       setShowSuccessMessage(false);
       setSuccessMessageData(null);
-      
+
       let errorMessage = 'Failed to create booking. ';
-      
+
       // Get auth user for error details
       const authUserForError = auth.currentUser;
-      
+
       if (error.code === 'permission-denied') {
         console.error('❌ Permission denied details:', {
           authUser: authUserForError?.uid,
@@ -1704,7 +1503,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       } else {
         errorMessage = 'An unexpected error occurred while processing your booking.\n\nPlease try again. If the problem persists, please contact support.';
       }
-      
+
       alert(errorMessage);
     }
   };
@@ -1713,7 +1512,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
-        
+
         try {
           const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
           if (touristDoc.exists()) {
@@ -1752,7 +1551,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
       try {
         const driverDoc = await getDoc(doc(db, 'serviceProviders', driverId));
-        
+
         if (driverDoc.exists()) {
           const driverData = driverDoc.data();
           setDriver({
@@ -1775,138 +1574,93 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     }
   }, [driverId]);
 
-  const initializeConversation = async () => {
-    if (!currentUser || !driverId || !driver) return;
+  // Old conversation initialization removed - using Chat component instead
+  // const initializeConversation = async () => {
+  //   if (!currentUser || !driverId || !driver) return;
+  //   try {
+  //     const conversationId = await createOrGetConversation(...);
+  //     setConversationId(conversationId);
+  //     await markMessagesAsRead(conversationId, currentUser.uid);
+  //   } catch (error) {
+  //     console.error('Error initializing conversation:', error);
+  //   }
+  // };
 
-    try {
-      const conversationId = await createOrGetConversation(
-        currentUser.uid,
-        driverId,
-        currentUser.displayName || 'User',
-        driver.fullName || 'Driver'
-      );
-      
-      setConversationId(conversationId);
-      await markMessagesAsRead(conversationId, currentUser.uid);
-    } catch (error) {
-      console.error('Error initializing conversation:', error);
-    }
-  };
+  // useEffect(() => {
+  //   if (currentUser && driverId && driver && !loading) {
+  //     initializeConversation();
+  //   }
+  // }, [currentUser, driverId, driver, loading]);
 
-  useEffect(() => {
-    // Only initialize conversation if driver data is loaded
-    if (currentUser && driverId && driver && !loading) {
-      initializeConversation();
-    }
-  }, [currentUser, driverId, driver, loading]);
-
-  useEffect(() => {
-    if (!conversationId || !currentUser) {
-      setMessages([]);
-      return;
-    }
-
-    const unsubscribe = getMessages(conversationId, (messagesData) => {
-      setMessages(messagesData);
-      
-      const unreadMessages = messagesData.filter(msg => 
-        msg.senderId !== currentUser.uid && !msg.read
-      );
-      
-      if (unreadMessages.length > 0) {
-        markMessagesAsRead(conversationId, currentUser.uid);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      setMessages([]);
-    };
-  }, [conversationId, currentUser]);
+  // useEffect(() => {
+  //   // Old message loading code removed
+  // }, [conversationId, currentUser]);
 
 
   const handleNotificationClick = async (notification) => {
     console.log('Notification clicked:', notification);
-    
+
     if (!notification.read) {
       await onMarkAsRead(notification.id);
     }
-    
-    if (notification.type === 'message' && notification.conversationId) {
-      const conversation = await getConversationById(notification.conversationId);
-      if (conversation && currentUser) {
-        const otherUser = getOtherParticipant(conversation, currentUser.uid);
-        
-        if (otherUser.id === driverId) {
-          setChatConversationId(notification.conversationId);
-          setChatOtherUser(otherUser);
-          setIsChatModalOpen(true);
+
+    if (notification.type === 'message' && (notification.chatId || notification.conversationId || notification.relatedId)) {
+      // Try to get chat from chatting collection (new system)
+      const chatId = notification.chatId || notification.conversationId || notification.relatedId;
+      try {
+        const chatDoc = await getDoc(doc(db, 'chatting', chatId));
+        if (chatDoc.exists() && currentUser) {
+          const chatData = chatDoc.data();
+          const otherId = chatData.participantIds?.find(id => id !== currentUser.uid);
+          if (otherId === driverId) {
+            // Get other user info
+            let otherName = chatData.participantNames?.[otherId] || notification.senderName || 'User';
+            let photo = '';
+            try {
+              const touristDoc = await getDoc(doc(db, 'tourists', otherId));
+              if (touristDoc.exists()) {
+                photo = touristDoc.data().profilePicture || '';
+              } else {
+                const providerDoc = await getDoc(doc(db, 'serviceProviders', otherId));
+                if (providerDoc.exists()) {
+                  photo = providerDoc.data().profilePicture || '';
+                }
+              }
+            } catch (photoError) {
+              console.warn('Error fetching photo:', photoError);
+            }
+
+            setChatOtherUser({
+              id: otherId,
+              name: otherName,
+              photo: photo,
+              role: chatData.participantRoles?.[otherId] || 'user'
+            });
+            setIsChatModalOpen(true);
+          }
         }
+      } catch (chatError) {
+        console.warn('Error opening chat from notification:', chatError);
       }
     }
   };
 
   const handleOpenChatModal = () => {
     if (driver && currentUser) {
-      setChatConversationId(conversationId);
       setChatOtherUser({
         id: driver.id,
         name: driver.fullName || 'Driver',
-        role: 'provider'
+        photo: driver.profilePicture || driver.imageUrl || '',
+        role: 'driver'
       });
       setIsChatModalOpen(true);
     }
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    
-    if (!message.trim() || !currentUser || !driverId || sending) return;
-
-    setSending(true);
-    
-    try {
-      // Ensure we have a conversation ID (create if missing)
-      let convId = conversationId;
-      if (!convId) {
-        convId = await createOrGetConversation(
-          currentUser.uid,
-          driverId,
-          currentUser.displayName || 'User',
-          driver?.fullName || 'Driver'
-        );
-        setConversationId(convId);
-      }
-
-      const messageData = {
-        content: message.trim(),
-        senderId: currentUser.uid,
-        senderName: currentUser.displayName || 'User',
-        receiverId: driverId,
-        timestamp: new Date()
-      };
-
-      await sendMessage(convId, messageData);
-
-      await createNotification({
-        type: 'message',
-        title: 'New Message',
-        message: `You have a new message from ${currentUser.displayName || 'a tourist'}`,
-        recipientId: driverId,
-        senderId: currentUser.uid,
-        senderName: currentUser.displayName || 'User',
-        relatedId: convId,
-        conversationId: convId
-      });
-
-      setMessage("");
-    } catch (error) {
-      console.error("Error sending message:", error);
-      alert("Failed to send message. Please try again.");
-    } finally {
-      setSending(false);
-    }
-  };
+  // Old handleSendMessage removed - using Chat component instead
+  // const handleSendMessage = async (e) => {
+  //   // This function has been replaced by the Chat component
+  // };
 
   const renderStars = (rating) => {
     const numericRating = Number(rating) || 0;
@@ -1973,7 +1727,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   <CheckCircle className="w-10 h-10 text-green-600" />
                 </div>
               </div>
-              
+
               <h2 className="text-2xl font-bold text-gray-900 mb-1">
                 Booking Confirmed
               </h2>
@@ -1988,7 +1742,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   Booking ID: {successMessageData.bookingId.substring(0, 8)}...
                 </p>
               )}
-              
+
               {/* Booking Details */}
               <div className="bg-emerald-50 rounded-xl p-4 mb-6 text-left space-y-2">
                 <div className="flex justify-between">
@@ -2008,7 +1762,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   <span className="text-emerald-600 font-bold text-lg">LKR {successMessageData.totalPrice.toLocaleString()}</span>
                 </div>
               </div>
-              
+
               {/* Close Button */}
               <button
                 onClick={() => {
@@ -2031,15 +1785,20 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           </div>
         </div>
       )}
-      
-      <ChatModal 
-        isOpen={isChatModalOpen}
-        onClose={() => setIsChatModalOpen(false)}
-        conversationId={chatConversationId}
-        otherUser={chatOtherUser}
-        currentUser={currentUser}
-      />
-      
+
+      {isChatModalOpen && chatOtherUser && currentUser && (
+        <Chat
+          user={currentUser}
+          otherUserId={chatOtherUser.id}
+          otherUserName={chatOtherUser.name}
+          otherUserPhoto={chatOtherUser.photo}
+          onClose={() => {
+            setIsChatModalOpen(false);
+            setChatOtherUser(null);
+          }}
+        />
+      )}
+
       <BookingFormModal
         isOpen={showBookingForm}
         onClose={() => setShowBookingForm(false)}
@@ -2055,16 +1814,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         selectedDatesWithType={selectedDatesWithType}
         onDateTypeChange={handleDateTypeChange}
       />
-      
-      <GlobalNotificationBell 
+
+      <GlobalNotificationBell
         user={currentUser}
         notifications={notifications}
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={onMarkAsRead}
       />
-      
+
       <ScrollToTopButton />
-      
+
       <div className="bg-white/80 backdrop-blur-md shadow-lg border-b border-emerald-100/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
@@ -2096,7 +1855,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 />
                 <h2 className="text-2xl font-bold text-gray-900 mb-1">{driver.fullName}</h2>
                 <p className="text-emerald-600 font-medium mb-4">{driver.serviceType}</p>
-                
+
                 {/* Rating */}
                 <div className="flex items-center justify-center mt-3 bg-emerald-50 rounded-xl p-3 border border-emerald-100">
                   <div className="flex items-center">
@@ -2121,7 +1880,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     <span className="font-semibold">{driver.contactPhone}</span>
                   </div>
                 )}
-                
+
                 {driver.contactEmail && (
                   <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
                     <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
@@ -2130,7 +1889,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     <span className="font-semibold">{driver.contactEmail}</span>
                   </div>
                 )}
-                
+
                 {driver.location && (
                   <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
                     <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
@@ -2154,7 +1913,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     </button>
                   </>
                 )}
-                
+
                 {!currentUser && (
                   <button
                     onClick={onShowAuth}
@@ -2175,11 +1934,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
-                      activeTab === 'overview'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
-                    }`}
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'overview'
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                      : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                      }`}
                   >
                     Overview
                     {activeTab === 'overview' && (
@@ -2188,11 +1946,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   </button>
                   <button
                     onClick={() => setActiveTab('services')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
-                      activeTab === 'services'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
-                    }`}
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'services'
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                      : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                      }`}
                   >
                     Services & Rates
                     {activeTab === 'services' && (
@@ -2201,11 +1958,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   </button>
                   <button
                     onClick={() => setActiveTab('reviews')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
-                      activeTab === 'reviews'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
-                    }`}
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'reviews'
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                      : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                      }`}
                   >
                     Reviews ({driver.totalReviews || 0})
                     {activeTab === 'reviews' && (
@@ -2215,11 +1971,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   {currentUser && userRole === 'tourist' && (
                     <button
                       onClick={() => setActiveTab('booking')}
-                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
-                        activeTab === 'booking'
-                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                          : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
-                      }`}
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'booking'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                        }`}
                     >
                       <CalendarIcon size={16} className="inline mr-2" />
                       Book Now
@@ -2230,23 +1985,18 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   )}
                   {currentUser && (
                     <button
-                      onClick={() => setActiveTab('chat')}
-                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${
-                        activeTab === 'chat'
-                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                          : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
-                      }`}
+                      onClick={() => {
+                        setActiveTab('chat');
+                        if (currentUser && driver) {
+                          handleOpenChatModal();
+                        }
+                      }}
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'chat'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                        }`}
                     >
                       Messages
-                      {messages.filter(msg => 
-                        msg.senderId === driverId && !msg.read
-                      ).length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
-                          {messages.filter(msg => 
-                            msg.senderId === driverId && !msg.read
-                          ).length}
-                        </span>
-                      )}
                       {activeTab === 'chat' && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
                       )}
@@ -2475,7 +2225,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
 
                 {activeTab === 'reviews' && (
-                  <ReviewSection 
+                  <ReviewSection
                     driverId={driverId}
                     currentUser={currentUser}
                     userRole={userRole}
@@ -2490,7 +2240,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       {/* Calendar */}
                       <div>
                         <h3 className="font-semibold text-gray-900 mb-4 text-lg">Select Your Dates</h3>
-                        <DatePickerCalendar 
+                        <DatePickerCalendar
                           selectedDates={selectedDates}
                           onDateSelect={handleDateSelect}
                           selectedDatesWithType={selectedDatesWithType}
@@ -2502,7 +2252,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       <div className="space-y-4">
                         <div className="bg-white border border-gray-200 rounded-lg p-4">
                           <h3 className="font-semibold text-gray-900 mb-3">Booking Summary</h3>
-                          
+
                           {selectedDates.length === 0 ? (
                             <p className="text-gray-500 text-center py-4">
                               Select dates to see booking details
@@ -2513,7 +2263,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 <span className="text-gray-600">Selected dates:</span>
                                 <span className="font-medium text-green-700">{selectedDates.length} day(s)</span>
                               </div>
-                              
+
                               {/* Show breakdown of dates and their types */}
                               <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
                                 {selectedDates.map((date, index) => {
@@ -2532,12 +2282,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                   );
                                 })}
                               </div>
-                              
+
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Price per day:</span>
                                 <span className="font-medium">LKR {driver.pricePerDay?.toLocaleString() || '0'}</span>
                               </div>
-                              
+
                               <div className="border-t border-gray-200 pt-2">
                                 <div className="flex justify-between items-center">
                                   <span className="text-lg font-semibold text-gray-900">Total:</span>
@@ -2546,7 +2296,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                   </span>
                                 </div>
                               </div>
-                              
+
                               <button
                                 onClick={(e) => {
                                   e.preventDefault();
@@ -2586,76 +2336,26 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   </div>
                 )}
 
-                {/* Chat Tab */}
+                {/* Chat Tab - Opens Chat Modal */}
                 {activeTab === 'chat' && (
-                  <div className="h-96 flex flex-col">
+                  <div className="h-96 flex flex-col items-center justify-center">
                     {currentUser ? (
-                      <>
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto space-y-4 mb-4 p-2">
-                          {messages.length === 0 ? (
-                            <div className="text-center text-gray-500 mt-8">
-                              <MessageCircle size={48} className="mx-auto mb-2 text-gray-300" />
-                              <p>No messages yet. Start a conversation!</p>
-                            </div>
-                          ) : (
-                            messages.map((msg) => (
-                              <div
-                                key={msg.id}
-                                className={`flex ${
-                                  msg.senderId === currentUser.uid ? 'justify-end' : 'justify-start'
-                                }`}
-                              >
-                                <div
-                                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                                    msg.senderId === currentUser.uid
-                                      ? 'bg-green-600 text-white'
-                                      : 'bg-gray-200 text-gray-800'
-                                  }`}
-                                >
-                                  <p className="text-sm">{msg.content}</p>
-                                  <div className={`text-xs mt-1 flex items-center ${
-                                    msg.senderId === currentUser.uid 
-                                      ? 'text-green-100' 
-                                      : 'text-gray-500'
-                                  }`}>
-                                    {formatTime(msg.timestamp)}
-                                    {msg.senderId === currentUser.uid && (
-                                      <span className="ml-1">
-                                        {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                          <div ref={messagesEndRef} />
-                        </div>
-
-                        {/* Message Input */}
-                        <form onSubmit={handleSendMessage} className="flex space-x-2">
-                          <input
-                            type="text"
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            placeholder="Type your message..."
-                            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            disabled={sending}
-                          />
-                          <button
-                            type="submit"
-                            disabled={sending || !message.trim()}
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            {sending ? (
-                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            ) : (
-                              <Send size={18} />
-                            )}
-                          </button>
-                        </form>
-                      </>
+                      <div className="text-center">
+                        <MessageCircle size={64} className="mx-auto mb-4 text-green-600" />
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          Chat with {driver.fullName}
+                        </h3>
+                        <p className="text-gray-600 mb-6">
+                          Click the button below to open the chat window
+                        </p>
+                        <button
+                          onClick={handleOpenChatModal}
+                          className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 mx-auto"
+                        >
+                          <MessageCircle size={20} />
+                          Open Chat
+                        </button>
+                      </div>
                     ) : (
                       <div className="text-center py-8">
                         <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />

@@ -6,6 +6,7 @@ import DestinationHero from './destinationhero'
 import Navbar from '../home/Navbar'
 import Destination2 from './DestinationSection2'
 import Footer from '../home/Footer'
+import ChatList from '../ChatList'
 
 // Firebase - use correct relative path to go up two levels to src
 import { auth } from '../../firebase'
@@ -18,6 +19,7 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
   // State Management
   const [user, setUser] = useState(propUser || null)
   const [loading, setLoading] = useState(true)
+  const [showChatList, setShowChatList] = useState(false)
   const navigate = useNavigate()
 
   // Authentication Listener
@@ -51,7 +53,7 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
       }, 0)
     }
-    
+
     window.addEventListener('popstate', handlePopState)
     return () => {
       window.removeEventListener('popstate', handlePopState)
@@ -66,8 +68,8 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
         setTimeout(() => {
           const element = document.getElementById(hash)
           if (element) {
-            element.scrollIntoView({ 
-              behavior: 'smooth', 
+            element.scrollIntoView({
+              behavior: 'smooth',
               block: 'start',
               inline: 'nearest'
             })
@@ -134,24 +136,33 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
   return (
     <div className="min-h-screen bg-white">
       {/* Global Notification Bell (Bottom Right) */}
-      <GlobalNotificationBell 
+      <GlobalNotificationBell
         user={user}
         notifications={notifications}
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
-      
+
       <ScrollToTopButton />
-      
+
       {/* Main Content */}
       <main className="relative">
-        <Navbar 
-          user={user} 
+        <Navbar
+          user={user}
           onLogin={handleLogin}
           onRegister={handleRegister}
           onLogout={handleLogout}
           onStartChat={handleStartChat}
+          onOpenChatList={() => setShowChatList(true)}
         />
+
+        {/* Chat List Modal */}
+        {showChatList && user && (
+          <ChatList
+            user={user}
+            onClose={() => setShowChatList(false)}
+          />
+        )}
         <DestinationHero />
         <Destination2 />
         <Footer />

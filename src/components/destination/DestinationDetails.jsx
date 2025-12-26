@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import Navbar from '../home/Navbar';
 import Footer from '../home/Footer';
+import ChatList from '../ChatList';
 import { GlobalNotificationBell, ScrollToTopButton } from '../../App';
 import { getFirestore, collection, query, where, getDocs, limit } from 'firebase/firestore';
 
@@ -127,15 +128,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Invalid Destination</h2>
           <button
-            onClick={() => {
-              navigate('/destination');
-              setTimeout(() => {
-                const section = document.getElementById('destinations-section');
-                if (section) {
-                  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }, 100);
-            }}
+            onClick={() => navigate('/destination')}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
           >
             Back to Destinations
@@ -236,15 +229,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Destination Not Found</h2>
           <button
-            onClick={() => {
-              navigate('/destination');
-              setTimeout(() => {
-                const section = document.getElementById('destinations-section');
-                if (section) {
-                  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }, 100);
-            }}
+            onClick={() => navigate('/destination')}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
           >
             Back to Destinations
@@ -283,9 +268,24 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
     }
   };
 
+  const [showChatList, setShowChatList] = useState(false);
+
   return (
     <div className="min-h-screen bg-white">
-      <Navbar user={user} onLogout={onLogout} onShowAuth={onShowAuth} />
+      <Navbar 
+        user={user} 
+        onLogout={onLogout} 
+        onShowAuth={onShowAuth}
+        onOpenChatList={() => setShowChatList(true)}
+      />
+      
+      {/* Chat List Modal */}
+      {showChatList && user && (
+        <ChatList
+          user={user}
+          onClose={() => setShowChatList(false)}
+        />
+      )}
       <GlobalNotificationBell 
         user={user}
         notifications={notifications}
@@ -307,22 +307,6 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
         </div>
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 md:pb-16">
-          <button
-            onClick={() => {
-              navigate('/destination');
-              setTimeout(() => {
-                const section = document.getElementById('destinations-section');
-                if (section) {
-                  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }, 100);
-            }}
-            className="mb-8 inline-flex items-center text-white/80 hover:text-white transition-colors text-sm font-medium"
-          >
-            <ArrowLeft className="mr-2" size={18} />
-            Back to Destinations
-          </button>
-          
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-white leading-tight">
             {destination.name}
           </h1>
@@ -834,36 +818,36 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               </div>
             </div>
           ) : weather && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Current Weather Display */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Conditions</h3>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Current Weather Display */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Conditions</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4">
                       {getWeatherIcon(weather.weather?.[0]?.main, 16)}
-                      <div>
+                    <div>
                         <p className="text-4xl font-bold text-gray-900">
                           {Math.round(weather.main?.temp || 0)}°C
                         </p>
                         <p className="text-gray-600 capitalize">
                           {weather.weather?.[0]?.description || 'N/A'}
                         </p>
-                      </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <Droplet className="h-5 w-5 text-blue-500" />
-                      <div>
-                        <p className="text-xs text-gray-500">Humidity</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <Droplet className="h-5 w-5 text-blue-500" />
+                    <div>
+                      <p className="text-xs text-gray-500">Humidity</p>
                         <p className="font-semibold text-gray-900">{weather.main?.humidity || 0}%</p>
-                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Wind className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="text-xs text-gray-500">Wind Speed</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Wind className="h-5 w-5 text-gray-500" />
+                    <div>
+                      <p className="text-xs text-gray-500">Wind Speed</p>
                         <p className="font-semibold text-gray-900">
                           {weather.wind?.speed ? `${weather.wind.speed.toFixed(1)} m/s` : 'N/A'}
                         </p>
@@ -883,36 +867,36 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                       <div>
                         <p className="text-xs text-gray-500">Cloudiness</p>
                         <p className="font-semibold text-gray-900">{weather.clouds?.all || 0}%</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Best Time to Visit */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Best Time to Visit</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-gray-900">{destination.bestTimeToVisit}</p>
-                        <p className="text-sm text-gray-600">Ideal weather conditions during this period</p>
-                      </div>
-                    </div>
-                    <div className="pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">
-                        Check seasonal weather patterns and plan your visit accordingly for the best experience.
-                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Best Time to Visit */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Best Time to Visit</h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-gray-900">{destination.bestTimeToVisit}</p>
+                      <p className="text-sm text-gray-600">Ideal weather conditions during this period</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-gray-200">
+                    <p className="text-sm text-gray-600">
+                      Check seasonal weather patterns and plan your visit accordingly for the best experience.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
               {/* 5-Day Forecast */}
               {forecast && forecast.list && (
-                <div className="mt-8 pt-8 border-t border-blue-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-6">5-Day Forecast</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="mt-8 pt-8 border-t border-blue-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">5-Day Forecast</h3>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     {forecast.list
                       .filter((item, index) => index % 8 === 0) // Get one forecast per day (every 8th item = 24 hours)
                       .slice(0, 5) // Limit to 5 days
@@ -921,21 +905,21 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                           <p className="font-semibold text-gray-900 text-sm mb-1">
                             {index === 0 ? 'Today' : formatDate(day.dt_txt)}
                           </p>
-                          <div className="flex justify-center mb-4">
+                    <div className="flex justify-center mb-4">
                             {getWeatherIcon(day.weather?.[0]?.main, 8)}
-                          </div>
+                    </div>
                           <p className="text-2xl font-semibold text-gray-900 mb-1">
                             {Math.round(day.main?.temp || 0)}°C
                           </p>
                           <p className="text-xs text-gray-500 capitalize">
                             {day.weather?.[0]?.description || 'N/A'}
                           </p>
-                        </div>
-                      ))}
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
+              )}
+          </div>
           )}
         </div>
       </section>
