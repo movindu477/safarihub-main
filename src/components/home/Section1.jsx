@@ -35,7 +35,7 @@ export default function Section1() {
   // Auto-slide functionality
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => 
+      setCurrentImageIndex((prevIndex) =>
         prevIndex === slides.length - 1 ? 0 : prevIndex + 1
       );
     }, 5000); // Change image every 5 seconds
@@ -54,9 +54,8 @@ export default function Section1() {
         {slides.map((slide, index) => (
           <div
             key={index}
-            className={`absolute top-0 left-0 w-full h-full transition-opacity duration-1000 ease-in-out ${
-              index === currentImageIndex ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`absolute top-0 left-0 w-full h-full transition-opacity duration-1000 ease-in-out ${index === currentImageIndex ? 'opacity-100' : 'opacity-0'
+              }`}
             style={{
               backgroundImage: `url(${slide.image})`,
               backgroundSize: "cover",
@@ -84,7 +83,7 @@ export default function Section1() {
           <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight drop-shadow-lg">
             {slides[currentImageIndex].title.split(' ').slice(0, -1).join(' ')}
             <br />
-            <span className="text-green-500">
+            <span className="text-white">
               {slides[currentImageIndex].title.split(' ').slice(-1)[0]}
             </span>
           </h1>
@@ -102,11 +101,10 @@ export default function Section1() {
           <button
             key={index}
             onClick={() => goToSlide(index)}
-            className={`transition-all duration-300 rounded-full cursor-pointer ${
-              index === currentImageIndex
+            className={`transition-all duration-300 rounded-full cursor-pointer ${index === currentImageIndex
                 ? 'w-12 h-2 bg-green-500'
                 : 'w-2 h-2 bg-white/50 hover:bg-white/75'
-            }`}
+              }`}
             aria-label={`Go to slide ${index + 1}`}
           />
         ))}

@@ -59,6 +59,7 @@ import GuideApp from "./components/guides/App";
 import GuideProfile from "./components/guides/GuideProfile";
 import Payment from "./components/Payment";
 import AboutUs from "./components/home/AboutUs";
+import Admin from "./components/Admin";
 
 // Import Chat components
 import Chat from "./components/Chat";
@@ -1702,6 +1703,16 @@ function App() {
               notifications={notifications}
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
+            />
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <Admin
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
             />
           }
         />

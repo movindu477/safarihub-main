@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Menu, 
-  X, 
-  User, 
-  Settings, 
-  LogOut, 
-  Heart, 
-  Calendar, 
-  CreditCard, 
+import {
+  Menu,
+  X,
+  User,
+  Settings,
+  LogOut,
+  Heart,
+  Calendar,
+  CreditCard,
   HelpCircle,
   MapPin,
   Globe,
@@ -50,7 +50,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
       setAuthUser(user);
       setAuthLoading(false);
       console.log("Navbar auth state:", user ? "User logged in" : "No user");
-      
+
       if (!user) {
         setUserData(null);
         setProfileOpen(false);
@@ -69,26 +69,25 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch user data from Firestore when profile opens or user changes
+  // Fetch user data from Firestore when user changes (not just when profile opens)
   useEffect(() => {
     const fetchUserData = async () => {
       const currentUser = user || authUser;
-      
-      if (currentUser && profileOpen) {
-        setLoading(true);
+
+      if (currentUser) {
         try {
           let userDocRef;
-          
+
           // Try tourists collection first
           userDocRef = doc(db, "tourists", currentUser.uid);
           let userDoc = await getDoc(userDocRef);
-          
+
           // If not found in tourists, try serviceProviders
           if (!userDoc.exists()) {
             userDocRef = doc(db, "serviceProviders", currentUser.uid);
             userDoc = await getDoc(userDocRef);
           }
-          
+
           if (userDoc.exists()) {
             setUserData(userDoc.data());
           } else {
@@ -101,11 +100,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
         } finally {
           setLoading(false);
         }
+      } else {
+        setUserData(null);
       }
     };
 
     fetchUserData();
-  }, [user, authUser, profileOpen, db]);
+  }, [user, authUser, db]);
 
   const handleLogout = async () => {
     try {
@@ -113,14 +114,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
       setProfileOpen(false);
       setUserData(null);
       setMenuOpen(false);
-      
+
       // Call the onLogout callback if provided
       if (onLogout) {
         onLogout();
       }
-      
+
       console.log("User logged out successfully");
-      
+
       // Navigate to home page after logout
       navigate('/');
     } catch (error) {
@@ -195,11 +196,21 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     { icon: ShoppingBag, label: "Rent Equipment", href: "#equipment" },
   ];
 
-  // Navigation items
-  const navItems = [
-    { label: "HOME", onClick: handleHomeClick, path: "/" },
-    { label: "ABOUT US", onClick: () => navigate("/about"), path: "/about" },
-  ];
+  // Determine user role (must be after userData is set)
+  const userRole = userData?.serviceType || null;
+  const isServiceProvider = userRole === "Jeep Driver" || userRole === "Tour Guide";
+
+  // Navigation items - Different for service providers vs tourists
+  const navItems = isServiceProvider
+    ? [
+      { label: "HOME", onClick: handleHomeClick, path: "/" },
+      { label: "ABOUT US", onClick: () => navigate("/about"), path: "/about" },
+      { label: "ADMIN", onClick: () => navigate("/admin"), path: "/admin" },
+    ]
+    : [
+      { label: "HOME", onClick: handleHomeClick, path: "/" },
+      { label: "ABOUT US", onClick: () => navigate("/about"), path: "/about" },
+    ];
 
   // Default user data if no user is logged in
   const defaultUserData = {
@@ -264,11 +275,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   return (
     <>
       {/* Navbar - Bright Green */}
-      <nav className={`fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-green-700/40 transition-all duration-300 ${
-        isScrolled 
-          ? 'bg-green-900 shadow-2xl shadow-black/40' 
-          : 'bg-green-900 shadow-2xl shadow-black/30'
-      }`}>
+      <nav className={`fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-green-700/40 transition-all duration-300 ${isScrolled
+        ? 'bg-green-900 shadow-2xl shadow-black/40'
+        : 'bg-green-900 shadow-2xl shadow-black/30'
+        }`}>
         {/* Left side - Logo */}
         <div className="flex items-center space-x-3">
           <img
@@ -285,69 +295,68 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             <button
               key={item.label}
               onClick={item.onClick}
-              className={`text-sm md:text-base font-medium px-3 py-1 rounded-xl transition-colors duration-300 cursor-pointer ${
-                isActivePath(item.path)
-                  ? "bg-green-800/70 text-emerald-100 border border-green-500/40 shadow-inner"
-                  : "text-gray-100 hover:text-white"
-              }`}
+              className={`text-sm md:text-base font-medium px-3 py-1 rounded-xl transition-colors duration-300 cursor-pointer ${isActivePath(item.path)
+                ? "bg-green-800/70 text-emerald-100 border border-green-500/40 shadow-inner"
+                : "text-gray-100 hover:text-white"
+                }`}
             >
               {item.label}
             </button>
           ))}
 
-          {/* Services Dropdown */}
-          <div 
-            className="relative"
-            onMouseEnter={() => setServicesDropdownOpen(true)}
-            onMouseLeave={() => setServicesDropdownOpen(false)}
-          >
-            <button
-              className={`text-sm md:text-base font-medium px-3 py-1 rounded-xl transition-colors duration-300 flex items-center gap-1 cursor-pointer ${
-                isServicesActive
+          {/* Services Dropdown - Only show for tourists */}
+          {!isServiceProvider && (
+            <div
+              className="relative"
+              onMouseEnter={() => setServicesDropdownOpen(true)}
+              onMouseLeave={() => setServicesDropdownOpen(false)}
+            >
+              <button
+                className={`text-sm md:text-base font-medium px-3 py-1 rounded-xl transition-colors duration-300 flex items-center gap-1 cursor-pointer ${isServicesActive
                   ? "bg-green-800/70 text-emerald-100 border border-green-500/40 shadow-inner"
                   : "text-gray-100 hover:text-white"
-              }`}
-            >
-              OUR SERVICES
-              <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Invisible connecting bridge to prevent gap */}
-            <div 
-              className="absolute top-full left-0 w-full h-2 bg-transparent"
-              onMouseEnter={() => setServicesDropdownOpen(true)}
-            ></div>
-
-            {/* Dropdown Menu */}
-            {servicesDropdownOpen && (
-              <div 
-                className="absolute top-full left-0 w-64 bg-green-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-green-700/40 overflow-hidden animate-fadeIn mt-2"
-                onMouseEnter={() => setServicesDropdownOpen(true)}
-                onMouseLeave={() => setServicesDropdownOpen(false)}
+                  }`}
               >
-                <div className="py-2">
-                  {servicesItems.map((item, index) => {
-                    const IconComponent = item.icon;
-                    return (
-                      <button
-                        key={item.label}
-                        onClick={item.onClick}
-                        className={`flex items-center gap-3 px-4 py-3 text-white transition-all duration-300 group cursor-pointer w-full text-left ${
-                          item.path && isActivePath(item.path)
+                OUR SERVICES
+                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Invisible connecting bridge to prevent gap */}
+              <div
+                className="absolute top-full left-0 w-full h-2 bg-transparent"
+                onMouseEnter={() => setServicesDropdownOpen(true)}
+              ></div>
+
+              {/* Dropdown Menu */}
+              {servicesDropdownOpen && (
+                <div
+                  className="absolute top-full left-0 w-64 bg-green-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-green-700/40 overflow-hidden animate-fadeIn mt-2"
+                  onMouseEnter={() => setServicesDropdownOpen(true)}
+                  onMouseLeave={() => setServicesDropdownOpen(false)}
+                >
+                  <div className="py-2">
+                    {servicesItems.map((item, index) => {
+                      const IconComponent = item.icon;
+                      return (
+                        <button
+                          key={item.label}
+                          onClick={item.onClick}
+                          className={`flex items-center gap-3 px-4 py-3 text-white transition-all duration-300 group cursor-pointer w-full text-left ${item.path && isActivePath(item.path)
                             ? "bg-green-800 text-emerald-100"
                             : "hover:bg-green-800 hover:text-white"
-                        }`}
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <IconComponent className="h-4 w-4 text-gray-200 group-hover:text-white" />
-                        <span className="font-medium text-sm">{item.label}</span>
-                      </button>
-                    );
-                  })}
+                            }`}
+                          style={{ animationDelay: `${index * 50}ms` }}
+                        >
+                          <IconComponent className="h-4 w-4 text-gray-200 group-hover:text-white" />
+                          <span className="font-medium text-sm">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* User Authentication Buttons - Show when NOT logged in */}
           {!currentUser ? (
@@ -465,11 +474,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                       if (item.onClick) item.onClick();
                       setMenuOpen(false);
                     }}
-                    className={`block transition-all duration-300 py-5 border-b border-emerald-400/20 font-medium text-xl w-full text-left animate-fadeInUp group cursor-pointer ${
-                      isActivePath(item.path)
-                        ? "text-emerald-100 bg-green-800/40"
-                        : "text-white hover:text-emerald-200 hover:border-emerald-300"
-                    }`}
+                    className={`block transition-all duration-300 py-5 border-b border-emerald-400/20 font-medium text-xl w-full text-left animate-fadeInUp group cursor-pointer ${isActivePath(item.path)
+                      ? "text-emerald-100 bg-green-800/40"
+                      : "text-white hover:text-emerald-200 hover:border-emerald-300"
+                      }`}
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <span className="flex items-center">
@@ -479,51 +487,53 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                   </button>
                 ))}
 
-                <div className="border-b border-green-700/40">
-                  <button
-                    onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
-                    className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group cursor-pointer"
-                    style={{ animationDelay: "200ms" }}
-                  >
-                    <span className="flex items-center">
-                      OUR SERVICES
-                      <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
-                    </span>
-                    <ChevronDown className={`h-5 w-5 transition-transform duration-300 ${mobileServicesOpen ? 'rotate-180' : ''}`} />
-                  </button>
+                {/* Services Dropdown - Only show for tourists */}
+                {!isServiceProvider && (
+                  <div className="border-b border-green-700/40">
+                    <button
+                      onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
+                      className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group cursor-pointer"
+                      style={{ animationDelay: "200ms" }}
+                    >
+                      <span className="flex items-center">
+                        OUR SERVICES
+                        <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+                      </span>
+                      <ChevronDown className={`h-5 w-5 transition-transform duration-300 ${mobileServicesOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-                  {mobileServicesOpen && (
-                    <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-green-700/40 ml-2">
-                      {servicesItems.map((item, index) => {
-                        const IconComponent = item.icon;
-                        return (
-                          <button
-                            key={item.label}
-                            onClick={() => {
-                              if (item.onClick) item.onClick();
-                              setMenuOpen(false);
-                            }}
-                            className={`flex items-center gap-3 transition-all duration-300 py-4 border-b border-green-800/40 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer ${
-                              item.path && isActivePath(item.path)
+                    {mobileServicesOpen && (
+                      <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-green-700/40 ml-2">
+                        {servicesItems.map((item, index) => {
+                          const IconComponent = item.icon;
+                          return (
+                            <button
+                              key={item.label}
+                              onClick={() => {
+                                if (item.onClick) item.onClick();
+                                setMenuOpen(false);
+                              }}
+                              className={`flex items-center gap-3 transition-all duration-300 py-4 border-b border-green-800/40 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer ${item.path && isActivePath(item.path)
                                 ? "text-emerald-100 bg-green-800/40 border-green-600"
                                 : "text-white hover:text-gray-200 hover:border-green-600"
-                            }`}
-                            style={{ animationDelay: `${index * 50 + 300}ms` }}
-                          >
-                            <IconComponent className="h-4 w-4 text-gray-200" />
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                                }`}
+                              style={{ animationDelay: `${index * 50 + 300}ms` }}
+                            >
+                              <IconComponent className="h-4 w-4 text-gray-200" />
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Authentication Buttons for Mobile - Show when NOT logged in */}
               {!currentUser && (
                 <div className="space-y-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp"
-                     style={{ animationDelay: "400ms" }}>
+                  style={{ animationDelay: "400ms" }}>
                   <button
                     onClick={handleLoginClick}
                     className="w-full bg-white hover:bg-emerald-100 text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30 cursor-pointer"
@@ -600,7 +610,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                   <div className="absolute top-0 right-0 w-64 h-64 bg-green-600/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
                   <div className="absolute bottom-0 left-0 w-48 h-48 bg-green-700/10 rounded-full -ml-24 -mb-24 blur-2xl"></div>
                 </div>
-                
+
                 <div className="px-6 pb-6 -mt-20 relative z-10">
                   <div className="relative inline-block group">
                     <div className="absolute -inset-2 bg-gradient-to-r from-green-500 to-green-600 rounded-full opacity-75 blur-lg group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></div>
@@ -646,7 +656,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                         <span className="text-white">{userProfileData.phone}</span>
                       </div>
                     )}
-                    
+
                     {userProfileData.location !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
                         <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
@@ -658,7 +668,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                         <span className="text-white">{userProfileData.location}</span>
                       </div>
                     )}
-                    
+
                     {userProfileData.languages !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
                         <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
@@ -670,7 +680,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                         <span className="text-white">{userProfileData.languages}</span>
                       </div>
                     )}
-                    
+
                     {userProfileData.experience && (
                       <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
                         <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
@@ -680,17 +690,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                         <span className="text-white">{userProfileData.experience} years</span>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
                       <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
                         <User className="h-3.5 w-3.5 text-green-400" />
                       </div>
                       <span className="text-green-300 font-medium">Role: </span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-300 hover:scale-105 ${
-                        userProfileData.role === "Service Provider" 
-                          ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-700/50 border border-green-500/30" 
-                          : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-600/50 border border-green-400/30"
-                      }`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-300 hover:scale-105 ${userProfileData.role === "Service Provider"
+                        ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-700/50 border border-green-500/30"
+                        : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-600/50 border border-green-400/30"
+                        }`}>
                         {userProfileData.role}
                       </span>
                     </div>
@@ -746,7 +755,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
               </div>
 
               <div className="px-6 py-5 border-t border-green-700/30 bg-gradient-to-b from-gray-900 to-black mt-auto animate-fadeInUp" style={{ animationDelay: "600ms" }}>
-                <button 
+                <button
                   onClick={handleLogout}
                   className="flex items-center gap-4 p-3.5 rounded-xl hover:bg-red-600/40 text-red-400 hover:text-red-300 transition-all duration-300 w-full group border border-red-700/30 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-900/30 hover:scale-[1.02] cursor-pointer"
                 >

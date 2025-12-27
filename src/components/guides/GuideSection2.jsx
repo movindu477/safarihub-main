@@ -18,7 +18,6 @@ const GuideSection2 = ({ currentUser, userRole }) => {
     priceRange: '',
     qualification: '',
     languages: [],
-    verification: [],
     currency: ''
   });
 
@@ -59,23 +58,21 @@ const GuideSection2 = ({ currentUser, userRole }) => {
       { value: '30000-50000', label: 'LKR 30,000 – 50,000 / day' }
     ],
     qualifications: [
-      'Tourism License',
-      'Tour Guide Certificate',
-      'Wildlife Department Certification',
-      'Eco Tourism Certification',
-      'Cultural Heritage Knowledge',
-      'Adventure Tourism Certified'
+      'SLTDA Licensed Tour Guide',
+      'National Tourist Guide (NTG)',
+      'Chauffeur / Driver Guide License',
+      'Diploma in Tourism & Hospitality',
+      'Certificate in Tour Guiding',
+      'Wildlife & Safari Guide Certification',
+      'Eco-Tourism Guide Certification',
+      'First Aid & CPR Certified',
+      'English-Speaking Guide',
+      'Multilingual Guide'
     ],
     languages: [
-      'English', 'Sinhala', 'Tamil', 'Hindi', 
+      'English', 'Sinhala', 'Tamil', 'Hindi',
       'French', 'German', 'Chinese', 'Japanese',
       'Spanish', 'Korean', 'Russian', 'Arabic'
-    ],
-    verificationDocs: [
-      'Government Guide License',
-      'First Aid Certificate',
-      'Driving License',
-      'Police Clearance Certificate'
     ],
     currencies: [
       'LKR - Sri Lankan Rupee',
@@ -88,7 +85,7 @@ const GuideSection2 = ({ currentUser, userRole }) => {
   // Real-time data listener for tour guides
   useEffect(() => {
     console.log('🔔 Setting up real-time data listener for tour guides...');
-    
+
     const serviceProvidersRef = collection(db, 'serviceProviders');
     const tourGuidesQuery = query(
       serviceProvidersRef,
@@ -98,13 +95,13 @@ const GuideSection2 = ({ currentUser, userRole }) => {
 
     const unsubscribe = onSnapshot(tourGuidesQuery, (snapshot) => {
       console.log('🔄 Real-time tour guides data update received');
-      
+
       const updatedGuides = [];
-      
+
       snapshot.forEach((doc) => {
         const providerData = doc.data();
         const providerId = doc.id;
-        
+
         // Only include Tour Guides
         if (providerData.serviceType === 'Tour Guide') {
           updatedGuides.push({
@@ -113,40 +110,40 @@ const GuideSection2 = ({ currentUser, userRole }) => {
             guideName: providerData.fullName || providerData.guideName || 'Tour Guide',
             imageUrl: providerData.profilePicture || providerData.imageUrl || '',
             location: providerData.location || providerData.baseLocation || 'Sri Lanka',
-            
+
             // Service Info
-            rating: typeof providerData.rating === 'number' ? providerData.rating : 
-                   typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
+            rating: typeof providerData.rating === 'number' ? providerData.rating :
+              typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
             totalReviews: providerData.totalReviews || 0,
             hourlyRate: providerData.hourlyRate || 0,
             dailyRate: providerData.dailyRate || 0,
             specialPackageRates: providerData.specialPackageRates || '',
             currencyPreference: providerData.currencyPreference || 'LKR',
             experience: providerData.experienceYears || providerData.experience || 0,
-            
+
             // Guide-specific arrays with proper fallbacks
-            specialQualifications: Array.isArray(providerData.specialQualifications) ? providerData.specialQualifications : 
-                                 providerData.specialQualifications ? [providerData.specialQualifications] : [],
+            specialQualifications: Array.isArray(providerData.specialQualifications) ? providerData.specialQualifications :
+              providerData.specialQualifications ? [providerData.specialQualifications] : [],
             areasOfExpertise: Array.isArray(providerData.areasOfExpertise) ? providerData.areasOfExpertise :
-                           providerData.areasOfExpertise ? [providerData.areasOfExpertise] : [],
+              providerData.areasOfExpertise ? [providerData.areasOfExpertise] : [],
             verificationDocuments: Array.isArray(providerData.verificationDocuments) ? providerData.verificationDocuments :
-                                providerData.verificationDocuments ? [providerData.verificationDocuments] : [],
+              providerData.verificationDocuments ? [providerData.verificationDocuments] : [],
             languages: Array.isArray(providerData.languages) ? providerData.languages :
-                      Array.isArray(providerData.languagesSpoken) ? providerData.languagesSpoken :
-                      providerData.languagesSpoken ? [providerData.languagesSpoken] :
-                      providerData.languages ? [providerData.languages] :
-                      ['English', 'Sinhala'],
-            
+              Array.isArray(providerData.languagesSpoken) ? providerData.languagesSpoken :
+                providerData.languagesSpoken ? [providerData.languagesSpoken] :
+                  providerData.languages ? [providerData.languages] :
+                    ['English', 'Sinhala'],
+
             // Contact Info
             contactPhone: providerData.contactPhone || providerData.phone || providerData.phoneNumber || 'Not provided',
             contactEmail: providerData.contactEmail || providerData.email || '',
             description: providerData.description || providerData.bio || 'Experienced tour guide',
-            
+
             // Additional fields
             featured: providerData.featured || false,
             availability: providerData.availability !== false,
             availableDates: providerData.availableDates || [],
-            
+
             // Mark if this is the current user's profile
             isCurrentUser: currentUser && currentUser.uid === providerId
           });
@@ -154,15 +151,15 @@ const GuideSection2 = ({ currentUser, userRole }) => {
       });
 
       const currentUserGuide = updatedGuides.find(g => g.isCurrentUser);
-      
+
       console.log(`🗺️ Real-time data: ${updatedGuides.length} tour guides`);
       if (currentUserGuide) {
         console.log(`👤 Current user guide: ${currentUserGuide.guideName}`);
       }
-      
+
       setGuides(updatedGuides);
       setFilteredGuides(updatedGuides);
-      
+
       if (loading) {
         setLoading(false);
       }
@@ -181,13 +178,13 @@ const GuideSection2 = ({ currentUser, userRole }) => {
   // Filter logic
   useEffect(() => {
     console.log('🔄 Applying filters...', filters);
-    
+
     let filtered = [...guides];
 
     // Expertise area filter
     if (filters.expertise) {
-      filtered = filtered.filter(guide => 
-        guide.areasOfExpertise?.some(expertise => 
+      filtered = filtered.filter(guide =>
+        guide.areasOfExpertise?.some(expertise =>
           expertise.toLowerCase().includes(filters.expertise.toLowerCase())
         )
       );
@@ -196,7 +193,7 @@ const GuideSection2 = ({ currentUser, userRole }) => {
     // Rating filter
     if (filters.rating) {
       const minRating = parseInt(filters.rating);
-      filtered = filtered.filter(guide => 
+      filtered = filtered.filter(guide =>
         (guide.rating || 0) >= minRating
       );
     }
@@ -212,8 +209,8 @@ const GuideSection2 = ({ currentUser, userRole }) => {
 
     // Qualification filter
     if (filters.qualification) {
-      filtered = filtered.filter(guide => 
-        guide.specialQualifications?.some(qual => 
+      filtered = filtered.filter(guide =>
+        guide.specialQualifications?.some(qual =>
           qual.toLowerCase().includes(filters.qualification.toLowerCase())
         )
       );
@@ -222,20 +219,9 @@ const GuideSection2 = ({ currentUser, userRole }) => {
     // Languages filter
     if (filters.languages.length > 0) {
       filtered = filtered.filter(guide =>
-        filters.languages.every(lang => 
-          guide.languages?.some(gLang => 
+        filters.languages.every(lang =>
+          guide.languages?.some(gLang =>
             gLang.toLowerCase().includes(lang.toLowerCase())
-          )
-        )
-      );
-    }
-
-    // Verification documents filter
-    if (filters.verification.length > 0) {
-      filtered = filtered.filter(guide =>
-        filters.verification.every(verif => 
-          guide.verificationDocuments?.some(gVerif => 
-            gVerif.toLowerCase().includes(verif.toLowerCase())
           )
         )
       );
@@ -269,35 +255,35 @@ const GuideSection2 = ({ currentUser, userRole }) => {
   };
 
   // Handle profile box click - Navigate to guide profile with guide data
-// Handle profile box click - Navigate to guide profile with guide data
-const handleProfileClick = (guide) => {
-  console.log('👤 Navigating to guide profile:', guide.id, guide.guideName);
-  
-  // Store the guide data in sessionStorage to pass to the profile page
-  sessionStorage.setItem('currentGuideData', JSON.stringify(guide));
-  
-  // Save the guide ID to sessionStorage so we can scroll to it when coming back
-  sessionStorage.setItem('lastViewedGuideId', guide.id);
-  sessionStorage.setItem('scrollToGuide', 'true');
-  
-  // Navigate to guide profile - FIXED NAVIGATION
-  navigate(`/guide-profile/${guide.id}`);
-};
+  // Handle profile box click - Navigate to guide profile with guide data
+  const handleProfileClick = (guide) => {
+    console.log('👤 Navigating to guide profile:', guide.id, guide.guideName);
 
-// Handle chat button click
-const handleChatClick = (guide, e) => {
-  e.stopPropagation();
-  console.log('💬 Opening chat for guide:', guide.id);
-  
-  // Store guide data and navigate with chat parameter
-  sessionStorage.setItem('currentGuideData', JSON.stringify(guide));
-  
-  // Save the guide ID to sessionStorage so we can scroll to it when coming back
-  sessionStorage.setItem('lastViewedGuideId', guide.id);
-  sessionStorage.setItem('scrollToGuide', 'true');
-  
-  navigate(`/guide-profile/${guide.id}?openChat=true`);
-};
+    // Store the guide data in sessionStorage to pass to the profile page
+    sessionStorage.setItem('currentGuideData', JSON.stringify(guide));
+
+    // Save the guide ID to sessionStorage so we can scroll to it when coming back
+    sessionStorage.setItem('lastViewedGuideId', guide.id);
+    sessionStorage.setItem('scrollToGuide', 'true');
+
+    // Navigate to guide profile - FIXED NAVIGATION
+    navigate(`/guide-profile/${guide.id}`);
+  };
+
+  // Handle chat button click
+  const handleChatClick = (guide, e) => {
+    e.stopPropagation();
+    console.log('💬 Opening chat for guide:', guide.id);
+
+    // Store guide data and navigate with chat parameter
+    sessionStorage.setItem('currentGuideData', JSON.stringify(guide));
+
+    // Save the guide ID to sessionStorage so we can scroll to it when coming back
+    sessionStorage.setItem('lastViewedGuideId', guide.id);
+    sessionStorage.setItem('scrollToGuide', 'true');
+
+    navigate(`/guide-profile/${guide.id}?openChat=true`);
+  };
 
   // Clear filters completely
   const clearFilters = () => {
@@ -310,7 +296,7 @@ const handleChatClick = (guide, e) => {
       verification: [],
       currency: ''
     });
-    
+
     setFilteredGuides(guides);
     console.log('🧹 All filters cleared, showing all guides:', guides.length);
   };
@@ -394,9 +380,8 @@ const handleChatClick = (guide, e) => {
         <img
           src={guide.imageUrl}
           alt={guide.guideName}
-          className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
           onError={handleImageError}
           onLoad={handleImageLoad}
           loading="lazy"
@@ -425,13 +410,13 @@ const handleChatClick = (guide, e) => {
           <h3 className="text-2xl font-bold text-gray-800 mb-3">Something went wrong</h3>
           <p className="text-gray-600 mb-6">{error}</p>
           <div className="space-y-3">
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="w-full bg-blue-500 text-white py-3 px-6 rounded-lg hover:bg-blue-600 transition-colors font-semibold"
             >
               Try Again
             </button>
-            <button 
+            <button
               onClick={clearFilters}
               className="w-full border border-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -490,7 +475,7 @@ const handleChatClick = (guide, e) => {
             {/* Expertise Area Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🗺️ Area of Expertise
+                Area of Expertise
               </label>
               <select
                 value={filters.expertise}
@@ -507,7 +492,7 @@ const handleChatClick = (guide, e) => {
             {/* Ratings Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                ⭐ Rating
+                Rating
               </label>
               <select
                 value={filters.rating}
@@ -526,7 +511,7 @@ const handleChatClick = (guide, e) => {
             {/* Hourly Price Range Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                💰 Hourly Rate
+                Hourly Rate
               </label>
               <select
                 value={filters.priceRange}
@@ -545,7 +530,7 @@ const handleChatClick = (guide, e) => {
             {/* Qualification Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🎓 Qualification
+                Qualification
               </label>
               <select
                 value={filters.qualification}
@@ -561,11 +546,11 @@ const handleChatClick = (guide, e) => {
           </div>
 
           {/* Multi-select Filters */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             {/* Languages Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🌐 Languages
+                Languages
               </label>
               <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-white">
                 {filterOptions.languages.map(language => (
@@ -585,33 +570,10 @@ const handleChatClick = (guide, e) => {
               </div>
             </div>
 
-            {/* Verification Documents Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📄 Verification Documents
-              </label>
-              <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-white">
-                {filterOptions.verificationDocs.map(doc => (
-                  <div key={doc} className="flex items-center mb-2">
-                    <input
-                      type="checkbox"
-                      id={`verif-${doc}`}
-                      checked={filters.verification.includes(doc)}
-                      onChange={() => handleMultiSelectChange('verification', doc)}
-                      className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`verif-${doc}`} className="text-sm text-gray-700 flex-1">
-                      {doc}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Currency Preference Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                💵 Currency Preference
+                Currency Preference
               </label>
               <select
                 value={filters.currency}
@@ -632,7 +594,7 @@ const handleChatClick = (guide, e) => {
         {/* Results Count */}
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <p className="text-gray-600 text-lg">
-            Found <span className="font-bold text-blue-600">{filteredGuides.length}</span> guide{filteredGuides.length !== 1 ? 's' : ''} 
+            Found <span className="font-bold text-blue-600">{filteredGuides.length}</span> guide{filteredGuides.length !== 1 ? 's' : ''}
             {guides.length > 0 && ` out of ${guides.length} total`}
           </p>
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
@@ -651,7 +613,7 @@ const handleChatClick = (guide, e) => {
         {filteredGuides.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredGuides.slice(0, 12).map((guide, index) => (
-              <div 
+              <div
                 key={guide.id}
                 id={`guide-card-${guide.id}`}
                 className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
@@ -661,7 +623,7 @@ const handleChatClick = (guide, e) => {
                 <div className="h-48 relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700">
                   <ProfileImage guide={guide} />
                   <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
-                  
+
                   {/* Experience Badge */}
                   {guide.experience > 0 && (
                     <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
@@ -695,7 +657,7 @@ const handleChatClick = (guide, e) => {
                       </h3>
                       {/* Quick Chat Button - Show for all users except current user */}
                       {!guide.isCurrentUser && (
-                        <button 
+                        <button
                           className="ml-2 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
                           onClick={(e) => handleChatClick(guide, e)}
                           title="Start Chat"
@@ -783,7 +745,7 @@ const handleChatClick = (guide, e) => {
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-2xl font-bold text-gray-800 mb-4">No guides found</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {guides.length === 0 
+              {guides.length === 0
                 ? "No tour guides are currently registered. Check back later or contact support."
                 : "We couldn't find any tour guides matching your current filters. Try adjusting your search criteria."
               }

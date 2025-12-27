@@ -11,6 +11,8 @@ import yala5 from '../assets/yala5.jpg';
 import yala6 from '../assets/yala6.jpg';
 import yala7 from '../assets/yala7.jpg';
 import yala8 from '../assets/yala8.jpg';
+import yala9 from '../assets/yala9.jpg';
+import yala10 from '../assets/yala10.webp';
 import wilpattuBackground from '../assets/wilpattu.avif';
 import mirissaBackground from '../assets/mirissa.avif';
 import unaBackground from '../assets/una.avif';
@@ -102,6 +104,20 @@ Best visited during the dry season (February to June), the park provides excelle
         description: 'Important prey species found throughout the park.',
         populationEstimate: '2,000–3,000',
         abundance: 'Common. Important prey species.'
+      },
+      {
+        name: 'Grey / Purple-faced Langur',
+        image: yala9,
+        description: 'Endemic primate species with distinctive grey and purple facial markings, commonly seen in tree canopies.',
+        populationEstimate: '600–1,000',
+        abundance: 'Common in forested areas. Often seen in troops in the tree canopy.'
+      },
+      {
+        name: 'Fishing Cat',
+        image: yala10,
+        description: 'A medium-sized wild cat adapted to wetland habitats, known for its exceptional fishing abilities.',
+        populationEstimate: '20–40',
+        abundance: 'Rare. Nocturnal and elusive, mostly found near water bodies and wetlands.'
       }
     ],
     accommodations: [
@@ -296,7 +312,7 @@ The beach is famous for being one of the best whale watching destinations in the
         description: 'Lodge at the base of the range'
       }
     ],
-    tips: ['Requires good fitness for trekking', 'Hire a local guide', 'Check weather conditions'    ],
+    tips: ['Requires good fitness for trekking', 'Hire a local guide', 'Check weather conditions'],
     mapZoom: 12
   },
   'lunugamvehera': {

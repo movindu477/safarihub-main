@@ -54,7 +54,7 @@ const JeepSection2 = ({ currentUser }) => {
       '4x4 Modified Jeep'
     ],
     languages: [
-      'English', 'Sinhala', 'Tamil', 'Hindi', 
+      'English', 'Sinhala', 'Tamil', 'Hindi',
       'French', 'German', 'Chinese', 'Japanese'
     ],
     specialSkills: [
@@ -79,7 +79,7 @@ const JeepSection2 = ({ currentUser }) => {
   // Real-time data listener for service providers
   useEffect(() => {
     console.log('🔔 Setting up real-time data listener for service providers...');
-    
+
     const serviceProvidersRef = collection(db, 'serviceProviders');
     const jeepDriversQuery = query(
       serviceProvidersRef,
@@ -89,13 +89,13 @@ const JeepSection2 = ({ currentUser }) => {
 
     const unsubscribe = onSnapshot(jeepDriversQuery, (snapshot) => {
       console.log('🔄 Real-time service providers data update received');
-      
+
       const updatedJeeps = [];
-      
+
       snapshot.forEach((doc) => {
         const providerData = doc.data();
         const providerId = doc.id;
-        
+
         // Only include Jeep Drivers
         if (providerData.serviceType === 'Jeep Driver') {
           updatedJeeps.push({
@@ -104,34 +104,34 @@ const JeepSection2 = ({ currentUser }) => {
             driverName: providerData.fullName || providerData.driverName || 'Safari Driver',
             imageUrl: providerData.profilePicture || providerData.imageUrl || '',
             location: providerData.location || providerData.baseLocation || 'Sri Lanka',
-            
+
             // Service Info
-            rating: typeof providerData.rating === 'number' ? providerData.rating : 
-                   typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
+            rating: typeof providerData.rating === 'number' ? providerData.rating :
+              typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
             totalReviews: providerData.totalReviews || 0,
             pricePerDay: providerData.pricePerDay || providerData.price || providerData.dailyRate || 0,
             vehicleType: providerData.vehicleType || 'Standard Safari Jeep',
             experience: providerData.experienceYears || providerData.experience || 0,
-            
+
             // Arrays with proper fallbacks
-            destinations: Array.isArray(providerData.destinations) ? providerData.destinations : 
-                         providerData.destinations ? [providerData.destinations] : 
-                         ['Multiple National Parks'],
+            destinations: Array.isArray(providerData.destinations) ? providerData.destinations :
+              providerData.destinations ? [providerData.destinations] :
+                ['Multiple National Parks'],
             languages: Array.isArray(providerData.languages) ? providerData.languages :
-                      Array.isArray(providerData.languagesSpoken) ? providerData.languagesSpoken :
-                      providerData.languagesSpoken ? [providerData.languagesSpoken] :
-                      providerData.languages ? [providerData.languages] :
-                      ['English', 'Sinhala'],
+              Array.isArray(providerData.languagesSpoken) ? providerData.languagesSpoken :
+                providerData.languagesSpoken ? [providerData.languagesSpoken] :
+                  providerData.languages ? [providerData.languages] :
+                    ['English', 'Sinhala'],
             specialSkills: Array.isArray(providerData.specialSkills) ? providerData.specialSkills :
-                          providerData.specialSkills ? [providerData.specialSkills] : [],
+              providerData.specialSkills ? [providerData.specialSkills] : [],
             certifications: Array.isArray(providerData.certifications) ? providerData.certifications :
-                           providerData.certifications ? [providerData.certifications] : [],
-            
+              providerData.certifications ? [providerData.certifications] : [],
+
             // Contact Info
             contactPhone: providerData.contactPhone || providerData.phone || providerData.phoneNumber || 'Not provided',
             contactEmail: providerData.contactEmail || providerData.email || '',
             description: providerData.description || providerData.bio || 'Experienced safari jeep driver',
-            
+
             // Mark if this is the current user's profile
             isCurrentUser: currentUser && currentUser.uid === providerId
           });
@@ -139,15 +139,15 @@ const JeepSection2 = ({ currentUser }) => {
       });
 
       const currentUserJeep = updatedJeeps.find(j => j.isCurrentUser);
-      
+
       console.log(`🚙 Real-time data: ${updatedJeeps.length} jeep drivers`);
       if (currentUserJeep) {
         console.log(`👤 Current user jeep: ${currentUserJeep.driverName}`);
       }
-      
+
       setJeeps(updatedJeeps);
       setFilteredJeeps(updatedJeeps);
-      
+
       if (loading) {
         setLoading(false);
       }
@@ -166,13 +166,13 @@ const JeepSection2 = ({ currentUser }) => {
   // Filter logic
   useEffect(() => {
     console.log('🔄 Applying filters...', filters);
-    
+
     let filtered = [...jeeps];
 
     // Destination filter
     if (filters.destination) {
-      filtered = filtered.filter(jeep => 
-        jeep.destinations?.some(dest => 
+      filtered = filtered.filter(jeep =>
+        jeep.destinations?.some(dest =>
           dest.toLowerCase().includes(filters.destination.toLowerCase())
         )
       );
@@ -181,7 +181,7 @@ const JeepSection2 = ({ currentUser }) => {
     // Rating filter
     if (filters.rating) {
       const minRating = parseInt(filters.rating);
-      filtered = filtered.filter(jeep => 
+      filtered = filtered.filter(jeep =>
         (jeep.rating || 0) >= minRating
       );
     }
@@ -197,7 +197,7 @@ const JeepSection2 = ({ currentUser }) => {
 
     // Vehicle type filter
     if (filters.vehicleType) {
-      filtered = filtered.filter(jeep => 
+      filtered = filtered.filter(jeep =>
         jeep.vehicleType?.toLowerCase() === filters.vehicleType.toLowerCase()
       );
     }
@@ -205,8 +205,8 @@ const JeepSection2 = ({ currentUser }) => {
     // Languages filter
     if (filters.languages.length > 0) {
       filtered = filtered.filter(jeep =>
-        filters.languages.every(lang => 
-          jeep.languages?.some(jLang => 
+        filters.languages.every(lang =>
+          jeep.languages?.some(jLang =>
             jLang.toLowerCase().includes(lang.toLowerCase())
           )
         )
@@ -216,8 +216,8 @@ const JeepSection2 = ({ currentUser }) => {
     // Special skills filter
     if (filters.specialSkills.length > 0) {
       filtered = filtered.filter(jeep =>
-        filters.specialSkills.every(skill => 
-          jeep.specialSkills?.some(jSkill => 
+        filters.specialSkills.every(skill =>
+          jeep.specialSkills?.some(jSkill =>
             jSkill.toLowerCase().includes(skill.toLowerCase())
           )
         )
@@ -227,8 +227,8 @@ const JeepSection2 = ({ currentUser }) => {
     // Certifications filter
     if (filters.certifications.length > 0) {
       filtered = filtered.filter(jeep =>
-        filters.certifications.every(cert => 
-          jeep.certifications?.some(jCert => 
+        filters.certifications.every(cert =>
+          jeep.certifications?.some(jCert =>
             jCert.toLowerCase().includes(cert.toLowerCase())
           )
         )
@@ -283,7 +283,7 @@ const JeepSection2 = ({ currentUser }) => {
       specialSkills: [],
       certifications: []
     });
-    
+
     setFilteredJeeps(jeeps);
     console.log('🧹 All filters cleared, showing all jeeps:', jeeps.length);
   };
@@ -357,9 +357,8 @@ const JeepSection2 = ({ currentUser }) => {
         <img
           src={jeep.imageUrl}
           alt={jeep.driverName}
-          className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
           onError={handleImageError}
           onLoad={handleImageLoad}
           loading="lazy"
@@ -388,13 +387,13 @@ const JeepSection2 = ({ currentUser }) => {
           <h3 className="text-2xl font-bold text-gray-800 mb-3">Something went wrong</h3>
           <p className="text-gray-600 mb-6">{error}</p>
           <div className="space-y-3">
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="w-full bg-emerald-500 text-white py-3 px-6 rounded-lg hover:bg-emerald-600 transition-colors font-semibold"
             >
               Try Again
             </button>
-            <button 
+            <button
               onClick={clearFilters}
               className="w-full border border-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -453,7 +452,7 @@ const JeepSection2 = ({ currentUser }) => {
             {/* Destination Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🗺️ Destination
+                Destination
               </label>
               <select
                 value={filters.destination}
@@ -470,7 +469,7 @@ const JeepSection2 = ({ currentUser }) => {
             {/* Ratings Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                ⭐ Rating
+                Rating
               </label>
               <select
                 value={filters.rating}
@@ -489,7 +488,7 @@ const JeepSection2 = ({ currentUser }) => {
             {/* Price Range Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                💰 Price Range
+                Price Range
               </label>
               <select
                 value={filters.priceRange}
@@ -508,7 +507,7 @@ const JeepSection2 = ({ currentUser }) => {
             {/* Vehicle Type Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🚙 Vehicle Type
+                Vehicle Type
               </label>
               <select
                 value={filters.vehicleType}
@@ -528,7 +527,7 @@ const JeepSection2 = ({ currentUser }) => {
             {/* Languages Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🌐 Languages
+                Languages
               </label>
               <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-white">
                 {filterOptions.languages.map(language => (
@@ -599,7 +598,7 @@ const JeepSection2 = ({ currentUser }) => {
         {/* Results Count */}
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <p className="text-gray-600 text-lg">
-            Found <span className="font-bold text-emerald-600">{filteredJeeps.length}</span> jeep{filteredJeeps.length !== 1 ? 's' : ''} 
+            Found <span className="font-bold text-emerald-600">{filteredJeeps.length}</span> jeep{filteredJeeps.length !== 1 ? 's' : ''}
             {jeeps.length > 0 && ` out of ${jeeps.length} total`}
           </p>
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
@@ -614,7 +613,7 @@ const JeepSection2 = ({ currentUser }) => {
         {filteredJeeps.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredJeeps.slice(0, 12).map((jeep, index) => (
-              <div 
+              <div
                 key={jeep.id}
                 id={`driver-card-${jeep.id}`}
                 className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
@@ -624,7 +623,7 @@ const JeepSection2 = ({ currentUser }) => {
                 <div className="h-48 relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700">
                   <ProfileImage jeep={jeep} />
                   <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
-                  
+
                   {/* Experience Badge */}
                   {jeep.experience > 0 && (
                     <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
@@ -651,7 +650,7 @@ const JeepSection2 = ({ currentUser }) => {
                       </h3>
                       {/* Quick Chat Button - Show for all users except current user */}
                       {!jeep.isCurrentUser && (
-                        <button 
+                        <button
                           className="ml-2 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
                           onClick={(e) => handleChatClick(jeep, e)}
                           title="Start Chat"
@@ -730,7 +729,7 @@ const JeepSection2 = ({ currentUser }) => {
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-2xl font-bold text-gray-800 mb-4">No jeeps found</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {jeeps.length === 0 
+              {jeeps.length === 0
                 ? "No jeep drivers are currently registered. Check back later or contact support."
                 : "We couldn't find any safari jeeps matching your current filters. Try adjusting your search criteria."
               }

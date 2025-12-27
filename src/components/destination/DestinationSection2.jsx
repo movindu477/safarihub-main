@@ -1,18 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  Filter, 
-  MapPin, 
-  Camera, 
-  Clock, 
-  DollarSign, 
-  Star, 
-  Users, 
-  Car,
-  Calendar,
+import {
+  Filter,
+  MapPin,
   ChevronDown,
   Search,
-  X
+  X,
+  AlertCircle
 } from "lucide-react";
 
 // Import background images
@@ -26,7 +20,6 @@ import lunuBackground from "../../assets/lunu.jpg";
 import kumanaBackground from "../../assets/kumana.jpg";
 import sinBackground from "../../assets/sin.avif";
 import knuckfoBackground from "../../assets/knuckfo.jpg";
-import camera1Background from "../../assets/camera1.avif";
 
 export default function Destination2() {
   const navigate = useNavigate();
@@ -43,146 +36,210 @@ export default function Destination2() {
       'Lunugamvehera': 'lunugamvehera',
       'Kumana Wildlife': 'kumana-wildlife',
       'Sinharaja Forest Reserve': 'sinharaja-forest-reserve',
-      'Knuckles Forest Reserve': 'knuckles-forest-reserve',
-      'Camera Equipment': 'camera-equipment',
-      'Adventure Gear': 'adventure-gear'
+      'Knuckles Forest Reserve': 'knuckles-forest-reserve'
     };
     return idMap[name] || name.toLowerCase().replace(/\s+/g, '-');
   };
 
+  // All destination names for search
+  const allDestinations = [
+    "Yala National Park",
+    "Wilpattu National Park",
+    "Mirissa Beach",
+    "Unawatuna Beach",
+    "Horton Plains",
+    "Knuckles Mountain Range",
+    "Lunugamvehera",
+    "Kumana Wildlife",
+    "Sinharaja Forest Reserve",
+    "Knuckles Forest Reserve"
+  ];
+
+  // Map destination names to their section IDs
+  const destinationToSectionMap = {
+    "Yala National Park": "national-parks",
+    "Wilpattu National Park": "national-parks",
+    "Mirissa Beach": "beaches",
+    "Unawatuna Beach": "beaches",
+    "Horton Plains": "camping-sites",
+    "Knuckles Mountain Range": "camping-sites",
+    "Lunugamvehera": "sanctuaries",
+    "Kumana Wildlife": "sanctuaries",
+    "Sinharaja Forest Reserve": "forest-reserves",
+    "Knuckles Forest Reserve": "forest-reserves"
+  };
+
+  // Category to section ID mapping
+  const categoryToSectionMap = {
+    "National Parks": "national-parks",
+    "Wildlife Sanctuaries": "sanctuaries",
+    "Famous Beaches": "beaches",
+    "Forest Reserves": "forest-reserves",
+    "Camping Sites": "camping-sites"
+  };
+
   const [filters, setFilters] = useState({
-    location: "",
-    safariType: "",
-    wildlife: "",
-    duration: "",
-    priceRange: "",
-    season: "",
-    difficulty: "",
-    vehicleType: "",
-    groupSize: "",
-    rating: "",
-    services: []
+    location: ""
   });
 
   const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const searchInputRef = useRef(null);
+  const suggestionsRef = useRef(null);
 
-  // Filter options data
+  // Filter options - only 5 main categories
   const filterOptions = {
     location: [
-      "Yala National Park",
-      "Udawalawe National Park", 
-      "Wilpattu National Park",
-      "Minneriya National Park",
-      "Kumana National Park",
-      "Horton Plains",
-      "Sinharaja Forest",
-      "Bundala National Park"
-    ],
-    safariType: [
-      "Jeep Safari",
-      "Night Safari",
-      "Bird Watching Safari", 
-      "Photography Safari",
-      "Private / Luxury Safari",
-      "Walking Safari"
-    ],
-    wildlife: [
-      "Leopard Spotting",
-      "Elephants",
-      "Birds",
-      "Crocodiles", 
-      "Bears",
-      "Rare Species",
-      "Deer",
-      "Wild Boar"
-    ],
-    duration: [
-      "2-3 hours",
-      "Half day (4-5 hours)",
-      "Full day (8+ hours)", 
-      "Multi-day packages"
-    ],
-    priceRange: [
-      "Budget (Under $50)",
-      "Standard ($50 - $100)",
-      "Premium ($100 - $200)",
-      "Luxury ($200+)"
-    ],
-    season: [
-      "Morning Safari",
-      "Evening Safari", 
-      "Dry Season (Best)",
-      "Wet Season",
-      "Year Round"
-    ],
-    difficulty: [
-      "Easy / Beginner",
-      "Medium",
-      "Hard terrain",
-      "Wheelchair friendly"
-    ],
-    vehicleType: [
-      "Standard Jeep",
-      "Luxury Jeep", 
-      "Open-roof Jeep",
-      "Private Jeep",
-      "4x4 Modified Jeep"
-    ],
-    groupSize: [
-      "Solo",
-      "Couple", 
-      "Family (2-4)",
-      "Large Group (5+)"
-    ],
-    rating: [
-      "5 stars",
-      "4 stars & above", 
-      "3 stars & above",
-      "Most popular",
-      "Newly added"
+      "National Parks",
+      "Wildlife Sanctuaries",
+      "Famous Beaches",
+      "Forest Reserves",
+      "Camping Sites"
     ]
   };
-
-  const additionalServices = [
-    "Hotel pickup & drop",
-    "Food included",
-    "Guide included",
-    "Photography guide", 
-    "Camping included",
-    "Insurance",
-    "Park fees included"
-  ];
 
   const handleFilterChange = (filterType, value) => {
     setFilters(prev => ({
       ...prev,
       [filterType]: value
     }));
-  };
 
-  const handleServiceToggle = (service) => {
-    setFilters(prev => ({
-      ...prev,
-      services: prev.services.includes(service)
-        ? prev.services.filter(s => s !== service)
-        : [...prev.services, service]
-    }));
+    // Scroll to the selected section
+    if (value && categoryToSectionMap[value]) {
+      setTimeout(() => {
+        scrollToSection(categoryToSectionMap[value]);
+      }, 100);
+    }
   };
 
   const clearFilters = () => {
     setFilters({
-      location: "",
-      safariType: "",
-      wildlife: "",
-      duration: "",
-      priceRange: "",
-      season: "",
-      difficulty: "",
-      vehicleType: "",
-      groupSize: "",
-      rating: "",
-      services: []
+      location: ""
     });
+    setSearchQuery("");
+    setSearchSuggestions([]);
+    setSearchError("");
+    // Scroll back to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Smooth scroll to section
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      const offset = 100; // Offset for fixed header
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    setSearchError("");
+
+    if (query.trim() === "") {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    // Case-insensitive search
+    const filtered = allDestinations.filter(dest =>
+      dest.toLowerCase().includes(query.toLowerCase())
+    );
+
+    setSearchSuggestions(filtered);
+    setShowSuggestions(filtered.length > 0);
+  };
+
+  // Handle search suggestion click
+  const handleSuggestionClick = (destination) => {
+    setSearchQuery(destination);
+    setShowSuggestions(false);
+    setSearchError("");
+
+    const sectionId = destinationToSectionMap[destination];
+    if (sectionId) {
+      setTimeout(() => {
+        scrollToSection(sectionId);
+      }, 100);
+    }
+  };
+
+  // Handle search submit (Enter key or button click)
+  const handleSearchSubmit = () => {
+    if (searchQuery.trim() === "") {
+      return;
+    }
+
+    // Find exact match (case-insensitive)
+    const matched = allDestinations.find(dest =>
+      dest.toLowerCase() === searchQuery.toLowerCase()
+    );
+
+    if (matched) {
+      handleSuggestionClick(matched);
+    } else {
+      // Find partial matches
+      const partialMatches = allDestinations.filter(dest =>
+        dest.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      if (partialMatches.length > 0) {
+        // Use first partial match
+        handleSuggestionClick(partialMatches[0]);
+      } else {
+        // No match found - show error
+        setSearchError("Destination not found. Coming soon!");
+        setShowSuggestions(false);
+      }
+    }
+  };
+
+  // Handle Enter key in search input
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSearchSubmit();
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Determine which sections to show based on filter
+  const shouldShowSection = (sectionId) => {
+    if (!filters.location) {
+      return true; // Show all if no filter
+    }
+    return categoryToSectionMap[filters.location] === sectionId;
   };
 
   const FilterSection = ({ title, icon: Icon, options, filterKey }) => (
@@ -209,45 +266,58 @@ export default function Destination2() {
   );
 
   // Reusable Section Component
-  const DestinationSection = ({ title, description, items, sectionId }) => (
-    <div id={sectionId} className="mb-16 scroll-mt-24">
-      <div className="text-center mb-12">
-        <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
-          {title}
-        </h2>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          {description}
-        </p>
-      </div>
+  const DestinationSection = ({ title, description, items, sectionId }) => {
+    if (!shouldShowSection(sectionId)) {
+      return null;
+    }
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {items.map((item, index) => (
-          <div key={index} className="relative rounded-2xl overflow-hidden shadow-2xl group">
-            <div 
-              className="h-96 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-              style={{ backgroundImage: `url(${item.background})` }}
+    return (
+      <div id={sectionId} className="mb-16 scroll-mt-24">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+            {title}
+          </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            {description}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {items.map((item, index) => (
+            <div
+              key={index}
+              onClick={() => navigate(`/destination/${getDestinationId(item.name)}`)}
+              className="relative rounded-2xl overflow-hidden shadow-2xl group cursor-pointer"
             >
-              <div className="absolute inset-0 bg-black/40 transition-all duration-300 group-hover:bg-black/30"></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-              
-              <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                <h3 className="text-3xl md:text-4xl font-black mb-4">{item.name}</h3>
-                <p className="text-lg mb-6 opacity-90 max-w-md">
-                  {item.description}
-                </p>
-                <button 
-                  onClick={() => navigate(`/destination/${getDestinationId(item.name)}`)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
-                >
-                  Explore {item.name.split(' ')[0]}
-                </button>
+              <div
+                className="h-96 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                style={{ backgroundImage: `url(${item.background})` }}
+              >
+                <div className="absolute inset-0 bg-black/40 transition-all duration-300 group-hover:bg-black/30"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+
+                <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                  <h3 className="text-3xl md:text-4xl font-black mb-4">{item.name}</h3>
+                  <p className="text-lg mb-6 opacity-90 max-w-md">
+                    {item.description}
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/destination/${getDestinationId(item.name)}`);
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
+                  >
+                    Explore {item.name.split(' ')[0]}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <section id="destinations-section" className="py-16 bg-gray-50">
@@ -261,24 +331,59 @@ export default function Destination2() {
             </span>
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover amazing wildlife experiences with our comprehensive filtering system. 
-            Find exactly what you're looking for in Sri Lanka's most beautiful national parks.
+            Discover amazing wildlife experiences with our comprehensive filtering system.
+            Find exactly what you're looking for in Sri Lanka's most beautiful destinations.
           </p>
         </div>
 
         {/* Search and Filter Bar */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <div className="flex flex-col lg:flex-row gap-4 items-center">
-            {/* Search Input */}
-            <div className="flex-1 relative">
+            {/* Search Input with Suggestions */}
+            <div className="flex-1 relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search destinations, wildlife, or experiences..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search destinations..."
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
+
+              {/* Search Suggestions Dropdown */}
+              {showSuggestions && searchSuggestions.length > 0 && (
+                <div
+                  ref={suggestionsRef}
+                  className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                >
+                  {searchSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="w-full text-left px-4 py-3 hover:bg-green-50 transition-colors border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Search className="h-4 w-4 text-gray-400" />
+                        <span className="text-gray-800">{suggestion}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Search Error Message */}
+              {searchError && (
+                <div className="absolute z-50 w-full mt-1 bg-red-50 border border-red-200 rounded-lg shadow-lg p-4">
+                  <div className="flex items-center gap-2 text-red-600">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">{searchError}</span>
+                  </div>
+                </div>
+              )}
             </div>
-            
+
             {/* Filter Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -290,7 +395,7 @@ export default function Destination2() {
             </button>
 
             {/* Clear Filters */}
-            {(filters.location || filters.safariType || filters.services.length > 0) && (
+            {filters.location && (
               <button
                 onClick={clearFilters}
                 className="flex items-center gap-2 text-gray-600 hover:text-gray-800 px-4 py-3 transition-colors"
@@ -304,128 +409,14 @@ export default function Destination2() {
           {/* Expanded Filters */}
           {showFilters && (
             <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {/* Main Filters */}
-                <FilterSection 
-                  title="Location / Region" 
-                  icon={MapPin} 
-                  options={filterOptions.location} 
-                  filterKey="location" 
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Location / Region Filter - Only 5 categories */}
+                <FilterSection
+                  title="Location / Region"
+                  icon={MapPin}
+                  options={filterOptions.location}
+                  filterKey="location"
                 />
-                
-                <FilterSection 
-                  title="Safari Type" 
-                  icon={Camera} 
-                  options={filterOptions.safariType} 
-                  filterKey="safariType" 
-                />
-                
-                <FilterSection 
-                  title="Wildlife Category" 
-                  icon={Star} 
-                  options={filterOptions.wildlife} 
-                  filterKey="wildlife" 
-                />
-                
-                <FilterSection 
-                  title="Duration" 
-                  icon={Clock} 
-                  options={filterOptions.duration} 
-                  filterKey="duration" 
-                />
-
-                <FilterSection 
-                  title="Price Range" 
-                  icon={DollarSign} 
-                  options={filterOptions.priceRange} 
-                  filterKey="priceRange" 
-                />
-                
-                <FilterSection 
-                  title="Best Time / Season" 
-                  icon={Calendar} 
-                  options={filterOptions.season} 
-                  filterKey="season" 
-                />
-                
-                <FilterSection 
-                  title="Difficulty" 
-                  icon={Users} 
-                  options={filterOptions.difficulty} 
-                  filterKey="difficulty" 
-                />
-                
-                <FilterSection 
-                  title="Vehicle Type" 
-                  icon={Car} 
-                  options={filterOptions.vehicleType} 
-                  filterKey="vehicleType" 
-                />
-
-                {/* Group Size */}
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Users className="h-5 w-5 text-green-600" />
-                    <h3 className="font-semibold text-gray-800">Group Size</h3>
-                  </div>
-                  <div className="space-y-2">
-                    {filterOptions.groupSize.map((option) => (
-                      <label key={option} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="groupSize"
-                          checked={filters.groupSize === option}
-                          onChange={() => handleFilterChange("groupSize", option)}
-                          className="text-green-600 focus:ring-green-500"
-                        />
-                        <span className="text-sm text-gray-700">{option}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Ratings */}
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Star className="h-5 w-5 text-green-600" />
-                    <h3 className="font-semibold text-gray-800">Ratings & Reviews</h3>
-                  </div>
-                  <div className="space-y-2">
-                    {filterOptions.rating.map((option) => (
-                      <label key={option} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="rating"
-                          checked={filters.rating === option}
-                          onChange={() => handleFilterChange("rating", option)}
-                          className="text-green-600 focus:ring-green-500"
-                        />
-                        <span className="text-sm text-gray-700">{option}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Additional Services */}
-                <div className="bg-white rounded-lg p-4 border border-gray-200 md:col-span-2">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Star className="h-5 w-5 text-green-600" />
-                    <h3 className="font-semibold text-gray-800">Additional Services</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {additionalServices.map((service) => (
-                      <label key={service} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={filters.services.includes(service)}
-                          onChange={() => handleServiceToggle(service)}
-                          className="text-green-600 focus:ring-green-500 rounded"
-                        />
-                        <span className="text-sm text-gray-700">{service}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -526,53 +517,17 @@ export default function Destination2() {
           ]}
         />
 
-        {/* Gear Rentings Section */}
-        <DestinationSection
-          sectionId="gear-rentings"
-          title="Gear Rentings"
-          description="Rent professional photography and adventure gear for your safari experience"
-          items={[
-            {
-              name: "Camera Equipment",
-              description: "Professional DSLR cameras, lenses, and photography accessories available for rent. Capture stunning wildlife moments with high-quality equipment perfect for safari photography.",
-              background: camera1Background
-            },
-            {
-              name: "Adventure Gear",
-              description: "Camping equipment, binoculars, and outdoor gear rentals. Everything you need for a comfortable and memorable safari adventure in Sri Lanka's wilderness.",
-              background: camera1Background
-            }
-          ]}
-        />
-
         {/* Active Filters Display */}
-        {(filters.location || filters.safariType || filters.services.length > 0) && (
+        {filters.location && (
           <div className="mt-8 p-4 bg-white rounded-lg shadow-sm border">
             <h4 className="font-semibold text-gray-800 mb-3">Active Filters:</h4>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(filters).map(([key, value]) => {
-                if (key === 'services' && Array.isArray(value)) {
-                  return value.map(service => (
-                    <span key={service} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                      {service}
-                      <button onClick={() => handleServiceToggle(service)} className="text-green-600 hover:text-green-800 cursor-pointer">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ));
-                }
-                if (value && key !== 'services') {
-                  return (
-                    <span key={key} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                      {value}
-                      <button onClick={() => handleFilterChange(key, "")} className="text-green-600 hover:text-green-800 cursor-pointer">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  );
-                }
-                return null;
-              })}
+              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                {filters.location}
+                <button onClick={() => handleFilterChange("location", "")} className="text-green-600 hover:text-green-800 cursor-pointer">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
             </div>
           </div>
         )}
