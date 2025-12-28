@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  CreditCard, 
-  CheckCircle, 
-  Calendar, 
-  MapPin, 
-  User, 
+import {
+  CreditCard,
+  CheckCircle,
+  Calendar,
+  MapPin,
+  User,
   DollarSign,
   X,
   AlertCircle,
@@ -46,6 +46,8 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
     cardName: ''
   });
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+  const [isLocked, setIsLocked] = useState(true);
 
   // Auth state listener
   useEffect(() => {
@@ -55,32 +57,30 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
     return () => unsubscribe();
   }, [propUser]);
 
-  // Auto-redirect to home page when payment is successful
+  // Unlock button when all card details are filled
   useEffect(() => {
-    if (paymentSuccess) {
-      console.log('✅ Payment successful, redirecting to home page in 2 seconds...');
-      const redirectTimer = setTimeout(() => {
-        console.log('🔄 Redirecting to home page now...');
+    const cardNumberValid = cardDetails.cardNumber.replace(/\s/g, '').length >= 16;
+    const expiryValid = cardDetails.expiryDate.length === 5;
+    const cvvValid = cardDetails.cvv.length >= 3;
+    const nameValid = cardDetails.cardName.length >= 3;
 
-        window.location.replace('/');
-      }, 2000);
-      
-      return () => {
-        clearTimeout(redirectTimer);
-      };
+    if (cardNumberValid && expiryValid && cvvValid && nameValid) {
+      setIsLocked(false);
+    } else {
+      setIsLocked(true);
     }
-  }, [paymentSuccess]);
+  }, [cardDetails]);
 
   // Real-time booking listener
   useEffect(() => {
     if (!bookingId) return;
 
     const bookingRef = doc(db, 'bookings', bookingId);
-    
+
     const unsubscribe = onSnapshot(bookingRef, async (snapshot) => {
       if (snapshot.exists()) {
         const bookingData = snapshot.data();
-        
+
         // Check if booking is accepted
         if (bookingData.status !== 'accepted') {
           setError('This booking has not been accepted yet. Please wait for the service provider to accept your booking.');
@@ -101,7 +101,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                 where('read', '==', false)
               );
               const notificationsSnapshot = await getDocs(notificationsQuery);
-              const markReadPromises = notificationsSnapshot.docs.map(doc => 
+              const markReadPromises = notificationsSnapshot.docs.map(doc =>
                 markNotificationAsRead(doc.id)
               );
               await Promise.all(markReadPromises);
@@ -144,12 +144,12 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Format dates
   const formatDates = (dates) => {
     if (!dates || !Array.isArray(dates)) return 'N/A';
-    
+
     return dates.map(date => {
       try {
         const dateObj = date?.toDate ? date.toDate() : new Date(date);
-        return dateObj.toLocaleDateString('en-US', { 
-          month: 'short', 
+        return dateObj.toLocaleDateString('en-US', {
+          month: 'short',
           day: 'numeric',
           year: 'numeric'
         });
@@ -212,16 +212,16 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
     }
 
     setProcessing(true);
-    
+
     try {
       // Simulate payment processing (Replace with actual Stripe/Payment Gateway API call)
       // In production, you would:
       // 1. Create a payment intent with Stripe
       // 2. Confirm the payment
       // 3. Get payment confirmation
-      
+
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Real-time update: Update booking status to 'paid' in Firestore with all form data
       const bookingRef = doc(db, 'bookings', bookingId);
       await updateDoc(bookingRef, {
@@ -269,7 +269,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
           where('read', '==', false)
         );
         const notificationsSnapshot = await getDocs(notificationsQuery);
-        const markReadPromises = notificationsSnapshot.docs.map(doc => 
+        const markReadPromises = notificationsSnapshot.docs.map(doc =>
           markNotificationAsRead(doc.id)
         );
         await Promise.all(markReadPromises);
@@ -279,8 +279,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
       }
 
       setPaymentSuccess(true);
-      
-      // Redirect is handled by useEffect when paymentSuccess becomes true
+      setShowPaymentConfirmation(true);
 
     } catch (err) {
       console.error('Payment error:', err);
@@ -321,8 +320,8 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
     );
   }
 
-  // Payment success state
-  if (paymentSuccess) {
+  // Payment confirmation modal
+  if (showPaymentConfirmation) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
@@ -330,14 +329,19 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
               <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
-            <p className="text-sm sm:text-base text-gray-600 mb-1">Your booking has been confirmed</p>
-            <p className="text-xs sm:text-sm text-gray-500">Redirecting you back...</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-1">Your payment has been processed successfully</p>
+            <p className="text-xs sm:text-sm text-gray-500">Your booking is now confirmed</p>
           </div>
-          <div className="flex items-center justify-center gap-2 text-green-500">
-            <Loader className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-            <span className="text-xs sm:text-sm">Processing redirect</span>
-          </div>
+          <button
+            onClick={() => {
+              setShowPaymentConfirmation(false);
+              navigate('/');
+            }}
+            className="w-full bg-green-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-600 transition-colors"
+          >
+            OK
+          </button>
         </div>
       </div>
     );
@@ -364,234 +368,211 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
     <>
       <ScrollToTopButton />
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-5xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
+        <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-5xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-base sm:text-xl font-bold truncate">Secure Payment</h1>
+                  <p className="text-green-100 text-xs sm:text-sm hidden sm:block">Complete your booking payment</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-base sm:text-xl font-bold truncate">Secure Payment</h1>
-                <p className="text-green-100 text-xs sm:text-sm hidden sm:block">Complete your booking payment</p>
-              </div>
+              <button
+                onClick={() => navigate(-1)}
+                className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer flex-shrink-0 ml-2"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
             </div>
-            <button
-              onClick={() => navigate(-1)}
-              className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer flex-shrink-0 ml-2"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5 sm:h-6 sm:w-6" />
-            </button>
           </div>
-        </div>
 
-        {/* Content */}
-        <div className="p-3 sm:p-4 md:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            {/* Left Column - Booking Details & Payment Form */}
-            <div className="lg:col-span-2 space-y-3 sm:space-y-4 order-2 lg:order-1">
-              {/* Booking Summary */}
-              <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200">
-                <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
-                  <span>Booking Summary</span>
-                </h2>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <p className="text-gray-500 text-xs">Service Provider</p>
-                      <p className="font-semibold text-gray-900">{booking.driverName || booking.guideName || 'N/A'}</p>
-                      <p className="text-xs text-gray-500">{serviceType}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <p className="text-gray-500 text-xs">Selected Dates</p>
-                      <p className="font-semibold text-gray-900 text-xs">{formatDates(booking.selectedDates)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <p className="text-gray-500 text-xs">Location</p>
-                      <p className="font-semibold text-gray-900">{booking.location || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <p className="text-gray-500 text-xs">Duration</p>
-                      <p className="font-semibold text-gray-900">{booking.numberOfDays || 0} day(s)</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          {/* Content */}
+          <div className="p-3 sm:p-4 md:p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* Left Column - Booking Details & Payment Form */}
+              <div className="lg:col-span-2 space-y-3 sm:space-y-4 order-2 lg:order-1">
+                {/* Booking Summary */}
+                <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
+                    <span>Booking Summary</span>
+                  </h2>
 
-              {/* Payment Method Selection */}
-              <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
-                <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Payment Method</h2>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
-                  <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                    paymentMethod === 'card' ? 'border-green-500 bg-green-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="card"
-                      checked={paymentMethod === 'card'}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="mr-2"
-                    />
-                    <CreditCard className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="font-medium text-sm">Card</span>
-                  </label>
-
-                  <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                    paymentMethod === 'bank' ? 'border-green-500 bg-green-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="bank"
-                      checked={paymentMethod === 'bank'}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="mr-2"
-                    />
-                    <CreditCard className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="font-medium text-sm">Bank Transfer</span>
-                  </label>
-                </div>
-
-                {/* Card Payment Form */}
-                {paymentMethod === 'card' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Cardholder Name</label>
-                      <input
-                        type="text"
-                        value={cardDetails.cardName}
-                        onChange={(e) => setCardDetails({...cardDetails, cardName: e.target.value})}
-                        placeholder="John Doe"
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Card Number</label>
-                      <input
-                        type="text"
-                        value={cardDetails.cardNumber}
-                        onChange={(e) => setCardDetails({...cardDetails, cardNumber: formatCardNumber(e.target.value)})}
-                        placeholder="1234 5678 9012 3456"
-                        maxLength="19"
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-gray-400" />
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
+                        <p className="text-gray-500 text-xs">Service Provider</p>
+                        <p className="font-semibold text-gray-900">{booking.driverName || booking.guideName || 'N/A'}</p>
+                        <p className="text-xs text-gray-500">{serviceType}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="text-gray-500 text-xs">Selected Dates</p>
+                        <p className="font-semibold text-gray-900 text-xs">{formatDates(booking.selectedDates)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="text-gray-500 text-xs">Location</p>
+                        <p className="font-semibold text-gray-900">{booking.location || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="text-gray-500 text-xs">Duration</p>
+                        <p className="font-semibold text-gray-900">{booking.numberOfDays || 0} day(s)</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Method Selection */}
+                <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Payment Method</h2>
+
+                  <div className="mb-3 sm:mb-4">
+                    <label className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-green-500 bg-green-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="card"
+                        checked={paymentMethod === 'card'}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="mr-2"
+                      />
+                      <CreditCard className="h-4 w-4 text-gray-400 mr-2" />
+                      <span className="font-medium text-sm">Card</span>
+                    </label>
+                  </div>
+
+                  {/* Card Payment Form */}
+                  {paymentMethod === 'card' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Cardholder Name</label>
                         <input
                           type="text"
-                          value={cardDetails.expiryDate}
-                          onChange={(e) => setCardDetails({...cardDetails, expiryDate: formatExpiryDate(e.target.value)})}
-                          placeholder="MM/YY"
-                          maxLength="5"
+                          value={cardDetails.cardName}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                            setCardDetails({ ...cardDetails, cardName: value });
+                          }}
+                          placeholder="John Doe"
                           className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Card Number</label>
                         <input
                           type="text"
-                          value={cardDetails.cvv}
-                          onChange={(e) => setCardDetails({...cardDetails, cvv: e.target.value.replace(/\D/g, '').slice(0, 4)})}
-                          placeholder="123"
-                          maxLength="4"
+                          value={cardDetails.cardNumber}
+                          onChange={(e) => setCardDetails({ ...cardDetails, cardNumber: formatCardNumber(e.target.value) })}
+                          placeholder="1234 5678 9012 3456"
+                          maxLength="19"
                           className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         />
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Bank Transfer Info */}
-                {paymentMethod === 'bank' && (
-                  <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-xs sm:text-sm border border-gray-200">
-                    <p className="font-semibold mb-2 sm:mb-3 text-gray-900">Bank Transfer Details:</p>
-                    <div className="space-y-1.5 sm:space-y-2 text-gray-700">
-                      <p className="break-words"><span className="font-medium">Account Name:</span> SafariHub Payments</p>
-                      <p className="break-all"><span className="font-medium">Account Number:</span> 1234567890</p>
-                      <p className="break-words"><span className="font-medium">Bank:</span> Commercial Bank of Ceylon</p>
-                      <p className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-300 break-all">
-                        <span className="font-medium">Reference:</span> <span className="font-mono text-green-600 text-[10px] sm:text-xs">{bookingId}</span>
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Column - Payment Summary */}
-            <div className="lg:col-span-1 order-1 lg:order-2">
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-4 sm:p-5 lg:sticky lg:top-4">
-                <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Payment Summary</h2>
-                
-                <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-5 text-xs sm:text-sm">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Subtotal</span>
-                    <span className="font-medium">LKR {((booking.totalPrice || 0) / (booking.numberOfDays || 1)).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Days</span>
-                    <span className="font-medium">{booking.numberOfDays || 0}</span>
-                  </div>
-                  <div className="border-t border-gray-300 pt-3">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-gray-900">Total</span>
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                        <span className="text-lg sm:text-2xl font-bold text-green-600">
-                          LKR {(booking.totalPrice || 0).toLocaleString()}
-                        </span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
+                          <input
+                            type="text"
+                            value={cardDetails.expiryDate}
+                            onChange={(e) => setCardDetails({ ...cardDetails, expiryDate: formatExpiryDate(e.target.value) })}
+                            placeholder="MM/YY"
+                            maxLength="5"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
+                          <input
+                            type="text"
+                            value={cardDetails.cvv}
+                            onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                            placeholder="123"
+                            maxLength="4"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handlePayment}
-                  disabled={processing}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-2.5 sm:py-3.5 rounded-lg text-sm sm:text-base font-semibold hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
-                >
-                  {processing ? (
-                    <>
-                      <Loader className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                      <span className="hidden sm:inline">Processing Payment...</span>
-                      <span className="sm:hidden">Processing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="hidden sm:inline">Pay LKR {(booking.totalPrice || 0).toLocaleString()}</span>
-                      <span className="sm:hidden">Pay Now</span>
-                    </>
                   )}
-                </button>
 
-                <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-3 sm:mt-4 text-[10px] sm:text-xs text-gray-500">
-                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span>256-bit SSL Encrypted</span>
+                </div>
+              </div>
+
+              {/* Right Column - Payment Summary */}
+              <div className="lg:col-span-1 order-1 lg:order-2">
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-4 sm:p-5 lg:sticky lg:top-4">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Payment Summary</h2>
+
+                  <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-5 text-xs sm:text-sm">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Subtotal</span>
+                      <span className="font-medium">LKR {((booking.totalPrice || 0) / (booking.numberOfDays || 1)).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Days</span>
+                      <span className="font-medium">{booking.numberOfDays || 0}</span>
+                    </div>
+                    <div className="border-t border-gray-300 pt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-gray-900">Total</span>
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                          <span className="text-lg sm:text-2xl font-bold text-green-600">
+                            LKR {(booking.totalPrice || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handlePayment}
+                    disabled={processing || isLocked}
+                    className={`w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-2.5 sm:py-3.5 rounded-lg text-sm sm:text-base font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl`}
+                  >
+                    {processing ? (
+                      <>
+                        <Loader className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                        <span className="hidden sm:inline">Processing Payment...</span>
+                        <span className="sm:hidden">Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        {isLocked ? (
+                          <Lock className="h-4 w-4 sm:h-5 sm:w-5 transition-all duration-300" />
+                        ) : (
+                          <div className="h-4 w-4 sm:h-5 sm:w-5 transition-all duration-500 opacity-0" />
+                        )}
+                        <span className="hidden sm:inline">Pay LKR {(booking.totalPrice || 0).toLocaleString()}</span>
+                        <span className="sm:hidden">Pay Now</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-3 sm:mt-4 text-[10px] sm:text-xs text-gray-500">
+                    <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>256-bit SSL Encrypted</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
     </>
   );
@@ -632,32 +613,29 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
           const Icon = step.icon;
           const isActive = currentStep === step.number;
           const isCompleted = currentStep > step.number;
-          
+
           return (
             <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
               <div className="flex flex-col items-center w-full">
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border-2 transition-all ${
-                  isActive ? 'bg-green-500 border-green-500 text-white' :
-                  isCompleted ? 'bg-green-100 border-green-500 text-green-600' :
-                  'bg-gray-100 border-gray-300 text-gray-400'
-                }`}>
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border-2 transition-all ${isActive ? 'bg-green-500 border-green-500 text-white' :
+                    isCompleted ? 'bg-green-100 border-green-500 text-green-600' :
+                      'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
                   {isCompleted ? (
                     <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                   ) : (
                     <Icon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                   )}
                 </div>
-                <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${
-                  isActive ? 'text-green-600' : 'text-gray-500'
-                }`}>
+                <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${isActive ? 'text-green-600' : 'text-gray-500'
+                  }`}>
                   <span className="hidden sm:inline">{step.title}</span>
                   <span className="sm:hidden">{step.shortTitle}</span>
                 </span>
               </div>
               {index < steps.length - 1 && (
-                <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${
-                  isCompleted ? 'bg-green-500' : 'bg-gray-200'
-                }`} />
+                <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${isCompleted ? 'bg-green-500' : 'bg-gray-200'
+                  }`} />
               )}
             </div>
           );
@@ -673,7 +651,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
               <User className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
               <span>Personal Details</span>
             </h2>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
@@ -683,9 +661,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="text"
                   value={formData.fullName}
                   onChange={(e) => updateFormData('fullName', e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:outline-none focus:ring-2 ${formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                   placeholder="Enter your full name"
                 />
                 {formErrors.fullName && <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>}
@@ -699,9 +676,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="email"
                   value={formData.email}
                   onChange={(e) => updateFormData('email', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                   placeholder="your.email@example.com"
                 />
                 {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
@@ -715,9 +691,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => updateFormData('phone', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                   placeholder="+94 77 123 4567"
                 />
                 {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
@@ -731,9 +706,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="text"
                   value={formData.country}
                   onChange={(e) => updateFormData('country', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                   placeholder="e.g., United States, United Kingdom"
                 />
                 {formErrors.country && <p className="text-red-500 text-xs mt-1">{formErrors.country}</p>}
@@ -749,9 +723,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   max="20"
                   value={formData.numberOfPassengers}
                   onChange={(e) => updateFormData('numberOfPassengers', parseInt(e.target.value) || 1)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                 />
                 {formErrors.numberOfPassengers && <p className="text-red-500 text-xs mt-1">{formErrors.numberOfPassengers}</p>}
               </div>
@@ -779,7 +752,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
               <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
               <span>Safari Booking Details</span>
             </h2>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -788,9 +761,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                 <select
                   value={formData.nationalPark}
                   onChange={(e) => updateFormData('nationalPark', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                 >
                   <option value="">Select National Park</option>
                   <option value="Yala National Park">Yala National Park</option>
@@ -811,9 +783,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                 <select
                   value={formData.safariType}
                   onChange={(e) => updateFormData('safariType', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                 >
                   <option value="Morning Safari">Morning Safari</option>
                   <option value="Evening Safari">Evening Safari</option>
@@ -830,9 +801,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="datetime-local"
                   value={formData.preferredTime}
                   onChange={(e) => updateFormData('preferredTime', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.preferredTime ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.preferredTime ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                 />
                 {formErrors.preferredTime && <p className="text-red-500 text-xs mt-1">{formErrors.preferredTime}</p>}
               </div>
@@ -860,7 +830,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
               <Navigation className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
               <span className="break-words">Pickup & Drop-off Information</span>
             </h2>
-            
+
             <div className="space-y-3 sm:space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <input
@@ -885,9 +855,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                       type="text"
                       value={formData.hotelName}
                       onChange={(e) => updateFormData('hotelName', e.target.value)}
-                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                        formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                      }`}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                        }`}
                       placeholder="Hotel name"
                     />
                     {formErrors.hotelName && <p className="text-red-500 text-xs mt-1">{formErrors.hotelName}</p>}
@@ -913,9 +882,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                     <textarea
                       value={formData.hotelAddress}
                       onChange={(e) => updateFormData('hotelAddress', e.target.value)}
-                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                        formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                      }`}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                        }`}
                       rows="2"
                       placeholder="Hotel address"
                     />
@@ -932,9 +900,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="text"
                   value={formData.pickupLocation}
                   onChange={(e) => updateFormData('pickupLocation', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                   placeholder="Pickup location or address"
                 />
                 {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
@@ -948,9 +915,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="text"
                   value={formData.dropoffLocation}
                   onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                   placeholder="Drop-off location or address"
                 />
                 {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
@@ -966,7 +932,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
               <Car className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
               <span className="break-words">Vehicle & Driver Preferences</span>
             </h2>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1021,7 +987,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
               <Package className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
               <span className="break-words">Additional Requests / Add-Ons</span>
             </h2>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
               <label className="flex items-center gap-2 cursor-pointer p-2.5 sm:p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
                 <input
@@ -1133,7 +1099,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
               <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
               <span>Emergency Contact</span>
             </h2>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1143,9 +1109,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="text"
                   value={formData.emergencyContactName}
                   onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                   placeholder="Full name"
                 />
                 {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
@@ -1159,9 +1124,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   type="tel"
                   value={formData.emergencyContactPhone}
                   onChange={(e) => updateFormData('emergencyContactPhone', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                  }`}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                    }`}
                   placeholder="+94 77 123 4567"
                 />
                 {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
@@ -1180,7 +1144,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
         >
           Previous
         </button>
-        
+
         {currentStep < steps.length ? (
           <button
             onClick={handleNext}

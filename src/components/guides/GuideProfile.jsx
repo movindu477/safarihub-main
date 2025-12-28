@@ -122,7 +122,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => navigateMonth(-1)}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-2 rounded-full"
         >
           <ArrowLeft size={16} />
         </button>
@@ -131,7 +131,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
         </h3>
         <button
           onClick={() => navigateMonth(1)}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-2 rounded-full"
         >
           <ArrowLeft size={16} className="rotate-180" />
         </button>
@@ -157,13 +157,13 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
               onClick={() => handleDateClick(day)}
               disabled={!available}
               className={`
-                h-8 text-sm rounded-lg transition-all
+                h-8 text-sm rounded-lg
                 ${selected
                   ? 'bg-emerald-600 text-white font-medium'
                   : available
                     ? isToday
                       ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                      : 'bg-gray-50 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700'
+                      : 'bg-gray-50 text-gray-700'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }
               `}
@@ -781,7 +781,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
           <p className="text-gray-600 mb-4">{error || "The guide you're looking for doesn't exist."}</p>
           <button
             onClick={() => navigate('/guide')}
-            className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium"
           >
             Browse All Guides
           </button>
@@ -851,7 +851,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     navigate('/guide', { replace: true });
                   }
                 }}
-                className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors font-semibold shadow-lg cursor-pointer"
+                className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg font-semibold shadow-lg cursor-pointer"
               >
                 Got it!
               </button>
@@ -888,9 +888,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
             <div className="flex items-center">
               <button
                 onClick={() => navigate('/guide')}
-                className="flex items-center text-emerald-700 hover:text-emerald-900 mr-6 transition-all duration-300 hover:scale-105 font-medium group"
+                className="flex items-center text-emerald-700 mr-6 font-medium"
               >
-                <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" />
+                <ArrowLeft size={20} className="mr-2" />
                 Back to Guides
               </button>
               <h1 className="text-3xl font-bold text-emerald-800">Tour Guide Profile</h1>
@@ -931,8 +931,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
               {/* Contact Info */}
               <div className="space-y-3 mb-8">
                 {guide.contactPhone && guide.contactPhone !== 'Not provided' && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
                       <Phone size={16} className="text-white" />
                     </div>
                     <span className="font-semibold">{guide.contactPhone}</span>
@@ -940,8 +940,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                 )}
 
                 {guide.contactEmail && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
                       <Mail size={16} className="text-white" />
                     </div>
                     <span className="font-semibold">{guide.contactEmail}</span>
@@ -949,8 +949,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                 )}
 
                 {guide.location && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
                       <MapPin size={16} className="text-white" />
                     </div>
                     <span className="font-semibold">{guide.location}</span>
@@ -964,7 +964,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                   <>
                     <button
                       onClick={handleOpenChatModal}
-                      className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 flex items-center justify-center font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] transform"
+                      className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl flex items-center justify-center font-semibold shadow-lg shadow-emerald-500/30"
                     >
                       <MessageCircle size={20} className="mr-2" />
                       Send Message
@@ -980,7 +980,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                         </div>
                         <button
                           onClick={handleBooking}
-                          className="w-full bg-gradient-to-r from-emerald-700 to-emerald-800 text-white py-3 px-4 rounded-xl hover:from-emerald-800 hover:to-emerald-900 transition-all duration-300 font-bold shadow-lg hover:shadow-xl hover:scale-[1.02] transform"
+                          className="w-full bg-gradient-to-r from-emerald-700 to-emerald-800 text-white py-3 px-4 rounded-xl font-bold shadow-lg"
                         >
                           Book Now ({selectedDates.length} days)
                         </button>
@@ -992,7 +992,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                 {!currentUser && (
                   <button
                     onClick={onShowAuth}
-                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] transform"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl font-semibold shadow-lg shadow-emerald-500/30"
                   >
                     Login to Book or Message
                   </button>
@@ -1009,9 +1009,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                 <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'overview'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'overview'
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                      : 'border-transparent text-gray-500'
                       }`}
                   >
                     Overview
@@ -1021,9 +1021,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                   </button>
                   <button
                     onClick={() => setActiveTab('services')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'services'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'services'
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                      : 'border-transparent text-gray-500'
                       }`}
                   >
                     Services & Rates
@@ -1031,12 +1031,24 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
                     )}
                   </button>
+                  <button
+                    onClick={() => setActiveTab('reviews')}
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'reviews'
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                      : 'border-transparent text-gray-500'
+                      }`}
+                  >
+                    Reviews ({guide.totalReviews || 0})
+                    {activeTab === 'reviews' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+                    )}
+                  </button>
                   {currentUser && userRole === 'tourist' && (
                     <button
                       onClick={() => setActiveTab('booking')}
-                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'booking'
-                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                          : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'booking'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500'
                         }`}
                     >
                       <CalendarIcon size={16} className="inline mr-2" />
@@ -1046,18 +1058,6 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       )}
                     </button>
                   )}
-                  <button
-                    onClick={() => setActiveTab('reviews')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'reviews'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
-                      }`}
-                  >
-                    Reviews ({guide.totalReviews || 0})
-                    {activeTab === 'reviews' && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
-                    )}
-                  </button>
                   {currentUser && (
                     <button
                       onClick={() => {
@@ -1066,9 +1066,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                           handleOpenChatModal();
                         }
                       }}
-                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'chat'
-                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                          : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'chat'
+                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                        : 'border-transparent text-gray-500'
                         }`}
                     >
                       Messages
@@ -1086,8 +1086,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                 {activeTab === 'overview' && (
                   <div className="space-y-6">
                     {/* Experience */}
-                    <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                      <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                    <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                      <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                         <Clock className="text-white" size={22} />
                       </div>
                       <div>
@@ -1110,8 +1110,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Languages */}
                     {guide.languages && guide.languages.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                           <Languages className="text-white" size={22} />
                         </div>
                         <div>
@@ -1132,8 +1132,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Areas of Expertise */}
                     {guide.areasOfExpertise && guide.areasOfExpertise.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                           <Globe className="text-white" size={22} />
                         </div>
                         <div>
@@ -1142,7 +1142,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                             {guide.areasOfExpertise.map((area, index) => (
                               <span
                                 key={index}
-                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm"
                               >
                                 {area}
                               </span>
@@ -1154,8 +1154,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Special Qualifications */}
                     {guide.specialQualifications && guide.specialQualifications.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                           <GraduationCap className="text-white" size={22} />
                         </div>
                         <div>
@@ -1164,7 +1164,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                             {guide.specialQualifications.map((qual, index) => (
                               <span
                                 key={index}
-                                className="bg-gradient-to-r from-green-100 to-green-50 text-green-800 px-4 py-2 rounded-full text-sm border-2 border-green-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                                className="bg-gradient-to-r from-green-100 to-green-50 text-green-800 px-4 py-2 rounded-full text-sm border-2 border-green-200 font-semibold shadow-sm"
                               >
                                 {qual}
                               </span>
@@ -1176,8 +1176,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Verification Documents */}
                     {guide.verificationDocuments && guide.verificationDocuments.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                           <FileText className="text-white" size={22} />
                         </div>
                         <div>
@@ -1211,7 +1211,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       </h3>
                       <div className="space-y-4">
                         {guide.hourlyRate > 0 && (
-                          <div className="flex items-center justify-between p-6 bg-white rounded-xl border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                          <div className="flex items-center justify-between p-6 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
                             <div>
                               <span className="text-gray-800 font-bold text-lg">Hourly Rate:</span>
                               <p className="text-sm text-gray-600 mt-1">Perfect for short tours and consultations</p>
@@ -1226,7 +1226,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                         )}
 
                         {guide.dailyRate > 0 && (
-                          <div className="flex items-center justify-between p-6 bg-white rounded-xl border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                          <div className="flex items-center justify-between p-6 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
                             <div>
                               <span className="text-gray-800 font-bold text-lg">Daily Rate:</span>
                               <p className="text-sm text-gray-600 mt-1">Full day guided tours (8+ hours)</p>
@@ -1348,9 +1348,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                               <button
                                 onClick={handleBooking}
                                 disabled={isBooking || selectedDates.length === 0}
-                                className={`w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium mt-4 shadow-md ${isBooking || selectedDates.length === 0
-                                    ? 'opacity-50 cursor-not-allowed'
-                                    : 'cursor-pointer'
+                                className={`w-full bg-emerald-600 text-white py-3 px-4 rounded-lg font-medium mt-4 shadow-md ${isBooking || selectedDates.length === 0
+                                  ? 'opacity-50 cursor-not-allowed'
+                                  : 'cursor-pointer'
                                   }`}
                               >
                                 {isBooking ? 'Processing...' : 'Confirm Booking'}
@@ -1395,7 +1395,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                         </p>
                         <button
                           onClick={handleOpenChatModal}
-                          className="bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 transition-colors font-medium flex items-center gap-2 mx-auto"
+                          className="bg-emerald-600 text-white px-8 py-3 rounded-lg font-medium flex items-center gap-2 mx-auto"
                         >
                           <MessageCircle size={20} />
                           Open Chat
@@ -1412,7 +1412,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                         </p>
                         <button
                           onClick={onShowAuth}
-                          className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+                          className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium"
                         >
                           Login Now
                         </button>

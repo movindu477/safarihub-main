@@ -4,7 +4,7 @@ import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Star, MapPin, Clock, Users, Shield, Award, Globe, Calendar } from 'lucide-react';
 
-const GuideSection2 = ({ currentUser, userRole }) => {
+const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
   const [guides, setGuides] = useState([]);
   const [filteredGuides, setFilteredGuides] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,6 @@ const GuideSection2 = ({ currentUser, userRole }) => {
     qualification: '',
     languages: [],
     currency: '',
-    status: '' // Online/Offline filter
   });
 
   // Filter options
@@ -148,9 +147,6 @@ const GuideSection2 = ({ currentUser, userRole }) => {
             // Mark if this is the current user's profile
             isCurrentUser: currentUser && currentUser.uid === providerId,
 
-            // Online status
-            online: providerData.online || providerData.isOnline || false,
-            isOnline: providerData.online || providerData.isOnline || false
           });
         }
       });
@@ -186,8 +182,17 @@ const GuideSection2 = ({ currentUser, userRole }) => {
 
     let filtered = [...guides];
 
-    // Expertise area filter
-    if (filters.expertise) {
+    // Destination filter (from props - selectedDestination) - filter guides by destinations
+    if (selectedDestination) {
+      filtered = filtered.filter(guide =>
+        guide.destinations?.some(dest =>
+          dest.toLowerCase().includes(selectedDestination.toLowerCase())
+        )
+      );
+    }
+
+    // Expertise area filter (from filter dropdown) - only if no destination filter is active
+    if (filters.expertise && !selectedDestination) {
       filtered = filtered.filter(guide =>
         guide.areasOfExpertise?.some(expertise =>
           expertise.toLowerCase().includes(filters.expertise.toLowerCase())
@@ -239,17 +244,10 @@ const GuideSection2 = ({ currentUser, userRole }) => {
       );
     }
 
-    // Status filter (Online/Offline)
-    if (filters.status) {
-      filtered = filtered.filter(guide => {
-        const isOnline = guide.online || guide.isOnline || false;
-        return filters.status === 'online' ? isOnline : !isOnline;
-      });
-    }
 
     console.log('✅ Filtered results:', filtered.length);
     setFilteredGuides(filtered);
-  }, [filters, guides]);
+  }, [filters, guides, selectedDestination]);
 
   const handleFilterChange = (filterType, value) => {
     setFilters(prev => ({
@@ -306,8 +304,7 @@ const GuideSection2 = ({ currentUser, userRole }) => {
       priceRange: '',
       qualification: '',
       languages: [],
-      currency: '',
-      status: ''
+      currency: ''
     });
 
     setFilteredGuides(guides);
@@ -470,7 +467,7 @@ const GuideSection2 = ({ currentUser, userRole }) => {
           </div>
 
           {/* Single Row Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Expertise Area Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -543,21 +540,6 @@ const GuideSection2 = ({ currentUser, userRole }) => {
               </select>
             </div>
 
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-              >
-                <option value="">All Status</option>
-                <option value="online">Online</option>
-                <option value="offline">Offline</option>
-              </select>
-            </div>
           </div>
 
           {/* Multi-select Filters */}
@@ -639,22 +621,9 @@ const GuideSection2 = ({ currentUser, userRole }) => {
                   <ProfileImage guide={guide} />
                   <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
 
-                  {/* Online Status Badge */}
-                  {(guide.online || guide.isOnline) && (
-                    <div className="absolute top-3 right-3 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg z-10">
-                      Online
-                    </div>
-                  )}
-
-                  {/* Experience Badge - Only show if not online (to avoid overlap) */}
-                  {guide.experience > 0 && !(guide.online || guide.isOnline) && (
+                  {/* Experience Badge */}
+                  {guide.experience > 0 && (
                     <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                      {guide.experience}+ years
-                    </div>
-                  )}
-                  {/* If online, show experience badge below online badge */}
-                  {guide.experience > 0 && (guide.online || guide.isOnline) && (
-                    <div className="absolute top-10 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {guide.experience}+ years
                     </div>
                   )}

@@ -9,8 +9,9 @@ import Footer from '../home/Footer'
 import ChatList from '../ChatList'
 
 // Firebase - use correct relative path to go up two levels to src
-import { auth } from '../../firebase'
+import { auth, db } from '../../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
+import { getDoc, doc } from 'firebase/firestore'
 
 // Import GlobalNotificationBell and ScrollToTopButton from App.jsx
 import { GlobalNotificationBell, ScrollToTopButton } from '../../App'
@@ -20,25 +21,62 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
   // State Management
   const [user, setUser] = useState(propUser || null)
   const [loading, setLoading] = useState(true)
+  const [checkingRole, setCheckingRole] = useState(true)
   const [showChatList, setShowChatList] = useState(false)
   const navigate = useNavigate()
 
   // Authentication Listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user)
-      setLoading(false)
+
+      // Check if user is a service provider before allowing page to render
+      if (user) {
+        try {
+          const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+          if (providerDoc.exists()) {
+            const providerData = providerDoc.data();
+            if (providerData.serviceType === 'Jeep Driver' || providerData.serviceType === 'Tour Guide') {
+              // Redirect immediately without showing page content
+              navigate('/', { replace: true });
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error checking user role:', error);
+        }
+      }
+
+      setCheckingRole(false);
+      setLoading(false);
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [navigate])
 
   // Update user when prop changes
   useEffect(() => {
     if (propUser !== undefined) {
-      setUser(propUser)
+      const checkAndRedirect = async () => {
+        if (propUser) {
+          try {
+            const providerDoc = await getDoc(doc(db, 'serviceProviders', propUser.uid));
+            if (providerDoc.exists()) {
+              const providerData = providerDoc.data();
+              if (providerData.serviceType === 'Jeep Driver' || providerData.serviceType === 'Tour Guide') {
+                navigate('/', { replace: true });
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Error checking user role:', error);
+          }
+        }
+        setUser(propUser);
+      };
+      checkAndRedirect();
     }
-  }, [propUser])
+  }, [propUser, navigate])
 
   // Scroll to top when page loads or navigates (including back button)
   const location = useLocation()
@@ -130,7 +168,7 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
     // navigate('/chat')
   }
 
-  if (loading) {
+  if (loading || checkingRole) {
     return <LoadingScreen />;
   }
 

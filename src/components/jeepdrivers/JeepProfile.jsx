@@ -130,7 +130,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => navigateMonth(-1)}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-2 rounded-full"
         >
           <ArrowLeft size={16} />
         </button>
@@ -139,7 +139,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
         </h3>
         <button
           onClick={() => navigateMonth(1)}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-2 rounded-full"
         >
           <ArrowLeft size={16} className="rotate-180" />
         </button>
@@ -169,14 +169,14 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
               onClick={() => handleDateClick(day)}
               disabled={isPast}
               className={`
-                h-8 text-sm rounded-lg transition-all
+                h-8 text-sm rounded-lg
                 ${selected
                   ? 'bg-emerald-600 text-white font-medium shadow-lg'
                   : isPast
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : isToday
                       ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300 font-semibold'
-                      : 'bg-gray-50 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-md'
+                      : 'bg-gray-50 text-gray-700'
                 }
               `}
             >
@@ -209,9 +209,9 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
                         e.stopPropagation();
                         if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
                       }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${dateType === 'half-day'
+                      className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
                         ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-gray-100 text-gray-600'
                         }`}
                     >
                       Half Day
@@ -221,9 +221,9 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
                         e.stopPropagation();
                         if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
                       }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${dateType === 'full-day'
+                      className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
                         ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-gray-100 text-gray-600'
                         }`}
                     >
                       Full Day
@@ -294,7 +294,6 @@ const BookingFormModal = ({
     } else if (currentStep === 2) {
       if (!formData.nationalPark.trim()) errors.nationalPark = 'National park is required';
       if (!formData.safariType) errors.safariType = 'Safari type is required';
-      if (!formData.preferredTime.trim()) errors.preferredTime = 'Preferred time is required';
     } else if (currentStep === 3) {
       if (formData.needsHotelPickup) {
         if (!formData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
@@ -330,7 +329,7 @@ const BookingFormModal = ({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer flex-shrink-0 ml-2"
+              className="p-1.5 sm:p-2 rounded-lg cursor-pointer flex-shrink-0 ml-2"
               aria-label="Close"
             >
               <X className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -349,7 +348,7 @@ const BookingFormModal = ({
               return (
                 <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
                   <div className="flex flex-col items-center w-full">
-                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 transition-all ${isActive ? 'bg-emerald-500 border-emerald-500 text-white' :
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 ${isActive ? 'bg-emerald-500 border-emerald-500 text-white' :
                       isCompleted ? 'bg-emerald-100 border-emerald-500 text-emerald-600' :
                         'bg-gray-100 border-gray-300 text-gray-400'
                       }`}>
@@ -420,7 +419,10 @@ const BookingFormModal = ({
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => updateFormData('phone', e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9+]/g, '');
+                      updateFormData('phone', value);
+                    }}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
                       }`}
                     placeholder="+94 77 123 4567"
@@ -487,17 +489,11 @@ const BookingFormModal = ({
                   <select
                     value={formData.nationalPark}
                     onChange={(e) => updateFormData('nationalPark', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
                       }`}
+                    disabled={!!(driver?.destinations && driver.destinations.length > 0)}
                   >
-                    <option value="">Select National Park</option>
-                    <option value="Yala National Park">Yala National Park</option>
-                    <option value="Udawalawe National Park">Udawalawe National Park</option>
-                    <option value="Wilpattu National Park">Wilpattu National Park</option>
-                    <option value="Minneriya National Park">Minneriya National Park</option>
-                    <option value="Kaudulla National Park">Kaudulla National Park</option>
-                    <option value="Bundala National Park">Bundala National Park</option>
-                    <option value="Kumana National Park">Kumana National Park</option>
+                    <option value={formData.nationalPark}>{formData.nationalPark || 'Select National Park'}</option>
                   </select>
                   {formErrors.nationalPark && <p className="text-red-500 text-xs mt-1">{formErrors.nationalPark}</p>}
                 </div>
@@ -516,31 +512,6 @@ const BookingFormModal = ({
                     <option value="Full-day Safari">Full-day Safari</option>
                   </select>
                   {formErrors.safariType && <p className="text-red-500 text-xs mt-1">{formErrors.safariType}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Preferred Date & Time <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.preferredTime}
-                    onChange={(e) => updateFormData('preferredTime', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.preferredTime ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                      }`}
-                  />
-                  {formErrors.preferredTime && <p className="text-red-500 text-xs mt-1">{formErrors.preferredTime}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Duration (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.duration}
-                    onChange={(e) => updateFormData('duration', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    placeholder="e.g., 4 hours"
-                  />
                 </div>
               </div>
 
@@ -564,9 +535,9 @@ const BookingFormModal = ({
                                 e.stopPropagation();
                                 if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
                               }}
-                              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${dateType === 'half-day'
+                              className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
                                 ? 'bg-emerald-600 text-white shadow-md'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                : 'bg-gray-100 text-gray-600'
                                 }`}
                             >
                               Half Day
@@ -577,9 +548,9 @@ const BookingFormModal = ({
                                 e.stopPropagation();
                                 if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
                               }}
-                              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${dateType === 'full-day'
+                              className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
                                 ? 'bg-emerald-600 text-white shadow-md'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                : 'bg-gray-100 text-gray-600'
                                 }`}
                             >
                               Full Day
@@ -639,45 +610,38 @@ const BookingFormModal = ({
                       />
                       {formErrors.hotelAddress && <p className="text-red-500 text-xs mt-1">{formErrors.hotelAddress}</p>}
                     </div>
+                  </div>
+                )}
+                {!formData.needsHotelPickup && (
+                  <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Room Number (Optional)
+                        Pickup Location <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        value={formData.roomNumber}
-                        onChange={(e) => updateFormData('roomNumber', e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={formData.pickupLocation}
+                        onChange={(e) => updateFormData('pickupLocation', e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
                       />
+                      {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
                     </div>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Drop-off Location <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.dropoffLocation}
+                        onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                          }`}
+                      />
+                      {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
+                    </div>
+                  </>
                 )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Pickup Location <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.pickupLocation}
-                    onChange={(e) => updateFormData('pickupLocation', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                      }`}
-                  />
-                  {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Drop-off Location <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.dropoffLocation}
-                    onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-                      }`}
-                  />
-                  {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
-                </div>
               </div>
             </div>
           )}
@@ -696,9 +660,9 @@ const BookingFormModal = ({
                     value={formData.jeepType}
                     onChange={(e) => updateFormData('jeepType', e.target.value)}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    disabled
                   >
-                    <option value="Standard Jeep">Standard Jeep</option>
-                    <option value="Luxury Jeep">Luxury Jeep</option>
+                    <option value={formData.jeepType}>{formData.jeepType}</option>
                   </select>
                 </div>
                 <div>
@@ -745,7 +709,7 @@ const BookingFormModal = ({
                   { key: 'needsPhotographyPackage', label: 'Photography Package' },
                   { key: 'parkEntranceIncluded', label: 'Park Entrance Tickets' }
                 ].map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  <label key={key} className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg">
                     <input
                       type="checkbox"
                       checked={formData[key]}
@@ -807,7 +771,10 @@ const BookingFormModal = ({
                   <input
                     type="tel"
                     value={formData.emergencyContactPhone}
-                    onChange={(e) => updateFormData('emergencyContactPhone', e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9+]/g, '');
+                      updateFormData('emergencyContactPhone', value);
+                    }}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
                       }`}
                   />
@@ -823,7 +790,7 @@ const BookingFormModal = ({
           <button
             onClick={handlePrevious}
             disabled={currentStep === 1}
-            className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-1 sm:flex-none"
+            className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none"
           >
             Previous
           </button>
@@ -835,14 +802,14 @@ const BookingFormModal = ({
                   handleNext();
                 }
               }}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 transition-colors flex-1 sm:flex-none"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium flex-1 sm:flex-none"
             >
               Next
             </button>
           ) : (
             <button
               onClick={onSubmit}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 transition-colors flex-1 sm:flex-none"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium flex-1 sm:flex-none"
             >
               Confirm Booking
             </button>
@@ -891,8 +858,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     // Safari Booking Details
     nationalPark: '',
     safariType: 'Morning Safari',
-    preferredTime: '',
-    duration: '',
     // Pickup & Drop-off
     pickupLocation: '',
     hotelName: '',
@@ -1059,9 +1024,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     if (bookingFormData.needsHotelPickup) {
       if (!bookingFormData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
       if (!bookingFormData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
+    } else {
+      if (!bookingFormData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
+      if (!bookingFormData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
     }
-    if (!bookingFormData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
-    if (!bookingFormData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
     if (!bookingFormData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
     if (!bookingFormData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
 
@@ -1427,7 +1393,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         pickupLocation: '',
         hotelName: '',
         hotelAddress: '',
-        roomNumber: '',
         dropoffLocation: '',
         needsHotelPickup: true,
         jeepType: 'Standard Jeep',
@@ -1447,21 +1412,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       });
       setIsBooking(false);
 
-      // Redirect to JeepProfile page after showing success message (3 seconds)
-      setTimeout(() => {
-        console.log('🔄 Redirecting to JeepProfile page...');
-        setShowSuccessMessage(false);
-        setSuccessMessageData(null);
-        // Ensure we're on the correct route with driverId
-        if (driverId) {
-          navigate(`/jeepprofile?driverId=${driverId}`, { replace: true });
-        } else if (driver?.id) {
-          navigate(`/jeepprofile?driverId=${driver.id}`, { replace: true });
-        } else {
-          // If no driverId, go to driver listing page
-          navigate('/driver', { replace: true });
-        }
-      }, 3000);
+      // Don't auto-redirect - wait for user to click "Got it!" button
 
     } catch (error) {
       setIsBooking(false);
@@ -1508,6 +1459,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     }
   };
 
+  const [userTouristData, setUserTouristData] = useState(null);
+
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -1517,6 +1470,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
           if (touristDoc.exists()) {
             setUserRole('tourist');
+            setUserTouristData(touristDoc.data());
           } else {
             const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
             if (providerDoc.exists()) {
@@ -1529,11 +1483,29 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       } else {
         setCurrentUser(null);
         setUserRole('');
+        setUserTouristData(null);
       }
     });
 
     return () => unsubscribeAuth();
   }, []);
+
+  // Auto-fill booking form data when form opens
+  useEffect(() => {
+    if (showBookingForm && currentUser && userTouristData) {
+      setBookingFormData(prev => ({
+        ...prev,
+        fullName: prev.fullName || currentUser.displayName || userTouristData.fullName || userTouristData.name || '',
+        email: prev.email || currentUser.email || userTouristData.email || '',
+        phone: prev.phone || userTouristData.phone || userTouristData.phoneNumber || '',
+        country: prev.country || userTouristData.country || userTouristData.location || '',
+        // Auto-fill national park from driver's first destination
+        nationalPark: prev.nationalPark || (driver?.destinations && driver.destinations.length > 0 ? driver.destinations[0] : ''),
+        // Auto-fill jeep type from driver's vehicle type
+        jeepType: prev.jeepType || driver?.vehicleType || 'Standard Safari Jeep'
+      }));
+    }
+  }, [showBookingForm, currentUser, userTouristData, driver]);
 
   useEffect(() => {
     const fetchDriverData = async () => {
@@ -1706,7 +1678,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           <p className="text-gray-600 mb-4">{error || "The driver you're looking for doesn't exist."}</p>
           <button
             onClick={() => navigate(-1)}
-            className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-3 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl"
+            className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg"
           >
             Go Back
           </button>
@@ -1777,7 +1749,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     navigate('/driver', { replace: true });
                   }
                 }}
-                className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors font-semibold shadow-lg"
+                className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg font-semibold shadow-lg"
               >
                 Got it!
               </button>
@@ -1830,9 +1802,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             <div className="flex items-center">
               <button
                 onClick={() => navigate(-1)}
-                className="flex items-center text-emerald-700 hover:text-emerald-900 mr-6 transition-all duration-300 hover:scale-105 font-medium group"
+                className="flex items-center text-emerald-700 mr-6 font-medium"
               >
-                <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" />
+                <ArrowLeft size={20} className="mr-2" />
                 Back
               </button>
               <h1 className="text-3xl font-bold text-emerald-800">Jeep Driver Profile</h1>
@@ -1873,8 +1845,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               {/* Contact Info */}
               <div className="space-y-3 mb-8">
                 {driver.contactPhone && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
                       <Phone size={16} className="text-white" />
                     </div>
                     <span className="font-semibold">{driver.contactPhone}</span>
@@ -1882,8 +1854,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 )}
 
                 {driver.contactEmail && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
                       <Mail size={16} className="text-white" />
                     </div>
                     <span className="font-semibold">{driver.contactEmail}</span>
@@ -1891,8 +1863,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 )}
 
                 {driver.location && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50 hover:shadow-md transition-all duration-300 group">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3 group-hover:scale-110 transition-transform">
+                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
+                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
                       <MapPin size={16} className="text-white" />
                     </div>
                     <span className="font-semibold">{driver.location}</span>
@@ -1902,22 +1874,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
               {/* Action Buttons */}
               <div className="space-y-4">
-                {currentUser && userRole === 'tourist' && (
-                  <>
-                    <button
-                      onClick={handleOpenChatModal}
-                      className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 flex items-center justify-center font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] transform"
-                    >
-                      <MessageCircle size={20} className="mr-2" />
-                      Send Message
-                    </button>
-                  </>
-                )}
-
                 {!currentUser && (
                   <button
                     onClick={onShowAuth}
-                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300 font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-[1.02] transform"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl font-semibold shadow-lg shadow-emerald-500/30"
                   >
                     Login to Book or Message
                   </button>
@@ -1934,9 +1894,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'overview'
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'overview'
                       ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                      : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                      : 'border-transparent text-gray-500'
                       }`}
                   >
                     Overview
@@ -1946,9 +1906,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   </button>
                   <button
                     onClick={() => setActiveTab('services')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'services'
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'services'
                       ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                      : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                      : 'border-transparent text-gray-500'
                       }`}
                   >
                     Services & Rates
@@ -1958,9 +1918,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   </button>
                   <button
                     onClick={() => setActiveTab('reviews')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'reviews'
+                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'reviews'
                       ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                      : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                      : 'border-transparent text-gray-500'
                       }`}
                   >
                     Reviews ({driver.totalReviews || 0})
@@ -1971,9 +1931,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   {currentUser && userRole === 'tourist' && (
                     <button
                       onClick={() => setActiveTab('booking')}
-                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'booking'
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'booking'
                         ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                        : 'border-transparent text-gray-500'
                         }`}
                     >
                       <CalendarIcon size={16} className="inline mr-2" />
@@ -1991,9 +1951,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           handleOpenChatModal();
                         }
                       }}
-                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm transition-all duration-300 whitespace-nowrap relative ${activeTab === 'chat'
+                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'chat'
                         ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30'
+                        : 'border-transparent text-gray-500'
                         }`}
                     >
                       Messages
@@ -2011,8 +1971,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 {activeTab === 'overview' && (
                   <div className="space-y-6">
                     {/* Experience */}
-                    <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                      <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                    <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                      <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                         <Clock className="text-white" size={22} />
                       </div>
                       <div>
@@ -2035,8 +1995,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Languages */}
                     {driver.languages && driver.languages.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                           <Languages className="text-white" size={22} />
                         </div>
                         <div>
@@ -2045,7 +2005,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             {driver.languages.map((lang, index) => (
                               <span
                                 key={index}
-                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm"
                               >
                                 {lang}
                               </span>
@@ -2057,8 +2017,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Destinations */}
                     {driver.destinations && driver.destinations.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                           <MapPin className="text-white" size={22} />
                         </div>
                         <div>
@@ -2067,7 +2027,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             {driver.destinations.map((destination, index) => (
                               <span
                                 key={index}
-                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm"
                               >
                                 {destination}
                               </span>
@@ -2079,8 +2039,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Certifications */}
                     {driver.certifications && driver.certifications.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                           <Award className="text-white" size={22} />
                         </div>
                         <div>
@@ -2089,7 +2049,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             {driver.certifications.map((cert, index) => (
                               <span
                                 key={index}
-                                className="bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 px-4 py-2 rounded-full text-sm border-2 border-blue-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                                className="bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 px-4 py-2 rounded-full text-sm border-2 border-blue-200 font-semibold shadow-sm"
                               >
                                 {cert}
                               </span>
@@ -2101,8 +2061,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Special Skills */}
                     {driver.specialSkills && driver.specialSkills.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md hover:shadow-lg transition-all duration-300 group">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg">
+                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
+                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
                           <Shield className="text-white" size={22} />
                         </div>
                         <div>
@@ -2111,7 +2071,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             {driver.specialSkills.map((skill, index) => (
                               <span
                                 key={index}
-                                className="bg-gradient-to-r from-purple-100 to-purple-50 text-purple-800 px-4 py-2 rounded-full text-sm border-2 border-purple-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                                className="bg-gradient-to-r from-purple-100 to-purple-50 text-purple-800 px-4 py-2 rounded-full text-sm border-2 border-purple-200 font-semibold shadow-sm"
                               >
                                 {skill}
                               </span>
@@ -2149,7 +2109,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           Rates
                         </h3>
                         <div className="space-y-4">
-                          <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                          <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
                             <div>
                               <span className="text-gray-800 font-bold text-lg">Price per day:</span>
                               <p className="text-sm text-gray-600 mt-1">Full day safari tours</p>
@@ -2162,7 +2122,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             </div>
                           </div>
                           {driver.pricePerHour && (
-                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
                               <div>
                                 <span className="text-gray-800 font-bold text-lg">Price per hour:</span>
                                 <p className="text-sm text-gray-600 mt-1">Hourly rate</p>
@@ -2196,7 +2156,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             {driver.availableDates.slice(0, 6).map((date, index) => (
                               <span
                                 key={index}
-                                className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg text-sm border-2 border-emerald-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                                className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg text-sm border-2 border-emerald-200 font-semibold shadow-sm"
                               >
                                 {new Date(date).toLocaleDateString()}
                               </span>
@@ -2311,7 +2271,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                   }
                                   setShowBookingForm(true);
                                 }}
-                                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium mt-4 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium mt-4 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                                 disabled={selectedDates.length === 0}
                               >
                                 {selectedDates.length === 0 ? (
@@ -2350,7 +2310,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         </p>
                         <button
                           onClick={handleOpenChatModal}
-                          className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 mx-auto"
+                          className="bg-green-600 text-white px-8 py-3 rounded-lg font-medium flex items-center gap-2 mx-auto"
                         >
                           <MessageCircle size={20} />
                           Open Chat
@@ -2367,7 +2327,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         </p>
                         <button
                           onClick={onShowAuth}
-                          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                          className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium"
                         >
                           Login Now
                         </button>

@@ -4,7 +4,7 @@ import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Star, MapPin, Clock, Users, Shield } from 'lucide-react';
 
-const JeepSection2 = ({ currentUser }) => {
+const JeepSection2 = ({ currentUser, selectedDestination }) => {
   const [jeeps, setJeeps] = useState([]);
   const [filteredJeeps, setFilteredJeeps] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,26 +13,16 @@ const JeepSection2 = ({ currentUser }) => {
 
   // Filter states
   const [filters, setFilters] = useState({
-    destination: '',
     rating: '',
     priceRange: '',
     vehicleType: '',
     languages: [],
     specialSkills: [],
     certifications: [],
-    status: '' // Online/Offline filter
   });
 
   // Filter options
   const filterOptions = {
-    destinations: [
-      'Yala National Park',
-      'Wilpattu National Park',
-      'Udawalawe National Park',
-      'Minneriya National Park',
-      'Horton Plains',
-      'Sinharaja Forest'
-    ],
     ratings: [
       { value: '1', label: '1★ and above' },
       { value: '2', label: '2★ and above' },
@@ -136,9 +126,6 @@ const JeepSection2 = ({ currentUser }) => {
             // Mark if this is the current user's profile
             isCurrentUser: currentUser && currentUser.uid === providerId,
 
-            // Online status
-            online: providerData.online || providerData.isOnline || false,
-            isOnline: providerData.online || providerData.isOnline || false
           });
         }
       });
@@ -174,11 +161,11 @@ const JeepSection2 = ({ currentUser }) => {
 
     let filtered = [...jeeps];
 
-    // Destination filter
-    if (filters.destination) {
+    // Destination filter (from props - selectedDestination)
+    if (selectedDestination) {
       filtered = filtered.filter(jeep =>
         jeep.destinations?.some(dest =>
-          dest.toLowerCase().includes(filters.destination.toLowerCase())
+          dest.toLowerCase().includes(selectedDestination.toLowerCase())
         )
       );
     }
@@ -240,17 +227,10 @@ const JeepSection2 = ({ currentUser }) => {
       );
     }
 
-    // Status filter (Online/Offline)
-    if (filters.status) {
-      filtered = filtered.filter(jeep => {
-        const isOnline = jeep.online || jeep.isOnline || false;
-        return filters.status === 'online' ? isOnline : !isOnline;
-      });
-    }
 
     console.log('✅ Filtered results:', filtered.length);
     setFilteredJeeps(filtered);
-  }, [filters, jeeps]);
+  }, [filters, jeeps, selectedDestination]);
 
   const handleFilterChange = (filterType, value) => {
     setFilters(prev => ({
@@ -288,14 +268,12 @@ const JeepSection2 = ({ currentUser }) => {
   // Clear filters completely
   const clearFilters = () => {
     setFilters({
-      destination: '',
       rating: '',
       priceRange: '',
       vehicleType: '',
       languages: [],
       specialSkills: [],
       certifications: [],
-      status: ''
     });
 
     setFilteredJeeps(jeeps);
@@ -448,24 +426,7 @@ const JeepSection2 = ({ currentUser }) => {
           </div>
 
           {/* Single Row Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Destination Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Destination
-              </label>
-              <select
-                value={filters.destination}
-                onChange={(e) => handleFilterChange('destination', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-              >
-                <option value="">All Destinations</option>
-                {filterOptions.destinations.map(dest => (
-                  <option key={dest} value={dest}>{dest}</option>
-                ))}
-              </select>
-            </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Ratings Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -521,21 +482,6 @@ const JeepSection2 = ({ currentUser }) => {
               </select>
             </div>
 
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-              >
-                <option value="">All Status</option>
-                <option value="online">Online</option>
-                <option value="offline">Offline</option>
-              </select>
-            </div>
           </div>
 
           {/* Multi-select Filters */}
@@ -566,7 +512,7 @@ const JeepSection2 = ({ currentUser }) => {
             {/* Special Skills Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🎯 Services
+                Services
               </label>
               <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-white">
                 {filterOptions.specialSkills.map(skill => (
@@ -640,22 +586,9 @@ const JeepSection2 = ({ currentUser }) => {
                   <ProfileImage jeep={jeep} />
                   <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
 
-                  {/* Online Status Badge */}
-                  {(jeep.online || jeep.isOnline) && (
-                    <div className="absolute top-3 right-3 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg z-10">
-                      Online
-                    </div>
-                  )}
-
-                  {/* Experience Badge - Only show if not online (to avoid overlap) */}
-                  {jeep.experience > 0 && !(jeep.online || jeep.isOnline) && (
+                  {/* Experience Badge */}
+                  {jeep.experience > 0 && (
                     <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                      {jeep.experience}+ years
-                    </div>
-                  )}
-                  {/* If online, show experience badge below online badge */}
-                  {jeep.experience > 0 && (jeep.online || jeep.isOnline) && (
-                    <div className="absolute top-10 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {jeep.experience}+ years
                     </div>
                   )}

@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, CreditCard, Check, X } from 'lucide-react';
+import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
 import LoadingScreen from './LoadingScreen';
-import { updateBookingStatus } from '../App';
+import { updateBookingStatus, GlobalNotificationBell, ScrollToTopButton } from '../App';
 
-const Admin = ({ user, onLogout, onShowAuth }) => {
+const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) => {
   const navigate = useNavigate();
   const auth = getAuth();
   const db = getFirestore();
@@ -23,7 +23,9 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
   const [profilePreview, setProfilePreview] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'payment'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings'
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [showBookingDetails, setShowBookingDetails] = useState(false);
 
   // Form state - will be populated from userData
   const [formData, setFormData] = useState({
@@ -41,6 +43,7 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
     specialSkills: [],
     certifications: [],
     // Guide fields
+    destinations: '',
     specialQualifications: [],
     areasOfExpertise: [],
     verificationDocuments: [],
@@ -63,8 +66,15 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
     "Wilpattu National Park",
     "Udawalawe National Park",
     "Minneriya National Park",
+    "Kaudulla National Park",
+    "Bundala National Park",
+    "Kumana National Park",
     "Horton Plains",
-    "Sinharaja Forest"
+    "Sinharaja Forest Reserve",
+    "Knuckles Mountain Range",
+    "Mirissa Beach",
+    "Unawatuna Beach",
+    "Lunugamvehera"
   ];
 
   const languages = [
@@ -176,6 +186,7 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
             specialSkills: Array.isArray(data.specialSkills) ? data.specialSkills : [],
             certifications: Array.isArray(data.certifications) ? data.certifications : [],
             // Guide fields
+            destinations: Array.isArray(data.destinations) ? data.destinations[0] || '' : data.destinations || '',
             specialQualifications: Array.isArray(data.specialQualifications) ? data.specialQualifications : [],
             areasOfExpertise: Array.isArray(data.areasOfExpertise) ? data.areasOfExpertise : [],
             verificationDocuments: Array.isArray(data.verificationDocuments) ? data.verificationDocuments : [],
@@ -344,6 +355,7 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
       } else if (serviceType === 'Tour Guide') {
         updateData = {
           ...updateData,
+          destinations: formData.destinations ? [formData.destinations] : [],
           specialQualifications: formData.specialQualifications || [],
           areasOfExpertise: formData.areasOfExpertise || [],
           verificationDocuments: formData.verificationDocuments || [],
@@ -411,7 +423,7 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
         onRegister={(screen) => (onShowAuth ? onShowAuth(screen || 'register') : null)}
       />
 
-      <div className="pt-20 pb-4 px-4 sm:px-6 lg:px-8">
+      <div className="pt-24 pb-4 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1600px] mx-auto">
           {/* Header */}
           <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-4 border border-gray-700">
@@ -468,16 +480,6 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
                 }`}
             >
               My Bookings
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('payment')}
-              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'payment'
-                ? 'bg-emerald-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                }`}
-            >
-              Payment Methods
             </button>
           </div>
 
@@ -675,6 +677,23 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
                     </h2>
 
                     <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                          National Park / Destination *
+                        </label>
+                        <select
+                          value={formData.destinations}
+                          onChange={(e) => handleInputChange('destinations', e.target.value)}
+                          required
+                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          <option value="">Select Park</option>
+                          {destinations.map(dest => (
+                            <option key={dest} value={dest}>{dest}</option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
@@ -974,7 +993,11 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
                     return (
                       <div
                         key={booking.id}
-                        className="bg-gray-700/50 rounded-lg p-4 border border-gray-600"
+                        onClick={() => {
+                          setSelectedBooking(booking);
+                          setShowBookingDetails(true);
+                        }}
+                        className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 cursor-pointer transition-colors hover:bg-gray-700"
                       >
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
@@ -1006,7 +1029,7 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
                             </div>
                           </div>
                           {booking.status === 'pending' && (
-                            <div className="flex gap-2">
+                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => handleBookingStatusUpdate(booking.id, 'accepted')}
                                 className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
@@ -1032,46 +1055,230 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
             </div>
           )}
 
-          {/* Payment Methods Tab */}
-          {activeTab === 'payment' && (
-            <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
-              <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-emerald-400" />
-                Payment Methods
-              </h2>
-
-              <div className="space-y-4">
-                <div className="bg-gray-700/50 rounded-lg p-6 border border-gray-600 text-center">
-                  <CreditCard className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                  <p className="text-gray-400 mb-2">Payment methods feature coming soon</p>
-                  <p className="text-sm text-gray-500">You'll be able to add and manage your payment methods here</p>
-                </div>
-
-                {/* Placeholder for future payment methods */}
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-8 bg-gray-600 rounded flex items-center justify-center">
-                        <CreditCard className="h-4 w-4 text-gray-400" />
-                      </div>
-                      <div>
-                        <p className="text-white font-medium">Add Payment Method</p>
-                        <p className="text-sm text-gray-400">Credit/Debit Card, Bank Account</p>
-                      </div>
-                    </div>
-                    <button
-                      disabled
-                      className="px-4 py-2 bg-gray-600 text-gray-400 rounded-lg cursor-not-allowed text-sm"
-                    >
-                      Coming Soon
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div >
+
+      {/* Global Notification Bell */}
+      {currentUser && (
+        <GlobalNotificationBell
+          user={currentUser}
+          notifications={notifications}
+          onNotificationClick={onNotificationClick}
+          onMarkAsRead={onMarkAsRead}
+        />
+      )}
+
+      <ScrollToTopButton />
+
+      {/* Booking Details Side Box */}
+      {showBookingDetails && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-end">
+          <div className="bg-gray-800 w-full max-w-md h-full overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-gray-900 border-b border-gray-700 p-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-white">Booking Details</h2>
+              <button
+                onClick={() => {
+                  setShowBookingDetails(false);
+                  setSelectedBooking(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Status Badge */}
+              <div>
+                <span className={`inline-block px-3 py-1 rounded text-sm font-medium border ${selectedBooking.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300 border-yellow-700' :
+                  selectedBooking.status === 'accepted' ? 'bg-green-900/50 text-green-300 border-green-700' :
+                    selectedBooking.status === 'declined' ? 'bg-red-900/50 text-red-300 border-red-700' :
+                      selectedBooking.status === 'completed' ? 'bg-blue-900/50 text-blue-300 border-blue-700' :
+                        'bg-gray-700/50 text-gray-300 border-gray-600'
+                  }`}>
+                  {selectedBooking.status?.toUpperCase() || 'PENDING'}
+                </span>
+              </div>
+
+              {/* Customer Information */}
+              <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <User className="h-5 w-5 text-emerald-400" />
+                  Customer Information
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <span className="text-gray-400 font-medium">Name:</span>
+                    <p className="text-white">{selectedBooking.customerName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 font-medium">Email:</span>
+                    <p className="text-white">{selectedBooking.customerEmail || 'N/A'}</p>
+                  </div>
+                  {selectedBooking.customerPhone && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Phone:</span>
+                      <p className="text-white">{selectedBooking.customerPhone}</p>
+                    </div>
+                  )}
+                  {selectedBooking.customerCountry && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Country:</span>
+                      <p className="text-white">{selectedBooking.customerCountry}</p>
+                    </div>
+                  )}
+                  {selectedBooking.emergencyContactName && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Emergency Contact:</span>
+                      <p className="text-white">{selectedBooking.emergencyContactName}</p>
+                      {selectedBooking.emergencyContactPhone && (
+                        <p className="text-gray-300 text-xs">{selectedBooking.emergencyContactPhone}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Booking Details */}
+              <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-emerald-400" />
+                  Booking Details
+                </h3>
+                <div className="space-y-3 text-sm">
+                  {selectedBooking.selectedDates && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Dates:</span>
+                      <p className="text-white">
+                        {Array.isArray(selectedBooking.selectedDates)
+                          ? selectedBooking.selectedDates.map(d => new Date(d).toLocaleDateString()).join(', ')
+                          : new Date(selectedBooking.selectedDates).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                  {selectedBooking.destination && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Destination:</span>
+                      <p className="text-white">{selectedBooking.destination}</p>
+                    </div>
+                  )}
+                  {selectedBooking.nationalPark && (
+                    <div>
+                      <span className="text-gray-400 font-medium">National Park:</span>
+                      <p className="text-white">{selectedBooking.nationalPark}</p>
+                    </div>
+                  )}
+                  {selectedBooking.vehicleType && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Vehicle Type:</span>
+                      <p className="text-white">{selectedBooking.vehicleType}</p>
+                    </div>
+                  )}
+                  {selectedBooking.totalPrice && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Total Price:</span>
+                      <p className="text-white font-semibold">LKR {selectedBooking.totalPrice.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {selectedBooking.createdAt && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Booked on:</span>
+                      <p className="text-white">
+                        {selectedBooking.createdAt?.toDate ?
+                          selectedBooking.createdAt.toDate().toLocaleDateString() :
+                          new Date(selectedBooking.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Location Details */}
+              {(selectedBooking.needsHotelPickup || selectedBooking.pickupLocation || selectedBooking.dropoffLocation || selectedBooking.hotelName || selectedBooking.hotelAddress) && (
+                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-emerald-400" />
+                    Location Details
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    {selectedBooking.needsHotelPickup && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Hotel Pickup:</span>
+                        <p className="text-white">Yes</p>
+                      </div>
+                    )}
+                    {selectedBooking.hotelName && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Hotel Name:</span>
+                        <p className="text-white">{selectedBooking.hotelName}</p>
+                      </div>
+                    )}
+                    {selectedBooking.hotelAddress && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Hotel Address:</span>
+                        <p className="text-white">{selectedBooking.hotelAddress}</p>
+                      </div>
+                    )}
+                    {selectedBooking.pickupLocation && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Pickup Location:</span>
+                        <p className="text-white">{selectedBooking.pickupLocation}</p>
+                      </div>
+                    )}
+                    {selectedBooking.dropoffLocation && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Drop-off Location:</span>
+                        <p className="text-white">{selectedBooking.dropoffLocation}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Additional Notes */}
+              {selectedBooking.additionalNotes && (
+                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-emerald-400" />
+                    Additional Notes
+                  </h3>
+                  <p className="text-white text-sm whitespace-pre-wrap">{selectedBooking.additionalNotes}</p>
+                </div>
+              )}
+
+              {/* Action Buttons for Pending Bookings */}
+              {selectedBooking.status === 'pending' && (
+                <div className="flex gap-3 pt-4 border-t border-gray-700">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleBookingStatusUpdate(selectedBooking.id, 'accepted');
+                      setShowBookingDetails(false);
+                      setSelectedBooking(null);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
+                  >
+                    <Check className="h-5 w-5" />
+                    Accept
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleBookingStatusUpdate(selectedBooking.id, 'declined');
+                      setShowBookingDetails(false);
+                      setSelectedBooking(null);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+                  >
+                    <X className="h-5 w-5" />
+                    Decline
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div >

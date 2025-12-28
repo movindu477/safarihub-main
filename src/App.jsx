@@ -1472,8 +1472,33 @@ function App() {
   const [returnToPath, setReturnToPath] = useState(null);
   const [authInitialScreen, setAuthInitialScreen] = useState('login');
 
-  const handleAuthSuccess = (returnPath) => {
+  const handleAuthSuccess = async (returnPath) => {
     setShowAuth(false);
+
+    // Check if user is a service provider and redirect to home if they're on restricted pages
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const providerDoc = await getDoc(doc(db, 'serviceProviders', currentUser.uid));
+        if (providerDoc.exists()) {
+          const providerData = providerDoc.data();
+          if (providerData.serviceType === 'Jeep Driver' || providerData.serviceType === 'Tour Guide') {
+            // Service provider logged in - redirect to home if on restricted pages
+            const restrictedRoutes = ['/destination', '/guide', '/driver'];
+            if (returnPath && restrictedRoutes.some(route => returnPath.startsWith(route))) {
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 500);
+              setReturnToPath(null);
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking user role in handleAuthSuccess:', error);
+      }
+    }
+
     if (returnPath && returnPath !== '/login' && returnPath !== '/register') {
       // Redirect to the previous page after successful login
       setTimeout(() => {
@@ -1704,6 +1729,9 @@ function App() {
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
             />
           }
         />
@@ -1935,8 +1963,11 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
         // Service type specific data
         if (serviceType === "Tour Guide") {
+          // Convert single destination to array format for Firestore compatibility
+          const destinationsArray = destinations ? [destinations] : [];
           userData = {
             ...userData,
+            destinations: destinationsArray,
             specialQualifications: specialQualifications || [],
             areasOfExpertise: areasOfExpertise || [],
             verificationDocuments: verificationDocuments || [],
@@ -2339,8 +2370,15 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
     "Wilpattu National Park",
     "Udawalawe National Park",
     "Minneriya National Park",
+    "Kaudulla National Park",
+    "Bundala National Park",
+    "Kumana National Park",
     "Horton Plains",
-    "Sinharaja Forest"
+    "Sinharaja Forest Reserve",
+    "Knuckles Mountain Range",
+    "Mirissa Beach",
+    "Unawatuna Beach",
+    "Lunugamvehera"
   ];
 
   const languages = [
@@ -2823,6 +2861,29 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       ))}
                     </select>
                   </div>
+                </div>
+
+                {/* Destination (Single-select for Tour Guide - same as Jeep Driver) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    National Park / Destination *
+                  </label>
+                  <select
+                    value={formData.destinations || ""}
+                    onChange={(e) => handlers.setDestinations(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                  >
+                    <option value="">Select Your National Park</option>
+                    {destinations.map(destination => (
+                      <option key={destination} value={destination} className="bg-gray-800">
+                        {destination}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-gray-400 text-[10px] mt-1">
+                    Select the primary destination you operate in
+                  </p>
                 </div>
               </>
             )}

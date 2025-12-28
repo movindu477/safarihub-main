@@ -26,6 +26,7 @@ import {
 
 // Import shared notification bell + scroll-to-top from App.jsx
 import { GlobalNotificationBell, ScrollToTopButton } from '../../App';
+import LoadingScreen from '../LoadingScreen';
 
 // Chat Modal Component
 const ChatModal = ({
@@ -173,8 +174,8 @@ const ChatModal = ({
                 >
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${msg.senderId === currentUser?.uid
-                        ? 'bg-yellow-500 text-white rounded-br-none'
-                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                      ? 'bg-yellow-500 text-white rounded-br-none'
+                      : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
                       }`}
                   >
                     <p className="text-sm">{msg.content}</p>
@@ -261,6 +262,26 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   const navigate = useNavigate();
   const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
+  const [checkingRole, setCheckingRole] = useState(true);
+  const [selectedDestination, setSelectedDestination] = useState(null);
+  const [showDestinationSelector, setShowDestinationSelector] = useState(true);
+
+  // All available destinations
+  const allDestinations = [
+    'Yala National Park',
+    'Wilpattu National Park',
+    'Udawalawe National Park',
+    'Minneriya National Park',
+    'Kaudulla National Park',
+    'Bundala National Park',
+    'Kumana National Park',
+    'Horton Plains',
+    'Sinharaja Forest Reserve',
+    'Knuckles Mountain Range',
+    'Mirissa Beach',
+    'Unawatuna Beach',
+    'Lunugamvehera'
+  ];
 
   // Chat modal state
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
@@ -272,14 +293,33 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 JeepMain Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
+
+      // Check if user is a service provider before allowing page to render
+      if (user) {
+        try {
+          const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+          if (providerDoc.exists()) {
+            const providerData = providerDoc.data();
+            if (providerData.serviceType === 'Jeep Driver' || providerData.serviceType === 'Tour Guide') {
+              // Redirect immediately without showing page content
+              navigate('/', { replace: true });
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error checking user role:', error);
+        }
+      }
+
       setCurrentUser(user);
+      setCheckingRole(false);
     });
 
     return () => {
       console.log('🔴 Cleaning up JeepMain auth listener');
       unsubscribeAuth();
     };
-  }, []);
+  }, [navigate]);
 
   // Scroll to top when page loads or navigates (including back button)
   useEffect(() => {
@@ -418,6 +458,10 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
     }
   };
 
+  if (checkingRole) {
+    return <LoadingScreen />;
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Chat Modal */}
@@ -456,9 +500,64 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
       )}
       <JeepHero />
       <div className="h-1 bg-black"></div>
-      <JeepSection2 currentUser={user} />
-      <div className="h-1 bg-black"></div>
-      <Footer />
+
+      {/* Destination Selection Box */}
+      {showDestinationSelector && (
+        <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white flex items-center justify-center py-8 px-4">
+          <div className="bg-white rounded-xl shadow-lg border border-emerald-200 p-5 max-w-lg w-full">
+            <h2 className="text-xl font-bold text-emerald-700 mb-1.5 text-center">Select a Destination</h2>
+            <p className="text-gray-600 text-sm mb-4 text-center">Choose a destination to find available jeep drivers</p>
+            <select
+              value={selectedDestination || ''}
+              onChange={(e) => {
+                setSelectedDestination(e.target.value || null);
+                setShowDestinationSelector(false);
+              }}
+              className="w-full p-2.5 text-base border-2 border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+            >
+              <option value="">All Destinations</option>
+              {allDestinations.map(dest => (
+                <option key={dest} value={dest}>{dest}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => {
+                setSelectedDestination(null);
+                setShowDestinationSelector(false);
+              }}
+              className="mt-3 w-full bg-emerald-700 text-white py-2 px-4 rounded-lg font-medium text-sm"
+            >
+              Show All Drivers
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!showDestinationSelector && (
+        <>
+          {selectedDestination && (
+            <div className="bg-emerald-100 border-b border-emerald-200 py-4">
+              <div className="container mx-auto px-4 flex items-center justify-between">
+                <p className="text-emerald-900 font-semibold">
+                  Showing drivers for: <span className="text-emerald-700">{selectedDestination}</span>
+                </p>
+                <button
+                  onClick={() => {
+                    setSelectedDestination(null);
+                    setShowDestinationSelector(true);
+                  }}
+                  className="text-emerald-700 hover:text-emerald-900 font-medium underline"
+                >
+                  Change Destination
+                </button>
+              </div>
+            </div>
+          )}
+          <JeepSection2 currentUser={user} selectedDestination={selectedDestination} />
+          <div className="h-1 bg-black"></div>
+          <Footer />
+        </>
+      )}
     </div>
   );
 }
