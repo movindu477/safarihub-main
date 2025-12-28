@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { User, Save, Upload, Loader2, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages } from 'lucide-react';
+import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, CreditCard, Check, X } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
+import LoadingScreen from './LoadingScreen';
+import { updateBookingStatus } from '../App';
 
 const Admin = ({ user, onLogout, onShowAuth }) => {
   const navigate = useNavigate();
@@ -19,6 +21,9 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [profileFile, setProfileFile] = useState(null);
   const [profilePreview, setProfilePreview] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'payment'
 
   // Form state - will be populated from userData
   const [formData, setFormData] = useState({
@@ -199,6 +204,71 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
     }
   };
 
+  // Fetch bookings for the provider
+  useEffect(() => {
+    if (!currentUser || !userData) return;
+
+    const isGuide = userData.serviceType === 'Tour Guide';
+    const providerIdField = isGuide ? 'guideId' : 'driverId';
+    const providerId = currentUser.uid;
+
+    setBookingsLoading(true);
+
+    const bookingsQuery = query(
+      collection(db, 'bookings'),
+      where(providerIdField, '==', providerId)
+    );
+
+    const unsubscribe = onSnapshot(
+      bookingsQuery,
+      (snapshot) => {
+        const bookingsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })).sort((a, b) => {
+          // Sort by date (newest first)
+          const dateA = a.createdAt?.toDate?.() || a.createdAt || new Date(0);
+          const dateB = b.createdAt?.toDate?.() || b.createdAt || new Date(0);
+          return dateB - dateA;
+        });
+        setBookings(bookingsList);
+        setBookingsLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching bookings:', error);
+        setBookingsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser, userData, db]);
+
+  // Handle booking status update
+  const handleBookingStatusUpdate = async (bookingId, status) => {
+    if (!currentUser || !userData) return;
+
+    try {
+      const booking = bookings.find(b => b.id === bookingId);
+      if (!booking) return;
+
+      await updateBookingStatus(
+        bookingId,
+        status,
+        currentUser.uid,
+        booking.customerId,
+        userData.fullName || userData.fullname || 'Provider',
+        booking.customerName || 'Customer'
+      );
+
+      setMessage({ type: 'success', text: `Booking ${status} successfully!` });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    } catch (error) {
+      console.error('Error updating booking status:', error);
+      setMessage({ type: 'error', text: 'Failed to update booking status. Please try again.' });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    }
+  };
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -322,14 +392,7 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-emerald-500 mx-auto mb-4" />
-          <p className="text-gray-400">Loading your profile...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!currentUser || !userData) {
@@ -341,7 +404,12 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <Navbar user={user} onLogout={onLogout} onShowAuth={onShowAuth} />
+      <Navbar
+        user={user}
+        onLogout={onLogout}
+        onLogin={(screen) => (onShowAuth ? onShowAuth(screen || 'login') : null)}
+        onRegister={(screen) => (onShowAuth ? onShowAuth(screen || 'register') : null)}
+      />
 
       <div className="pt-20 pb-4 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1600px] mx-auto">
@@ -379,460 +447,629 @@ const Admin = ({ user, onLogout, onShowAuth }) => {
             )}
           </div>
 
-          {/* Form - Compact layout */}
-          <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
-            {/* Main Two Boxes - Side by Side */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
-              {/* Left Box - Basic Information */}
-              <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                  <User className="h-4 w-4 text-emerald-400" />
-                  Basic Information
-                </h2>
+          {/* Tabs */}
+          <div className="flex gap-2 mb-4 bg-gray-800 rounded-lg p-1 border border-gray-700">
+            <button
+              type="button"
+              onClick={() => setActiveTab('profile')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'profile'
+                ? 'bg-emerald-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+            >
+              Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('bookings')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'bookings'
+                ? 'bg-emerald-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+            >
+              My Bookings
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('payment')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'payment'
+                ? 'bg-emerald-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+            >
+              Payment Methods
+            </button>
+          </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-300 mb-1">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fullName}
-                      onChange={(e) => handleInputChange('fullName', e.target.value)}
-                      required
-                      className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1">
-                        Email *
-                      </label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        required
-                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        Phone *
-                      </label>
-                      <input
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                        required
-                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        placeholder="+94701234567"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        Location *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.location}
-                        onChange={(e) => handleInputChange('location', e.target.value)}
-                        required
-                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        placeholder="Base location"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Experience *
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.experience}
-                        onChange={(e) => handleInputChange('experience', e.target.value)}
-                        required
-                        min="0"
-                        max="50"
-                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-300 mb-1">
-                      Description
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => handleInputChange('description', e.target.value)}
-                      rows="2"
-                      className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                      placeholder="Tell us about yourself..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                      <Upload className="h-3 w-3" />
-                      Profile Picture
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleProfileImageSelect}
-                      className="w-full px-3 py-1.5 text-xs bg-gray-900 border border-gray-600 rounded-lg text-white file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                    {profilePreview && (
-                      <img
-                        src={profilePreview}
-                        alt="Preview"
-                        className="mt-2 h-12 w-12 rounded-full object-cover border-2 border-emerald-500"
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Box - Service Specific Details */}
-              {isJeepDriver && (
+          {/* Profile Tab */}
+          {activeTab === 'profile' && (
+            <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
+              {/* Main Two Boxes - Side by Side */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+                {/* Left Box - Basic Information */}
                 <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                   <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <Car className="h-4 w-4 text-emerald-400" />
-                    Jeep Driver Details
+                    <User className="h-4 w-4 text-emerald-400" />
+                    Basic Information
                   </h2>
 
                   <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.fullName}
+                        onChange={(e) => handleInputChange('fullName', e.target.value)}
+                        required
+                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-300 mb-1">
-                          Vehicle Type
+                          Email *
                         </label>
-                        <select
-                          value={formData.vehicleType}
-                          onChange={(e) => handleInputChange('vehicleType', e.target.value)}
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          <option value="">Select Type</option>
-                          {vehicleTypes.map(type => (
-                            <option key={type} value={type}>{type}</option>
-                          ))}
-                        </select>
+                        <input
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => handleInputChange('email', e.target.value)}
+                          required
+                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        />
                       </div>
 
                       <div>
                         <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                          <DollarSign className="h-3 w-3" />
-                          Price/Day (LKR)
+                          <Phone className="h-3 w-3" />
+                          Phone *
+                        </label>
+                        <input
+                          type="tel"
+                          value={formData.phone}
+                          onChange={(e) => handleInputChange('phone', e.target.value)}
+                          required
+                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          placeholder="+94701234567"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          Location *
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.location}
+                          onChange={(e) => handleInputChange('location', e.target.value)}
+                          required
+                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          placeholder="Base location"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Experience *
                         </label>
                         <input
                           type="number"
-                          value={formData.pricePerDay}
-                          onChange={(e) => handleInputChange('pricePerDay', e.target.value)}
+                          value={formData.experience}
+                          onChange={(e) => handleInputChange('experience', e.target.value)}
+                          required
                           min="0"
+                          max="50"
                           className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="12000"
                         />
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-300 mb-1">
-                        National Park *
+                        Description
                       </label>
-                      <select
-                        value={formData.destinations}
-                        onChange={(e) => handleInputChange('destinations', e.target.value)}
-                        required
-                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      >
-                        <option value="">Select Park</option>
-                        {destinations.map(dest => (
-                          <option key={dest} value={dest}>{dest}</option>
-                        ))}
-                      </select>
+                      <textarea
+                        value={formData.description}
+                        onChange={(e) => handleInputChange('description', e.target.value)}
+                        rows="2"
+                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+                        placeholder="Tell us about yourself..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                        <Upload className="h-3 w-3" />
+                        Profile Picture
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProfileImageSelect}
+                        className="w-full px-3 py-1.5 text-xs bg-gray-900 border border-gray-600 rounded-lg text-white file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                      {profilePreview && (
+                        <img
+                          src={profilePreview}
+                          alt="Preview"
+                          className="mt-2 h-12 w-12 rounded-full object-cover border-2 border-emerald-500"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Box - Service Specific Details */}
+                {isJeepDriver && (
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                      <Car className="h-4 w-4 text-emerald-400" />
+                      Jeep Driver Details
+                    </h2>
+
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                            Vehicle Type
+                          </label>
+                          <select
+                            value={formData.vehicleType}
+                            onChange={(e) => handleInputChange('vehicleType', e.target.value)}
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          >
+                            <option value="">Select Type</option>
+                            {vehicleTypes.map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            Price/Day (LKR)
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.pricePerDay}
+                            onChange={(e) => handleInputChange('pricePerDay', e.target.value)}
+                            min="0"
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="12000"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                          National Park *
+                        </label>
+                        <select
+                          value={formData.destinations}
+                          onChange={(e) => handleInputChange('destinations', e.target.value)}
+                          required
+                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          <option value="">Select Park</option>
+                          {destinations.map(dest => (
+                            <option key={dest} value={dest}>{dest}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isGuide && (
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                      <Award className="h-4 w-4 text-emerald-400" />
+                      Tour Guide Details
+                    </h2>
+
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            Hourly Rate
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.hourlyRate}
+                            onChange={(e) => handleInputChange('hourlyRate', e.target.value)}
+                            min="0"
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="2000"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            Daily Rate
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.dailyRate}
+                            onChange={(e) => handleInputChange('dailyRate', e.target.value)}
+                            min="0"
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="15000"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                            Package Rates
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.specialPackageRates}
+                            onChange={(e) => handleInputChange('specialPackageRates', e.target.value)}
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="3-day: 40,000 LKR"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                            Currency
+                          </label>
+                          <select
+                            value={formData.currencyPreference}
+                            onChange={(e) => handleInputChange('currencyPreference', e.target.value)}
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          >
+                            {currencyOptions.map(currency => (
+                              <option key={currency} value={currency.split(' - ')[0]}>
+                                {currency.split(' - ')[0]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Additional Sections Below - Languages, Skills, etc. in separate boxes */}
+              {isJeepDriver && (
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+                  {/* Languages Box */}
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                      <Languages className="h-4 w-4 text-emerald-400" />
+                      Languages
+                    </label>
+                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
+                      {languages.map(language => (
+                        <div key={language} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`lang-${language}`}
+                            checked={formData.languages.includes(language)}
+                            onChange={() => handleMultiSelectChange('languages', language)}
+                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                          />
+                          <label htmlFor={`lang-${language}`} className="text-xs text-gray-300">
+                            {language}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Special Skills Box */}
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <label className="block text-sm font-semibold text-white mb-3">Special Skills</label>
+                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
+                      {specialSkills.map(skill => (
+                        <div key={skill} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`skill-${skill}`}
+                            checked={formData.specialSkills.includes(skill)}
+                            onChange={() => handleMultiSelectChange('specialSkills', skill)}
+                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                          />
+                          <label htmlFor={`skill-${skill}`} className="text-xs text-gray-300">
+                            {skill}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Certifications Box */}
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <label className="block text-sm font-semibold text-white mb-3">Certifications</label>
+                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
+                      {certifications.map(cert => (
+                        <div key={cert} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`cert-${cert}`}
+                            checked={formData.certifications.includes(cert)}
+                            onChange={() => handleMultiSelectChange('certifications', cert)}
+                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                          />
+                          <label htmlFor={`cert-${cert}`} className="text-xs text-gray-300">
+                            {cert}
+                          </label>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               )}
 
               {isGuide && (
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <Award className="h-4 w-4 text-emerald-400" />
-                    Tour Guide Details
-                  </h2>
-
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                          <DollarSign className="h-3 w-3" />
-                          Hourly Rate
-                        </label>
-                        <input
-                          type="number"
-                          value={formData.hourlyRate}
-                          onChange={(e) => handleInputChange('hourlyRate', e.target.value)}
-                          min="0"
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="2000"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                          <DollarSign className="h-3 w-3" />
-                          Daily Rate
-                        </label>
-                        <input
-                          type="number"
-                          value={formData.dailyRate}
-                          onChange={(e) => handleInputChange('dailyRate', e.target.value)}
-                          min="0"
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="15000"
-                        />
-                      </div>
+                <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 mt-4">
+                  {/* Qualifications Box */}
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <label className="block text-sm font-semibold text-white mb-3">Qualifications</label>
+                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-48 overflow-y-auto">
+                      {specialQualifications.map(qual => (
+                        <div key={qual} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`qual-${qual}`}
+                            checked={formData.specialQualifications.includes(qual)}
+                            onChange={() => handleMultiSelectChange('specialQualifications', qual)}
+                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                          />
+                          <label htmlFor={`qual-${qual}`} className="text-xs text-gray-300">
+                            {qual}
+                          </label>
+                        </div>
+                      ))}
                     </div>
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-300 mb-1">
-                          Package Rates
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.specialPackageRates}
-                          onChange={(e) => handleInputChange('specialPackageRates', e.target.value)}
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="3-day: 40,000 LKR"
-                        />
-                      </div>
+                  {/* Areas of Expertise Box */}
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <label className="block text-sm font-semibold text-white mb-3">Areas of Expertise</label>
+                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-48 overflow-y-auto">
+                      {areasOfExpertise.map(area => (
+                        <div key={area} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`area-${area}`}
+                            checked={formData.areasOfExpertise.includes(area)}
+                            onChange={() => handleMultiSelectChange('areasOfExpertise', area)}
+                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                          />
+                          <label htmlFor={`area-${area}`} className="text-xs text-gray-300">
+                            {area}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-                      <div>
-                        <label className="block text-xs font-medium text-gray-300 mb-1">
-                          Currency
-                        </label>
-                        <select
-                          value={formData.currencyPreference}
-                          onChange={(e) => handleInputChange('currencyPreference', e.target.value)}
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          {currencyOptions.map(currency => (
-                            <option key={currency} value={currency.split(' - ')[0]}>
-                              {currency.split(' - ')[0]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                  {/* Verification Documents Box */}
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-1">
+                      <FileText className="h-4 w-4 text-emerald-400" />
+                      Verification Docs
+                    </label>
+                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-32 overflow-y-auto">
+                      {verificationDocuments.map(doc => (
+                        <div key={doc} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`verif-${doc}`}
+                            checked={formData.verificationDocuments.includes(doc)}
+                            onChange={() => handleMultiSelectChange('verificationDocuments', doc)}
+                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                          />
+                          <label htmlFor={`verif-${doc}`} className="text-xs text-gray-300">
+                            {doc}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Languages Box */}
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-1">
+                      <Languages className="h-4 w-4 text-emerald-400" />
+                      Languages
+                    </label>
+                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-32 overflow-y-auto">
+                      {languages.map(language => (
+                        <div key={language} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`lang-guide-${language}`}
+                            checked={formData.languages.includes(language)}
+                            onChange={() => handleMultiSelectChange('languages', language)}
+                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                          />
+                          <label htmlFor={`lang-guide-${language}`} className="text-xs text-gray-300">
+                            {language}
+                          </label>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               )}
+
+              {/* Submit Button - Full Width */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-gray-700 mt-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/')}
+                  className="px-4 py-2 text-sm border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {saving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Bookings Tab */}
+          {activeTab === 'bookings' && (
+            <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
+              <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-emerald-400" />
+                My Bookings
+              </h2>
+
+              {bookingsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                    <span className="text-gray-400 text-sm">Loading bookings...</span>
+                  </div>
+                </div>
+              ) : bookings.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">No bookings yet</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {bookings.map((booking) => {
+                    const bookingDate = booking.createdAt?.toDate?.() || booking.createdAt || new Date();
+                    const formattedDate = bookingDate instanceof Date ? bookingDate.toLocaleDateString() : new Date(bookingDate).toLocaleDateString();
+                    const statusColors = {
+                      pending: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
+                      accepted: 'bg-green-900/50 text-green-300 border-green-700',
+                      declined: 'bg-red-900/50 text-red-300 border-red-700',
+                      completed: 'bg-blue-900/50 text-blue-300 border-blue-700',
+                      cancelled: 'bg-gray-700/50 text-gray-300 border-gray-600'
+                    };
+
+                    return (
+                      <div
+                        key={booking.id}
+                        className="bg-gray-700/50 rounded-lg p-4 border border-gray-600"
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-lg font-semibold text-white">
+                                {booking.customerName || 'Customer'}
+                              </h3>
+                              <span className={`px-2 py-1 rounded text-xs font-medium border ${statusColors[booking.status] || statusColors.pending
+                                }`}>
+                                {booking.status?.toUpperCase() || 'PENDING'}
+                              </span>
+                            </div>
+                            <div className="space-y-1 text-sm text-gray-300">
+                              <p><span className="font-medium">Email:</span> {booking.customerEmail || 'N/A'}</p>
+                              {booking.selectedDates && (
+                                <p><span className="font-medium">Dates:</span> {
+                                  Array.isArray(booking.selectedDates)
+                                    ? booking.selectedDates.map(d => new Date(d).toLocaleDateString()).join(', ')
+                                    : new Date(booking.selectedDates).toLocaleDateString()
+                                }</p>
+                              )}
+                              {booking.destination && (
+                                <p><span className="font-medium">Destination:</span> {booking.destination}</p>
+                              )}
+                              {booking.totalPrice && (
+                                <p><span className="font-medium">Total Price:</span> LKR {booking.totalPrice.toLocaleString()}</p>
+                              )}
+                              <p><span className="font-medium">Booked on:</span> {formattedDate}</p>
+                            </div>
+                          </div>
+                          {booking.status === 'pending' && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleBookingStatusUpdate(booking.id, 'accepted')}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
+                              >
+                                <Check className="h-4 w-4" />
+                                Accept
+                              </button>
+                              <button
+                                onClick={() => handleBookingStatusUpdate(booking.id, 'declined')}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+                              >
+                                <X className="h-4 w-4" />
+                                Decline
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+          )}
 
-            {/* Additional Sections Below - Languages, Skills, etc. in separate boxes */}
-            {isJeepDriver && (
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
-                {/* Languages Box */}
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                    <Languages className="h-4 w-4 text-emerald-400" />
-                    Languages
-                  </label>
-                  <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
-                    {languages.map(language => (
-                      <div key={language} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`lang-${language}`}
-                          checked={formData.languages.includes(language)}
-                          onChange={() => handleMultiSelectChange('languages', language)}
-                          className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                        />
-                        <label htmlFor={`lang-${language}`} className="text-xs text-gray-300">
-                          {language}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+          {/* Payment Methods Tab */}
+          {activeTab === 'payment' && (
+            <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
+              <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-emerald-400" />
+                Payment Methods
+              </h2>
+
+              <div className="space-y-4">
+                <div className="bg-gray-700/50 rounded-lg p-6 border border-gray-600 text-center">
+                  <CreditCard className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400 mb-2">Payment methods feature coming soon</p>
+                  <p className="text-sm text-gray-500">You'll be able to add and manage your payment methods here</p>
                 </div>
 
-                {/* Special Skills Box */}
+                {/* Placeholder for future payment methods */}
                 <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <label className="block text-sm font-semibold text-white mb-3">Special Skills</label>
-                  <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
-                    {specialSkills.map(skill => (
-                      <div key={skill} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`skill-${skill}`}
-                          checked={formData.specialSkills.includes(skill)}
-                          onChange={() => handleMultiSelectChange('specialSkills', skill)}
-                          className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                        />
-                        <label htmlFor={`skill-${skill}`} className="text-xs text-gray-300">
-                          {skill}
-                        </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-8 bg-gray-600 rounded flex items-center justify-center">
+                        <CreditCard className="h-4 w-4 text-gray-400" />
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Certifications Box */}
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <label className="block text-sm font-semibold text-white mb-3">Certifications</label>
-                  <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
-                    {certifications.map(cert => (
-                      <div key={cert} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`cert-${cert}`}
-                          checked={formData.certifications.includes(cert)}
-                          onChange={() => handleMultiSelectChange('certifications', cert)}
-                          className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                        />
-                        <label htmlFor={`cert-${cert}`} className="text-xs text-gray-300">
-                          {cert}
-                        </label>
+                      <div>
+                        <p className="text-white font-medium">Add Payment Method</p>
+                        <p className="text-sm text-gray-400">Credit/Debit Card, Bank Account</p>
                       </div>
-                    ))}
+                    </div>
+                    <button
+                      disabled
+                      className="px-4 py-2 bg-gray-600 text-gray-400 rounded-lg cursor-not-allowed text-sm"
+                    >
+                      Coming Soon
+                    </button>
                   </div>
                 </div>
               </div>
-            )}
-
-            {isGuide && (
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 mt-4">
-                {/* Qualifications Box */}
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <label className="block text-sm font-semibold text-white mb-3">Qualifications</label>
-                  <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-48 overflow-y-auto">
-                    {specialQualifications.map(qual => (
-                      <div key={qual} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`qual-${qual}`}
-                          checked={formData.specialQualifications.includes(qual)}
-                          onChange={() => handleMultiSelectChange('specialQualifications', qual)}
-                          className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                        />
-                        <label htmlFor={`qual-${qual}`} className="text-xs text-gray-300">
-                          {qual}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Areas of Expertise Box */}
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <label className="block text-sm font-semibold text-white mb-3">Areas of Expertise</label>
-                  <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-48 overflow-y-auto">
-                    {areasOfExpertise.map(area => (
-                      <div key={area} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`area-${area}`}
-                          checked={formData.areasOfExpertise.includes(area)}
-                          onChange={() => handleMultiSelectChange('areasOfExpertise', area)}
-                          className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                        />
-                        <label htmlFor={`area-${area}`} className="text-xs text-gray-300">
-                          {area}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Verification Documents Box */}
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-1">
-                    <FileText className="h-4 w-4 text-emerald-400" />
-                    Verification Docs
-                  </label>
-                  <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-32 overflow-y-auto">
-                    {verificationDocuments.map(doc => (
-                      <div key={doc} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`verif-${doc}`}
-                          checked={formData.verificationDocuments.includes(doc)}
-                          onChange={() => handleMultiSelectChange('verificationDocuments', doc)}
-                          className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                        />
-                        <label htmlFor={`verif-${doc}`} className="text-xs text-gray-300">
-                          {doc}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Languages Box */}
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                  <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-1">
-                    <Languages className="h-4 w-4 text-emerald-400" />
-                    Languages
-                  </label>
-                  <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-32 overflow-y-auto">
-                    {languages.map(language => (
-                      <div key={language} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`lang-guide-${language}`}
-                          checked={formData.languages.includes(language)}
-                          onChange={() => handleMultiSelectChange('languages', language)}
-                          className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                        />
-                        <label htmlFor={`lang-guide-${language}`} className="text-xs text-gray-300">
-                          {language}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Submit Button - Full Width */}
-            <div className="flex justify-end gap-3 pt-3 border-t border-gray-700 mt-3">
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                className="px-4 py-2 text-sm border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Save Changes
-                  </>
-                )}
-              </button>
             </div>
-          </form>
+          )}
         </div>
       </div >
 

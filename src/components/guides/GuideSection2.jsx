@@ -18,7 +18,8 @@ const GuideSection2 = ({ currentUser, userRole }) => {
     priceRange: '',
     qualification: '',
     languages: [],
-    currency: ''
+    currency: '',
+    status: '' // Online/Offline filter
   });
 
   // Filter options
@@ -145,7 +146,11 @@ const GuideSection2 = ({ currentUser, userRole }) => {
             availableDates: providerData.availableDates || [],
 
             // Mark if this is the current user's profile
-            isCurrentUser: currentUser && currentUser.uid === providerId
+            isCurrentUser: currentUser && currentUser.uid === providerId,
+
+            // Online status
+            online: providerData.online || providerData.isOnline || false,
+            isOnline: providerData.online || providerData.isOnline || false
           });
         }
       });
@@ -234,6 +239,14 @@ const GuideSection2 = ({ currentUser, userRole }) => {
       );
     }
 
+    // Status filter (Online/Offline)
+    if (filters.status) {
+      filtered = filtered.filter(guide => {
+        const isOnline = guide.online || guide.isOnline || false;
+        return filters.status === 'online' ? isOnline : !isOnline;
+      });
+    }
+
     console.log('✅ Filtered results:', filtered.length);
     setFilteredGuides(filtered);
   }, [filters, guides]);
@@ -293,8 +306,8 @@ const GuideSection2 = ({ currentUser, userRole }) => {
       priceRange: '',
       qualification: '',
       languages: [],
-      verification: [],
-      currency: ''
+      currency: '',
+      status: ''
     });
 
     setFilteredGuides(guides);
@@ -437,20 +450,6 @@ const GuideSection2 = ({ currentUser, userRole }) => {
           <p className="text-lg text-emerald-700 max-w-2xl mx-auto">
             Discover experienced tour guides for your Sri Lankan adventures. Filter by expertise, languages, and pricing to find your perfect guide.
           </p>
-
-          {/* Current User Status Indicator */}
-          {currentUser && (
-            <div className="mt-4 p-3 bg-white/90 rounded-xl shadow-xl border border-emerald-100 max-w-md mx-auto backdrop-blur">
-              <p className="text-sm text-emerald-700">
-                <span className="font-semibold">Your Profile:</span>{' '}
-                {guides.find(g => g.isCurrentUser) ? (
-                  <span className="text-green-600 font-medium">🟢 Listed - Other users can see your profile</span>
-                ) : (
-                  <span className="text-gray-500">⚫ Not listed - Register as a tour guide</span>
-                )}
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Filter Section */}
@@ -471,7 +470,7 @@ const GuideSection2 = ({ currentUser, userRole }) => {
           </div>
 
           {/* Single Row Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Expertise Area Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -541,6 +540,22 @@ const GuideSection2 = ({ currentUser, userRole }) => {
                 {filterOptions.qualifications.map(qual => (
                   <option key={qual} value={qual}>{qual}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">All Status</option>
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
               </select>
             </div>
           </div>
@@ -624,9 +639,22 @@ const GuideSection2 = ({ currentUser, userRole }) => {
                   <ProfileImage guide={guide} />
                   <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
 
-                  {/* Experience Badge */}
-                  {guide.experience > 0 && (
+                  {/* Online Status Badge */}
+                  {(guide.online || guide.isOnline) && (
+                    <div className="absolute top-3 right-3 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg z-10">
+                      Online
+                    </div>
+                  )}
+
+                  {/* Experience Badge - Only show if not online (to avoid overlap) */}
+                  {guide.experience > 0 && !(guide.online || guide.isOnline) && (
                     <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                      {guide.experience}+ years
+                    </div>
+                  )}
+                  {/* If online, show experience badge below online badge */}
+                  {guide.experience > 0 && (guide.online || guide.isOnline) && (
+                    <div className="absolute top-10 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {guide.experience}+ years
                     </div>
                   )}

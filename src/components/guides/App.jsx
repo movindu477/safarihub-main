@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { 
+import {
   collection,
   query,
   where,
@@ -10,13 +10,13 @@ import {
   doc,
   getDoc
 } from 'firebase/firestore';
-import { 
-  MessageCircle, 
-  X, 
-  Send, 
-  Check, 
-  CheckCheck, 
-  User 
+import {
+  MessageCircle,
+  X,
+  Send,
+  Check,
+  CheckCheck,
+  User
 } from 'lucide-react';
 import Navbar from '../home/Navbar.jsx';
 import GuideHero from './guidehero.jsx';
@@ -25,13 +25,13 @@ import Footer from '../home/Footer.jsx';
 import ChatList from '../ChatList';
 
 // Firebase imports
-import { 
+import {
   auth,
   db,
-  createOrGetConversation, 
-  sendMessage, 
-  getMessages, 
-  markMessagesAsRead, 
+  createOrGetConversation,
+  sendMessage,
+  getMessages,
+  markMessagesAsRead,
   createNotification,
   getConversationById,
   getOtherParticipant,
@@ -42,12 +42,12 @@ import {
 import { GlobalNotificationBell, ScrollToTopButton } from '../../App';
 
 // Chat Modal Component
-const ChatModal = ({ 
-  isOpen, 
-  onClose, 
-  conversationId, 
-  otherUser, 
-  currentUser 
+const ChatModal = ({
+  isOpen,
+  onClose,
+  conversationId,
+  otherUser,
+  currentUser
 }) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
@@ -70,7 +70,7 @@ const ChatModal = ({
     const unsubscribe = getMessages(conversationId, (messagesData) => {
       console.log(`📬 Received ${messagesData.length} messages`);
       setMessages(messagesData);
-      
+
       if (currentUser) {
         markMessagesAsRead(conversationId, currentUser.uid);
       }
@@ -88,7 +88,7 @@ const ChatModal = ({
 
     try {
       setSending(true);
-      
+
       const messageData = {
         content: message.trim(),
         senderId: currentUser.uid,
@@ -98,7 +98,7 @@ const ChatModal = ({
       };
 
       console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
-      
+
       await sendMessage(conversationId, messageData);
 
       await createNotification({
@@ -127,10 +127,10 @@ const ChatModal = ({
     if (!timestamp) return '';
     try {
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit',
-        hour12: true 
+        hour12: true
       });
     } catch (error) {
       return '';
@@ -181,16 +181,14 @@ const ChatModal = ({
                   className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                      msg.senderId === currentUser?.uid
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${msg.senderId === currentUser?.uid
                         ? 'bg-blue-600 text-white rounded-br-none'
                         : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                    }`}
+                      }`}
                   >
                     <p className="text-sm">{msg.content}</p>
-                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-blue-100' : 'text-gray-500'
-                    }`}>
+                    <div className={`flex items-center space-x-2 mt-1 text-xs ${msg.senderId === currentUser?.uid ? 'text-blue-100' : 'text-gray-500'
+                      }`}>
                       <span>{formatTime(msg.timestamp)}</span>
                       {msg.senderId === currentUser?.uid && (
                         <span className="flex items-center space-x-1">
@@ -264,7 +262,7 @@ const getGuideUserNotifications = (userId, callback) => {
   } catch (error) {
     console.error('Error getting notifications:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -272,7 +270,7 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
   const navigate = useNavigate();
   const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
-  
+
   // Chat modal state
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
@@ -297,11 +295,11 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
     // Check if we should scroll to a specific guide card
     const shouldScrollToGuide = sessionStorage.getItem('scrollToGuide') === 'true';
     const lastViewedGuideId = sessionStorage.getItem('lastViewedGuideId');
-    
+
     if (shouldScrollToGuide && lastViewedGuideId && location.pathname === '/guide') {
       // First scroll to top
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      
+
       // Then scroll to the specific guide card after a short delay
       setTimeout(() => {
         const guideCard = document.getElementById(`guide-card-${lastViewedGuideId}`);
@@ -331,11 +329,11 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
         // Check if we should scroll to a specific guide card
         const shouldScrollToGuide = sessionStorage.getItem('scrollToGuide') === 'true';
         const lastViewedGuideId = sessionStorage.getItem('lastViewedGuideId');
-        
+
         if (shouldScrollToGuide && lastViewedGuideId && location.pathname === '/guide') {
           // First scroll to top
           window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-          
+
           // Then scroll to the specific guide card
           setTimeout(() => {
             const guideCard = document.getElementById(`guide-card-${lastViewedGuideId}`);
@@ -357,7 +355,7 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
         }
       }, 0);
     };
-    
+
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
@@ -367,12 +365,12 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
   // Handle notification click
   const handleNotificationClick = async (notification) => {
     console.log('🔘 Notification clicked:', notification);
-    
+
     // Mark notification as read
     if (!notification.read && onMarkAsRead) {
       await onMarkAsRead(notification.id);
     }
-    
+
     if (notification.type === 'message' && notification.conversationId) {
       // Open chat modal with the conversation
       const conversation = await getConversationById(notification.conversationId);
@@ -389,7 +387,7 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
       // Handle legacy notification format
       const participantIds = notification.relatedId.split('_');
       const otherParticipantId = participantIds.find(id => id !== user.uid);
-      
+
       if (otherParticipantId) {
         // Try to get user data to open chat
         try {
@@ -402,7 +400,7 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
               name: providerData.fullName || 'Guide',
               role: 'provider'
             });
-            
+
             // Create or get conversation
             const conversationId = await createOrGetConversation(
               user.uid,
@@ -410,7 +408,7 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
               user.displayName || 'User',
               providerData.fullName || 'Guide'
             );
-            
+
             setChatConversationId(conversationId);
             setIsChatModalOpen(true);
           }
@@ -432,38 +430,38 @@ export default function GuideMain({ user, onLogin, onRegister, onLogout, onShowA
   return (
     <div className="min-h-screen bg-white">
       {/* Chat Modal */}
-      <ChatModal 
+      <ChatModal
         isOpen={isChatModalOpen}
         onClose={() => setIsChatModalOpen(false)}
         conversationId={chatConversationId}
         otherUser={chatOtherUser}
         currentUser={currentUser}
       />
-      
+
       {/* Global Notification Bell (Bottom Right) */}
-      <GlobalNotificationBell 
+      <GlobalNotificationBell
         user={user}
         notifications={notifications}
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
-      
+
       <ScrollToTopButton />
-      
-      <Navbar 
-        user={user} 
-        onLogin={onLogin || onShowAuth} 
-        onRegister={onRegister || onShowAuth} 
-        onLogout={onLogout} 
+
+      <Navbar
+        user={user}
+        onLogin={(screen) => (onLogin ? onLogin(screen) : (onShowAuth ? onShowAuth(screen || 'login') : null))}
+        onRegister={(screen) => (onRegister ? onRegister(screen) : (onShowAuth ? onShowAuth(screen || 'register') : null))}
+        onLogout={onLogout}
         onOpenChatList={() => setShowChatList(true)}
       />
-      
+
       {/* Chat List Modal */}
       {showChatList && currentUser && (
         <ChatList
           user={currentUser}
           onClose={() => setShowChatList(false)}
-      />
+        />
       )}
       <GuideHero />
       <div className="h-1 bg-black"></div>

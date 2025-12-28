@@ -102,6 +102,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
         }
       } else {
         setUserData(null);
+        setLoading(false);
       }
     };
 
@@ -133,7 +134,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   const handleLoginClick = () => {
     setMenuOpen(false);
     if (onLogin) {
-      onLogin();
+      onLogin('login');
     }
   };
 
@@ -141,7 +142,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   const handleRegisterClick = () => {
     setMenuOpen(false);
     if (onRegister) {
-      onRegister();
+      onRegister('register');
     }
   };
 
@@ -180,15 +181,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   // Use parent user prop if available, otherwise use local auth state
   const currentUser = user || authUser;
 
-  const profileMenuItems = [
-    { icon: User, label: "My Profile", href: "#" },
-    { icon: Heart, label: "My Favorites", href: "#" },
-    { icon: Calendar, label: "My Bookings", href: "#" },
-    { icon: CreditCard, label: "Payment Methods", href: "#" },
-    { icon: Settings, label: "Settings", href: "#" },
-    { icon: HelpCircle, label: "Help & Support", href: "#" },
-  ];
-
   const servicesItems = [
     { icon: Map, label: "Find a Guide", onClick: handleGuideClick, path: "/guide" },
     { icon: Compass, label: "Explore Destinations", onClick: handleDestinationClick, path: "/destination" },
@@ -197,8 +189,34 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
   ];
 
   // Determine user role (must be after userData is set)
+  // Service providers are Jeep Drivers or Tour Guides - hide "Our Services" for them
   const userRole = userData?.serviceType || null;
-  const isServiceProvider = userRole === "Jeep Driver" || userRole === "Tour Guide";
+  // Mark as service provider if userData exists and serviceType matches exactly
+  const isServiceProvider = Boolean(userData && (userRole === "Jeep Driver" || userRole === "Tour Guide"));
+
+  // Different menu items for service providers vs tourists
+  const getProfileMenuItems = () => {
+    if (isServiceProvider) {
+      // Service providers see fewer items - main items are in Admin page
+      return [
+        { icon: Heart, label: "My Favorites", href: "#" },
+        { icon: Settings, label: "Settings", href: "#" },
+        { icon: HelpCircle, label: "Help & Support", href: "#" },
+      ];
+    } else {
+      // Tourists see all menu items
+      return [
+        { icon: User, label: "My Profile", href: "#" },
+        { icon: Heart, label: "My Favorites", href: "#" },
+        { icon: Calendar, label: "My Bookings", href: "#" },
+        { icon: CreditCard, label: "Payment Methods", href: "#" },
+        { icon: Settings, label: "Settings", href: "#" },
+        { icon: HelpCircle, label: "Help & Support", href: "#" },
+      ];
+    }
+  };
+
+  const profileMenuItems = getProfileMenuItems();
 
   // Navigation items - Different for service providers vs tourists
   const navItems = isServiceProvider
@@ -254,23 +272,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
     (item) => item.path && isActivePath(item.path)
   );
 
-  // Show loading state while checking authentication
-  if (authLoading) {
-    return (
-      <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 w-[95%] max-w-6xl bg-emerald-500 text-white flex items-center justify-between px-6 md:px-12 py-3 z-50 h-16 rounded-2xl border border-emerald-300/30 shadow-2xl shadow-emerald-800/30">
-        <div className="flex items-center space-x-3">
-          <img
-            src={logo}
-            alt="SafariHub Logo"
-            className="h-12 md:h-40 w-auto object-contain"
-          />
-        </div>
-        <div className="flex items-center">
-          <div className="animate-pulse bg-emerald-400 rounded-lg h-8 w-20"></div>
-        </div>
-      </nav>
-    );
-  }
 
   return (
     <>
@@ -304,7 +305,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             </button>
           ))}
 
-          {/* Services Dropdown - Only show for tourists */}
+          {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers & guides) */}
           {!isServiceProvider && (
             <div
               className="relative"
@@ -487,7 +488,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                   </button>
                 ))}
 
-                {/* Services Dropdown - Only show for tourists */}
+                {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers & guides) */}
                 {!isServiceProvider && (
                   <div className="border-b border-green-700/40">
                     <button
@@ -595,11 +596,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             <div className="absolute top-4 right-4 z-10">
               <button
                 onClick={() => setProfileOpen(false)}
-                className="group relative p-2 bg-green-800/80 hover:bg-green-700 rounded-full border border-green-600/50 hover:border-green-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-green-500/30 backdrop-blur-sm cursor-pointer"
+                className="p-2 cursor-pointer"
                 aria-label="Close profile"
               >
-                <X className="h-5 w-5 text-green-300 group-hover:text-green-100 transition-colors duration-300" />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></span>
+                <X className="h-5 w-5 text-green-300" />
               </button>
             </div>
 
@@ -612,21 +612,20 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 </div>
 
                 <div className="px-6 pb-6 -mt-20 relative z-10">
-                  <div className="relative inline-block group">
-                    <div className="absolute -inset-2 bg-gradient-to-r from-green-500 to-green-600 rounded-full opacity-75 blur-lg group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></div>
+                  <div className="relative inline-block">
                     <img
                       src={userProfileData.avatar}
                       alt="User"
-                      className="relative h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900 shadow-2xl shadow-green-900/50 group-hover:scale-105 transition-transform duration-300"
+                      className="relative h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900 shadow-2xl shadow-green-900/50"
                     />
                     <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-400 rounded-full border-2 border-gray-900 shadow-lg shadow-green-500/50 animate-pulse"></div>
                   </div>
 
                   <div className="mt-4 animate-fadeInUp" style={{ animationDelay: "100ms" }}>
-                    <h2 className="text-2xl font-bold text-white group-hover:text-green-200 transition-colors duration-300">{userProfileData.name}</h2>
+                    <h2 className="text-2xl font-bold text-white">{userProfileData.name}</h2>
                     <p className="text-green-300 text-sm mt-1">{userProfileData.email}</p>
                     <div className="flex flex-col gap-2 mt-3">
-                      <span className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-1.5 rounded-full text-xs font-bold w-fit shadow-lg shadow-green-700/50 border border-green-500/30 hover:shadow-green-500/70 transition-all duration-300 hover:scale-105">
+                      <span className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-1.5 rounded-full text-xs font-bold w-fit shadow-lg shadow-green-700/50 border border-green-500/30">
                         {userProfileData.membership}
                       </span>
                       <span className="text-green-400 text-sm flex items-center gap-2">
@@ -638,17 +637,17 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 </div>
               </div>
 
-              {!loading && userData && (
+              {userData && (
                 <div className="px-6 py-5 border-y border-green-700/30 bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm animate-fadeInUp" style={{ animationDelay: "200ms" }}>
-                  <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2 group">
-                    <div className="p-1.5 bg-green-800/50 rounded-lg border border-green-600/30 group-hover:bg-green-700/50 transition-colors duration-300">
+                  <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2">
+                    <div className="p-1.5 bg-green-800/50 rounded-lg border border-green-600/30">
                       <User className="h-4 w-4 text-green-300" />
                     </div>
                     Profile Information
                   </h3>
                   <div className="space-y-3">
                     {userProfileData.phone !== "Not provided" && (
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                         <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
                           <Phone className="h-3.5 w-3.5 text-green-400" />
                         </div>
@@ -658,7 +657,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                     )}
 
                     {userProfileData.location !== "Not specified" && (
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                         <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
                           <MapPin className="h-3.5 w-3.5 text-green-400" />
                         </div>
@@ -670,7 +669,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                     )}
 
                     {userProfileData.languages !== "Not specified" && (
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                         <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
                           <Globe className="h-3.5 w-3.5 text-green-400" />
                         </div>
@@ -682,7 +681,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                     )}
 
                     {userProfileData.experience && (
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                         <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
                           <Award className="h-3.5 w-3.5 text-green-400" />
                         </div>
@@ -691,12 +690,12 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                       </div>
                     )}
 
-                    <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors duration-300 border border-gray-700/30 hover:border-green-700/50">
+                    <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                       <div className="p-1.5 bg-green-800/40 rounded-lg border border-green-700/30">
                         <User className="h-3.5 w-3.5 text-green-400" />
                       </div>
                       <span className="text-green-300 font-medium">Role: </span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-300 hover:scale-105 ${userProfileData.role === "Service Provider"
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${userProfileData.role === "Service Provider"
                         ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-700/50 border border-green-500/30"
                         : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-600/50 border border-green-400/30"
                         }`}>
@@ -707,46 +706,58 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 </div>
               )}
 
-              {loading && (
-                <div className="px-6 py-8 text-center animate-fadeIn">
-                  <div className="relative inline-block">
-                    <div className="animate-spin rounded-full h-10 w-10 border-3 border-gray-700 border-t-green-500 mx-auto"></div>
-                    <div className="absolute inset-0 animate-ping rounded-full border-2 border-green-500/30"></div>
-                  </div>
-                  <p className="text-green-300 mt-3 font-medium">Loading profile...</p>
-                </div>
-              )}
 
               <div className="grid grid-cols-3 gap-3 px-6 py-5 border-y border-green-700/30 bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm animate-fadeInUp" style={{ animationDelay: "300ms" }}>
-                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30 hover:border-green-700/50 hover:bg-gray-800/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
-                  <div className="text-xl font-bold text-green-400 group-hover:text-green-300 transition-colors duration-300">12</div>
+                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
+                  <div className="text-xl font-bold text-green-400">12</div>
                   <div className="text-xs text-green-300/80 mt-1">Trips</div>
                 </div>
-                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30 hover:border-green-700/50 hover:bg-gray-800/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
-                  <div className="text-xl font-bold text-green-400 group-hover:text-green-300 transition-colors duration-300">8</div>
+                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
+                  <div className="text-xl font-bold text-green-400">8</div>
                   <div className="text-xs text-green-300/80 mt-1">Favorites</div>
                 </div>
-                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30 hover:border-green-700/50 hover:bg-gray-800/50 transition-all duration-300 hover:scale-105 group cursor-pointer">
-                  <div className="text-xl font-bold text-green-400 group-hover:text-green-300 transition-colors duration-300">2</div>
+                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
+                  <div className="text-xl font-bold text-green-400">2</div>
                   <div className="text-xs text-green-300/80 mt-1">Upcoming</div>
                 </div>
               </div>
 
-              <div className="p-6 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp" style={{ animationDelay: "400ms" }}>
+              {/* Admin Button for Service Providers */}
+              {isServiceProvider && (
+                <div className="p-6 pb-4 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp" style={{ animationDelay: "400ms" }}>
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      navigate('/admin');
+                    }}
+                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-green-600/50 animate-fadeInUp bg-green-800/20"
+                    style={{ animationDelay: "500ms" }}
+                  >
+                    <div className="p-2 bg-green-700/50 rounded-lg border border-green-600/50">
+                      <User className="h-5 w-5 text-green-300" />
+                    </div>
+                    <span className="font-medium text-green-200">
+                      My Profile / Admin
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              <div className={`p-6 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp ${isServiceProvider ? 'pt-4' : ''}`} style={{ animationDelay: "400ms" }}>
                 {profileMenuItems.map((item, index) => {
                   const IconComponent = item.icon;
                   return (
                     <a
                       key={item.label}
                       href={item.href}
-                      className="flex items-center gap-4 p-3.5 rounded-xl hover:bg-green-800/30 transition-all duration-300 group cursor-pointer border border-gray-700/30 hover:border-green-600/50 hover:shadow-lg hover:shadow-green-900/30 hover:scale-[1.02] animate-fadeInUp"
+                      className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-700/30 animate-fadeInUp"
                       style={{ animationDelay: `${index * 50 + 500}ms` }}
                       onClick={() => setProfileOpen(false)}
                     >
-                      <div className="p-2 bg-green-800/30 rounded-lg group-hover:bg-green-700/50 group-hover:scale-110 transition-all duration-300 border border-green-700/30 group-hover:border-green-500/50">
-                        <IconComponent className="h-5 w-5 text-green-400 group-hover:text-green-200 transition-colors duration-300" />
+                      <div className="p-2 bg-green-800/30 rounded-lg border border-green-700/30">
+                        <IconComponent className="h-5 w-5 text-green-400" />
                       </div>
-                      <span className="font-medium text-green-300 group-hover:text-green-100 transition-colors duration-300">
+                      <span className="font-medium text-green-300">
                         {item.label}
                       </span>
                     </a>
@@ -757,12 +768,12 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
               <div className="px-6 py-5 border-t border-green-700/30 bg-gradient-to-b from-gray-900 to-black mt-auto animate-fadeInUp" style={{ animationDelay: "600ms" }}>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-4 p-3.5 rounded-xl hover:bg-red-600/40 text-red-400 hover:text-red-300 transition-all duration-300 w-full group border border-red-700/30 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-900/30 hover:scale-[1.02] cursor-pointer"
+                  className="flex items-center gap-4 p-3.5 rounded-xl text-red-400 w-full border border-red-700/30 cursor-pointer"
                 >
-                  <div className="p-2 bg-red-700/20 rounded-lg group-hover:bg-red-600 group-hover:scale-110 transition-all duration-300 border border-red-600/30 group-hover:border-red-500/50">
-                    <LogOut className="h-5 w-5 group-hover:text-white transition-colors duration-300" />
+                  <div className="p-2 bg-red-700/20 rounded-lg border border-red-600/30">
+                    <LogOut className="h-5 w-5" />
                   </div>
-                  <span className="font-medium group-hover:text-red-200 transition-colors duration-300">Log Out</span>
+                  <span className="font-medium">Log Out</span>
                 </button>
               </div>
             </div>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Filter,
-  MapPin,
+import { 
+  Filter, 
+  MapPin, 
   ChevronDown,
   Search,
   X,
@@ -272,51 +272,51 @@ export default function Destination2() {
     }
 
     return (
-      <div id={sectionId} className="mb-16 scroll-mt-24">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
-            {title}
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            {description}
-          </p>
-        </div>
+    <div id={sectionId} className="mb-16 scroll-mt-24">
+      <div className="text-center mb-12">
+        <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+          {title}
+        </h2>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          {description}
+        </p>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {items.map((item, index) => (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {items.map((item, index) => (
             <div
               key={index}
               onClick={() => navigate(`/destination/${getDestinationId(item.name)}`)}
               className="relative rounded-2xl overflow-hidden shadow-2xl group cursor-pointer"
             >
-              <div
-                className="h-96 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                style={{ backgroundImage: `url(${item.background})` }}
-              >
-                <div className="absolute inset-0 bg-black/40 transition-all duration-300 group-hover:bg-black/30"></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-
-                <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                  <h3 className="text-3xl md:text-4xl font-black mb-4">{item.name}</h3>
-                  <p className="text-lg mb-6 opacity-90 max-w-md">
-                    {item.description}
-                  </p>
-                  <button
+            <div 
+              className="h-96 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+              style={{ backgroundImage: `url(${item.background})` }}
+            >
+              <div className="absolute inset-0 bg-black/40 transition-all duration-300 group-hover:bg-black/30"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+              
+              <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                <h3 className="text-3xl md:text-4xl font-black mb-4">{item.name}</h3>
+                <p className="text-lg mb-6 opacity-90 max-w-md">
+                  {item.description}
+                </p>
+                <button 
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/destination/${getDestinationId(item.name)}`);
                     }}
-                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
-                  >
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
+                >
                     Explore {item.name.split(' ')[0]}
-                  </button>
-                </div>
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-    );
+    </div>
+  );
   };
 
   return (
@@ -331,7 +331,7 @@ export default function Destination2() {
             </span>
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover amazing wildlife experiences with our comprehensive filtering system.
+            Discover amazing wildlife experiences with our comprehensive filtering system. 
             Find exactly what you're looking for in Sri Lanka's most beautiful destinations.
           </p>
         </div>
@@ -383,7 +383,7 @@ export default function Destination2() {
                 </div>
               )}
             </div>
-
+            
             {/* Filter Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -411,11 +411,11 @@ export default function Destination2() {
             <div className="mt-6 pt-6 border-t border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Location / Region Filter - Only 5 categories */}
-                <FilterSection
-                  title="Location / Region"
-                  icon={MapPin}
-                  options={filterOptions.location}
-                  filterKey="location"
+                <FilterSection 
+                  title="Location / Region" 
+                  icon={MapPin} 
+                  options={filterOptions.location} 
+                  filterKey="location" 
                 />
               </div>
             </div>
@@ -525,9 +525,9 @@ export default function Destination2() {
               <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
                 {filters.location}
                 <button onClick={() => handleFilterChange("location", "")} className="text-green-600 hover:text-green-800 cursor-pointer">
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
             </div>
           </div>
         )}

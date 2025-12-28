@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { 
-  Heart, 
-  Globe, 
-  Users, 
-  Award, 
-  Shield, 
+import {
+  Heart,
+  Globe,
+  Users,
+  Award,
+  Shield,
   Sparkles,
   MapPin,
   Target,
@@ -82,20 +82,20 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
   return (
     <div className="min-h-screen bg-white">
       <ScrollToTopButton />
-      <Navbar 
-        user={user} 
-        onLogout={onLogout} 
-        onLogin={onShowAuth}
-        onRegister={onShowAuth}
+      <Navbar
+        user={user}
+        onLogout={onLogout}
+        onLogin={(screen) => (onShowAuth ? onShowAuth(screen || 'login') : null)}
+        onRegister={(screen) => (onShowAuth ? onShowAuth(screen || 'register') : null)}
         onOpenChatList={() => setShowChatList(true)}
       />
-      
+
       {/* Chat List Modal */}
       {showChatList && user && (
         <ChatList
           user={user}
           onClose={() => setShowChatList(false)}
-      />
+        />
       )}
 
       {/* Hero Section */}
@@ -105,21 +105,21 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
           <div className="absolute top-20 left-10 w-72 h-72 bg-emerald-400/20 rounded-full blur-3xl"></div>
           <div className="absolute bottom-20 right-10 w-96 h-96 bg-teal-400/20 rounded-full blur-3xl"></div>
         </div>
-        
+
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
               <Sparkles className="h-4 w-4" />
               <span className="text-sm font-medium">About SafariHub</span>
             </div>
-            
+
             <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
               Connecting Adventure Seekers with
               <span className="block text-emerald-200">Nature's Wonders</span>
             </h1>
-            
+
             <p className="text-xl md:text-2xl text-emerald-100 mb-8 max-w-3xl mx-auto leading-relaxed">
-              Your trusted platform for discovering authentic wildlife safaris, expert tour guides, 
+              Your trusted platform for discovering authentic wildlife safaris, expert tour guides,
               and unforgettable adventures across Sri Lanka's pristine national parks.
             </p>
 
@@ -146,16 +146,16 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
               </h2>
               <div className="w-24 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 mx-auto"></div>
             </div>
-            
+
             <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 border border-gray-100">
               <p className="text-lg md:text-xl text-gray-700 leading-relaxed mb-6">
-                At SafariHub, we believe that everyone deserves to experience the magic of Sri Lanka's 
-                wildlife and natural beauty. Our mission is to bridge the gap between adventure enthusiasts 
+                At SafariHub, we believe that everyone deserves to experience the magic of Sri Lanka's
+                wildlife and natural beauty. Our mission is to bridge the gap between adventure enthusiasts
                 and local experts, creating meaningful connections that benefit both tourists and service providers.
               </p>
               <p className="text-lg md:text-xl text-gray-700 leading-relaxed">
-                We're committed to promoting sustainable tourism, supporting local communities, and ensuring 
-                every journey is safe, authentic, and unforgettable. Through our platform, we empower local 
+                We're committed to promoting sustainable tourism, supporting local communities, and ensuring
+                every journey is safe, authentic, and unforgettable. Through our platform, we empower local
                 guides and jeep drivers while helping visitors discover the hidden gems of this beautiful island.
               </p>
             </div>
@@ -178,7 +178,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
-              <div 
+              <div
                 key={index}
                 className="group bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-8 border border-emerald-100 hover:border-emerald-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2"
               >
@@ -230,7 +230,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {values.map((value, index) => (
-              <div 
+              <div
                 key={index}
                 className="bg-white rounded-xl p-6 border border-gray-200 hover:border-emerald-300 hover:shadow-lg transition-all duration-300"
               >
@@ -257,7 +257,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
               Ready to Start Your Adventure?
             </h2>
             <p className="text-xl text-emerald-100 mb-8 max-w-2xl mx-auto">
-              Join thousands of travelers exploring Sri Lanka's natural wonders. 
+              Join thousands of travelers exploring Sri Lanka's natural wonders.
               Find your perfect guide or start offering your services today.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -10,13 +10,13 @@ import Footer from "../home/Footer";
 import ChatList from "../ChatList";
 
 // Import Firebase functions
-import { 
-  db, 
-  auth, 
-  createOrGetConversation, 
-  sendMessage, 
-  getMessages, 
-  markMessagesAsRead, 
+import {
+  db,
+  auth,
+  createOrGetConversation,
+  sendMessage,
+  getMessages,
+  markMessagesAsRead,
   createNotification,
   getConversationById,
   getOtherParticipant,
@@ -28,12 +28,12 @@ import {
 import { GlobalNotificationBell, ScrollToTopButton } from '../../App';
 
 // Chat Modal Component
-const ChatModal = ({ 
-  isOpen, 
-  onClose, 
-  conversationId, 
-  otherUser, 
-  currentUser 
+const ChatModal = ({
+  isOpen,
+  onClose,
+  conversationId,
+  otherUser,
+  currentUser
 }) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
@@ -58,7 +58,7 @@ const ChatModal = ({
     const unsubscribe = getMessages(conversationId, (messagesData) => {
       console.log(`📬 Received ${messagesData.length} messages`);
       setMessages(messagesData);
-      
+
       // Mark messages as read and delivered
       if (currentUser) {
         markMessagesAsRead(conversationId, currentUser.uid);
@@ -77,7 +77,7 @@ const ChatModal = ({
 
     try {
       setSending(true);
-      
+
       const messageData = {
         content: message.trim(),
         senderId: currentUser.uid,
@@ -87,7 +87,7 @@ const ChatModal = ({
       };
 
       console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
-      
+
       // Send the message
       await sendMessage(conversationId, messageData);
 
@@ -118,10 +118,10 @@ const ChatModal = ({
     if (!timestamp) return '';
     try {
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit',
-        hour12: true 
+        hour12: true
       });
     } catch (error) {
       return '';
@@ -172,16 +172,14 @@ const ChatModal = ({
                   className={`flex ${msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                      msg.senderId === currentUser?.uid
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${msg.senderId === currentUser?.uid
                         ? 'bg-yellow-500 text-white rounded-br-none'
                         : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                    }`}
+                      }`}
                   >
                     <p className="text-sm">{msg.content}</p>
-                    <div className={`flex items-center space-x-2 mt-1 text-xs ${
-                      msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
-                    }`}>
+                    <div className={`flex items-center space-x-2 mt-1 text-xs ${msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
+                      }`}>
                       <span>{formatTime(msg.timestamp)}</span>
                       {msg.senderId === currentUser?.uid && (
                         <span className="flex items-center space-x-1">
@@ -255,7 +253,7 @@ const getUserNotifications = (userId, callback) => {
   } catch (error) {
     console.error('Error getting notifications:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -263,7 +261,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   const navigate = useNavigate();
   const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
-  
+
   // Chat modal state
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
@@ -288,11 +286,11 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
     // Check if we should scroll to a specific driver card
     const shouldScrollToDriver = sessionStorage.getItem('scrollToDriver') === 'true';
     const lastViewedDriverId = sessionStorage.getItem('lastViewedDriverId');
-    
+
     if (shouldScrollToDriver && lastViewedDriverId && location.pathname === '/driver') {
       // First scroll to top
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      
+
       // Then scroll to the specific driver card after a short delay
       setTimeout(() => {
         const driverCard = document.getElementById(`driver-card-${lastViewedDriverId}`);
@@ -322,11 +320,11 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
         // Check if we should scroll to a specific driver card
         const shouldScrollToDriver = sessionStorage.getItem('scrollToDriver') === 'true';
         const lastViewedDriverId = sessionStorage.getItem('lastViewedDriverId');
-        
+
         if (shouldScrollToDriver && lastViewedDriverId && location.pathname === '/driver') {
           // First scroll to top
           window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-          
+
           // Then scroll to the specific driver card
           setTimeout(() => {
             const driverCard = document.getElementById(`driver-card-${lastViewedDriverId}`);
@@ -348,7 +346,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
         }
       }, 0);
     };
-    
+
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
@@ -358,12 +356,12 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   // Handle notification click
   const handleNotificationClick = async (notification) => {
     console.log('🔘 Notification clicked:', notification);
-    
+
     // Mark notification as read
     if (!notification.read && onMarkAsRead) {
       await onMarkAsRead(notification.id);
     }
-    
+
     if (notification.type === 'message' && notification.conversationId) {
       // Open chat modal with the conversation
       const conversation = await getConversationById(notification.conversationId);
@@ -380,7 +378,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
       // Handle legacy notification format
       const participantIds = notification.relatedId.split('_');
       const otherParticipantId = participantIds.find(id => id !== user.uid);
-      
+
       if (otherParticipantId) {
         // Try to get user data to open chat
         try {
@@ -393,7 +391,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
               name: providerData.fullName || 'Driver',
               role: 'provider'
             });
-            
+
             // Create or get conversation
             const conversationId = await createOrGetConversation(
               user.uid,
@@ -401,7 +399,7 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
               user.displayName || 'User',
               providerData.fullName || 'Driver'
             );
-            
+
             setChatConversationId(conversationId);
             setIsChatModalOpen(true);
           }
@@ -423,43 +421,43 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
   return (
     <div className="min-h-screen bg-white">
       {/* Chat Modal */}
-      <ChatModal 
+      <ChatModal
         isOpen={isChatModalOpen}
         onClose={() => setIsChatModalOpen(false)}
         conversationId={chatConversationId}
         otherUser={chatOtherUser}
         currentUser={currentUser}
       />
-      
+
       {/* Global Notification Bell (Bottom Right) */}
-      <GlobalNotificationBell 
+      <GlobalNotificationBell
         user={user}
         notifications={notifications}
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
-      
+
       <ScrollToTopButton />
-      
-      <Navbar 
-        user={user} 
-        onLogin={onLogin || onShowAuth} 
-        onRegister={onRegister || onShowAuth} 
-        onLogout={onLogout} 
+
+      <Navbar
+        user={user}
+        onLogin={(screen) => (onLogin ? onLogin(screen) : (onShowAuth ? onShowAuth(screen || 'login') : null))}
+        onRegister={(screen) => (onRegister ? onRegister(screen) : (onShowAuth ? onShowAuth(screen || 'register') : null))}
+        onLogout={onLogout}
         onOpenChatList={() => setShowChatList(true)}
       />
-      
+
       {/* Chat List Modal */}
       {showChatList && currentUser && (
         <ChatList
           user={currentUser}
           onClose={() => setShowChatList(false)}
-      />
+        />
       )}
       <JeepHero />
       <div className="h-1 bg-black"></div>
       <JeepSection2 currentUser={user} />
-            <div className="h-1 bg-black"></div>
+      <div className="h-1 bg-black"></div>
       <Footer />
     </div>
   );

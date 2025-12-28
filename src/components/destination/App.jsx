@@ -14,6 +14,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 
 // Import GlobalNotificationBell and ScrollToTopButton from App.jsx
 import { GlobalNotificationBell, ScrollToTopButton } from '../../App'
+import LoadingScreen from '../LoadingScreen'
 
 function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) {
   // State Management
@@ -86,14 +87,18 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
     return () => window.removeEventListener('hashchange', handleHashScroll)
   }, [])
 
-  // Handle login navigation
+  // Handle login navigation (legacy - kept for compatibility)
   const handleLogin = () => {
-    navigate('/login')
+    if (onShowAuth) {
+      onShowAuth('login');
+    }
   }
 
-  // Handle register navigation
+  // Handle register navigation (legacy - kept for compatibility)
   const handleRegister = () => {
-    navigate('/register')
+    if (onShowAuth) {
+      onShowAuth('register');
+    }
   }
 
   // Handle logout
@@ -126,11 +131,7 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500"></div>
-      </div>
-    )
+    return <LoadingScreen />;
   }
 
   return (
@@ -149,8 +150,8 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
       <main className="relative">
         <Navbar
           user={user}
-          onLogin={handleLogin}
-          onRegister={handleRegister}
+          onLogin={(screen) => (onShowAuth ? onShowAuth(screen || 'login') : handleLogin())}
+          onRegister={(screen) => (onShowAuth ? onShowAuth(screen || 'register') : handleRegister())}
           onLogout={handleLogout}
           onStartChat={handleStartChat}
           onOpenChatList={() => setShowChatList(true)}

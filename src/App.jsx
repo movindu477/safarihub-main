@@ -38,7 +38,7 @@ import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLef
 import logo from "./assets/logo.png";
 
 // Import components
-import SplashScreen from "./components/SplashScreen";
+import LoadingScreen from "./components/LoadingScreen";
 import Navbar from "./components/home/Navbar";
 import Section1 from "./components/home/Section1";
 import Section2 from "./components/home/Section2";
@@ -64,6 +64,9 @@ import Admin from "./components/Admin";
 // Import Chat components
 import Chat from "./components/Chat";
 import ChatList from "./components/ChatList";
+
+// Import online status functions
+import { setUserOnline, setUserOffline } from "./firebase";
 
 
 // 🔥 Firebase Config
@@ -1305,8 +1308,8 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
       <Navbar
         user={user}
         onLogout={onLogout}
-        onLogin={onShowAuth}
-        onRegister={onShowAuth}
+        onLogin={(screen) => onShowAuth(screen || 'login')}
+        onRegister={(screen) => onShowAuth(screen || 'register')}
         onOpenChatList={() => setShowChatList(true)}
       />
 
@@ -1339,54 +1342,62 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
 
-  // Check if splash screen should be shown (only on first visit, not if user is logged in)
-  const [showSplash, setShowSplash] = useState(() => {
-    // Check if splash was already shown
-    const splashShown = localStorage.getItem('safarihub_splash_shown');
-    return !splashShown;
-  });
-
-  // Handle splash screen completion
-  const handleSplashComplete = () => {
-    setShowSplash(false);
-    localStorage.setItem('safarihub_splash_shown', 'true');
-  };
-
   // Auth state listener
   useEffect(() => {
-    // Set a timeout to ensure loading eventually completes (max 10 seconds)
+    const startTime = Date.now();
+    const minDisplayTime = 4000; // Minimum 4 seconds to show loading screen
+    const maxWaitTime = 60000; // Maximum 60 seconds timeout
+
+    // Set a timeout to ensure loading eventually completes (max 60 seconds)
     const loadingTimeout = setTimeout(() => {
       console.warn('⚠️ Auth check taking too long, setting loading to false');
       setLoading(false);
-      setShowSplash(false);
-      localStorage.setItem('safarihub_splash_shown', 'true');
-    }, 10000);
+    }, maxWaitTime);
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
 
-      // Clear the timeout since auth resolved
-      clearTimeout(loadingTimeout);
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
 
-      setUser(user);
-      setLoading(false);
+      // Wait for minimum display time to ensure loading screen is visible
+      setTimeout(async () => {
+        // Clear the timeout since auth resolved
+        clearTimeout(loadingTimeout);
 
-      // Hide splash if user is logged in (user already saw it or is returning)
-      if (user) {
-        setShowSplash(false);
-        localStorage.setItem('safarihub_splash_shown', 'true');
-      }
+        setUser(user);
+        setLoading(false);
 
-      if (!user) {
-        setNotifications([]);
-      }
+        if (!user) {
+          setNotifications([]);
+        } else {
+          // Set user online status for service providers
+          try {
+            // Check if user is a service provider by checking serviceProviders collection
+            const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+            if (providerDoc.exists()) {
+              const providerData = providerDoc.data();
+              await setUserOnline(user.uid, 'provider', {
+                email: user.email || providerData.email || '',
+                userName: user.displayName || providerData.fullName || 'Service Provider'
+              });
+            }
+          } catch (error) {
+            console.error('Error setting user online status:', error);
+          }
+        }
+      }, remainingTime);
     }, (error) => {
       // Handle auth errors
       console.error('❌ Auth state error:', error);
-      clearTimeout(loadingTimeout);
-      setLoading(false);
-      setShowSplash(false);
-      localStorage.setItem('safarihub_splash_shown', 'true');
+
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
+
+      setTimeout(() => {
+        clearTimeout(loadingTimeout);
+        setLoading(false);
+      }, remainingTime);
     });
 
     return () => {
@@ -1424,6 +1435,20 @@ function App() {
     try {
       console.log('🔄 Starting logout...');
 
+      // Set user offline if they're a service provider
+      const currentUserId = user?.uid;
+      if (currentUserId) {
+        try {
+          // Check if user is a service provider by checking serviceProviders collection
+          const providerDoc = await getDoc(doc(db, 'serviceProviders', currentUserId));
+          if (providerDoc.exists()) {
+            await setUserOffline(currentUserId, 'provider');
+          }
+        } catch (error) {
+          console.error('Error setting user offline status:', error);
+        }
+      }
+
       // Force immediate UI update
       setUser(null);
       setNotifications([]);
@@ -1445,6 +1470,7 @@ function App() {
   };
 
   const [returnToPath, setReturnToPath] = useState(null);
+  const [authInitialScreen, setAuthInitialScreen] = useState('login');
 
   const handleAuthSuccess = (returnPath) => {
     setShowAuth(false);
@@ -1457,10 +1483,11 @@ function App() {
     setReturnToPath(null);
   };
 
-  const handleShowAuth = () => {
+  const handleShowAuth = (initialScreen = 'login') => {
     // Save current location before showing auth
     const currentPath = window.location.pathname;
     setReturnToPath(currentPath);
+    setAuthInitialScreen(initialScreen); // Store the initial screen
     setShowAuth(true);
   };
 
@@ -1498,49 +1525,13 @@ function App() {
     await markNotificationAsRead(notificationId);
   };
 
-  // Auto-hide splash after max 5 seconds (safety timeout)
-  useEffect(() => {
-    if (showSplash) {
-      const splashTimeout = setTimeout(() => {
-        console.warn('⚠️ Splash screen timeout, hiding automatically');
-        setShowSplash(false);
-        localStorage.setItem('safarihub_splash_shown', 'true');
-      }, 5000);
-      return () => clearTimeout(splashTimeout);
-    }
-  }, [showSplash]);
-
-  // Auto-resolve loading after max 10 seconds (safety timeout)
-  useEffect(() => {
-    if (loading) {
-      const loadingTimeout = setTimeout(() => {
-        console.warn('⚠️ Loading timeout, setting loading to false');
-        setLoading(false);
-        setShowSplash(false);
-        localStorage.setItem('safarihub_splash_shown', 'true');
-      }, 10000);
-      return () => clearTimeout(loadingTimeout);
-    }
-  }, [loading]);
-
-  // Show splash screen on first load
-  if (showSplash) {
-    return <SplashScreen onLoadingComplete={handleSplashComplete} />;
-  }
-
+  // Show modern loading screen while loading
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading SafariHub...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (showAuth) {
-    return <Authentication onAuthSuccess={handleAuthSuccess} returnToPath={returnToPath} />;
+    return <Authentication onAuthSuccess={handleAuthSuccess} returnToPath={returnToPath} initialScreen={authInitialScreen} onBackToHome={() => setShowAuth(false)} />;
   }
 
 
@@ -1753,8 +1744,8 @@ const isValidSriLankanPhone = (phone) => {
 };
 
 // Authentication Component
-function Authentication({ onAuthSuccess, returnToPath }) {
-  const [screen, setScreen] = useState("login");
+function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", onBackToHome }) {
+  const [screen, setScreen] = useState(initialScreen);
   const [role, setRole] = useState(null);
   const [msg, setMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -2078,17 +2069,36 @@ function Authentication({ onAuthSuccess, returnToPath }) {
     }
   }, [screen]);
 
+  // Update screen when initialScreen prop changes
+  useEffect(() => {
+    if (initialScreen) {
+      setScreen(initialScreen);
+    }
+  }, [initialScreen]);
+
   // Login Page
   if (screen === "login")
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
         <div className="relative w-full max-w-md">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
+            {/* Back Button */}
+            {onBackToHome && (
+              <button
+                onClick={onBackToHome}
+                className="absolute top-4 left-4 text-yellow-400 hover:text-yellow-300 font-semibold flex items-center gap-2 text-sm transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back to Home
+              </button>
+            )}
+
             <div className="text-center mb-8">
               <img
                 src={logo}
                 alt="SafariHub Logo"
-                className="h-24 sm:h-28 md:h-32 w-auto object-contain mx-auto mb-4"
+                className="h-24 sm:h-28 md:h-32 w-auto object-contain mx-auto mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={onBackToHome || (() => { })}
               />
               <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
               <p className="text-gray-300 mt-2">Sign in to continue your adventure</p>
@@ -2181,25 +2191,26 @@ function Authentication({ onAuthSuccess, returnToPath }) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
         <div className="relative w-full max-w-2xl">
-          <div className="flex justify-between items-center mb-4">
+          {/* Back Button */}
+          {onBackToHome && (
             <button
               onClick={() => {
                 if (role) {
                   setRole(null);
                   resetForm();
                 } else {
-                  setScreen("login");
+                  onBackToHome();
                 }
               }}
-              className="text-yellow-400 hover:text-yellow-300 font-semibold flex items-center gap-2 text-sm"
+              className="absolute top-4 left-4 text-yellow-400 hover:text-yellow-300 font-semibold flex items-center gap-2 text-sm transition-colors z-10"
             >
               <ChevronLeft className="h-4 w-4" />
-              Back to {role ? 'Selection' : 'Login'}
+              Back to {role ? 'Selection' : 'Home'}
             </button>
-          </div>
+          )}
 
           {!role ? (
-            <UserTypeSelection onSelect={setRole} logo={logo} />
+            <UserTypeSelection onSelect={setRole} logo={logo} onBackToHome={onBackToHome} />
           ) : (
             <RegistrationForm
               role={role}
@@ -2237,13 +2248,14 @@ function Authentication({ onAuthSuccess, returnToPath }) {
 }
 
 // User Type Selection Component
-const UserTypeSelection = ({ onSelect, logo }) => (
+const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
   <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-2xl">
     <div className="text-center mb-6">
       <img
         src={logo}
         alt="SafariHub Logo"
-        className="h-24 sm:h-28 md:h-32 w-auto object-contain mx-auto mb-4"
+        className="h-24 sm:h-28 md:h-32 w-auto object-contain mx-auto mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={onBackToHome || (() => { })}
       />
       <h2 className="text-xl font-bold text-white">Join SafariHub</h2>
       <p className="text-gray-300 text-sm mt-1">Choose your adventure type</p>

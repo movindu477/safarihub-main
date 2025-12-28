@@ -19,7 +19,8 @@ const JeepSection2 = ({ currentUser }) => {
     vehicleType: '',
     languages: [],
     specialSkills: [],
-    certifications: []
+    certifications: [],
+    status: '' // Online/Offline filter
   });
 
   // Filter options
@@ -133,7 +134,11 @@ const JeepSection2 = ({ currentUser }) => {
             description: providerData.description || providerData.bio || 'Experienced safari jeep driver',
 
             // Mark if this is the current user's profile
-            isCurrentUser: currentUser && currentUser.uid === providerId
+            isCurrentUser: currentUser && currentUser.uid === providerId,
+
+            // Online status
+            online: providerData.online || providerData.isOnline || false,
+            isOnline: providerData.online || providerData.isOnline || false
           });
         }
       });
@@ -235,6 +240,14 @@ const JeepSection2 = ({ currentUser }) => {
       );
     }
 
+    // Status filter (Online/Offline)
+    if (filters.status) {
+      filtered = filtered.filter(jeep => {
+        const isOnline = jeep.online || jeep.isOnline || false;
+        return filters.status === 'online' ? isOnline : !isOnline;
+      });
+    }
+
     console.log('✅ Filtered results:', filtered.length);
     setFilteredJeeps(filtered);
   }, [filters, jeeps]);
@@ -281,7 +294,8 @@ const JeepSection2 = ({ currentUser }) => {
       vehicleType: '',
       languages: [],
       specialSkills: [],
-      certifications: []
+      certifications: [],
+      status: ''
     });
 
     setFilteredJeeps(jeeps);
@@ -414,20 +428,6 @@ const JeepSection2 = ({ currentUser }) => {
           <p className="text-lg text-emerald-700 max-w-2xl mx-auto">
             Discover experienced safari jeep drivers for your wildlife adventures. Filter by your preferences to find the perfect match.
           </p>
-
-          {/* Current User Status Indicator */}
-          {currentUser && (
-            <div className="mt-4 p-3 bg-white/90 rounded-xl shadow-xl border border-emerald-100 max-w-md mx-auto backdrop-blur">
-              <p className="text-sm text-emerald-700">
-                <span className="font-semibold">Your Profile:</span>{' '}
-                {jeeps.find(j => j.isCurrentUser) ? (
-                  <span className="text-green-600 font-medium">🟢 Listed - Other users can see your profile</span>
-                ) : (
-                  <span className="text-gray-500">⚫ Not listed - Register as a service provider</span>
-                )}
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Filter Section */}
@@ -448,7 +448,7 @@ const JeepSection2 = ({ currentUser }) => {
           </div>
 
           {/* Single Row Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Destination Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -518,6 +518,22 @@ const JeepSection2 = ({ currentUser }) => {
                 {filterOptions.vehicleTypes.map(type => (
                   <option key={type} value={type}>{type}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+              >
+                <option value="">All Status</option>
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
               </select>
             </div>
           </div>
@@ -624,9 +640,22 @@ const JeepSection2 = ({ currentUser }) => {
                   <ProfileImage jeep={jeep} />
                   <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
 
-                  {/* Experience Badge */}
-                  {jeep.experience > 0 && (
+                  {/* Online Status Badge */}
+                  {(jeep.online || jeep.isOnline) && (
+                    <div className="absolute top-3 right-3 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg z-10">
+                      Online
+                    </div>
+                  )}
+
+                  {/* Experience Badge - Only show if not online (to avoid overlap) */}
+                  {jeep.experience > 0 && !(jeep.online || jeep.isOnline) && (
                     <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                      {jeep.experience}+ years
+                    </div>
+                  )}
+                  {/* If online, show experience badge below online badge */}
+                  {jeep.experience > 0 && (jeep.online || jeep.isOnline) && (
+                    <div className="absolute top-10 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {jeep.experience}+ years
                     </div>
                   )}

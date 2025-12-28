@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Camera, 
-  Clock, 
-  Users, 
+import {
+  ArrowLeft,
+  MapPin,
+  Camera,
+  Clock,
+  Users,
   Star,
   Hotel,
   Navigation,
@@ -73,7 +73,7 @@ function AnimatedCounter({ value, duration = 1500 }) {
 // Helper function to get weather icon based on weather condition
 const getWeatherIcon = (weatherMain, size = 16) => {
   const iconProps = { className: `h-${size} w-${size}` };
-  
+
   switch (weatherMain?.toLowerCase()) {
     case 'clear':
       return <Sun {...iconProps} className={`h-${size} w-${size} text-amber-500`} />;
@@ -100,27 +100,27 @@ const formatDate = (dateString) => {
   const date = new Date(dateString);
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
+
   return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
 };
 
 export default function DestinationDetails({ user, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) {
   const { destinationId } = useParams();
   const navigate = useNavigate();
-  
+
   // All hooks must be called before any conditional returns
   const [selectedAnimal, setSelectedAnimal] = useState(0);
   const [mapZoom, setMapZoom] = useState(12);
   const [jeepDrivers, setJeepDrivers] = useState([]);
   const [tourGuides, setTourGuides] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
-  
+
   // Weather state
   const [weather, setWeather] = useState(null);
   const [forecast, setForecast] = useState(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [weatherError, setWeatherError] = useState(null);
-  
+
   // Early return if no destinationId (AFTER all hooks)
   if (!destinationId) {
     return (
@@ -272,13 +272,14 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar 
-        user={user} 
-        onLogout={onLogout} 
-        onShowAuth={onShowAuth}
+      <Navbar
+        user={user}
+        onLogout={onLogout}
+        onLogin={(screen) => (onShowAuth ? onShowAuth(screen || 'login') : null)}
+        onRegister={(screen) => (onShowAuth ? onShowAuth(screen || 'register') : null)}
         onOpenChatList={() => setShowChatList(true)}
       />
-      
+
       {/* Chat List Modal */}
       {showChatList && user && (
         <ChatList
@@ -286,7 +287,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
           onClose={() => setShowChatList(false)}
         />
       )}
-      <GlobalNotificationBell 
+      <GlobalNotificationBell
         user={user}
         notifications={notifications}
         onNotificationClick={onNotificationClick}
@@ -297,7 +298,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
 
       {/* Hero Section */}
       <section className="relative h-[60vh] md:h-[75vh] flex items-end overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: `url(${destination.backgroundImage})`,
@@ -410,7 +411,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
-                
+
                 {/* Navigation Buttons */}
                 <button
                   onClick={handlePreviousAnimal}
@@ -462,11 +463,10 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                     <button
                       key={index}
                       onClick={() => setSelectedAnimal(index)}
-                      className={`rounded-full transition-all ${
-                        index === selectedAnimal 
-                          ? 'bg-white h-2 w-8' 
+                      className={`rounded-full transition-all ${index === selectedAnimal
+                          ? 'bg-white h-2 w-8'
                           : 'bg-white/50 hover:bg-white/75 h-2 w-2'
-                      }`}
+                        }`}
                       aria-label={`Go to ${destination.animals[index].name}`}
                     />
                   ))}
@@ -479,20 +479,18 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                   <button
                     key={index}
                     onClick={() => setSelectedAnimal(index)}
-                    className={`relative h-24 md:h-32 rounded-lg overflow-hidden border-2 transition-all ${
-                      index === selectedAnimal 
-                        ? 'border-gray-900 ring-2 ring-gray-900 ring-offset-2' 
+                    className={`relative h-24 md:h-32 rounded-lg overflow-hidden border-2 transition-all ${index === selectedAnimal
+                        ? 'border-gray-900 ring-2 ring-gray-900 ring-offset-2'
                         : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                   >
                     <img
                       src={animal.image}
                       alt={animal.name}
                       className="w-full h-full object-cover"
                     />
-                    <div className={`absolute inset-0 transition-colors ${
-                      index === selectedAnimal ? 'bg-black/20' : 'bg-black/30 hover:bg-black/20'
-                    }`}></div>
+                    <div className={`absolute inset-0 transition-colors ${index === selectedAnimal ? 'bg-black/20' : 'bg-black/30 hover:bg-black/20'
+                      }`}></div>
                     <p className="absolute bottom-1.5 left-1.5 right-1.5 text-white text-xs font-medium text-center bg-black/40 backdrop-blur-sm rounded px-1.5 py-0.5">
                       {animal.name}
                     </p>
@@ -580,15 +578,15 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
 
       {/* Available Service Providers Section */}
       <section className="py-20 md:py-24 bg-gradient-to-b from-gray-50 to-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 tracking-tight">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 tracking-tight">
               Available Service Providers
-              </h2>
-              <p className="text-base text-gray-600 max-w-xl mx-auto">
+            </h2>
+            <p className="text-base text-gray-600 max-w-xl mx-auto">
               Professional jeep drivers and tour guides ready to assist your visit
-              </p>
-            </div>
+            </p>
+          </div>
 
           {loadingProviders ? (
             <div className="text-center py-12">
@@ -604,35 +602,35 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                     <TruckIcon className="h-6 w-6 mr-2 text-green-600" />
                     Jeep Drivers
                   </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {jeepDrivers.map((driver) => (
-                      <div 
-                        key={driver.id} 
+                      <div
+                        key={driver.id}
                         className="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
                         onClick={() => navigate(`/jeep-profile/${driver.id}`)}
                       >
                         <div className="relative h-48 overflow-hidden">
-                    <img
+                          <img
                             src={driver.profilePicture || driver.imageUrl || '/api/placeholder/400/300'}
                             alt={driver.fullName || 'Jeep Driver'}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
+                          />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                           <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg">
-                      <Star className="h-4 w-4 text-amber-500 fill-current" />
+                            <Star className="h-4 w-4 text-amber-500 fill-current" />
                             <span className="text-sm font-semibold text-gray-900">
                               {driver.rating ? driver.rating.toFixed(1) : '0.0'}
                             </span>
-                    </div>
-                  </div>
-                  <div className="p-6">
+                          </div>
+                        </div>
+                        <div className="p-6">
                           <h4 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-green-600 transition-colors">
                             {driver.fullName || 'Jeep Driver'}
                           </h4>
-                    <div className="flex items-center text-sm text-gray-600 mb-3">
+                          <div className="flex items-center text-sm text-gray-600 mb-3">
                             <MapPin className="h-4 w-4 mr-1 text-gray-500" />
                             <span>{driver.location || driver.baseLocation || 'Sri Lanka'}</span>
-                    </div>
+                          </div>
                           <p className="text-sm text-gray-600 mb-4 line-clamp-2">
                             {driver.description || driver.bio || 'Experienced jeep driver'}
                           </p>
@@ -641,8 +639,8 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                               {driver.currencyPreference === 'USD' ? '$' : 'LKR '}
                               {driver.dailyRate || driver.hourlyRate || 'Contact'}
                               {driver.dailyRate ? '/day' : driver.hourlyRate ? '/hr' : ''}
-                        </span>
-                            <button 
+                            </span>
+                            <button
                               className="text-green-600 hover:text-green-700 font-medium text-sm transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -654,8 +652,8 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                           </div>
                         </div>
                       </div>
-                      ))}
-                    </div>
+                    ))}
+                  </div>
                   <div className="text-center mt-8">
                     <button
                       onClick={() => {
@@ -686,8 +684,8 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {tourGuides.map((guide) => (
-                      <div 
-                        key={guide.id} 
+                      <div
+                        key={guide.id}
                         className="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
                         onClick={() => navigate(`/guide-profile/${guide.id}`)}
                       >
@@ -716,13 +714,13 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                           <p className="text-sm text-gray-600 mb-4 line-clamp-2">
                             {guide.description || guide.bio || 'Experienced tour guide'}
                           </p>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                             <span className="text-lg font-bold text-green-600">
                               {guide.currencyPreference === 'USD' ? '$' : 'LKR '}
                               {guide.dailyRate || guide.hourlyRate || 'Contact'}
                               {guide.dailyRate ? '/day' : guide.hourlyRate ? '/hr' : ''}
                             </span>
-                            <button 
+                            <button
                               className="text-green-600 hover:text-green-700 font-medium text-sm transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -730,12 +728,12 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                               }}
                             >
                               View Profile →
-                      </button>
-                    </div>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
                   <div className="text-center mt-8">
                     <button
                       onClick={() => {
@@ -785,8 +783,8 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               )}
             </div>
           )}
-          </div>
-        </section>
+        </div>
+      </section>
 
       {/* Weather Section */}
       <section className="py-20 md:py-24 bg-white">
@@ -818,36 +816,36 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               </div>
             </div>
           ) : weather && (
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Current Weather Display */}
-              <div className="bg-white rounded-xl p-6 border border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Conditions</h3>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Current Weather Display */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Conditions</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
                       {getWeatherIcon(weather.weather?.[0]?.main, 16)}
-                    <div>
+                      <div>
                         <p className="text-4xl font-bold text-gray-900">
                           {Math.round(weather.main?.temp || 0)}°C
                         </p>
                         <p className="text-gray-600 capitalize">
                           {weather.weather?.[0]?.description || 'N/A'}
                         </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <Droplet className="h-5 w-5 text-blue-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">Humidity</p>
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <Droplet className="h-5 w-5 text-blue-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Humidity</p>
                         <p className="font-semibold text-gray-900">{weather.main?.humidity || 0}%</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Wind className="h-5 w-5 text-gray-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">Wind Speed</p>
+                    <div className="flex items-center gap-2">
+                      <Wind className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Wind Speed</p>
                         <p className="font-semibold text-gray-900">
                           {weather.wind?.speed ? `${weather.wind.speed.toFixed(1)} m/s` : 'N/A'}
                         </p>
@@ -867,36 +865,36 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                       <div>
                         <p className="text-xs text-gray-500">Cloudiness</p>
                         <p className="font-semibold text-gray-900">{weather.clouds?.all || 0}%</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Best Time to Visit */}
-              <div className="bg-white rounded-xl p-6 border border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Best Time to Visit</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-gray-900">{destination.bestTimeToVisit}</p>
-                      <p className="text-sm text-gray-600">Ideal weather conditions during this period</p>
+                {/* Best Time to Visit */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Best Time to Visit</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-gray-900">{destination.bestTimeToVisit}</p>
+                        <p className="text-sm text-gray-600">Ideal weather conditions during this period</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="pt-3 border-t border-gray-200">
-                    <p className="text-sm text-gray-600">
-                      Check seasonal weather patterns and plan your visit accordingly for the best experience.
-                    </p>
+                    <div className="pt-3 border-t border-gray-200">
+                      <p className="text-sm text-gray-600">
+                        Check seasonal weather patterns and plan your visit accordingly for the best experience.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
               {/* 5-Day Forecast */}
               {forecast && forecast.list && (
-            <div className="mt-8 pt-8 border-t border-blue-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">5-Day Forecast</h3>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="mt-8 pt-8 border-t border-blue-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-6">5-Day Forecast</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     {forecast.list
                       .filter((item, index) => index % 8 === 0) // Get one forecast per day (every 8th item = 24 hours)
                       .slice(0, 5) // Limit to 5 days
@@ -905,21 +903,21 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                           <p className="font-semibold text-gray-900 text-sm mb-1">
                             {index === 0 ? 'Today' : formatDate(day.dt_txt)}
                           </p>
-                    <div className="flex justify-center mb-4">
+                          <div className="flex justify-center mb-4">
                             {getWeatherIcon(day.weather?.[0]?.main, 8)}
-                    </div>
+                          </div>
                           <p className="text-2xl font-semibold text-gray-900 mb-1">
                             {Math.round(day.main?.temp || 0)}°C
                           </p>
                           <p className="text-xs text-gray-500 capitalize">
                             {day.weather?.[0]?.description || 'N/A'}
                           </p>
+                        </div>
+                      ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
               )}
-          </div>
+            </div>
           )}
         </div>
       </section>
