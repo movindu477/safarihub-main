@@ -101,10 +101,10 @@ export const getUserRole = async (userId) => {
   try {
     const touristDoc = await getDoc(doc(db, 'tourists', userId));
     if (touristDoc.exists()) return 'tourist';
-
+    
     const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
     if (providerDoc.exists()) return 'provider';
-
+    
     return null;
   } catch (error) {
     console.error('Error getting user role:', error);
@@ -140,7 +140,7 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-
+      
       console.log(`✅ New conversation created: ${conversationId}`);
     } else {
       console.log(`✅ Existing conversation found: ${conversationId}`);
@@ -171,7 +171,7 @@ export const getConversationById = async (conversationId) => {
 
 export const getOtherParticipant = (conversation, currentUserId) => {
   if (!conversation || !conversation.participantIds) return null;
-
+  
   const otherParticipantId = conversation.participantIds.find(id => id !== currentUserId);
   return {
     id: otherParticipantId,
@@ -189,7 +189,7 @@ export const getUserConversations = (userId, callback) => {
       orderBy('lastMessageTimestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(userConversationsQuery,
+    const unsubscribe = onSnapshot(userConversationsQuery, 
       (snapshot) => {
         const conversations = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -218,7 +218,7 @@ export const getMessages = (conversationId, callback) => {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
     const messagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
 
-    const unsubscribe = onSnapshot(messagesQuery,
+    const unsubscribe = onSnapshot(messagesQuery, 
       (snapshot) => {
         const messages = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -244,7 +244,7 @@ export const getMessages = (conversationId, callback) => {
 export const sendMessage = async (conversationId, messageData) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-
+    
     const messageDoc = await addDoc(messagesRef, {
       ...messageData,
       timestamp: serverTimestamp(),
@@ -703,7 +703,7 @@ export const getUserNotifications = (userId, callback) => {
       orderBy('timestampValue', 'desc')
     );
 
-    const unsubscribe = onSnapshot(notificationsQuery,
+    const unsubscribe = onSnapshot(notificationsQuery, 
       (snapshot) => {
         const notifications = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -735,7 +735,7 @@ export const createNotification = async (notificationData) => {
       timestamp: serverTimestamp(),
       timestampValue: Date.now()
     });
-
+    
     console.log(`✅ Notification created for user ${notificationData.recipientId}`);
     return notificationDoc.id;
   } catch (error) {
@@ -765,24 +765,24 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
     if (!bookingDoc.exists()) {
       throw new Error('Booking not found');
     }
-
+    
     const bookingData = bookingDoc.data();
     const isGuideBooking = !!bookingData.guideId;
     const serviceType = isGuideBooking ? 'guide' : 'driver';
     const serviceProviderName = isGuideBooking ? 'guide' : 'driver';
-
+    
     // Update booking status
     await updateDoc(doc(db, 'bookings', bookingId), {
       status: status,
       updatedAt: serverTimestamp(),
       statusUpdatedAt: serverTimestamp()
     });
-
+    
     // Create notification for customer
-    const statusMessage = status === 'accepted'
+    const statusMessage = status === 'accepted' 
       ? `Your booking with ${providerName} has been accepted!`
       : `Your booking with ${providerName} has been declined.`;
-
+    
     await createNotification({
       type: 'booking',
       title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
@@ -793,7 +793,7 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
       relatedId: bookingId,
       bookingId: bookingId
     });
-
+    
     console.log(`✅ Booking ${bookingId} status updated to ${status} (${serviceType})`);
   } catch (error) {
     console.error('Error updating booking status:', error);
@@ -819,12 +819,12 @@ export const getBookingById = async (bookingId) => {
 
 
 // Chat Modal Component
-const ChatModal = ({
-  isOpen,
-  onClose,
-  conversationId,
-  otherUser,
-  currentUser
+const ChatModal = ({ 
+  isOpen, 
+  onClose, 
+  conversationId, 
+  otherUser, 
+  currentUser 
 }) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
@@ -849,11 +849,11 @@ const ChatModal = ({
     const unsubscribe = getMessages(conversationId, (messagesData) => {
       console.log(`📬 Received ${messagesData.length} messages`);
       setMessages(messagesData);
-
+      
       // Mark messages as read and delivered
       if (currentUser) {
         markMessagesAsRead(conversationId, currentUser.uid);
-
+        
         // Mark own messages as delivered
         messagesData.forEach(msg => {
           if (msg.senderId === currentUser.uid && !msg.delivered) {
@@ -875,7 +875,7 @@ const ChatModal = ({
 
     try {
       setSending(true);
-
+      
       const messageData = {
         content: message.trim(),
         senderId: currentUser.uid,
@@ -885,7 +885,7 @@ const ChatModal = ({
       };
 
       console.log(`📤 Sending message to ${otherUser.name}: ${message.trim()}`);
-
+      
       // Send the message
       await sendMessage(conversationId, messageData);
 
@@ -916,10 +916,10 @@ const ChatModal = ({
     if (!timestamp) return '';
     try {
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
         minute: '2-digit',
-        hour12: true
+        hour12: true 
       });
     } catch (error) {
       return '';
@@ -971,13 +971,13 @@ const ChatModal = ({
                 >
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${msg.senderId === currentUser?.uid
-                      ? 'bg-yellow-500 text-white rounded-br-none'
-                      : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                      }`}
+                        ? 'bg-yellow-500 text-white rounded-br-none'
+                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                    }`}
                   >
                     <p className="text-sm">{msg.content}</p>
                     <div className={`flex items-center space-x-2 mt-1 text-xs ${msg.senderId === currentUser?.uid ? 'text-yellow-100' : 'text-gray-500'
-                      }`}>
+                    }`}>
                       <span>{formatTime(msg.timestamp)}</span>
                       {msg.senderId === currentUser?.uid && (
                         <span className="flex items-center space-x-1">
@@ -1057,9 +1057,9 @@ export const ScrollToTopButton = () => {
   };
 
   return (
-    <div
+    <div 
       className={`fixed bottom-6 left-6 z-50 transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
-        }`}
+      }`}
     >
       <button
         onClick={scrollToTop}
@@ -1115,7 +1115,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
       <div className="relative">
         {showNotifications && (
           <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
-            <NotificationPanel
+            <NotificationPanel 
               notifications={notifications}
               onClose={() => setShowNotifications(false)}
               onNotificationClick={handleNotificationItemClick}
@@ -1161,7 +1161,7 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       }, 0);
     };
-
+    
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
@@ -1171,12 +1171,12 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
   // Handle notification click - OPEN CHAT MODAL
   const handleNotificationClick = async (notification) => {
     console.log('🔘 Notification clicked:', notification);
-
+    
     // Mark notification as read
     if (!notification.read) {
       await onMarkAsRead(notification.id);
     }
-
+    
     if (notification.type === 'message' && (notification.conversationId || notification.chatId || notification.relatedId)) {
       try {
         // Get chat/conversation ID
@@ -1226,17 +1226,17 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
         // Fallback: Try conversations collection (legacy)
         try {
           const conversation = await getConversationById(chatId);
-          if (conversation && user) {
-            const otherUser = getOtherParticipant(conversation, user.uid);
-            if (otherUser) {
+      if (conversation && user) {
+        const otherUser = getOtherParticipant(conversation, user.uid);
+        if (otherUser) {
               setChatOtherUser({
                 id: otherUser.id,
                 name: otherUser.name,
                 photo: '',
                 role: otherUser.role
               });
-              setShowChatModal(true);
-              console.log(`💬 Opening chat with ${otherUser.name}`);
+          setShowChatModal(true);
+          console.log(`💬 Opening chat with ${otherUser.name}`);
               return;
             }
           }
@@ -1293,21 +1293,21 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
             setShowChatModal(false);
             setChatOtherUser(null);
           }}
-        />
+      />
       )}
-
-      <GlobalNotificationBell
+      
+      <GlobalNotificationBell 
         user={user}
         notifications={notifications}
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={onMarkAsRead}
       />
-
+      
       <ScrollToTopButton />
-
-      <Navbar
-        user={user}
-        onLogout={onLogout}
+      
+      <Navbar 
+        user={user} 
+        onLogout={onLogout} 
         onLogin={(screen) => onShowAuth(screen || 'login')}
         onRegister={(screen) => onShowAuth(screen || 'register')}
         onOpenChatList={() => setShowChatList(true)}
@@ -1318,18 +1318,18 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
         <ChatList
           user={user}
           onClose={() => setShowChatList(false)}
-        />
+      />
       )}
-
+      
       {/* Home Content with All Sections */}
       <div className="pt--1 space-y-1">
-        <Section1 />
-        <Section2 />
-        <Section3 />
-        <Section4 />
-        <Section5 />
-        <Footer />
-      </div>
+  <Section1 />
+  <Section2 />
+  <Section3 />
+  <Section4 />
+  <Section5 />
+  <Footer />
+</div>
 
     </div>
   );
@@ -1364,12 +1364,12 @@ function App() {
       setTimeout(async () => {
         // Clear the timeout since auth resolved
         clearTimeout(loadingTimeout);
-
-        setUser(user);
-        setLoading(false);
-
-        if (!user) {
-          setNotifications([]);
+      
+      setUser(user);
+      setLoading(false);
+      
+      if (!user) {
+        setNotifications([]);
         } else {
           // Set user online status for service providers
           try {
@@ -1399,7 +1399,7 @@ function App() {
         setLoading(false);
       }, remainingTime);
     });
-
+    
     return () => {
       clearTimeout(loadingTimeout);
       console.log('🔴 Cleaning up auth listener');
@@ -1411,17 +1411,17 @@ function App() {
   useEffect(() => {
     if (user) {
       console.log(`🔔 Setting up notifications listener for user: ${user.uid}`);
-
+      
       const processedNotifications = new Set(); // Track processed notifications to prevent multiple redirects
-
+      
       const unsubscribe = getUserNotifications(user.uid, async (notifications) => {
         console.log(`📢 Received ${notifications.length} notifications`);
         setNotifications(notifications);
-
+        
         // NOTE: Auto-redirect removed - users will now see Accept/Decline buttons in notifications
         // and can choose to go to payment page by clicking Accept
       });
-
+      
       return () => {
         console.log(`🔴 Unsubscribing from notifications for user: ${user.uid}`);
         unsubscribe();
@@ -1448,19 +1448,19 @@ function App() {
           console.error('Error setting user offline status:', error);
         }
       }
-
+      
       // Force immediate UI update
       setUser(null);
       setNotifications([]);
-
+      
       await signOut(auth);
-
+      
       // Force navigation
       setTimeout(() => {
         window.history.replaceState(null, '', '/');
         window.dispatchEvent(new PopStateEvent('popstate'));
       }, 100);
-
+      
     } catch (error) {
       console.error('Logout error:', error);
       // Still reset state
@@ -1518,12 +1518,12 @@ function App() {
 
   const handleNotificationClick = async (notification) => {
     console.log('🔘 Global notification clicked:', notification);
-
+    
     // Mark notification as read
     if (!notification.read) {
       await markNotificationAsRead(notification.id);
     }
-
+    
     // Auto-redirect to payment page if booking is accepted
     if (notification.type === 'booking' && notification.bookingId) {
       try {
@@ -1542,7 +1542,7 @@ function App() {
         console.error('Error checking booking status:', err);
       }
     }
-
+    
     console.log('Notification click handled by global system:', notification);
   };
 
@@ -1563,12 +1563,12 @@ function App() {
   // Scroll to top component - handles route changes and back/forward button
   const ScrollToTop = () => {
     const { pathname } = useLocation();
-
+    
     useEffect(() => {
       // Scroll to top on route change
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }, [pathname]);
-
+    
     useEffect(() => {
       // Handle back/forward button navigation
       const handlePopState = () => {
@@ -1577,13 +1577,13 @@ function App() {
           window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         }, 0);
       };
-
+      
       window.addEventListener('popstate', handlePopState);
       return () => {
         window.removeEventListener('popstate', handlePopState);
       };
     }, []);
-
+    
     return null;
   };
 
@@ -1591,10 +1591,10 @@ function App() {
     <Router>
       <ScrollToTop />
       <Routes>
-        <Route
-          path="/"
+        <Route 
+          path="/" 
           element={
-            <HomePage
+            <HomePage 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1602,12 +1602,12 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          }
+          } 
         />
-        <Route
-          path="/driver"
+        <Route 
+          path="/driver" 
           element={
-            <JeepDriversPage
+            <JeepDriversPage 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1615,9 +1615,9 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          }
+          } 
         />
-        <Route
+        <Route 
           path="/jeep"
           element={
             <JeepDriversPage
@@ -1633,7 +1633,7 @@ function App() {
         <Route
           path="/jeep-profile/:jeepId"
           element={
-            <JeepProfile
+            <JeepProfile 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1641,13 +1641,13 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          }
+          } 
         />
         {/* Destination Routes - Specific routes first */}
-        <Route
-          path="/destination/:destinationId"
+        <Route 
+          path="/destination/:destinationId" 
           element={
-            <DestinationDetails
+            <DestinationDetails 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1655,12 +1655,12 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          }
+          } 
         />
-        <Route
-          path="/destination"
+        <Route 
+          path="/destination" 
           element={
-            <DestinationApp
+            <DestinationApp 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1668,13 +1668,13 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          }
+          } 
         />
         {/* Guide Route */}
-        <Route
-          path="/guide"
+        <Route 
+          path="/guide" 
           element={
-            <GuideApp
+            <GuideApp 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1682,12 +1682,12 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          }
+          } 
         />
-        <Route
-          path="/guide-profile/:guideId"
+        <Route 
+          path="/guide-profile/:guideId" 
           element={
-            <GuideProfile
+            <GuideProfile 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1695,24 +1695,24 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          }
+          } 
         />
         {/* Payment Route */}
-        <Route
-          path="/payment/:bookingId"
+        <Route 
+          path="/payment/:bookingId" 
           element={
-            <Payment
+            <Payment 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
             />
-          }
+          } 
         />
         {/* About Us Route */}
-        <Route
-          path="/about"
+        <Route 
+          path="/about" 
           element={
-            <AboutUs
+            <AboutUs 
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1720,7 +1720,7 @@ function App() {
               onNotificationClick={handleNotificationClick}
               onMarkAsRead={handleMarkAsRead}
             />
-          }
+          } 
         />
         <Route
           path="/admin"
@@ -1744,28 +1744,28 @@ function App() {
 // Phone number formatting utility
 const formatPhoneNumber = (phone) => {
   if (!phone) return "";
-
+  
   let cleaned = phone.replace(/\D/g, '');
-
+  
   if (cleaned.startsWith('94')) {
     return `+${cleaned}`;
   }
-
+  
   if (cleaned.startsWith('0')) {
     return `+94${cleaned.substring(1)}`;
   }
-
+  
   if (!cleaned.startsWith('+')) {
     return `+94${cleaned}`;
   }
-
+  
   return phone;
 };
 
 // Phone number validation
 const isValidSriLankanPhone = (phone) => {
   if (!phone) return false;
-
+  
   const formatted = formatPhoneNumber(phone);
   const sriLankanRegex = /^\+94[0-9]{9}$/;
   return sriLankanRegex.test(formatted);
@@ -1871,7 +1871,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   // Register Function
   const handleRegister = async (e) => {
     e.preventDefault();
-
+    
     console.log("🔄 Starting registration process...");
     console.log("Role:", role);
     console.log("Form data:", {
@@ -1879,39 +1879,39 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       destinations, languages, specialSkills, certifications, specialQualifications,
       areasOfExpertise, verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
     });
-
+    
     // Basic validation
     if (!email || !fullName || !password) {
       setMsg("❌ Please fill in all required fields");
       return;
     }
-
+    
     if (password !== confirm) {
       setMsg("❌ Passwords do not match!");
       return;
     }
-
+    
     if (password.length < 6) {
       setMsg("❌ Password must be at least 6 characters!");
       return;
     }
-
+    
     // Phone validation for service providers
     if (role === 'provider' && phone && !isValidSriLankanPhone(phone)) {
       setMsg("❌ Please enter a valid Sri Lankan phone number (e.g., +94701234567)");
       return;
     }
-
+    
     setBusy(true);
     setMsg("⏳ Creating your account...");
-
+    
     try {
       console.log("Creating user with email:", email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
-
+      
       console.log("✅ User created with UID:", uid);
-
+      
       // Format phone number for storage
       const formattedPhone = phone ? formatPhoneNumber(phone) : "";
 
@@ -1927,7 +1927,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       };
 
       let collectionName = "";
-
+      
       if (role === "tourist") {
         collectionName = "tourists";
         // Handle custom language if "other" was selected
@@ -1935,7 +1935,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         if (language?.startsWith('other:')) {
           finalLanguage = language.replace('other:', '').trim() || "english";
         }
-
+        
         userData = {
           ...userData,
           country: country?.trim() || "",
@@ -1945,7 +1945,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         };
       } else {
         collectionName = "serviceProviders";
-
+        
         // Base provider data
         userData = {
           ...userData,
@@ -2011,41 +2011,41 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
           const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
           const snap = await uploadBytes(storageRef, profileFile);
           photoURL = await getDownloadURL(snap.ref);
-
+          
           await setDoc(doc(db, collectionName, uid), {
             profilePicture: photoURL,
             updatedAt: serverTimestamp(),
           }, { merge: true });
-
-          await updateProfile(userCredential.user, {
-            displayName: fullName,
-            photoURL: photoURL
+          
+          await updateProfile(userCredential.user, { 
+            displayName: fullName, 
+            photoURL: photoURL 
           });
-
+          
           console.log("✅ Profile picture uploaded successfully");
         } catch (uploadError) {
           console.error("❌ Profile image upload failed:", uploadError);
           // Continue without profile picture
         }
       } else {
-        await updateProfile(userCredential.user, {
-          displayName: fullName
+        await updateProfile(userCredential.user, { 
+          displayName: fullName 
         });
       }
 
       setMsg("🎉 Account created successfully! Redirecting to login...");
       setBusy(false);
-
+      
       setTimeout(() => {
         signOut(auth);
         setScreen("login");
         resetForm();
       }, 2000);
-
+      
     } catch (error) {
       console.error("❌ Registration error:", error);
       let errorMessage = "❌ Registration failed! ";
-
+      
       if (error.code === 'auth/email-already-in-use') {
         errorMessage += "Email is already registered.";
       } else if (error.code === 'auth/invalid-email') {
@@ -2057,7 +2057,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       } else {
         errorMessage += `Error: ${error.message}`;
       }
-
+      
       setMsg(errorMessage);
       setBusy(false);
     }
@@ -2076,7 +2076,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       }, 1000);
     } catch (error) {
       let errorMessage = "❌ Login failed! ";
-
+      
       if (error.code === 'auth/invalid-credential') {
         errorMessage += "Invalid email or password.";
       } else if (error.code === 'auth/user-not-found') {
@@ -2086,7 +2086,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       } else {
         errorMessage += "Please try again.";
       }
-
+      
       setMsg(errorMessage);
     } finally {
       setBusy(false);
@@ -2206,9 +2206,9 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
             {msg && (
               <div className={`mt-4 p-3 rounded-xl text-center text-sm font-medium ${msg.includes("❌")
-                ? "bg-red-500/20 text-red-300 border border-red-500/30"
-                : "bg-green-500/20 text-green-300 border border-green-500/30"
-                }`}>
+                  ? "bg-red-500/20 text-red-300 border border-red-500/30" 
+                  : "bg-green-500/20 text-green-300 border border-green-500/30"
+              }`}>
                 {msg}
               </div>
             )}
@@ -2243,20 +2243,20 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
           {!role ? (
             <UserTypeSelection onSelect={setRole} logo={logo} onBackToHome={onBackToHome} />
           ) : (
-            <RegistrationForm
+            <RegistrationForm 
               role={role}
               serviceType={serviceType}
-              formData={{
+              formData={{ 
                 email, fullName, password, confirm, country, phone, language,
                 locationBase, experience, languagesSpoken, serviceType,
-                vehicleType, pricePerDay,
+                vehicleType, pricePerDay, 
                 destinations: typeof destinations === 'string' ? destinations : (destinations && destinations.length > 0 ? destinations[0] : ""), // Convert array to string for single select
-                languages,
+                languages, 
                 specialSkills, certifications, description,
                 availableDates, specialQualifications, areasOfExpertise,
                 verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
               }}
-              handlers={{
+              handlers={{ 
                 setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone: handlePhoneChange, setLanguage,
                 setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
                 setVehicleType, setPricePerDay, setDestinations, setLanguages,
@@ -2299,12 +2299,12 @@ const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
       >
         {/* Animated background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 via-green-500/0 to-teal-500/0 group-hover:from-emerald-500/10 group-hover:via-green-500/10 group-hover:to-teal-500/10 transition-all duration-300"></div>
-
+        
         {/* Icon with gradient background and emoji */}
         <div className="relative mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:shadow-emerald-400/50 group-hover:scale-110 transition-all duration-300">
           <span className="text-3xl">🧳</span>
         </div>
-
+        
         {/* Content */}
         <div className="relative z-10">
           <h3 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-100 transition-colors duration-300">Tourist</h3>
@@ -2312,7 +2312,7 @@ const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
             Explore amazing destinations
           </p>
         </div>
-
+        
         {/* Hover effect border */}
         <div className="absolute inset-0 rounded-2xl border-2 border-emerald-400/0 group-hover:border-emerald-400/50 transition-all duration-300"></div>
       </button>
@@ -2323,12 +2323,12 @@ const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
       >
         {/* Animated background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/0 via-amber-500/0 to-orange-500/0 group-hover:from-yellow-500/10 group-hover:via-amber-500/10 group-hover:to-orange-500/10 transition-all duration-300"></div>
-
+        
         {/* Icon with gradient background and emoji */}
         <div className="relative mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/30 group-hover:shadow-yellow-400/50 group-hover:scale-110 transition-all duration-300">
           <span className="text-3xl">🚙</span>
         </div>
-
+        
         {/* Content */}
         <div className="relative z-10">
           <h3 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-100 transition-colors duration-300">Service Provider</h3>
@@ -2336,7 +2336,7 @@ const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
             Offer your services
           </p>
         </div>
-
+        
         {/* Hover effect border */}
         <div className="absolute inset-0 rounded-2xl border-2 border-yellow-400/0 group-hover:border-yellow-400/50 transition-all duration-300"></div>
       </button>
@@ -2354,13 +2354,13 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
   const serviceTypes = [
     "Jeep Driver",
-    "Tour Guide",
+    "Tour Guide", 
     "Renting"
   ];
 
   const vehicleTypes = [
     "Standard Safari Jeep",
-    "Luxury Safari Jeep",
+    "Luxury Safari Jeep", 
     "Open Roof Jeep",
     "4x4 Modified Jeep"
   ];
@@ -2388,7 +2388,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
   const specialSkills = [
     "Wildlife photography knowledge",
-    "Birdwatching expertise",
+    "Birdwatching expertise", 
     "Family-friendly tours",
     "Private tours",
     "Full-day safari",
@@ -2442,10 +2442,10 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   // Phone input helper text
   const getPhoneHelperText = () => {
     if (!formData.phone) return "Enter your Sri Lankan phone number";
-
+    
     const formatted = formData.phone.startsWith('+') ? formData.phone : `+94${formData.phone.replace(/^0/, '')}`;
     const isValid = /^\+94[0-9]{9}$/.test(formatted);
-
+    
     if (isValid) {
       return "✓ Valid Sri Lankan number";
     } else {
@@ -2459,7 +2459,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
     const updatedArray = currentArray.includes(value)
       ? currentArray.filter(item => item !== value)
       : [...currentArray, value];
-
+    
     handlers[`set${field.charAt(0).toUpperCase() + field.slice(1)}`](updatedArray);
   };
 
@@ -2614,7 +2614,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 }
               }}
               className="w-full px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs cursor-pointer"
-              style={{
+              style={{ 
                 backgroundColor: '#111827',
                 color: '#ffffff'
               }}
@@ -3042,11 +3042,11 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
       {msg && (
         <div className={`mt-3 p-2 rounded text-center text-xs font-medium ${msg.includes("❌")
-          ? "bg-red-500/20 text-red-300 border border-red-500/30"
-          : msg.includes("⏳")
+            ? "bg-red-500/20 text-red-300 border border-red-500/30" 
+            : msg.includes("⏳")
             ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
             : "bg-green-500/20 text-green-300 border border-green-500/30"
-          }`}>
+        }`}>
           {msg}
         </div>
       )}

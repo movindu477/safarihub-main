@@ -991,7 +991,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                 {!currentUser && (
                   <button
-                    onClick={onShowAuth}
+                    onClick={() => {
+                      if (onShowAuth) {
+                        onShowAuth('login');
+                      }
+                    }}
                     className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-4 px-6 rounded-xl font-semibold shadow-lg shadow-emerald-500/30"
                   >
                     Login to Book or Message
@@ -1411,7 +1415,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                           Please login to start a conversation with {guide.guideName || guide.fullName || 'this guide'}
                         </p>
                         <button
-                          onClick={onShowAuth}
+                          onClick={() => {
+                            if (onShowAuth) {
+                              onShowAuth('login');
+                            }
+                          }}
                           className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium"
                         >
                           Login Now

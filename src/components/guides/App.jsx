@@ -272,8 +272,15 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
   const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   const [checkingRole, setCheckingRole] = useState(true);
-  const [selectedDestination, setSelectedDestination] = useState(null);
-  const [showDestinationSelector, setShowDestinationSelector] = useState(true);
+  const [selectedDestination, setSelectedDestination] = useState(() => {
+    // Restore selectedDestination from sessionStorage on mount
+    return sessionStorage.getItem('selectedDestination') || null;
+  });
+  const [showDestinationSelector, setShowDestinationSelector] = useState(() => {
+    // Restore showDestinationSelector from sessionStorage on mount
+    const saved = sessionStorage.getItem('showDestinationSelector');
+    return saved === null ? true : saved === 'false' ? false : true;
+  });
 
   // All available destinations
   const allDestinations = [
@@ -519,10 +526,19 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
             <select
               value={selectedDestination || ''}
               onChange={(e) => {
-                setSelectedDestination(e.target.value || null);
+                const value = e.target.value || null;
+                setSelectedDestination(value);
                 setShowDestinationSelector(false);
+                // Save to sessionStorage
+                if (value) {
+                  sessionStorage.setItem('selectedDestination', value);
+                  sessionStorage.setItem('showDestinationSelector', 'false');
+                } else {
+                  sessionStorage.removeItem('selectedDestination');
+                  sessionStorage.setItem('showDestinationSelector', 'true');
+                }
               }}
-              className="w-full p-2.5 text-base border-2 border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+              className="w-full p-2.5 text-base border-2 border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white appearance-none"
             >
               <option value="">All Destinations</option>
               {allDestinations.map(dest => (
@@ -533,6 +549,9 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
               onClick={() => {
                 setSelectedDestination(null);
                 setShowDestinationSelector(false);
+                // Clear from sessionStorage
+                sessionStorage.removeItem('selectedDestination');
+                sessionStorage.setItem('showDestinationSelector', 'false');
               }}
               className="mt-3 w-full bg-emerald-700 text-white py-2 px-4 rounded-lg font-medium text-sm"
             >
@@ -545,17 +564,20 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
       {!showDestinationSelector && (
         <>
           {selectedDestination && (
-            <div className="bg-blue-100 border-b border-blue-200 py-4">
+            <div className="bg-emerald-100 border-b border-emerald-200 py-4">
               <div className="container mx-auto px-4 flex items-center justify-between">
-                <p className="text-blue-900 font-semibold">
-                  Showing guides for: <span className="text-blue-700">{selectedDestination}</span>
+                <p className="text-emerald-900 font-semibold">
+                  Showing guides for: <span className="text-emerald-700">{selectedDestination}</span>
                 </p>
                 <button
                   onClick={() => {
                     setSelectedDestination(null);
                     setShowDestinationSelector(true);
+                    // Clear from sessionStorage
+                    sessionStorage.removeItem('selectedDestination');
+                    sessionStorage.setItem('showDestinationSelector', 'true');
                   }}
-                  className="text-blue-700 hover:text-blue-900 font-medium underline"
+                  className="text-emerald-700 hover:text-emerald-900 font-medium underline"
                 >
                   Change Destination
                 </button>

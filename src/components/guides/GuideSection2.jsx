@@ -276,6 +276,11 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
     // Save the guide ID to sessionStorage so we can scroll to it when coming back
     sessionStorage.setItem('lastViewedGuideId', guide.id);
     sessionStorage.setItem('scrollToGuide', 'true');
+    // Save selectedDestination to sessionStorage to preserve it when navigating back
+    if (selectedDestination) {
+      sessionStorage.setItem('selectedDestination', selectedDestination);
+      sessionStorage.setItem('showDestinationSelector', 'false');
+    }
 
     // Navigate to guide profile - FIXED NAVIGATION
     navigate(`/guide-profile/${guide.id}`);
@@ -292,6 +297,11 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
     // Save the guide ID to sessionStorage so we can scroll to it when coming back
     sessionStorage.setItem('lastViewedGuideId', guide.id);
     sessionStorage.setItem('scrollToGuide', 'true');
+    // Save selectedDestination to sessionStorage to preserve it when navigating back
+    if (selectedDestination) {
+      sessionStorage.setItem('selectedDestination', selectedDestination);
+      sessionStorage.setItem('showDestinationSelector', 'false');
+    }
 
     navigate(`/guide-profile/${guide.id}?openChat=true`);
   };
