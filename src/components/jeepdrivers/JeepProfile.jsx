@@ -270,12 +270,16 @@ const BookingFormModal = ({
 
   const handleNext = () => {
     if (currentStep < steps.length) {
+      // Clear errors when moving to next step
+      setFormErrors({});
       setCurrentStep(currentStep + 1);
     }
   };
 
   const handlePrevious = () => {
     if (currentStep > 1) {
+      // Clear errors when moving to previous step
+      setFormErrors({});
       setCurrentStep(currentStep - 1);
     }
   };
@@ -298,9 +302,10 @@ const BookingFormModal = ({
       if (formData.needsHotelPickup) {
         if (!formData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
         if (!formData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
+      } else {
+        if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
+        if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
       }
-      if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
-      if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
     } else if (currentStep === 6) {
       if (!formData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
       if (!formData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
@@ -390,6 +395,8 @@ const BookingFormModal = ({
                   </label>
                   <input
                     type="text"
+                    name="fullName"
+                    id="fullName"
                     value={formData.fullName}
                     onChange={(e) => updateFormData('fullName', e.target.value)}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -404,6 +411,8 @@ const BookingFormModal = ({
                   </label>
                   <input
                     type="email"
+                    name="email"
+                    id="email"
                     value={formData.email}
                     onChange={(e) => updateFormData('email', e.target.value)}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -418,6 +427,8 @@ const BookingFormModal = ({
                   </label>
                   <input
                     type="tel"
+                    name="phone"
+                    id="phone"
                     value={formData.phone}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9+]/g, '');
@@ -435,6 +446,8 @@ const BookingFormModal = ({
                   </label>
                   <input
                     type="text"
+                    name="country"
+                    id="country"
                     value={formData.country}
                     onChange={(e) => updateFormData('country', e.target.value)}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -449,6 +462,8 @@ const BookingFormModal = ({
                   </label>
                   <input
                     type="number"
+                    name="numberOfPassengers"
+                    id="numberOfPassengers"
                     min="1"
                     max="20"
                     value={formData.numberOfPassengers}
@@ -487,6 +502,8 @@ const BookingFormModal = ({
                     National Park <span className="text-red-500">*</span>
                   </label>
                   <select
+                    name="nationalPark"
+                    id="nationalPark"
                     value={formData.nationalPark}
                     onChange={(e) => updateFormData('nationalPark', e.target.value)}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -502,6 +519,8 @@ const BookingFormModal = ({
                     Safari Type <span className="text-red-500">*</span>
                   </label>
                   <select
+                    name="safariType"
+                    id="safariType"
                     value={formData.safariType}
                     onChange={(e) => updateFormData('safariType', e.target.value)}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -590,6 +609,8 @@ const BookingFormModal = ({
                       </label>
                       <input
                         type="text"
+                        name="hotelName"
+                        id="hotelName"
                         value={formData.hotelName}
                         onChange={(e) => updateFormData('hotelName', e.target.value)}
                         className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -603,6 +624,8 @@ const BookingFormModal = ({
                       </label>
                       <input
                         type="text"
+                        name="hotelAddress"
+                        id="hotelAddress"
                         value={formData.hotelAddress}
                         onChange={(e) => updateFormData('hotelAddress', e.target.value)}
                         className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -620,6 +643,8 @@ const BookingFormModal = ({
                       </label>
                       <input
                         type="text"
+                        name="pickupLocation"
+                        id="pickupLocation"
                         value={formData.pickupLocation}
                         onChange={(e) => updateFormData('pickupLocation', e.target.value)}
                         className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -633,6 +658,8 @@ const BookingFormModal = ({
                       </label>
                       <input
                         type="text"
+                        name="dropoffLocation"
+                        id="dropoffLocation"
                         value={formData.dropoffLocation}
                         onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
                         className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -757,6 +784,8 @@ const BookingFormModal = ({
                   </label>
                   <input
                     type="text"
+                    name="emergencyContactName"
+                    id="emergencyContactName"
                     value={formData.emergencyContactName}
                     onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
@@ -770,6 +799,8 @@ const BookingFormModal = ({
                   </label>
                   <input
                     type="tel"
+                    name="emergencyContactPhone"
+                    id="emergencyContactPhone"
                     value={formData.emergencyContactPhone}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9+]/g, '');
@@ -808,8 +839,23 @@ const BookingFormModal = ({
             </button>
           ) : (
             <button
-              onClick={onSubmit}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium flex-1 sm:flex-none"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔵 Confirm Booking button clicked');
+                if (validateStep()) {
+                  console.log('✅ Step validation passed, calling onSubmit');
+                  try {
+                    await onSubmit();
+                  } catch (error) {
+                    console.error('❌ Error in onSubmit:', error);
+                    alert('An error occurred. Please try again.');
+                  }
+                } else {
+                  console.warn('⚠️ Step validation failed');
+                }
+              }}
+              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium flex-1 sm:flex-none hover:bg-emerald-600 transition-colors cursor-pointer"
             >
               Confirm Booking
             </button>
@@ -1007,41 +1053,119 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     return total;
   };
 
-  // Validate booking form
+  // Validate booking form and return errors with step mapping
   const validateBookingForm = () => {
     const errors = {};
 
-    if (!bookingFormData.fullName.trim()) errors.fullName = 'Full name is required';
-    if (!bookingFormData.email.trim()) errors.email = 'Email is required';
-    if (!bookingFormData.phone.trim()) errors.phone = 'Phone number is required';
-    if (!bookingFormData.country.trim()) errors.country = 'Country is required';
+    // Helper function to safely trim strings
+    const safeTrim = (value) => {
+      return value && typeof value === 'string' ? value.trim() : '';
+    };
+
+    // Step 1: Personal Details
+    if (!safeTrim(bookingFormData.fullName)) errors.fullName = 'Full name is required';
+    if (!safeTrim(bookingFormData.email)) errors.email = 'Email is required';
+    if (!safeTrim(bookingFormData.phone)) errors.phone = 'Phone number is required';
+    if (!safeTrim(bookingFormData.country)) errors.country = 'Country is required';
     if (!bookingFormData.numberOfPassengers || bookingFormData.numberOfPassengers < 1) {
       errors.numberOfPassengers = 'Number of passengers must be at least 1';
     }
-    if (!bookingFormData.nationalPark.trim()) errors.nationalPark = 'National park is required';
+
+    // Step 2: Safari Details
+    if (!safeTrim(bookingFormData.nationalPark)) errors.nationalPark = 'National park is required';
     if (!bookingFormData.safariType) errors.safariType = 'Safari type is required';
-    if (!bookingFormData.preferredTime.trim()) errors.preferredTime = 'Preferred time is required';
+
+    // Step 3: Pickup & Drop-off
     if (bookingFormData.needsHotelPickup) {
-      if (!bookingFormData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
-      if (!bookingFormData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
+      if (!safeTrim(bookingFormData.hotelName)) errors.hotelName = 'Hotel name is required';
+      if (!safeTrim(bookingFormData.hotelAddress)) errors.hotelAddress = 'Hotel address is required';
     } else {
-      if (!bookingFormData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
-      if (!bookingFormData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
+      if (!safeTrim(bookingFormData.pickupLocation)) errors.pickupLocation = 'Pickup location is required';
+      if (!safeTrim(bookingFormData.dropoffLocation)) errors.dropoffLocation = 'Drop-off location is required';
     }
-    if (!bookingFormData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
-    if (!bookingFormData.emergencyContactPhone.trim()) errors.emergencyContactPhone = 'Emergency contact phone is required';
+
+    // Step 6: Emergency Contact
+    if (!safeTrim(bookingFormData.emergencyContactName)) errors.emergencyContactName = 'Emergency contact name is required';
+    if (!safeTrim(bookingFormData.emergencyContactPhone)) errors.emergencyContactPhone = 'Emergency contact phone is required';
 
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    return { isValid: Object.keys(errors).length === 0, errors };
   };
 
-  const handleBookingFormSubmit = () => {
-    if (!validateBookingForm()) {
-      alert('Please fill in all required fields correctly.');
+  // Map field names to their step numbers
+  const getStepForField = (fieldName) => {
+    const stepMap = {
+      fullName: 1, email: 1, phone: 1, country: 1, numberOfPassengers: 1,
+      nationalPark: 2, safariType: 2,
+      hotelName: 3, hotelAddress: 3, pickupLocation: 3, dropoffLocation: 3,
+      emergencyContactName: 6, emergencyContactPhone: 6
+    };
+    return stepMap[fieldName] || 1;
+  };
+
+  const handleBookingFormSubmit = async () => {
+    console.log('🔵 handleBookingFormSubmit called');
+
+    // Validate the entire form (step validation is already done in the button click handler)
+    const validation = validateBookingForm();
+    if (!validation.isValid) {
+      console.warn('⚠️ Full form validation failed', validation.errors);
+
+      // Find the first error and navigate to that step
+      const firstErrorField = Object.keys(validation.errors)[0];
+      if (firstErrorField) {
+        const targetStep = getStepForField(firstErrorField);
+        setCurrentStep(targetStep);
+
+        // Scroll to the error field after a brief delay
+        setTimeout(() => {
+          // Try multiple selectors to find the error field
+          const selectors = [
+            `[name="${firstErrorField}"]`,
+            `#${firstErrorField}`,
+            `input[id*="${firstErrorField}"]`,
+            `textarea[id*="${firstErrorField}"]`,
+            `select[id*="${firstErrorField}"]`
+          ];
+
+          let errorElement = null;
+          for (const selector of selectors) {
+            errorElement = document.querySelector(selector);
+            if (errorElement) break;
+          }
+
+          if (errorElement) {
+            errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+              errorElement.focus();
+              // Highlight the field
+              errorElement.style.border = '2px solid red';
+              setTimeout(() => {
+                errorElement.style.border = '';
+              }, 2000);
+            }, 100);
+          }
+        }, 300);
+
+        // Show which field is missing
+        const fieldLabel = firstErrorField.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        alert(`Please fill in: ${fieldLabel}\n\nNavigating to the required field...`);
+      } else {
+        alert('Please fill in all required fields correctly.');
+      }
       return;
     }
-    setShowBookingForm(false);
-    handleBooking();
+
+    console.log('✅ Validation passed, proceeding with booking...');
+
+    // Don't close the form immediately - let handleBooking handle it after success
+    // This ensures the success message shows properly
+    try {
+      await handleBooking();
+    } catch (error) {
+      console.error('❌ Error in handleBooking:', error);
+      alert('An error occurred while processing your booking. Please try again.');
+    }
   };
 
   const handleBooking = async () => {
@@ -1062,7 +1186,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
     if (selectedDates.length === 0) {
       console.warn('⚠️ No dates selected');
-      alert('Please select at least one date for your booking.');
+      alert('Please select at least one date for your booking. Go back to the "Book Now" tab to select dates.');
+      setIsBooking(false);
       return;
     }
 
@@ -1365,6 +1490,14 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       }
 
       // Show success animation with booking ID
+      console.log('✅ Setting success message data:', {
+        driverName: driver.fullName,
+        dates: datesString,
+        totalPrice: totalPrice,
+        numberOfDays: selectedDates.length,
+        bookingId: bookingId
+      });
+
       setSuccessMessageData({
         driverName: driver.fullName,
         dates: datesString,
@@ -1372,13 +1505,21 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         numberOfDays: selectedDates.length,
         bookingId: bookingId
       });
-      setShowSuccessMessage(true);
 
+      console.log('✅ Setting showSuccessMessage to true');
+
+      // Close booking form first
+      setShowBookingForm(false);
+      setCurrentStep(1);
+
+      // Then show success message after a brief delay to ensure form is closed
+      setTimeout(() => {
+        setShowSuccessMessage(true);
+        console.log('✅ Success message should now be visible');
+      }, 100);
       // Reset selected dates and form
       setSelectedDates([]);
       setSelectedDatesWithType({});
-      setShowBookingForm(false);
-      setCurrentStep(1);
       setBookingFormData({
         fullName: '',
         email: '',
@@ -1425,6 +1566,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       // Hide any success message that might have been shown
       setShowSuccessMessage(false);
       setSuccessMessageData(null);
+
+      // Re-open the booking form so user can try again
+      setShowBookingForm(true);
 
       let errorMessage = 'Failed to create booking. ';
 
@@ -1691,7 +1835,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     <div className="min-h-screen bg-gray-50">
       {/* Booking Success Message */}
       {showSuccessMessage && successMessageData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
             <div className="text-center space-y-4">
               <div className="flex justify-center">
@@ -1701,13 +1845,13 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               </div>
 
               <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                Booking Confirmed
+                Booking Successful!
               </h2>
               <p className="text-gray-600 mb-2">
-                Your booking request has been successfully sent to the driver.
+                Your booking request has been successfully submitted.
               </p>
               <p className="text-sm text-emerald-600 font-semibold mb-6">
-                The driver will receive a notification and can accept or decline your booking.
+                Please wait for the service provider's acceptance.
               </p>
               {successMessageData.bookingId && (
                 <p className="text-xs text-gray-500 mb-4">

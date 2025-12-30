@@ -592,19 +592,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
         setSelectedDates([]);
         setIsBooking(false);
 
-        // Redirect to GuideProfile page after showing success message (3 seconds)
-        setTimeout(() => {
-          console.log('🔄 Redirecting to GuideProfile page...');
-          setShowSuccessMessage(false);
-          setSuccessMessageData(null);
-          if (guideId) {
-            navigate(`/guide-profile/${guideId}`, { replace: true });
-          } else if (guide?.id) {
-            navigate(`/guide-profile/${guide.id}`, { replace: true });
-          } else {
-            navigate('/guide', { replace: true });
-          }
-        }, 3000);
+        // Don't auto-redirect - wait for user to click "Got it!" button
 
       } catch (bookingError) {
         console.error('❌ CRITICAL: Failed to create booking document:', bookingError);
@@ -794,7 +782,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
     <div className="min-h-screen bg-gray-50">
       {/* Booking Success Message */}
       {showSuccessMessage && successMessageData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
             <div className="text-center space-y-4">
               <div className="flex justify-center">
@@ -804,13 +792,13 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
               </div>
 
               <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                Booking Confirmed
+                Booking Successful!
               </h2>
               <p className="text-gray-600 mb-2">
-                Your booking request has been successfully sent to the guide.
+                Your booking request has been successfully submitted.
               </p>
               <p className="text-sm text-emerald-600 font-semibold mb-6">
-                The guide will receive a notification and can accept or decline your booking.
+                Please wait for the service provider's acceptance.
               </p>
               {successMessageData.bookingId && (
                 <p className="text-xs text-gray-500 mb-4">
