@@ -27,7 +27,7 @@ import {
 import { getDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../firebase';
-import { createNotification, markNotificationAsRead, ScrollToTopButton } from '../App';
+import { createNotification, markNotificationAsRead } from '../App';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function Payment({ user: propUser, onLogout, onShowAuth }) {
@@ -366,7 +366,6 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
   return (
     <>
-      <ScrollToTopButton />
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-5xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
           {/* Header */}
@@ -618,8 +617,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
             <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
               <div className="flex flex-col items-center w-full">
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border-2 transition-all ${isActive ? 'bg-green-500 border-green-500 text-white' :
-                    isCompleted ? 'bg-green-100 border-green-500 text-green-600' :
-                      'bg-gray-100 border-gray-300 text-gray-400'
+                  isCompleted ? 'bg-green-100 border-green-500 text-green-600' :
+                    'bg-gray-100 border-gray-300 text-gray-400'
                   }`}>
                   {isCompleted ? (
                     <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />

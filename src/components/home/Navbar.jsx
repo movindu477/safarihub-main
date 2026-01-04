@@ -17,8 +17,7 @@ import {
   Map,
   Compass,
   Car,
-  ShoppingBag,
-  MessageCircle
+  ShoppingBag
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -28,7 +27,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import userImage from "../../assets/user.png";
 
-export default function Navbar({ user, onLogout, onLogin, onRegister, onStartChat, onOpenChatList }) {
+export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [userData, setUserData] = useState(null);
@@ -377,16 +376,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             </div>
           ) : (
             <div className="flex items-center space-x-4">
-              {/* Chat Button */}
-              {onOpenChatList && (
-                <button
-                  onClick={onOpenChatList}
-                  className="relative p-2 text-white hover:text-emerald-200 hover:bg-emerald-800/40 rounded-full transition-all duration-300"
-                  title="Messages"
-                >
-                  <MessageCircle className="h-6 w-6" />
-                </button>
-              )}
               {/* User Profile */}
               <div className="relative">
                 <img
@@ -406,16 +395,6 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
         <div className="md:hidden flex items-center space-x-4">
           {currentUser ? (
             <div className="flex items-center space-x-2">
-              {/* Chat Button for Mobile */}
-              {onOpenChatList && (
-                <button
-                  onClick={onOpenChatList}
-                  className="relative p-2 text-white hover:text-emerald-200 hover:bg-emerald-800/40 rounded-full transition-all duration-300"
-                  title="Messages"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                </button>
-              )}
               {/* User Profile for Mobile */}
               <div className="relative">
                 <img
@@ -452,8 +431,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
             onClick={() => setMenuOpen(false)}
           />
 
-          <div className="fixed top-0 left-0 h-full w-full bg-emerald-500 text-white z-50 md:hidden animate-slideInLeft backdrop-blur-xl border-r border-emerald-400/30">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-400/30 bg-emerald-600/40 backdrop-blur-sm">
+          <div className="fixed top-0 left-0 h-full w-full bg-[#116231] text-white z-50 md:hidden animate-slideInLeft backdrop-blur-xl border-r border-green-700/30">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-green-700/30 bg-green-900/40 backdrop-blur-sm">
               <img
                 src={logo}
                 alt="SafariHub Logo"
@@ -461,7 +440,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                 onClick={handleHomeClick}
               />
               <X
-                className="h-8 w-8 text-white cursor-pointer hover:text-emerald-200 transition-colors duration-300 bg-emerald-500/30 rounded-lg p-1"
+                className="h-8 w-8 text-white cursor-pointer hover:text-green-200 transition-colors duration-300 bg-green-800/30 rounded-lg p-1"
                 onClick={() => setMenuOpen(false)}
               />
             </div>
@@ -475,9 +454,9 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                       if (item.onClick) item.onClick();
                       setMenuOpen(false);
                     }}
-                    className={`block transition-all duration-300 py-5 border-b border-emerald-400/20 font-medium text-xl w-full text-left animate-fadeInUp group cursor-pointer ${isActivePath(item.path)
-                        ? "text-emerald-100 bg-green-800/40"
-                        : "text-white hover:text-emerald-200 hover:border-emerald-300"
+                    className={`block transition-all duration-300 py-5 border-b border-green-700/20 font-medium text-xl w-full text-left animate-fadeInUp group cursor-pointer ${isActivePath(item.path)
+                      ? "text-green-100 bg-green-900/60"
+                      : "text-white hover:text-green-200 hover:border-green-600"
                     }`}
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
@@ -515,8 +494,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
                               setMenuOpen(false);
                             }}
                               className={`flex items-center gap-3 transition-all duration-300 py-4 border-b border-green-800/40 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer ${item.path && isActivePath(item.path)
-                                ? "text-emerald-100 bg-green-800/40 border-green-600"
-                                : "text-white hover:text-gray-200 hover:border-green-600"
+                                ? "text-green-100 bg-green-900/60 border-green-700"
+                                : "text-white hover:text-gray-200 hover:border-green-700"
                             }`}
                             style={{ animationDelay: `${index * 50 + 300}ms` }}
                           >
@@ -533,17 +512,17 @@ export default function Navbar({ user, onLogout, onLogin, onRegister, onStartCha
 
               {/* Authentication Buttons for Mobile - Show when NOT logged in */}
               {!currentUser && (
-                <div className="space-y-3 py-4 border-t border-emerald-400/20 pt-6 animate-fadeInUp"
+                <div className="space-y-3 py-4 border-t border-green-700/20 pt-6 animate-fadeInUp"
                      style={{ animationDelay: "400ms" }}>
                   <button
                     onClick={handleLoginClick}
-                    className="w-full bg-white hover:bg-emerald-100 text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-emerald-300 shadow-lg shadow-emerald-500/30 cursor-pointer"
+                    className="w-full bg-white hover:bg-green-100 text-green-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-green-300 shadow-lg shadow-green-500/30 cursor-pointer"
                   >
                     Login
                   </button>
                   <button
                     onClick={handleRegisterClick}
-                    className="w-full border-2 border-white text-white hover:bg-white hover:text-emerald-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-emerald-400/20 cursor-pointer"
+                    className="w-full border-2 border-white text-white hover:bg-white hover:text-green-700 py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-green-400/20 cursor-pointer"
                   >
                     Register
                   </button>

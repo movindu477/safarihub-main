@@ -13,9 +13,8 @@ import { auth, db } from '../../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 import { getDoc, doc } from 'firebase/firestore'
 
-// Import GlobalNotificationBell and ScrollToTopButton from App.jsx
-import { GlobalNotificationBell, ScrollToTopButton } from '../../App'
-import LoadingScreen from '../LoadingScreen'
+// Import GlobalNotificationBell from App.jsx
+import { GlobalNotificationBell } from '../../App'
 
 function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) {
   // State Management
@@ -92,7 +91,7 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
       }, 0)
     }
-
+    
     window.addEventListener('popstate', handlePopState)
     return () => {
       window.removeEventListener('popstate', handlePopState)
@@ -107,8 +106,8 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
         setTimeout(() => {
           const element = document.getElementById(hash)
           if (element) {
-            element.scrollIntoView({
-              behavior: 'smooth',
+            element.scrollIntoView({ 
+              behavior: 'smooth', 
               block: 'start',
               inline: 'nearest'
             })
@@ -169,25 +168,31 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
   }
 
   if (loading || checkingRole) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-white">
       {/* Global Notification Bell (Bottom Right) */}
-      <GlobalNotificationBell
+      <GlobalNotificationBell 
         user={user}
         notifications={notifications}
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
-
-      <ScrollToTopButton />
-
+      
+      
       {/* Main Content */}
       <main className="relative">
-        <Navbar
-          user={user}
+        <Navbar 
+          user={user} 
           onLogin={(screen) => (onShowAuth ? onShowAuth(screen || 'login') : handleLogin())}
           onRegister={(screen) => (onShowAuth ? onShowAuth(screen || 'register') : handleRegister())}
           onLogout={handleLogout}
@@ -200,7 +205,7 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
           <ChatList
             user={user}
             onClose={() => setShowChatList(false)}
-          />
+        />
         )}
         <DestinationHero />
         <Destination2 />

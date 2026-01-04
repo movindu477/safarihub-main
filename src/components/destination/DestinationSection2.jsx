@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  Filter, 
-  MapPin, 
+import {
+  Filter,
+  MapPin,
   ChevronDown,
   Search,
   X,
@@ -69,6 +69,34 @@ export default function Destination2() {
     "Knuckles Forest Reserve": "forest-reserves"
   };
 
+  // Map destinations to their provinces
+  const destinationToProvinceMap = {
+    "Yala National Park": "Southern Province",
+    "Wilpattu National Park": "North Western Province",
+    "Mirissa Beach": "Southern Province",
+    "Unawatuna Beach": "Southern Province",
+    "Horton Plains": "Central Province",
+    "Knuckles Mountain Range": "Central Province",
+    "Lunugamvehera": "Southern Province",
+    "Kumana Wildlife": "Eastern Province",
+    "Sinharaja Forest Reserve": "Sabaragamuwa Province",
+    "Knuckles Forest Reserve": "Central Province"
+  };
+
+  // Map destinations to their districts
+  const destinationToDistrictMap = {
+    "Yala National Park": "Hambantota",
+    "Wilpattu National Park": "Puttalam",
+    "Mirissa Beach": "Matara",
+    "Unawatuna Beach": "Galle",
+    "Horton Plains": "Nuwara Eliya",
+    "Knuckles Mountain Range": "Matale",
+    "Lunugamvehera": "Hambantota",
+    "Kumana Wildlife": "Ampara",
+    "Sinharaja Forest Reserve": "Ratnapura",
+    "Knuckles Forest Reserve": "Matale"
+  };
+
   // Category to section ID mapping
   const categoryToSectionMap = {
     "National Parks": "national-parks",
@@ -79,7 +107,8 @@ export default function Destination2() {
   };
 
   const [filters, setFilters] = useState({
-    location: ""
+    location: "",
+    province: ""
   });
 
   const [showFilters, setShowFilters] = useState(false);
@@ -90,7 +119,7 @@ export default function Destination2() {
   const searchInputRef = useRef(null);
   const suggestionsRef = useRef(null);
 
-  // Filter options - only 5 main categories
+  // Filter options - categories and provinces
   const filterOptions = {
     location: [
       "National Parks",
@@ -98,6 +127,17 @@ export default function Destination2() {
       "Famous Beaches",
       "Forest Reserves",
       "Camping Sites"
+    ],
+    province: [
+      "Central Province",
+      "Eastern Province",
+      "North Central Province",
+      "Northern Province",
+      "North Western Province",
+      "Sabaragamuwa Province",
+      "Southern Province",
+      "Uva Province",
+      "Western Province"
     ]
   };
 
@@ -117,7 +157,8 @@ export default function Destination2() {
 
   const clearFilters = () => {
     setFilters({
-      location: ""
+      location: "",
+      province: ""
     });
     setSearchQuery("");
     setSearchSuggestions([]);
@@ -236,10 +277,58 @@ export default function Destination2() {
 
   // Determine which sections to show based on filter
   const shouldShowSection = (sectionId) => {
-    if (!filters.location) {
-      return true; // Show all if no filter
+    // If no filters are active, show all
+    if (!filters.location && !filters.province) {
+      return true;
     }
-    return categoryToSectionMap[filters.location] === sectionId;
+
+    // Check category filter
+    if (filters.location && categoryToSectionMap[filters.location] !== sectionId) {
+      return false;
+    }
+
+    // Check province filter - get all destinations in this section
+    if (filters.province) {
+      const sectionDestinations = Object.keys(destinationToSectionMap).filter(
+        dest => destinationToSectionMap[dest] === sectionId
+      );
+
+      // Check if any destination in this section matches the selected province
+      const hasMatchingProvince = sectionDestinations.some(
+        dest => destinationToProvinceMap[dest] === filters.province
+      );
+
+      if (!hasMatchingProvince) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  // Determine if a specific destination should be shown
+  const shouldShowDestination = (destinationName) => {
+    // If no filters are active, show all
+    if (!filters.location && !filters.province) {
+      return true;
+    }
+
+    // Check category filter
+    if (filters.location) {
+      const sectionId = destinationToSectionMap[destinationName];
+      if (categoryToSectionMap[filters.location] !== sectionId) {
+        return false;
+      }
+    }
+
+    // Check province filter
+    if (filters.province) {
+      if (destinationToProvinceMap[destinationName] !== filters.province) {
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const FilterSection = ({ title, icon: Icon, options, filterKey }) => (
@@ -272,51 +361,51 @@ export default function Destination2() {
     }
 
     return (
-    <div id={sectionId} className="mb-16 scroll-mt-24">
-      <div className="text-center mb-12">
-        <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
-          {title}
-        </h2>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          {description}
-        </p>
-      </div>
+      <div id={sectionId} className="mb-16 scroll-mt-24">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+            {title}
+          </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            {description}
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {items.map((item, index) => (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {items.filter(item => shouldShowDestination(item.name)).map((item, index) => (
             <div
               key={index}
               onClick={() => navigate(`/destination/${getDestinationId(item.name)}`)}
               className="relative rounded-2xl overflow-hidden shadow-2xl group cursor-pointer"
             >
-            <div 
-              className="h-96 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-              style={{ backgroundImage: `url(${item.background})` }}
-            >
-              <div className="absolute inset-0 bg-black/40 transition-all duration-300 group-hover:bg-black/30"></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-              
-              <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                <h3 className="text-3xl md:text-4xl font-black mb-4">{item.name}</h3>
-                <p className="text-lg mb-6 opacity-90 max-w-md">
-                  {item.description}
-                </p>
-                <button 
+              <div
+                className="h-96 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                style={{ backgroundImage: `url(${item.background})` }}
+              >
+                <div className="absolute inset-0 bg-black/40 transition-all duration-300 group-hover:bg-black/30"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+
+                <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                  <h3 className="text-3xl md:text-4xl font-black mb-4">{item.name}</h3>
+                  <p className="text-lg mb-6 opacity-90 max-w-md">
+                    {item.description}
+                  </p>
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/destination/${getDestinationId(item.name)}`);
                     }}
-                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
-                >
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
+                  >
                     Explore {item.name.split(' ')[0]}
-                </button>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
   };
 
   return (
@@ -331,7 +420,7 @@ export default function Destination2() {
             </span>
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover amazing wildlife experiences with our comprehensive filtering system. 
+            Discover amazing wildlife experiences with our comprehensive filtering system.
             Find exactly what you're looking for in Sri Lanka's most beautiful destinations.
           </p>
         </div>
@@ -383,7 +472,7 @@ export default function Destination2() {
                 </div>
               )}
             </div>
-            
+
             {/* Filter Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -411,11 +500,18 @@ export default function Destination2() {
             <div className="mt-6 pt-6 border-t border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Location / Region Filter - Only 5 categories */}
-                <FilterSection 
-                  title="Location / Region" 
-                  icon={MapPin} 
-                  options={filterOptions.location} 
-                  filterKey="location" 
+                <FilterSection
+                  title="Location / Region"
+                  icon={MapPin}
+                  options={filterOptions.location}
+                  filterKey="location"
+                />
+                {/* Province Filter */}
+                <FilterSection
+                  title="Province"
+                  icon={MapPin}
+                  options={filterOptions.province}
+                  filterKey="province"
                 />
               </div>
             </div>
@@ -518,16 +614,26 @@ export default function Destination2() {
         />
 
         {/* Active Filters Display */}
-        {filters.location && (
+        {(filters.location || filters.province) && (
           <div className="mt-8 p-4 bg-white rounded-lg shadow-sm border">
             <h4 className="font-semibold text-gray-800 mb-3">Active Filters:</h4>
             <div className="flex flex-wrap gap-2">
-              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                {filters.location}
-                <button onClick={() => handleFilterChange("location", "")} className="text-green-600 hover:text-green-800 cursor-pointer">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
+              {filters.location && (
+                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                  {filters.location}
+                  <button onClick={() => handleFilterChange("location", "")} className="text-green-600 hover:text-green-800 cursor-pointer">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {filters.province && (
+                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                  {filters.province}
+                  <button onClick={() => handleFilterChange("province", "")} className="text-green-600 hover:text-green-800 cursor-pointer">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
             </div>
           </div>
         )}

@@ -39,8 +39,7 @@ import {
 } from '../../firebase';
 
 // Import shared notification bell + scroll-to-top from App.jsx
-import { GlobalNotificationBell, ScrollToTopButton } from '../../App';
-import LoadingScreen from '../LoadingScreen';
+import { GlobalNotificationBell } from '../../App';
 
 // Chat Modal Component
 const ChatModal = ({
@@ -475,7 +474,14 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
   };
 
   if (checkingRole) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -497,7 +503,6 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
         onMarkAsRead={handleMarkAsRead}
       />
 
-      <ScrollToTopButton />
 
       <Navbar
         user={user}

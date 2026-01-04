@@ -63,8 +63,7 @@ import {
   // getConversationById, // Removed - using Chat component instead
   // getOtherParticipant, // Removed - using Chat component instead
   markNotificationAsRead,
-  GlobalNotificationBell,
-  ScrollToTopButton
+  GlobalNotificationBell
 } from "../../App";
 
 // Calendar Component for Date Selection
@@ -868,7 +867,6 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
         onMarkAsRead={onMarkAsRead}
       />
 
-      <ScrollToTopButton />
 
       <div className="bg-white shadow-sm border-b border-emerald-100/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

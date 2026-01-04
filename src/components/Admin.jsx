@@ -6,8 +6,7 @@ import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/s
 import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
-import LoadingScreen from './LoadingScreen';
-import { updateBookingStatus, GlobalNotificationBell, ScrollToTopButton } from '../App';
+import { updateBookingStatus, GlobalNotificationBell } from '../App';
 
 const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) => {
   const navigate = useNavigate();
@@ -404,7 +403,14 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   };
 
   if (loading) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!currentUser || !userData) {
@@ -429,7 +435,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-4 border border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
+                <h1 className="text-2xl font-bold text-white">Service Provider Dashboard</h1>
                 <p className="text-gray-400 text-sm mt-1">
                   {isGuide ? 'Manage your Tour Guide profile' : 'Manage your Jeep Driver profile'}
                 </p>
@@ -1068,7 +1074,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
         />
       )}
 
-      <ScrollToTopButton />
 
       {/* Booking Details Side Box */}
       {showBookingDetails && selectedBooking && (
