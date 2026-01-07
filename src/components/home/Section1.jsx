@@ -3,20 +3,20 @@ import React from "react";
 // Import image from src/assets
 import back4ori from "../../assets/back4ori2.avif";
 
-export default function Section1() {
+export default function Section1({ children }) {
   return (
     <section className="relative w-full h-screen overflow-hidden">
       {/* Background Image */}
       <div className="absolute top-0 left-0 w-full h-full">
-        <div
+          <div
           className="absolute top-0 left-0 w-full h-full"
-          style={{
+            style={{
             backgroundImage: `url(${back4ori})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-          }}
-        ></div>
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+          ></div>
       </div>
 
       {/* Content Section */}
@@ -33,15 +33,15 @@ export default function Section1() {
       >
         {/* Title */}
         <div>
-          <div className="text-2xl md:text-3xl font-thin mb-2 leading-tight drop-shadow-lg">
+          <div className="text-2xl md:text-3xl font-thin -mb-2 leading-tight drop-shadow-lg">
             Welcome To
           </div>
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold mb-6 leading-tight drop-shadow-lg">
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold -mb-2 leading-tight drop-shadow-lg">
             SafariHub
           </h1>
 
           {/* Description */}
-          <p className="text-base md:text-lg max-w-2xl text-gray-300 font-light leading-relaxed drop-shadow-md">
+          <p className="text-lg md:text-xl lg:text-2xl max-w-2xl text-gray-300 font-light leading-tight drop-shadow-md">
             Create Memories That Last a Lifetime
           </p>
         </div>
@@ -49,6 +49,9 @@ export default function Section1() {
 
       {/* Optional gradient fade at the bottom for elegance */}
       <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/40 to-transparent pointer-events-none z-10"></div>
+
+      {/* Booking Panel - Positioned in hero section */}
+      {children}
     </section>
   );
 }

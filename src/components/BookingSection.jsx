@@ -1,32 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, orderBy, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { updateBookingStatus } from '../App';
-import { Calendar, CheckCircle, XCircle, Clock, MapPin, User, Phone, Mail, DollarSign, X, Check } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, Clock, MapPin, User, DollarSign, X, Check, ArrowRight } from 'lucide-react';
 
-const BookingPanel = ({ user }) => {
+const BookingSection = ({ user }) => {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStatus, setSelectedStatus] = useState('all'); // 'all', 'pending', 'accepted', 'declined'
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [userRole, setUserRole] = useState(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const [clickedCardRef, setClickedCardRef] = useState(null); // Store reference to clicked card
-
-  // Check if mobile device - hide panel on mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const [clickedCardRef, setClickedCardRef] = useState(null);
+  const [popupPosition, setPopupPosition] = useState({ left: 0, top: 0, arrowOnLeft: true });
 
   // Check user role
   useEffect(() => {
@@ -37,14 +25,12 @@ const BookingPanel = ({ user }) => {
       }
 
       try {
-        // Check if user is a service provider
         const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
         if (providerDoc.exists()) {
           setUserRole('provider');
           return;
         }
 
-        // Check if user is a tourist
         const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
         if (touristDoc.exists()) {
           setUserRole('tourist');
@@ -61,6 +47,7 @@ const BookingPanel = ({ user }) => {
     checkUserRole();
   }, [user]);
 
+  // Fetch bookings
   useEffect(() => {
     if (!user || !user.uid) {
       setLoading(false);
@@ -69,8 +56,6 @@ const BookingPanel = ({ user }) => {
 
     console.log('📋 Fetching bookings for user:', user.uid);
 
-    // Query bookings where user is either the customer OR the service provider
-    // We need to fetch both and combine them
     const customerQuery = query(
       collection(db, 'bookings'),
       where('customerId', '==', user.uid)
@@ -86,24 +71,20 @@ const BookingPanel = ({ user }) => {
       where('guideId', '==', user.uid)
     );
 
-    // Set up listeners for all three queries
     const unsubscribers = [];
-
-    const allBookings = new Map(); // Use Map to avoid duplicates
+    const allBookings = new Map();
 
     const updateBookings = () => {
       const bookingsArray = Array.from(allBookings.values());
-      // Sort by createdAt if available
       bookingsArray.sort((a, b) => {
         const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt || 0);
         const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt || 0);
-        return bTime - aTime; // Descending order
+        return bTime - aTime;
       });
       setBookings(bookingsArray);
       setLoading(false);
     };
 
-    // Customer bookings
     const unsubscribeCustomer = onSnapshot(
       customerQuery,
       (snapshot) => {
@@ -119,7 +100,6 @@ const BookingPanel = ({ user }) => {
     );
     unsubscribers.push(unsubscribeCustomer);
 
-    // Driver bookings
     const unsubscribeDriver = onSnapshot(
       driverQuery,
       (snapshot) => {
@@ -134,7 +114,6 @@ const BookingPanel = ({ user }) => {
     );
     unsubscribers.push(unsubscribeDriver);
 
-    // Guide bookings
     const unsubscribeGuide = onSnapshot(
       guideQuery,
       (snapshot) => {
@@ -154,19 +133,17 @@ const BookingPanel = ({ user }) => {
     };
   }, [user]);
 
-  // Filter bookings by status
+  // Filter bookings
   const filteredBookings = bookings.filter(booking => {
     if (selectedStatus === 'all') return true;
     if (selectedStatus === 'pending') return booking.status === 'pending';
     if (selectedStatus === 'accepted') {
-      // Show confirmed bookings (accepted/confirmed with paid status)
       return (booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus === 'paid';
     }
     if (selectedStatus === 'declined') return booking.status === 'declined';
     return booking.status === selectedStatus;
   });
 
-  // Group bookings by status
   const pendingBookings = bookings.filter(b => b.status === 'pending');
   const acceptedBookings = bookings.filter(b => b.status === 'accepted' || b.status === 'confirmed');
   const confirmedBookings = bookings.filter(b =>
@@ -177,6 +154,7 @@ const BookingPanel = ({ user }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'accepted':
+      case 'confirmed':
         return 'bg-green-100 text-green-800 border-green-300';
       case 'declined':
         return 'bg-red-100 text-red-800 border-red-300';
@@ -190,6 +168,7 @@ const BookingPanel = ({ user }) => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'accepted':
+      case 'confirmed':
         return <CheckCircle className="h-4 w-4" />;
       case 'declined':
         return <XCircle className="h-4 w-4" />;
@@ -222,11 +201,6 @@ const BookingPanel = ({ user }) => {
     return `${formatDate(dates[0])} - ${formatDate(dates[dates.length - 1])}`;
   };
 
-  if (!user) {
-    return null;
-  }
-
-  // Handle booking status update (for service providers)
   const handleBookingStatusUpdate = async (bookingId, status) => {
     if (!user || !user.uid) return;
 
@@ -248,46 +222,119 @@ const BookingPanel = ({ user }) => {
         customerName
       );
 
-      // Close details panel
       setShowBookingDetails(false);
       setSelectedBooking(null);
-      setClickedCardRef(null);
     } catch (error) {
       console.error('Error updating booking status:', error);
       alert('Failed to update booking status. Please try again.');
     }
   };
 
-  // Hide panel completely on mobile devices - only show on desktop
+  if (!user) {
+    return null;
+  }
+
+  // Hide on mobile devices
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Update popup position on scroll/resize
+  useEffect(() => {
+    if (!showBookingDetails || !clickedCardRef) {
+      setPopupPosition({ left: 0, top: 0, arrowOnLeft: true });
+      return;
+    }
+
+    const updatePosition = () => {
+      if (!clickedCardRef) return;
+
+      const cardRect = clickedCardRef.getBoundingClientRect();
+      const popupWidth = 320;
+      const popupHeight = 400;
+      const spacing = 12;
+
+      // Position popup to the right of the clicked card (inside the booking panel area)
+      // This way it won't appear from the left side of the screen
+      let left = cardRect.right + spacing;
+      let top = cardRect.top;
+
+      // If popup would go off-screen to the right, position it to the left of the card instead
+      if (left + popupWidth > window.innerWidth - 10) {
+        left = cardRect.left - popupWidth - spacing;
+        // If still off-screen, center it or adjust
+        if (left < 10) {
+          left = Math.max(10, (window.innerWidth - popupWidth) / 2);
+        }
+      }
+
+      // Ensure popup stays within viewport vertically
+      const maxTop = window.innerHeight - popupHeight - 10;
+      if (top > maxTop) {
+        top = Math.max(10, maxTop);
+      }
+      if (top < 10) {
+        top = 10;
+      }
+
+      // Determine arrow position: 
+      // If popup is on the right of the card, arrow should be on the left side of popup (pointing left toward card)
+      // If popup is on the left of the card, arrow should be on the right side of popup (pointing right toward card)
+      const arrowOnLeft = left > cardRect.right;
+
+      setPopupPosition({ left, top, arrowOnLeft });
+    };
+
+    // Initial position calculation
+    updatePosition();
+
+    // Update on scroll and resize - use requestAnimationFrame for smooth updates
+    let rafId;
+    const handleUpdate = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updatePosition);
+    };
+
+    window.addEventListener('scroll', handleUpdate, true);
+    window.addEventListener('resize', handleUpdate);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', handleUpdate, true);
+      window.removeEventListener('resize', handleUpdate);
+    };
+  }, [showBookingDetails, clickedCardRef]);
+
   if (isMobile) {
     return null;
   }
 
   return (
-    <>
-      <div
-        className="fixed right-0 bg-gray-900 border-l border-gray-700 shadow-xl z-30 w-80 rounded-l-[10px] overflow-hidden"
-        style={{
-          top: '88px',
-          height: 'calc(100vh - 180px)'
-        }}
-      >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4 flex items-center justify-between border-b border-green-800 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            <h2 className="font-bold text-lg">My Bookings</h2>
+    <div className="relative">
+      <section className="absolute top-28 right-4 z-40 w-80 h-[calc(100vh-180px)] bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4 flex items-center justify-between border-b border-green-800 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              <h2 className="font-bold text-lg">My Bookings</h2>
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-col flex-1 overflow-hidden bg-gray-900 min-h-0">
           {/* Status Filter Tabs */}
-          <div className="bg-gray-800 border-b border-gray-700 p-2 flex gap-1 overflow-x-auto flex-shrink-0">
+          <div className="bg-gray-50 border-b border-gray-200 p-2 flex gap-1 overflow-x-auto flex-shrink-0">
             <button
               onClick={() => setSelectedStatus('all')}
               className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'all'
                 ? 'bg-green-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
             >
               All ({bookings.length})
@@ -296,7 +343,7 @@ const BookingPanel = ({ user }) => {
               onClick={() => setSelectedStatus('pending')}
               className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'pending'
                 ? 'bg-yellow-500 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
             >
               Requests ({pendingBookings.length})
@@ -305,7 +352,7 @@ const BookingPanel = ({ user }) => {
               onClick={() => setSelectedStatus('accepted')}
               className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'accepted'
                 ? 'bg-green-500 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
             >
               Confirmed ({confirmedBookings.length})
@@ -314,7 +361,7 @@ const BookingPanel = ({ user }) => {
               onClick={() => setSelectedStatus('declined')}
               className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'declined'
                 ? 'bg-red-500 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
             >
               Declined ({declinedBookings.length})
@@ -322,7 +369,7 @@ const BookingPanel = ({ user }) => {
           </div>
 
           {/* Bookings List */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-900">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-white">
             {loading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
@@ -330,22 +377,18 @@ const BookingPanel = ({ user }) => {
               </div>
             ) : filteredBookings.length === 0 ? (
               <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-2" />
+                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-400 text-sm">No bookings found</p>
               </div>
             ) : (
               filteredBookings.map((booking) => (
                 <div
                   key={booking.id}
-                  className="bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-sm hover:bg-gray-750 hover:border-gray-600 transition-all cursor-pointer relative"
+                  className="bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm hover:bg-gray-100 hover:border-gray-300 transition-all cursor-pointer"
                   onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
                     setSelectedBooking(booking);
                     setShowBookingDetails(true);
                     setClickedCardRef(e.currentTarget);
-                    // On mobile, keep panel open but show details
-                    // Don't navigate or close panel
                   }}
                 >
                   {/* Status Badge */}
@@ -357,7 +400,7 @@ const BookingPanel = ({ user }) => {
                   {/* Service Provider/Customer Info */}
                   <div className="flex items-center gap-2 mb-2">
                     <User className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm font-semibold text-gray-200">
+                    <span className="text-sm font-semibold text-gray-900">
                       {userRole === 'provider'
                         ? (booking.customerName || 'Customer')
                         : (booking.driverName || booking.guideName || 'Service Provider')
@@ -366,7 +409,7 @@ const BookingPanel = ({ user }) => {
                   </div>
 
                   {/* Dates */}
-                  <div className="flex items-center gap-2 mb-2 text-xs text-gray-400">
+                  <div className="flex items-center gap-2 mb-2 text-xs text-gray-600">
                     <Calendar className="h-3 w-3 flex-shrink-0" />
                     <span className="truncate">
                       {booking.datesString || formatDates(booking.selectedDates)}
@@ -378,62 +421,79 @@ const BookingPanel = ({ user }) => {
 
                   {/* Destination */}
                   {booking.nationalPark && (
-                    <div className="flex items-center gap-2 mb-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 mb-2 text-xs text-gray-600">
                       <MapPin className="h-3 w-3" />
-                      <span>{booking.nationalPark}</span>
+                      <span className="truncate">{booking.nationalPark}</span>
                     </div>
                   )}
 
                   {/* Price */}
                   {booking.totalPrice && (
-                    <div className="flex items-center gap-2 mb-2 text-xs">
-                      <DollarSign className="h-3 w-3 text-green-500" />
-                      <span className="font-semibold text-green-400">
-                        LKR {booking.totalPrice.toLocaleString()}
-                      </span>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="h-4 w-4 text-green-600" />
+                        <span className="font-bold text-sm text-green-600">
+                          LKR {booking.totalPrice.toLocaleString()}
+                        </span>
+                      </div>
                       {(booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus !== 'paid' && (
-                        <span className="ml-auto text-red-400 text-xs font-medium">Payment Pending</span>
+                        <span className="text-red-500 text-xs font-medium">Payment Pending</span>
                       )}
                       {booking.paymentStatus === 'paid' && (
-                        <span className="ml-auto text-green-400 text-xs font-medium">✓ Paid</span>
+                        <span className="text-green-500 text-xs font-medium">✓ Paid</span>
                       )}
                     </div>
                   )}
-
                 </div>
               ))
             )}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Booking Details Popup - Small box next to clicked card */}
       {showBookingDetails && selectedBooking && clickedCardRef && (
-        <div
-          className="fixed inset-0 z-40 pointer-events-none"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setShowBookingDetails(false);
-            setSelectedBooking(null);
-            setClickedCardRef(null);
-          }}
-        >
+        <React.Fragment>
+          {/* Backdrop */}
           <div
-            className="bg-white rounded-lg shadow-2xl z-50 overflow-hidden transition-all duration-300 pointer-events-auto flex flex-col"
+            className="fixed inset-0 z-50 pointer-events-auto bg-black/10"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowBookingDetails(false);
+              setSelectedBooking(null);
+              setClickedCardRef(null);
+            }}
+          />
+          {/* Popup - positioned fixed to follow card on scroll */}
+          <div
+            className="bg-white rounded-lg shadow-2xl z-50 overflow-hidden pointer-events-auto flex flex-col border border-gray-200 relative"
             style={{
-              position: 'absolute',
-              width: '420px',
+              position: 'fixed',
+              width: '320px',
               maxHeight: '400px',
-              right: clickedCardRef ? `${Math.max(10, window.innerWidth - clickedCardRef.getBoundingClientRect().right - 430)}px` : '50%',
-              top: clickedCardRef ? `${Math.max(10, clickedCardRef.getBoundingClientRect().top)}px` : '50%',
-              transform: clickedCardRef ? 'none' : 'translate(50%, -50%)'
+              left: `${popupPosition.left}px`,
+              top: `${popupPosition.top}px`,
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Arrow pointing to the booking card */}
+            <div
+              className={`absolute top-6 ${popupPosition.arrowOnLeft ? 'right-0' : 'left-0'}`}
+              style={{
+                width: 0,
+                height: 0,
+                borderTop: '8px solid transparent',
+                borderBottom: '8px solid transparent',
+                [popupPosition.arrowOnLeft ? 'borderRight' : 'borderLeft']: '8px solid white',
+                transform: popupPosition.arrowOnLeft ? 'translateX(100%)' : 'translateX(-100%)',
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+              }}
+            />
+
             {/* Header */}
-            <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-2.5 flex items-center justify-between border-b border-green-800">
-              <h3 className="font-bold text-sm">Booking Details</h3>
+            <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-2 flex items-center justify-between border-b border-green-800 flex-shrink-0">
+              <h3 className="font-bold text-xs">Booking Details</h3>
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -441,39 +501,34 @@ const BookingPanel = ({ user }) => {
                   setShowBookingDetails(false);
                   setSelectedBooking(null);
                   setClickedCardRef(null);
-                  // Don't change panel state on mobile - just close details
                 }}
-                className="p-1 hover:bg-white/20 rounded transition-colors flex items-center justify-center"
-                aria-label="Close"
+                className="p-0.5 hover:bg-white/20 rounded transition-colors"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            {/* Booking Details Content */}
-            <div className="p-3 space-y-2 bg-white overflow-y-auto flex-1" style={{ maxHeight: '280px' }}>
-              {/* Status Badge */}
-              <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border ${getStatusColor(selectedBooking.status)}`}>
+            {/* Content */}
+            <div className="p-2.5 space-y-1.5 bg-white overflow-y-auto flex-1" style={{ maxHeight: '360px' }}>
+              {/* Status */}
+              <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(selectedBooking.status)}`}>
                 {getStatusIcon(selectedBooking.status)}
                 <span className="uppercase text-xs">{selectedBooking.status || 'Pending'}</span>
               </div>
 
-              {/* Service Provider Info */}
-              <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                  <User className="h-3.5 w-3.5 text-green-600" />
+              {/* Service Provider */}
+              <div className="bg-gray-50 rounded p-1.5 border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-1 text-xs">
+                  <User className="h-3 w-3 text-green-600" />
                   Service Provider
                 </h4>
                 <p className="text-xs text-gray-700">{selectedBooking.driverName || selectedBooking.guideName || 'Service Provider'}</p>
-                {selectedBooking.driverEmail || selectedBooking.guideEmail ? (
-                  <p className="text-xs text-gray-600 mt-0.5">{selectedBooking.driverEmail || selectedBooking.guideEmail}</p>
-                ) : null}
               </div>
 
-              {/* Booking Dates */}
-              <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                  <Calendar className="h-3.5 w-3.5 text-green-600" />
+              {/* Dates */}
+              <div className="bg-gray-50 rounded p-1.5 border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-1 text-xs">
+                  <Calendar className="h-3 w-3 text-green-600" />
                   Booking Dates
                 </h4>
                 <p className="text-xs text-gray-700">{selectedBooking.datesString || formatDates(selectedBooking.selectedDates)}</p>
@@ -484,9 +539,9 @@ const BookingPanel = ({ user }) => {
 
               {/* Destination */}
               {selectedBooking.nationalPark && (
-                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                    <MapPin className="h-3.5 w-3.5 text-green-600" />
+                <div className="bg-gray-50 rounded p-1.5 border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-1 text-xs">
+                    <MapPin className="h-3 w-3 text-green-600" />
                     Destination
                   </h4>
                   <p className="text-xs text-gray-700">{selectedBooking.nationalPark}</p>
@@ -495,84 +550,23 @@ const BookingPanel = ({ user }) => {
 
               {/* Price */}
               {selectedBooking.totalPrice && (
-                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                    <DollarSign className="h-3.5 w-3.5 text-green-600" />
+                <div className="bg-gray-50 rounded p-1.5 border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-1 text-xs">
+                    <DollarSign className="h-3 w-3 text-green-600" />
                     Total Price
                   </h4>
-                  <p className="text-lg font-bold text-green-700">LKR {selectedBooking.totalPrice.toLocaleString()}</p>
-                  {selectedBooking.status === 'accepted' && !selectedBooking.paid && (
+                  <p className="text-base font-bold text-green-700">LKR {selectedBooking.totalPrice.toLocaleString()}</p>
+                  {(selectedBooking.status === 'accepted' || selectedBooking.status === 'confirmed') && selectedBooking.paymentStatus !== 'paid' && (
                     <p className="text-xs text-red-600 mt-0.5 font-medium">Payment Pending</p>
+                  )}
+                  {selectedBooking.paymentStatus === 'paid' && (
+                    <p className="text-xs text-green-600 mt-0.5 font-medium">✓ Payment Completed</p>
                   )}
                 </div>
               )}
 
-              {/* Customer Info (for service providers) */}
-              {userRole === 'provider' && (
-                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                    <User className="h-3.5 w-3.5 text-green-600" />
-                    Customer Information
-                  </h4>
-                  <div className="space-y-1 text-xs">
-                    <p><span className="font-medium text-gray-600">Name:</span> <span className="text-gray-900">{selectedBooking.customerName || 'N/A'}</span></p>
-                    {selectedBooking.customerEmail && (
-                      <p><span className="font-medium text-gray-600">Email:</span> <span className="text-gray-900">{selectedBooking.customerEmail}</span></p>
-                    )}
-                    {selectedBooking.customerPhone && (
-                      <p><span className="font-medium text-gray-600">Phone:</span> <span className="text-gray-900">{selectedBooking.customerPhone}</span></p>
-                    )}
-                    {selectedBooking.emergencyContactName && (
-                      <p><span className="font-medium text-gray-600">Emergency:</span> <span className="text-gray-900">{selectedBooking.emergencyContactName}</span></p>
-                    )}
-                    {selectedBooking.emergencyContactPhone && (
-                      <p className="text-xs text-gray-500 ml-3">{selectedBooking.emergencyContactPhone}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Additional Details - Compact */}
-              {(selectedBooking.pickupLocation || selectedBooking.hotelName || selectedBooking.numberOfPassengers || selectedBooking.needsHotelPickup) && (
-                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1.5 text-xs">Additional Details</h4>
-                  <div className="space-y-1 text-xs">
-                    {selectedBooking.numberOfPassengers && (
-                      <p><span className="font-medium text-gray-600">Passengers:</span> <span className="text-gray-900">{selectedBooking.numberOfPassengers}</span></p>
-                    )}
-                    {selectedBooking.needsHotelPickup && (
-                      <p><span className="font-medium text-gray-600">Hotel Pickup:</span> <span className="text-gray-900">Yes</span></p>
-                    )}
-                    {selectedBooking.pickupLocation && (
-                      <p><span className="font-medium text-gray-600">Pickup:</span> <span className="text-gray-900">{selectedBooking.pickupLocation}</span></p>
-                    )}
-                    {selectedBooking.dropoffLocation && (
-                      <p><span className="font-medium text-gray-600">Drop-off:</span> <span className="text-gray-900">{selectedBooking.dropoffLocation}</span></p>
-                    )}
-                    {selectedBooking.hotelName && (
-                      <>
-                        <p><span className="font-medium text-gray-600">Hotel:</span> <span className="text-gray-900">{selectedBooking.hotelName}</span></p>
-                        {selectedBooking.hotelAddress && (
-                          <p className="text-xs text-gray-600 ml-3">{selectedBooking.hotelAddress}</p>
-                        )}
-                      </>
-                    )}
-                    {selectedBooking.vehicleType && (
-                      <p><span className="font-medium text-gray-600">Vehicle:</span> <span className="text-gray-900">{selectedBooking.vehicleType}</span></p>
-                    )}
-                    {selectedBooking.additionalNotes && (
-                      <div className="mt-1.5 pt-1.5 border-t border-gray-300">
-                        <p className="font-medium text-gray-600 mb-0.5 text-xs">Notes:</p>
-                        <p className="text-xs text-gray-900 whitespace-pre-wrap">{selectedBooking.additionalNotes}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="space-y-1.5 pt-2 border-t border-gray-300 flex-shrink-0">
-                {/* For Service Providers - Accept/Decline */}
+              {/* Actions */}
+              <div className="space-y-1 pt-1.5 border-t border-gray-300 flex-shrink-0">
                 {userRole === 'provider' && selectedBooking.status === 'pending' && (
                   <div className="flex gap-1.5">
                     <button
@@ -600,8 +594,7 @@ const BookingPanel = ({ user }) => {
                   </div>
                 )}
 
-                {/* For Customers - Pay Now */}
-                {userRole === 'tourist' && selectedBooking.status === 'accepted' && !selectedBooking.paid && (
+                {userRole === 'tourist' && selectedBooking.status === 'accepted' && selectedBooking.paymentStatus !== 'paid' && (
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -620,11 +613,10 @@ const BookingPanel = ({ user }) => {
               </div>
             </div>
           </div>
-        </div>
+        </React.Fragment>
       )}
-
-    </>
+    </div>
   );
 };
 
-export default BookingPanel;
+export default BookingSection;

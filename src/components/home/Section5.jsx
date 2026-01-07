@@ -15,13 +15,13 @@ export default function Section5() {
           <div className="flex flex-col space-y-4 sm:space-y-6 order-1 lg:order-1 text-center lg:text-left lg:mr-20">
             {/* Title - One Line */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold lg:font-semibold text-black leading-tight">
-              Rental Locations
+                Rental Locations
             </h1>
 
             {/* Paragraph Text */}
             <p className="text-sm sm:text-base md:text-lg text-black leading-relaxed max-w-lg mx-auto lg:mx-0 lg:text-justify">
               Discover premium camera and adventure gear rental locations across Sri Lanka. From professional DSLRs to action cameras, we provide high-quality equipment for capturing every unforgettable moment of your journey.
-            </p>
+              </p>
 
             {/* Explore Locations Button */}
             <div className="pt-2 flex justify-center lg:justify-start">
@@ -31,8 +31,8 @@ export default function Section5() {
               >
                 Explore Locations
               </button>
-            </div>
-          </div>
+                </div>
+              </div>
 
           {/* Image Area - Right on Desktop, Second on Mobile */}
           <div className="w-full h-full min-h-[300px] sm:min-h-[400px] md:min-h-[500px] lg:min-h-[600px] flex items-center justify-center order-2 lg:order-2">

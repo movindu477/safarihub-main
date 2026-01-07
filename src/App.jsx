@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { initializeApp } from "firebase/app";
 import {
@@ -63,6 +63,7 @@ import Admin from "./components/Admin";
 // Import Chat components
 import Chat from "./components/Chat";
 import ChatList from "./components/ChatList";
+import BookingSection from "./components/BookingSection";
 
 // Import online status functions
 import { setUserOnline, setUserOffline } from "./firebase";
@@ -1110,10 +1111,10 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
   if (!user) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 notification-container">
+    <div className="fixed bottom-6 left-6 z-50 notification-container">
       <div className="relative">
         {showNotifications && (
-          <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
+          <div className="absolute bottom-full left-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
             <NotificationPanel
               notifications={notifications}
               onClose={() => setShowNotifications(false)}
@@ -1302,6 +1303,7 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
         onMarkAsRead={onMarkAsRead}
       />
 
+      {/* Booking Section - Integrated into page */}
 
       <Navbar
         user={user}
@@ -1321,7 +1323,10 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
 
       {/* Home Content with All Sections */}
       <div className="pt--1 space-y-1">
-        <Section1 />
+        <Section1>
+          {/* Booking Panel - Positioned in hero section, scrolls with page */}
+          {user && <BookingSection user={user} />}
+        </Section1>
         <Section2 />
         <Section3 />
         <Section4 />
@@ -1339,18 +1344,71 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
+  const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
+  const [welcomeUserName, setWelcomeUserName] = useState('');
+
+  // TEMPORARY TEST: Verify Stripe Public Key is loaded
+  useEffect(() => {
+    console.log("Stripe Public Key:", import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+  }, []);
 
   // Auth state listener
+  const previousUserRef = useRef(null);
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log(`🔐 Auth state changed:`, user ? `User ${user.uid} logged in` : 'User logged out');
+
+      // Check if this is a new login (user exists now but didn't before)
+      const isNewLogin = user && !previousUserRef.current;
 
       setUser(user);
       setLoading(false);
 
       if (!user) {
         setNotifications([]);
+        setShowWelcomeMessage(false);
+        previousUserRef.current = null;
       } else {
+        // If this is a new login, show welcome message
+        if (isNewLogin) {
+          try {
+            // Try to get user's name from their profile
+            let userName = user.displayName || '';
+
+            // Try to get from tourists collection
+            try {
+              const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
+              if (touristDoc.exists()) {
+                userName = touristDoc.data().fullName || touristDoc.data().name || userName;
+              }
+            } catch (e) {
+              // Try serviceProviders collection
+              try {
+                const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+                if (providerDoc.exists()) {
+                  userName = providerDoc.data().fullName || providerDoc.data().name || userName;
+                }
+              } catch (e2) {
+                console.log('Could not fetch user name from collections');
+              }
+            }
+
+            setWelcomeUserName(userName || 'User');
+            setShowWelcomeMessage(true);
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+              setShowWelcomeMessage(false);
+            }, 5000);
+          } catch (error) {
+            console.error('Error fetching user name for welcome message:', error);
+            setWelcomeUserName('User');
+            setShowWelcomeMessage(true);
+            setTimeout(() => {
+              setShowWelcomeMessage(false);
+            }, 5000);
+          }
+        }
         // Set user online status for service providers
         try {
           // Check if user is a service provider by checking serviceProviders collection
@@ -1365,6 +1423,9 @@ function App() {
         } catch (error) {
           console.error('Error setting user online status:', error);
         }
+
+        // Update previous user reference
+        previousUserRef.current = user;
       }
     }, (error) => {
       // Handle auth errors
@@ -1556,6 +1617,34 @@ function App() {
   return (
     <Router>
       <ScrollToTop />
+
+      {/* Welcome Message - Shows on all pages */}
+      {showWelcomeMessage && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
+          <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-4 min-w-[300px] max-w-md">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-lg">Welcome back!</h3>
+              <p className="text-sm text-green-100">Hello, {welcomeUserName || 'User'}! 👋</p>
+            </div>
+            <button
+              onClick={() => setShowWelcomeMessage(false)}
+              className="flex-shrink-0 text-white/80 hover:text-white transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <Routes>
         <Route
           path="/"
@@ -2035,31 +2124,48 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         });
       }
 
-      // Handle certification files upload (Jeep Drivers)
+      // Handle certification files upload (Jeep Drivers) - Save to separate collection
       if (serviceType !== "Tour Guide" && Object.keys(certificationFiles).length > 0) {
         try {
-          console.log("📄 Uploading certification files...");
+          console.log("📄 Uploading certification files for Jeep Driver...");
           const certificationUrls = {};
+          const certificationDocs = [];
+
           for (const [certName, file] of Object.entries(certificationFiles)) {
             try {
               const ext = file.name.split(".").pop();
               const sanitizedCertName = certName.replace(/[^a-zA-Z0-9]/g, '_');
-              const storageRef = sRef(storage, `certifications/${uid}/${sanitizedCertName}.${ext}`);
+              const storageRef = sRef(storage, `jeep-driver-certifications/${uid}/${sanitizedCertName}.${ext}`);
               const snap = await uploadBytes(storageRef, file);
               const fileURL = await getDownloadURL(snap.ref);
               certificationUrls[certName] = fileURL;
-              console.log(`✅ Uploaded certification: ${certName}`);
+
+              // Create document in jeepDriverCertifications collection
+              const certDocRef = doc(db, 'jeepDriverCertifications', `${uid}_${sanitizedCertName}`);
+              await setDoc(certDocRef, {
+                providerId: uid,
+                certificationName: certName,
+                fileName: file.name,
+                fileUrl: fileURL,
+                fileSize: file.size,
+                fileType: file.type || `application/${ext}`,
+                uploadedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
+              certificationDocs.push(certDocRef.id);
+              console.log(`✅ Uploaded and saved certification: ${certName}`);
             } catch (fileError) {
               console.error(`❌ Failed to upload certification ${certName}:`, fileError);
             }
           }
 
+          // Also update serviceProviders document with URLs for backward compatibility
           if (Object.keys(certificationUrls).length > 0) {
             await setDoc(doc(db, collectionName, uid), {
               certificationUrls: certificationUrls,
               updatedAt: serverTimestamp(),
             }, { merge: true });
-            console.log("✅ Certification files uploaded successfully");
+            console.log("✅ Certification files uploaded and saved to Firestore collections successfully");
           }
         } catch (uploadError) {
           console.error("❌ Certification files upload failed:", uploadError);
@@ -2067,31 +2173,48 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         }
       }
 
-      // Handle verification document files upload (Tour Guides)
+      // Handle verification document files upload (Tour Guides) - Save to separate collection
       if (serviceType === "Tour Guide" && Object.keys(verificationDocumentFiles).length > 0) {
         try {
-          console.log("📄 Uploading verification document files...");
+          console.log("📄 Uploading verification document files for Tour Guide...");
           const verificationDocumentUrls = {};
+          const verificationDocs = [];
+
           for (const [docName, file] of Object.entries(verificationDocumentFiles)) {
             try {
               const ext = file.name.split(".").pop();
               const sanitizedDocName = docName.replace(/[^a-zA-Z0-9]/g, '_');
-              const storageRef = sRef(storage, `verification-documents/${uid}/${sanitizedDocName}.${ext}`);
+              const storageRef = sRef(storage, `guide-certifications/${uid}/${sanitizedDocName}.${ext}`);
               const snap = await uploadBytes(storageRef, file);
               const fileURL = await getDownloadURL(snap.ref);
               verificationDocumentUrls[docName] = fileURL;
-              console.log(`✅ Uploaded verification document: ${docName}`);
+
+              // Create document in guideCertifications collection
+              const certDocRef = doc(db, 'guideCertifications', `${uid}_${sanitizedDocName}`);
+              await setDoc(certDocRef, {
+                providerId: uid,
+                certificationName: docName,
+                fileName: file.name,
+                fileUrl: fileURL,
+                fileSize: file.size,
+                fileType: file.type || `application/${ext}`,
+                uploadedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
+              verificationDocs.push(certDocRef.id);
+              console.log(`✅ Uploaded and saved verification document: ${docName}`);
             } catch (fileError) {
               console.error(`❌ Failed to upload verification document ${docName}:`, fileError);
             }
           }
 
+          // Also update serviceProviders document with URLs for backward compatibility
           if (Object.keys(verificationDocumentUrls).length > 0) {
             await setDoc(doc(db, collectionName, uid), {
               verificationDocumentUrls: verificationDocumentUrls,
               updatedAt: serverTimestamp(),
             }, { merge: true });
-            console.log("✅ Verification document files uploaded successfully");
+            console.log("✅ Verification document files uploaded and saved to Firestore collections successfully");
           }
         } catch (uploadError) {
           console.error("❌ Verification document files upload failed:", uploadError);
@@ -2365,50 +2488,28 @@ const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <button
         onClick={() => onSelect('tourist')}
-        className="group relative bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:via-green-500/20 hover:to-teal-500/20 border border-emerald-500/30 hover:border-emerald-400/60 rounded-2xl p-6 text-center transition-all duration-300 transform hover:-translate-y-1 hover:scale-[1.02] shadow-lg hover:shadow-2xl hover:shadow-emerald-500/20 backdrop-blur-sm overflow-hidden"
+        className="relative bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 border border-emerald-500/30 rounded-2xl p-6 text-center shadow-lg backdrop-blur-sm"
       >
-        {/* Animated background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 via-green-500/0 to-teal-500/0 group-hover:from-emerald-500/10 group-hover:via-green-500/10 group-hover:to-teal-500/10 transition-all duration-300"></div>
-
-        {/* Icon with gradient background and emoji */}
-        <div className="relative mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:shadow-emerald-400/50 group-hover:scale-110 transition-all duration-300">
-          <span className="text-3xl">🧳</span>
-        </div>
-
         {/* Content */}
         <div className="relative z-10">
-          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-100 transition-colors duration-300">Tourist</h3>
-          <p className="text-gray-300 text-sm group-hover:text-gray-200 transition-colors duration-300">
+          <h3 className="text-xl font-bold text-white mb-2">Tourist</h3>
+          <p className="text-gray-300 text-sm">
             Explore amazing destinations
           </p>
         </div>
-
-        {/* Hover effect border */}
-        <div className="absolute inset-0 rounded-2xl border-2 border-emerald-400/0 group-hover:border-emerald-400/50 transition-all duration-300"></div>
       </button>
 
       <button
         onClick={() => onSelect('provider')}
-        className="group relative bg-gradient-to-br from-yellow-500/10 via-amber-500/10 to-orange-500/10 hover:from-yellow-500/20 hover:via-amber-500/20 hover:to-orange-500/20 border border-yellow-500/30 hover:border-yellow-400/60 rounded-2xl p-6 text-center transition-all duration-300 transform hover:-translate-y-1 hover:scale-[1.02] shadow-lg hover:shadow-2xl hover:shadow-yellow-500/20 backdrop-blur-sm overflow-hidden"
+        className="relative bg-gradient-to-br from-yellow-500/10 via-amber-500/10 to-orange-500/10 border border-yellow-500/30 rounded-2xl p-6 text-center shadow-lg backdrop-blur-sm"
       >
-        {/* Animated background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/0 via-amber-500/0 to-orange-500/0 group-hover:from-yellow-500/10 group-hover:via-amber-500/10 group-hover:to-orange-500/10 transition-all duration-300"></div>
-
-        {/* Icon with gradient background and emoji */}
-        <div className="relative mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/30 group-hover:shadow-yellow-400/50 group-hover:scale-110 transition-all duration-300">
-          <span className="text-3xl">🚙</span>
-        </div>
-
         {/* Content */}
         <div className="relative z-10">
-          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-100 transition-colors duration-300">Service Provider</h3>
-          <p className="text-gray-300 text-sm group-hover:text-gray-200 transition-colors duration-300">
+          <h3 className="text-xl font-bold text-white mb-2">Service Provider</h3>
+          <p className="text-gray-300 text-sm">
             Offer your services
           </p>
         </div>
-
-        {/* Hover effect border */}
-        <div className="absolute inset-0 rounded-2xl border-2 border-yellow-400/0 group-hover:border-yellow-400/50 transition-all duration-300"></div>
       </button>
     </div>
   </div>

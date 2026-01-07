@@ -39,27 +39,6 @@ export default function Footer() {
     },
   ];
 
-  // Newsletter Component
-  const NewsletterSignup = () => (
-    <div className="mb-6">
-      <h3 className="text-lg font-semibold mb-3 text-white flex items-center">
-        <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-        Newsletter
-      </h3>
-      <p className="text-gray-400 text-sm mb-3">Subscribe for adventure updates</p>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="email"
-          placeholder="Enter your email"
-          className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:border-green-500 transition-colors"
-        />
-        <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-300 text-sm whitespace-nowrap cursor-pointer">
-          Subscribe
-        </button>
-      </div>
-    </div>
-  );
-
   // Contact Item Component
   const ContactItem = ({ icon, text, subtext }) => (
     <div className="flex items-start space-x-3 mb-4 group cursor-pointer">
@@ -100,29 +79,28 @@ export default function Footer() {
       <div className="absolute inset-0 opacity-5">
         <div className="w-full h-full bg-gradient-to-br from-green-500 to-blue-500"></div>
       </div>
-      
+
       <div className="relative z-10 py-12 px-6 lg:px-20">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 pb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 pb-10">
           {/* Brand Section */}
           <div className="lg:col-span-1">
             <div className="flex items-center mb-4">
-              <img 
-                src={logo} 
-                alt="SafariHub Logo" 
-                className="w-40 h-auto transform hover:scale-105 transition-transform duration-300" 
+              <img
+                src={logo}
+                alt="SafariHub Logo"
+                className="w-40 h-auto transform hover:scale-105 transition-transform duration-300 cursor-pointer"
+                onClick={() => window.location.href = '/'}
               />
             </div>
-            <p className="text-gray-300 text-sm leading-relaxed mb-4 italic">
+            <p className="text-gray-300 text-sm leading-relaxed mb-6">
               Your All in One Gateway to Adventure. Discover the wild, embrace the journey.
             </p>
-            <NewsletterSignup />
           </div>
 
           {/* Quick Links Section */}
           <div>
-            <h3 className="text-xl font-bold mb-6 text-white relative inline-block">
+            <h3 className="text-lg font-bold mb-6 text-white">
               Quick Links
-              <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-green-500 to-blue-500 transform scale-x-0 hover:scale-x-100 transition-transform duration-300"></span>
             </h3>
             <ul className="space-y-2">
               {quickLinks.map((link, index) => (
@@ -133,9 +111,8 @@ export default function Footer() {
 
           {/* Contact Us Section */}
           <div>
-            <h3 className="text-xl font-bold mb-6 text-white relative inline-block">
+            <h3 className="text-lg font-bold mb-6 text-white">
               Contact Us
-              <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-green-500 to-blue-500 transform scale-x-0 hover:scale-x-100 transition-transform duration-300"></span>
             </h3>
             <div className="space-y-1">
               {contactInfo.map((item, index) => (
@@ -146,9 +123,8 @@ export default function Footer() {
 
           {/* Social Media Section */}
           <div>
-            <h3 className="text-xl font-bold mb-6 text-white relative inline-block">
+            <h3 className="text-lg font-bold mb-6 text-white">
               Follow Us
-              <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-green-500 to-blue-500 transform scale-x-0 hover:scale-x-100 transition-transform duration-300"></span>
             </h3>
             <p className="text-gray-300 text-sm mb-4">
               Stay connected with our latest adventures and offers
@@ -158,13 +134,13 @@ export default function Footer() {
                 <a
                   key={index}
                   href={social.href}
-                  className={`w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-white transition-all duration-300 transform hover:scale-110 ${social.color} hover:bg-gray-700`}
+                  className={`w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-white transition-all duration-300 transform hover:scale-110 ${social.color} hover:bg-gray-700 cursor-pointer`}
                 >
                   {social.icon}
                 </a>
               ))}
             </div>
-            
+
             {/* Opening Hours */}
             <div className="bg-gray-800 rounded-lg p-4 border-l-4 border-green-500">
               <h4 className="font-semibold text-white mb-2 text-sm">Opening Hours</h4>

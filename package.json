@@ -15,6 +15,8 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.6.0",
     "@tailwindcss/vite": "^4.1.16",
     "axios": "^1.13.2",
     "concurrently": "^9.2.1",
@@ -29,6 +31,7 @@
     "react-router-dom": "^7.9.5",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
+    "stripe": "^20.1.0",
     "tailwindcss": "^4.1.16"
   },
   "devDependencies": {

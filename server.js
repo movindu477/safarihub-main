@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
@@ -5,7 +6,8 @@ import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, getDoc, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import Stripe from 'stripe';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,6 +26,12 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
+// Initialize Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// TEMPORARY TEST: Verify Stripe Secret Key is loaded
+console.log("Stripe Secret Key Loaded:", !!process.env.STRIPE_SECRET_KEY);
+
 const app = express();
 const server = createServer(app);
 
@@ -37,6 +45,8 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// ==================== Stripe Payment API ====================
 
 // Socket.io configuration
 const io = new Server(server, {
@@ -76,18 +86,18 @@ const formatPhoneNumber = (phoneNumber) => {
 // Send SMS/WhatsApp notification for booking
 app.post('/api/send-booking-notification', async (req, res) => {
   try {
-    const { 
-      phoneNumber, 
-      bookingId, 
-      customerName, 
-      dates, 
+    const {
+      phoneNumber,
+      bookingId,
+      customerName,
+      dates,
       totalPrice,
-      driverName 
+      driverName
     } = req.body;
 
     if (!phoneNumber || !bookingId) {
-      return res.status(400).json({ 
-        error: 'Phone number and booking ID are required' 
+      return res.status(400).json({
+        error: 'Phone number and booking ID are required'
       });
     }
 
@@ -115,7 +125,7 @@ app.post('/api/send-booking-notification', async (req, res) => {
       try {
         const twilio = await import('twilio');
         const client = twilio.default(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-        
+
         const smsResult = await client.messages.create({
           to: formattedPhone,
           from: TWILIO_PHONE_NUMBER,
@@ -128,7 +138,7 @@ app.post('/api/send-booking-notification', async (req, res) => {
           messageSid: smsResult.sid,
           to: formattedPhone
         };
-        
+
         console.log(`✅ SMS sent via Twilio to ${formattedPhone}`);
         return res.json(result);
       } catch (twilioError) {
@@ -142,7 +152,7 @@ app.post('/api/send-booking-notification', async (req, res) => {
       try {
         const axios = await import('axios');
         const whatsappUrl = `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-        
+
         const whatsappResponse = await axios.default.post(
           whatsappUrl,
           {
@@ -167,7 +177,7 @@ app.post('/api/send-booking-notification', async (req, res) => {
           messageId: whatsappResponse.data.messages[0].id,
           to: formattedPhone
         };
-        
+
         console.log(`✅ WhatsApp message sent to ${formattedPhone}`);
         return res.json(result);
       } catch (whatsappError) {
@@ -178,7 +188,7 @@ app.post('/api/send-booking-notification', async (req, res) => {
 
     // Option 3: Fallback - Generate WhatsApp link
     const whatsappLink = `https://wa.me/${formattedPhone.replace('+', '')}?text=${encodeURIComponent(message)}`;
-    
+
     result = {
       success: true,
       method: 'whatsapp-link',
@@ -194,17 +204,17 @@ app.post('/api/send-booking-notification', async (req, res) => {
 
   } catch (error) {
     console.error('Error sending booking notification:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to send notification',
-      details: error.message 
+      details: error.message
     });
   }
 });
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     smsProviders: {
       twilio: !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN),
       whatsapp: !!(WHATSAPP_PHONE_NUMBER_ID && WHATSAPP_ACCESS_TOKEN)
@@ -218,16 +228,16 @@ app.get('/api/health', (req, res) => {
 app.post('/api/webhook/twilio/sms', express.urlencoded({ extended: false }), async (req, res) => {
   try {
     const { From, To, Body, MessageSid } = req.body;
-    
+
     console.log('📨 Incoming SMS from Twilio:');
     console.log('From:', From);
     console.log('To:', To);
     console.log('Message:', Body);
-    
+
     // Format phone number - handle various formats
     const senderPhone = From.replace(/\D/g, '');
     let formattedSender = senderPhone;
-    
+
     // Convert to Sri Lanka format if needed
     if (!formattedSender.startsWith('94')) {
       if (formattedSender.startsWith('0')) {
@@ -236,15 +246,15 @@ app.post('/api/webhook/twilio/sms', express.urlencoded({ extended: false }), asy
         formattedSender = '94' + formattedSender;
       }
     }
-    
+
     // Process the message
     const messageText = Body.toLowerCase().trim();
-    
+
     // Find pending booking for this phone number
     // Try multiple phone number formats
     try {
       const bookingsRef = collection(db, 'bookings');
-      
+
       // Try with + prefix
       let q = query(
         bookingsRef,
@@ -252,7 +262,7 @@ app.post('/api/webhook/twilio/sms', express.urlencoded({ extended: false }), asy
         where('status', '==', 'pending')
       );
       let querySnapshot = await getDocs(q);
-      
+
       // Try without + prefix
       if (querySnapshot.empty) {
         q = query(
@@ -262,7 +272,7 @@ app.post('/api/webhook/twilio/sms', express.urlencoded({ extended: false }), asy
         );
         querySnapshot = await getDocs(q);
       }
-      
+
       // Try with 0 prefix (local format)
       if (querySnapshot.empty && formattedSender.startsWith('94')) {
         const localFormat = '0' + formattedSender.substring(2);
@@ -273,24 +283,24 @@ app.post('/api/webhook/twilio/sms', express.urlencoded({ extended: false }), asy
         );
         querySnapshot = await getDocs(q);
       }
-      
+
       if (!querySnapshot.empty) {
         // Get the most recent pending booking
         const bookingDoc = querySnapshot.docs[0];
         const bookingId = bookingDoc.id;
         const bookingData = bookingDoc.data();
-        
+
         // Process accept/decline
         if (messageText.includes('accept') || messageText.includes('yes') || messageText === '1' || messageText.includes('ok')) {
           console.log(`✅ Driver ${formattedSender} accepted booking ${bookingId}`);
-          
+
           // Update booking status
           await updateDoc(doc(db, 'bookings', bookingId), {
             status: 'accepted',
             updatedAt: serverTimestamp(),
             statusUpdatedAt: serverTimestamp()
           });
-          
+
           // Create notification for customer
           await addDoc(collection(db, 'notifications'), {
             type: 'booking',
@@ -305,10 +315,10 @@ app.post('/api/webhook/twilio/sms', express.urlencoded({ extended: false }), asy
             read: false,
             createdAt: serverTimestamp()
           });
-          
+
         } else if (messageText.includes('decline') || messageText.includes('no') || messageText.includes('cancel') || messageText === '2') {
           console.log(`❌ Driver ${formattedSender} declined booking ${bookingId}`);
-          
+
           // Update booking status
           await updateDoc(doc(db, 'bookings', bookingId), {
             status: 'cancelled',
@@ -317,7 +327,7 @@ app.post('/api/webhook/twilio/sms', express.urlencoded({ extended: false }), asy
             updatedAt: serverTimestamp(),
             statusUpdatedAt: serverTimestamp()
           });
-          
+
           // Create notification for customer
           await addDoc(collection(db, 'notifications'), {
             type: 'booking',
@@ -339,11 +349,11 @@ app.post('/api/webhook/twilio/sms', express.urlencoded({ extended: false }), asy
     } catch (error) {
       console.error('Error processing booking response:', error);
     }
-    
+
     // Respond to Twilio (required)
     res.type('text/xml');
     res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-    
+
   } catch (error) {
     console.error('Error processing Twilio webhook:', error);
     res.status(500).send('Error processing webhook');
@@ -362,26 +372,26 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
       }
       return res.status(403).send('Invalid verify token');
     }
-    
+
     // Handle incoming messages
     const { entry } = req.body;
-    
+
     if (entry && entry[0] && entry[0].changes) {
       const change = entry[0].changes[0];
-      
+
       if (change.value && change.value.messages) {
         const message = change.value.messages[0];
         const from = message.from;
         const text = message.text?.body || '';
         const messageId = message.id;
-        
+
         console.log('📨 Incoming WhatsApp message:');
         console.log('From:', from);
         console.log('Message:', text);
-        
+
         // Format phone number - handle various formats
         let formattedSender = from.replace(/\D/g, '');
-        
+
         // Convert to Sri Lanka format if needed
         if (!formattedSender.startsWith('94')) {
           if (formattedSender.startsWith('0')) {
@@ -390,15 +400,15 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
             formattedSender = '94' + formattedSender;
           }
         }
-        
+
         // Process the message
         const messageText = text.toLowerCase().trim();
-        
+
         // Find pending booking for this phone number
         // Try multiple phone number formats
         try {
           const bookingsRef = collection(db, 'bookings');
-          
+
           // Try with + prefix
           let q = query(
             bookingsRef,
@@ -406,7 +416,7 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
             where('status', '==', 'pending')
           );
           let querySnapshot = await getDocs(q);
-          
+
           // Try without + prefix
           if (querySnapshot.empty) {
             q = query(
@@ -416,7 +426,7 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
             );
             querySnapshot = await getDocs(q);
           }
-          
+
           // Try with 0 prefix (local format)
           if (querySnapshot.empty && formattedSender.startsWith('94')) {
             const localFormat = '0' + formattedSender.substring(2);
@@ -427,22 +437,22 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
             );
             querySnapshot = await getDocs(q);
           }
-          
+
           if (!querySnapshot.empty) {
             const bookingDoc = querySnapshot.docs[0];
             const bookingId = bookingDoc.id;
             const bookingData = bookingDoc.data();
-            
+
             // Process accept/decline
             if (messageText.includes('accept') || messageText.includes('yes') || messageText === '1' || messageText.includes('ok')) {
               console.log(`✅ Driver ${formattedSender} accepted booking ${bookingId} via WhatsApp`);
-              
+
               await updateDoc(doc(db, 'bookings', bookingId), {
                 status: 'accepted',
                 updatedAt: serverTimestamp(),
                 statusUpdatedAt: serverTimestamp()
               });
-              
+
               await addDoc(collection(db, 'notifications'), {
                 type: 'booking',
                 title: 'Booking Accepted',
@@ -456,10 +466,10 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
                 read: false,
                 createdAt: serverTimestamp()
               });
-              
+
             } else if (messageText.includes('decline') || messageText.includes('no') || messageText.includes('cancel') || messageText === '2') {
               console.log(`❌ Driver ${formattedSender} declined booking ${bookingId} via WhatsApp`);
-              
+
               await updateDoc(doc(db, 'bookings', bookingId), {
                 status: 'cancelled',
                 cancellationReason: 'Declined by driver via WhatsApp',
@@ -467,7 +477,7 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
                 updatedAt: serverTimestamp(),
                 statusUpdatedAt: serverTimestamp()
               });
-              
+
               await addDoc(collection(db, 'notifications'), {
                 type: 'booking',
                 title: 'Booking Cancelled',
@@ -486,15 +496,15 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
         } catch (error) {
           console.error('Error processing WhatsApp booking response:', error);
         }
-        
+
         // Respond to WhatsApp (acknowledge receipt)
         res.status(200).json({ status: 'received' });
         return;
       }
     }
-    
+
     res.status(200).json({ status: 'ok' });
-    
+
   } catch (error) {
     console.error('Error processing WhatsApp webhook:', error);
     res.status(500).json({ error: 'Error processing webhook' });
@@ -504,7 +514,7 @@ app.post('/api/webhook/whatsapp', express.json(), async (req, res) => {
 // GET endpoint for WhatsApp webhook verification
 app.get('/api/webhook/whatsapp', (req, res) => {
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'your_verify_token';
-  
+
   if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === verifyToken) {
     console.log('✅ WhatsApp webhook verified');
     res.status(200).send(req.query['hub.challenge']);
@@ -531,11 +541,11 @@ io.on('connection', (socket) => {
   socket.on('user_join', (data) => {
     const { userId, driverId, userName } = data;
     const conversationId = generateConversationId(userId, driverId);
-    
+
     users.set(userId, socket.id);
     socket.join(`user_${userId}`);
     socket.join(conversationId);
-    
+
     // Initialize conversation
     if (!conversations.has(conversationId)) {
       conversations.set(conversationId, {
@@ -561,7 +571,7 @@ io.on('connection', (socket) => {
   socket.on('send_message', (data) => {
     const { userId, driverId, message, senderType, userName } = data;
     const conversationId = generateConversationId(userId, driverId);
-    
+
     const messageData = {
       id: Date.now(),
       conversationId,
@@ -642,7 +652,7 @@ app.get('/api/conversations/:driverId/:userId', (req, res) => {
 app.get('/api/driver/conversations/:driverId', (req, res) => {
   const { driverId } = req.params;
   const driverConversations = [];
-  
+
   conversations.forEach((conv, convId) => {
     if (conv.participants.driverId === driverId) {
       driverConversations.push({
@@ -654,8 +664,107 @@ app.get('/api/driver/conversations/:driverId', (req, res) => {
       });
     }
   });
-  
+
   res.json(driverConversations);
+});
+
+// ✅ Stripe test endpoint (MUST be above app.get('*'))
+app.get('/api/stripe-test', async (req, res) => {
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: 20000, // LKR 200.00 (200 × 100)
+      currency: 'lkr',
+    });
+
+    res.json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error) {
+    console.error('Stripe test error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Create PaymentIntent for booking payment
+app.post('/api/create-payment-intent', async (req, res) => {
+  try {
+    const { amount, bookingId } = req.body;
+
+    if (!amount || !bookingId) {
+      return res.status(400).json({ error: 'Amount and bookingId are required' });
+    }
+
+    // Validate amount is a number
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      return res.status(400).json({ error: 'Invalid amount. Amount must be a positive number.' });
+    }
+
+    // amount must be in cents (LKR × 100)
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amountNum * 100), // Convert LKR to cents
+      currency: 'lkr',
+      metadata: {
+        bookingId
+      }
+    });
+
+    res.json({
+      clientSecret: paymentIntent.client_secret
+    });
+  } catch (error) {
+    console.error('Stripe PaymentIntent creation error:', error);
+    res.status(500).json({ error: error.message || 'Failed to create payment intent' });
+  }
+});
+
+// ✅ Mark booking as paid after successful payment
+app.post('/api/bookings/:bookingId/mark-paid', async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    if (!bookingId) {
+      return res.status(400).json({ error: 'Booking ID is required' });
+    }
+
+    const bookingRef = doc(db, 'bookings', bookingId);
+    const bookingDoc = await getDoc(bookingRef);
+
+    if (!bookingDoc.exists()) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const bookingData = bookingDoc.data();
+
+    // Check if already paid
+    if (bookingData.paymentStatus === 'paid') {
+      return res.json({
+        success: true,
+        message: 'Booking already marked as paid',
+        bookingId
+      });
+    }
+
+    // Update booking status
+    await updateDoc(bookingRef, {
+      paymentStatus: 'paid',
+      status: 'confirmed',
+      paidAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    console.log(`✅ Booking ${bookingId} marked as paid`);
+
+    res.json({
+      success: true,
+      message: 'Booking marked as paid successfully',
+      bookingId
+    });
+  } catch (error) {
+    console.error('Error marking booking as paid:', error);
+    res.status(500).json({ error: error.message || 'Failed to update booking status' });
+  }
 });
 
 // Serve React app for all other routes (PRODUCTION ONLY)
