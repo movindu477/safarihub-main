@@ -10,11 +10,9 @@ const BookingSection = ({ user }) => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedBooking, setSelectedBooking] = useState(null);
-  const [showBookingDetails, setShowBookingDetails] = useState(false);
+  const [expandedBookingId, setExpandedBookingId] = useState(null);
   const [userRole, setUserRole] = useState(null);
-  const [clickedCardRef, setClickedCardRef] = useState(null);
-  const [popupPosition, setPopupPosition] = useState({ left: 0, top: 0, arrowOnLeft: true });
+  const [isMobile, setIsMobile] = useState(false);
 
   // Check user role
   useEffect(() => {
@@ -201,6 +199,31 @@ const BookingSection = ({ user }) => {
     return `${formatDate(dates[0])} - ${formatDate(dates[dates.length - 1])}`;
   };
 
+  // Format dates with their types (half-day/full-day)
+  const formatDatesWithTypes = (booking) => {
+    // If datesWithTypes is available, use it to show each date with its type
+    if (booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0) {
+      return booking.datesWithTypes.map(item => {
+        const date = item.date ? new Date(item.date) : null;
+        const type = item.type || 'full-day';
+        const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+        if (date) {
+          return `${date.toLocaleDateString()} (${typeLabel})`;
+        }
+        return '';
+      }).filter(Boolean).join(', ');
+    }
+    // Fallback to datesString if available
+    if (booking.datesString) {
+      return booking.datesString;
+    }
+    // Fallback to formatDates
+    if (booking.selectedDates && Array.isArray(booking.selectedDates)) {
+      return formatDates(booking.selectedDates.map(d => d.toDate ? d.toDate() : new Date(d)));
+    }
+    return 'N/A';
+  };
+
   const handleBookingStatusUpdate = async (bookingId, status) => {
     if (!user || !user.uid) return;
 
@@ -222,21 +245,15 @@ const BookingSection = ({ user }) => {
         customerName
       );
 
-      setShowBookingDetails(false);
-      setSelectedBooking(null);
+      // Collapse the expanded booking after status update
+      setExpandedBookingId(null);
     } catch (error) {
       console.error('Error updating booking status:', error);
       alert('Failed to update booking status. Please try again.');
     }
   };
 
-  if (!user) {
-    return null;
-  }
-
-  // Hide on mobile devices
-  const [isMobile, setIsMobile] = useState(false);
-
+  // Check mobile screen size
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -246,71 +263,15 @@ const BookingSection = ({ user }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Update popup position on scroll/resize
-  useEffect(() => {
-    if (!showBookingDetails || !clickedCardRef) {
-      setPopupPosition({ left: 0, top: 0, arrowOnLeft: true });
-      return;
-    }
+  // Early returns - must be after all hooks
+  if (!user) {
+    return null;
+  }
 
-    const updatePosition = () => {
-      if (!clickedCardRef) return;
-
-      const cardRect = clickedCardRef.getBoundingClientRect();
-      const popupWidth = 320;
-      const popupHeight = 400;
-      const spacing = 12;
-
-      // Position popup to the right of the clicked card (inside the booking panel area)
-      // This way it won't appear from the left side of the screen
-      let left = cardRect.right + spacing;
-      let top = cardRect.top;
-
-      // If popup would go off-screen to the right, position it to the left of the card instead
-      if (left + popupWidth > window.innerWidth - 10) {
-        left = cardRect.left - popupWidth - spacing;
-        // If still off-screen, center it or adjust
-        if (left < 10) {
-          left = Math.max(10, (window.innerWidth - popupWidth) / 2);
-        }
-      }
-
-      // Ensure popup stays within viewport vertically
-      const maxTop = window.innerHeight - popupHeight - 10;
-      if (top > maxTop) {
-        top = Math.max(10, maxTop);
-      }
-      if (top < 10) {
-        top = 10;
-      }
-
-      // Determine arrow position: 
-      // If popup is on the right of the card, arrow should be on the left side of popup (pointing left toward card)
-      // If popup is on the left of the card, arrow should be on the right side of popup (pointing right toward card)
-      const arrowOnLeft = left > cardRect.right;
-
-      setPopupPosition({ left, top, arrowOnLeft });
-    };
-
-    // Initial position calculation
-    updatePosition();
-
-    // Update on scroll and resize - use requestAnimationFrame for smooth updates
-    let rafId;
-    const handleUpdate = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(updatePosition);
-    };
-
-    window.addEventListener('scroll', handleUpdate, true);
-    window.addEventListener('resize', handleUpdate);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('scroll', handleUpdate, true);
-      window.removeEventListener('resize', handleUpdate);
-    };
-  }, [showBookingDetails, clickedCardRef]);
+  // Hide booking panel for service providers (they have admin panel)
+  if (userRole === 'provider') {
+    return null;
+  }
 
   if (isMobile) {
     return null;
@@ -381,240 +342,197 @@ const BookingSection = ({ user }) => {
                 <p className="text-gray-400 text-sm">No bookings found</p>
               </div>
             ) : (
-              filteredBookings.map((booking) => (
-                <div
-                  key={booking.id}
-                  className="bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm hover:bg-gray-100 hover:border-gray-300 transition-all cursor-pointer"
-                  onClick={(e) => {
-                    setSelectedBooking(booking);
-                    setShowBookingDetails(true);
-                    setClickedCardRef(e.currentTarget);
-                  }}
-                >
-                  {/* Status Badge */}
-                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border mb-2 ${getStatusColor(booking.status)}`}>
-                    {getStatusIcon(booking.status)}
-                    <span className="uppercase">{booking.status || 'Pending'}</span>
-                  </div>
+              filteredBookings.map((booking) => {
+                const isExpanded = expandedBookingId === booking.id;
+                return (
+                  <div
+                    key={booking.id}
+                    className="bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all"
+                  >
+                    {/* Main Card Content */}
+                    <div
+                      className="p-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                      onClick={() => {
+                        setExpandedBookingId(isExpanded ? null : booking.id);
+                      }}
+                    >
+                      {/* Status Badge */}
+                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border mb-2 ${getStatusColor(booking.status)}`}>
+                        {getStatusIcon(booking.status)}
+                        <span className="uppercase">{booking.status || 'Pending'}</span>
+                      </div>
 
-                  {/* Service Provider/Customer Info */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm font-semibold text-gray-900">
-                      {userRole === 'provider'
-                        ? (booking.customerName || 'Customer')
-                        : (booking.driverName || booking.guideName || 'Service Provider')
-                      }
-                    </span>
-                  </div>
-
-                  {/* Dates */}
-                  <div className="flex items-center gap-2 mb-2 text-xs text-gray-600">
-                    <Calendar className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate">
-                      {booking.datesString || formatDates(booking.selectedDates)}
-                    </span>
-                    {booking.numberOfDays && (
-                      <span className="text-gray-500 flex-shrink-0">({booking.numberOfDays} day{booking.numberOfDays > 1 ? 's' : ''})</span>
-                    )}
-                  </div>
-
-                  {/* Destination */}
-                  {booking.nationalPark && (
-                    <div className="flex items-center gap-2 mb-2 text-xs text-gray-600">
-                      <MapPin className="h-3 w-3" />
-                      <span className="truncate">{booking.nationalPark}</span>
-                    </div>
-                  )}
-
-                  {/* Price */}
-                  {booking.totalPrice && (
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                        <span className="font-bold text-sm text-green-600">
-                          LKR {booking.totalPrice.toLocaleString()}
+                      {/* Service Provider/Customer Info */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm font-semibold text-gray-900">
+                          {userRole === 'provider'
+                            ? (booking.customerName || 'Customer')
+                            : (booking.driverName || booking.guideName || 'Service Provider')
+                          }
                         </span>
                       </div>
-                      {(booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus !== 'paid' && (
-                        <span className="text-red-500 text-xs font-medium">Payment Pending</span>
+
+                      {/* Dates */}
+                      <div className="flex items-center gap-2 mb-2 text-xs text-gray-600">
+                        <Calendar className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">
+                          {formatDatesWithTypes(booking)}
+                        </span>
+                        {booking.numberOfDays && (
+                          <span className="text-gray-500 flex-shrink-0">({booking.numberOfDays} day{booking.numberOfDays > 1 ? 's' : ''})</span>
+                        )}
+                      </div>
+
+                      {/* Destination */}
+                      {booking.nationalPark && (
+                        <div className="flex items-center gap-2 mb-2 text-xs text-gray-600">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate">{booking.nationalPark}</span>
+                        </div>
                       )}
-                      {booking.paymentStatus === 'paid' && (
-                        <span className="text-green-500 text-xs font-medium">✓ Paid</span>
+
+                      {/* Price */}
+                      {booking.totalPrice && (
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-4 w-4 text-green-600" />
+                            <span className="font-bold text-sm text-green-600">
+                              LKR {booking.totalPrice.toLocaleString()}
+                            </span>
+                          </div>
+                          {(booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus !== 'paid' && (
+                            <span className="text-red-500 text-xs font-medium">Payment Pending</span>
+                          )}
+                          {booking.paymentStatus === 'paid' && (
+                            <span className="text-green-500 text-xs font-medium">✓ Paid</span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              ))
+
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                      <div className="px-3 pb-3 pt-0 border-t border-gray-300 bg-black rounded-b-lg animate-slideUp">
+                        <div className="space-y-2 mt-2">
+                          {/* Service Provider Details */}
+                          <div className="bg-gray-900 rounded p-2 border border-gray-700">
+                            <h4 className="font-semibold text-white mb-1 flex items-center gap-1 text-xs">
+                              <User className="h-3 w-3 text-green-400" />
+                              Service Provider
+                            </h4>
+                            <p className="text-xs text-gray-300">{booking.driverName || booking.guideName || 'Service Provider'}</p>
+                          </div>
+
+                          {/* Booking Dates Details */}
+                          <div className="bg-gray-900 rounded p-2 border border-gray-700">
+                            <h4 className="font-semibold text-white mb-1 flex items-center gap-1 text-xs">
+                              <Calendar className="h-3 w-3 text-green-400" />
+                              Booking Dates
+                            </h4>
+                            <div className="space-y-1">
+                              {booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0 ? (
+                                booking.datesWithTypes.map((item, index) => {
+                                  const date = item.date ? new Date(item.date) : null;
+                                  const type = item.type || 'full-day';
+                                  const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                                  const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
+                                  if (!date) return null;
+                                  return (
+                                    <div key={index} className="flex items-center justify-between text-xs">
+                                      <span className="text-gray-300">{date.toLocaleDateString()}</span>
+                                      <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <p className="text-xs text-gray-300">{formatDatesWithTypes(booking)}</p>
+                              )}
+                            </div>
+                            {booking.numberOfDays && (
+                              <p className="text-xs text-gray-400 mt-1.5 pt-1 border-t border-gray-700">{booking.numberOfDays} day{booking.numberOfDays > 1 ? 's' : ''}</p>
+                            )}
+                          </div>
+
+                          {/* Destination Details */}
+                          {booking.nationalPark && (
+                            <div className="bg-gray-900 rounded p-2 border border-gray-700">
+                              <h4 className="font-semibold text-white mb-1 flex items-center gap-1 text-xs">
+                                <MapPin className="h-3 w-3 text-green-400" />
+                                Destination
+                              </h4>
+                              <p className="text-xs text-gray-300">{booking.nationalPark}</p>
+                            </div>
+                          )}
+
+                          {/* Price Details */}
+                          {booking.totalPrice && (
+                            <div className="bg-gray-900 rounded p-2 border border-gray-700">
+                              <h4 className="font-semibold text-white mb-1 flex items-center gap-1 text-xs">
+                                <DollarSign className="h-3 w-3 text-green-400" />
+                                Total Price
+                              </h4>
+                              <p className="text-base font-bold text-green-400">LKR {booking.totalPrice.toLocaleString()}</p>
+                              {(booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus !== 'paid' && (
+                                <p className="text-xs text-red-400 mt-0.5 font-medium">Payment Pending</p>
+                              )}
+                              {booking.paymentStatus === 'paid' && (
+                                <p className="text-xs text-green-400 mt-0.5 font-medium">✓ Payment Completed</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div className="space-y-1 pt-1 border-t border-gray-700">
+                            {userRole === 'provider' && booking.status === 'pending' && (
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleBookingStatusUpdate(booking.id, 'accepted');
+                                  }}
+                                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded transition-colors text-xs font-medium"
+                                >
+                                  <Check className="h-3 w-3" />
+                                  Accept
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleBookingStatusUpdate(booking.id, 'declined');
+                                  }}
+                                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded transition-colors text-xs font-medium"
+                                >
+                                  <X className="h-3 w-3" />
+                                  Decline
+                                </button>
+                              </div>
+                            )}
+
+                            {userRole === 'tourist' && booking.status === 'accepted' && booking.paymentStatus !== 'paid' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedBookingId(null);
+                                  navigate(`/payment/${booking.id}`);
+                                }}
+                                className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded transition-colors text-xs font-medium"
+                              >
+                                <DollarSign className="h-3 w-3" />
+                                Pay Now
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
       </section>
-
-      {/* Booking Details Popup - Small box next to clicked card */}
-      {showBookingDetails && selectedBooking && clickedCardRef && (
-        <React.Fragment>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-50 pointer-events-auto bg-black/10"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowBookingDetails(false);
-              setSelectedBooking(null);
-              setClickedCardRef(null);
-            }}
-          />
-          {/* Popup - positioned fixed to follow card on scroll */}
-          <div
-            className="bg-white rounded-lg shadow-2xl z-50 overflow-hidden pointer-events-auto flex flex-col border border-gray-200 relative"
-            style={{
-              position: 'fixed',
-              width: '320px',
-              maxHeight: '400px',
-              left: `${popupPosition.left}px`,
-              top: `${popupPosition.top}px`,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Arrow pointing to the booking card */}
-            <div
-              className={`absolute top-6 ${popupPosition.arrowOnLeft ? 'right-0' : 'left-0'}`}
-              style={{
-                width: 0,
-                height: 0,
-                borderTop: '8px solid transparent',
-                borderBottom: '8px solid transparent',
-                [popupPosition.arrowOnLeft ? 'borderRight' : 'borderLeft']: '8px solid white',
-                transform: popupPosition.arrowOnLeft ? 'translateX(100%)' : 'translateX(-100%)',
-                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-              }}
-            />
-
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-2 flex items-center justify-between border-b border-green-800 flex-shrink-0">
-              <h3 className="font-bold text-xs">Booking Details</h3>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowBookingDetails(false);
-                  setSelectedBooking(null);
-                  setClickedCardRef(null);
-                }}
-                className="p-0.5 hover:bg-white/20 rounded transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-2.5 space-y-1.5 bg-white overflow-y-auto flex-1" style={{ maxHeight: '360px' }}>
-              {/* Status */}
-              <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(selectedBooking.status)}`}>
-                {getStatusIcon(selectedBooking.status)}
-                <span className="uppercase text-xs">{selectedBooking.status || 'Pending'}</span>
-              </div>
-
-              {/* Service Provider */}
-              <div className="bg-gray-50 rounded p-1.5 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-1 text-xs">
-                  <User className="h-3 w-3 text-green-600" />
-                  Service Provider
-                </h4>
-                <p className="text-xs text-gray-700">{selectedBooking.driverName || selectedBooking.guideName || 'Service Provider'}</p>
-              </div>
-
-              {/* Dates */}
-              <div className="bg-gray-50 rounded p-1.5 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-1 text-xs">
-                  <Calendar className="h-3 w-3 text-green-600" />
-                  Booking Dates
-                </h4>
-                <p className="text-xs text-gray-700">{selectedBooking.datesString || formatDates(selectedBooking.selectedDates)}</p>
-                {selectedBooking.numberOfDays && (
-                  <p className="text-xs text-gray-600 mt-0.5">{selectedBooking.numberOfDays} day{selectedBooking.numberOfDays > 1 ? 's' : ''}</p>
-                )}
-              </div>
-
-              {/* Destination */}
-              {selectedBooking.nationalPark && (
-                <div className="bg-gray-50 rounded p-1.5 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-1 text-xs">
-                    <MapPin className="h-3 w-3 text-green-600" />
-                    Destination
-                  </h4>
-                  <p className="text-xs text-gray-700">{selectedBooking.nationalPark}</p>
-                </div>
-              )}
-
-              {/* Price */}
-              {selectedBooking.totalPrice && (
-                <div className="bg-gray-50 rounded p-1.5 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-1 text-xs">
-                    <DollarSign className="h-3 w-3 text-green-600" />
-                    Total Price
-                  </h4>
-                  <p className="text-base font-bold text-green-700">LKR {selectedBooking.totalPrice.toLocaleString()}</p>
-                  {(selectedBooking.status === 'accepted' || selectedBooking.status === 'confirmed') && selectedBooking.paymentStatus !== 'paid' && (
-                    <p className="text-xs text-red-600 mt-0.5 font-medium">Payment Pending</p>
-                  )}
-                  {selectedBooking.paymentStatus === 'paid' && (
-                    <p className="text-xs text-green-600 mt-0.5 font-medium">✓ Payment Completed</p>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="space-y-1 pt-1.5 border-t border-gray-300 flex-shrink-0">
-                {userRole === 'provider' && selectedBooking.status === 'pending' && (
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleBookingStatusUpdate(selectedBooking.id, 'accepted');
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded transition-colors text-xs font-medium"
-                    >
-                      <Check className="h-3 w-3" />
-                      Accept
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleBookingStatusUpdate(selectedBooking.id, 'declined');
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded transition-colors text-xs font-medium"
-                    >
-                      <X className="h-3 w-3" />
-                      Decline
-                    </button>
-                  </div>
-                )}
-
-                {userRole === 'tourist' && selectedBooking.status === 'accepted' && selectedBooking.paymentStatus !== 'paid' && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowBookingDetails(false);
-                      setSelectedBooking(null);
-                      setClickedCardRef(null);
-                      navigate(`/payment/${selectedBooking.id}`);
-                    }}
-                    className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded transition-colors text-xs font-medium"
-                  >
-                    <DollarSign className="h-3 w-3" />
-                    Pay Now
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </React.Fragment>
-      )}
     </div>
   );
 };

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getFirestore, doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
@@ -22,9 +22,14 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   const [profilePreview, setProfilePreview] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'documents'
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
+  const [certificationFiles, setCertificationFiles] = useState([]);
+  const [uploadingCertifications, setUploadingCertifications] = useState(false);
+  const [uploadedCertifications, setUploadedCertifications] = useState([]);
+  const [deletingCertId, setDeletingCertId] = useState(null);
+  const [newCertificationFiles, setNewCertificationFiles] = useState([]);
 
   // Form state - will be populated from userData
   const [formData, setFormData] = useState({
@@ -252,6 +257,54 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
 
     return () => unsubscribe();
   }, [currentUser, userData, db]);
+
+  // Fetch uploaded certifications
+  useEffect(() => {
+    if (!currentUser || !userData) {
+      setUploadedCertifications([]);
+      return;
+    }
+
+    try {
+      const isJeepDriver = userData.serviceType === 'Jeep Driver';
+      const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+      const certificationsQuery = query(
+        collection(db, collectionName),
+        where('providerId', '==', currentUser.uid)
+      );
+
+      const unsubscribe = onSnapshot(
+        certificationsQuery,
+        (snapshot) => {
+          const certs = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              certificationName: data.certificationName || data.fileName || 'Unknown',
+              fileName: data.fileName || 'Unknown',
+              fileUrl: data.fileUrl || '',
+              fileSize: data.fileSize || 0,
+              fileType: data.fileType || 'Unknown',
+              uploadedAt: data.uploadedAt || null,
+              updatedAt: data.updatedAt || null,
+              providerId: data.providerId || ''
+            };
+          });
+          console.log(`📄 Loaded ${certs.length} certification(s) for provider`);
+          setUploadedCertifications(certs);
+        },
+        (error) => {
+          console.error('Error fetching certifications:', error);
+          setUploadedCertifications([]);
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Error setting up certifications listener:', error);
+      setUploadedCertifications([]);
+    }
+  }, [currentUser?.uid, userData?.serviceType]);
 
   // Handle booking status update
   const handleBookingStatusUpdate = async (bookingId, status) => {
@@ -486,6 +539,16 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 }`}
             >
               My Bookings
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('documents')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'documents'
+                ? 'bg-emerald-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+            >
+              Documents
             </button>
           </div>
 
@@ -933,6 +996,109 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 </div>
               )}
 
+              {/* Certification Upload Section */}
+              <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 mt-4">
+                <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                  <Award className="h-4 w-4 text-emerald-400" />
+                  {isJeepDriver ? 'Jeep Driver Certifications' : 'Guide Certifications'}
+                </h2>
+                <p className="text-xs text-gray-400 mb-3">Upload your certification documents (PDF or images)</p>
+
+                <div className="space-y-3">
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.avif"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setCertificationFiles(files);
+                    }}
+                    className="w-full px-3 py-1.5 text-xs bg-gray-900 border border-gray-600 rounded-lg text-white file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+
+                  {certificationFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-300">Selected files:</p>
+                      {certificationFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between bg-gray-900/50 p-2 rounded text-xs text-gray-300">
+                          <span>{file.name}</span>
+                          <span className="text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!currentUser || !userData || certificationFiles.length === 0) return;
+
+                      setUploadingCertifications(true);
+                      setMessage({ type: '', text: '' });
+
+                      try {
+                        const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                        const uploaded = [];
+
+                        for (const file of certificationFiles) {
+                          try {
+                            // Upload file to storage
+                            const ext = file.name.split('.').pop();
+                            const fileName = `${currentUser.uid}_${Date.now()}_${file.name}`;
+                            const storageRef = sRef(storage, `certifications/${collectionName}/${fileName}`);
+                            const snap = await uploadBytes(storageRef, file);
+                            const fileUrl = await getDownloadURL(snap.ref);
+
+                            // Save to Firestore
+                            await addDoc(collection(db, collectionName), {
+                              providerId: currentUser.uid,
+                              certificationName: file.name,
+                              fileName: fileName,
+                              fileUrl: fileUrl,
+                              fileSize: file.size,
+                              fileType: file.type,
+                              uploadedAt: serverTimestamp(),
+                              updatedAt: serverTimestamp()
+                            });
+
+                            uploaded.push(file.name);
+                          } catch (error) {
+                            console.error(`Error uploading ${file.name}:`, error);
+                          }
+                        }
+
+                        if (uploaded.length > 0) {
+                          setMessage({ type: 'success', text: `Successfully uploaded ${uploaded.length} certification(s)!` });
+                          setCertificationFiles([]);
+                          setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+                        } else {
+                          setMessage({ type: 'error', text: 'Failed to upload certifications. Please try again.' });
+                        }
+                      } catch (error) {
+                        console.error('Error uploading certifications:', error);
+                        setMessage({ type: 'error', text: 'Failed to upload certifications. Please try again.' });
+                      } finally {
+                        setUploadingCertifications(false);
+                      }
+                    }}
+                    disabled={certificationFiles.length === 0 || uploadingCertifications}
+                    className="w-full px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {uploadingCertifications ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4" />
+                        Upload Certifications
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
               {/* Submit Button - Full Width */}
               <div className="flex justify-end gap-3 pt-3 border-t border-gray-700 mt-3">
                 <button
@@ -1018,13 +1184,34 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                             </div>
                             <div className="space-y-1 text-sm text-gray-300">
                               <p><span className="font-medium">Email:</span> {booking.customerEmail || 'N/A'}</p>
-                              {booking.selectedDates && (
+                              {booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0 ? (
+                                <div>
+                                  <p className="font-medium mb-1">Dates:</p>
+                                  <div className="space-y-1">
+                                    {booking.datesWithTypes.map((item, index) => {
+                                      const date = item.date ? new Date(item.date) : null;
+                                      const type = item.type || 'full-day';
+                                      const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                                      const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
+                                      if (!date) return null;
+                                      return (
+                                        <div key={index} className="flex items-center justify-between text-xs">
+                                          <span className="text-gray-300">{date.toLocaleDateString()}</span>
+                                          <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ) : booking.selectedDates ? (
                                 <p><span className="font-medium">Dates:</span> {
                                   Array.isArray(booking.selectedDates)
                                     ? booking.selectedDates.map(d => new Date(d).toLocaleDateString()).join(', ')
                                     : new Date(booking.selectedDates).toLocaleDateString()
                                 }</p>
-                              )}
+                              ) : booking.datesString ? (
+                                <p><span className="font-medium">Dates:</span> {booking.datesString}</p>
+                              ) : null}
                               {booking.destination && (
                                 <p><span className="font-medium">Destination:</span> {booking.destination}</p>
                               )}
@@ -1151,7 +1338,26 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   Booking Details
                 </h3>
                 <div className="space-y-3 text-sm">
-                  {selectedBooking.selectedDates && (
+                  {selectedBooking.datesWithTypes && Array.isArray(selectedBooking.datesWithTypes) && selectedBooking.datesWithTypes.length > 0 ? (
+                    <div>
+                      <span className="text-gray-400 font-medium">Dates:</span>
+                      <div className="mt-2 space-y-1">
+                        {selectedBooking.datesWithTypes.map((item, index) => {
+                          const date = item.date ? new Date(item.date) : null;
+                          const type = item.type || 'full-day';
+                          const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                          const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
+                          if (!date) return null;
+                          return (
+                            <div key={index} className="flex items-center justify-between text-sm">
+                              <span className="text-white">{date.toLocaleDateString()}</span>
+                              <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : selectedBooking.selectedDates ? (
                     <div>
                       <span className="text-gray-400 font-medium">Dates:</span>
                       <p className="text-white">
@@ -1160,7 +1366,12 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           : new Date(selectedBooking.selectedDates).toLocaleDateString()}
                       </p>
                     </div>
-                  )}
+                  ) : selectedBooking.datesString ? (
+                    <div>
+                      <span className="text-gray-400 font-medium">Dates:</span>
+                      <p className="text-white">{selectedBooking.datesString}</p>
+                    </div>
+                  ) : null}
                   {selectedBooking.destination && (
                     <div>
                       <span className="text-gray-400 font-medium">Destination:</span>
@@ -1281,6 +1492,248 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Documents Tab */}
+      {activeTab === 'documents' && (
+        <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
+          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-emerald-400" />
+            {isJeepDriver ? 'Jeep Driver Certifications' : 'Guide Certifications'}
+          </h2>
+
+          {/* Upload New Documents Section */}
+          <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 mb-4">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+              <Upload className="h-4 w-4 text-emerald-400" />
+              Upload New Documents
+            </h3>
+            <p className="text-xs text-gray-400 mb-3">Upload certification documents (PDF or images)</p>
+
+            <div className="space-y-3">
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.avif"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  setNewCertificationFiles(files);
+                }}
+                className="w-full px-3 py-1.5 text-xs bg-gray-900 border border-gray-600 rounded-lg text-white file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+
+              {newCertificationFiles.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-300">Selected files:</p>
+                  {newCertificationFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-900/50 p-2 rounded text-xs text-gray-300">
+                      <span>{file.name}</span>
+                      <span className="text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!currentUser || !userData || newCertificationFiles.length === 0) return;
+
+                  setUploadingCertifications(true);
+                  setMessage({ type: '', text: '' });
+
+                  try {
+                    const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                    const uploaded = [];
+
+                    for (const file of newCertificationFiles) {
+                      try {
+                        console.log(`📤 Starting upload for: ${file.name}`);
+
+                        // Upload file to storage
+                        const ext = file.name.split('.').pop();
+                        const timestamp = Date.now();
+                        const fileName = `${currentUser.uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                        const storageRef = sRef(storage, `certifications/${collectionName}/${fileName}`);
+
+                        console.log(`📤 Uploading to: certifications/${collectionName}/${fileName}`);
+
+                        // Upload with timeout
+                        const uploadPromise = uploadBytes(storageRef, file);
+                        const timeoutPromise = new Promise((_, reject) =>
+                          setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000)
+                        );
+
+                        const snap = await Promise.race([uploadPromise, timeoutPromise]);
+                        console.log(`✅ File uploaded to storage: ${file.name}`);
+
+                        const fileUrl = await getDownloadURL(snap.ref);
+                        console.log(`✅ Got download URL for: ${file.name}`);
+
+                        // Save to Firestore
+                        const docRef = await addDoc(collection(db, collectionName), {
+                          providerId: currentUser.uid,
+                          certificationName: file.name,
+                          fileName: fileName,
+                          fileUrl: fileUrl,
+                          fileSize: file.size,
+                          fileType: file.type || `application/${ext}`,
+                          uploadedAt: serverTimestamp(),
+                          updatedAt: serverTimestamp()
+                        });
+
+                        console.log(`✅ Saved to Firestore with ID: ${docRef.id} for: ${file.name}`);
+                        uploaded.push(file.name);
+                      } catch (error) {
+                        console.error(`❌ Error uploading ${file.name}:`, error);
+                        console.error('Error details:', {
+                          message: error.message,
+                          code: error.code,
+                          stack: error.stack
+                        });
+
+                        // Check if it's a CORS error
+                        if (error.message.includes('CORS') || error.code === 'storage/unauthorized' || error.code === 'storage/canceled') {
+                          setMessage({
+                            type: 'error',
+                            text: `CORS Error: Please configure Firebase Storage CORS. See STORAGE_CORS_SETUP.md for instructions.`
+                          });
+                        }
+                      }
+                    }
+
+                    if (uploaded.length > 0) {
+                      setMessage({ type: 'success', text: `Successfully uploaded ${uploaded.length} document(s)!` });
+                      setNewCertificationFiles([]);
+                      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+                    } else {
+                      setMessage({
+                        type: 'error',
+                        text: 'Failed to upload documents. If you see CORS errors in console, please configure Firebase Storage CORS (see STORAGE_CORS_SETUP.md).'
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Error uploading documents:', error);
+                    let errorMessage = 'Failed to upload documents. Please try again.';
+                    if (error.message && (error.message.includes('CORS') || error.message.includes('blocked'))) {
+                      errorMessage = 'CORS Error: Firebase Storage CORS is not configured. Please run: gsutil cors set cors.json gs://safarihub-a80bd.firebasestorage.app (See STORAGE_CORS_SETUP.md)';
+                    }
+                    setMessage({ type: 'error', text: errorMessage });
+                  } finally {
+                    setUploadingCertifications(false);
+                  }
+                }}
+                disabled={newCertificationFiles.length === 0 || uploadingCertifications}
+                className="w-full px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {uploadingCertifications ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Upload Documents
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Existing Documents List */}
+          <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-emerald-400" />
+              Uploaded Documents
+            </h3>
+
+            {uploadedCertifications.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-8">No documents uploaded yet</p>
+            ) : (
+              <div className="space-y-2">
+                {uploadedCertifications.map((cert) => (
+                  <div key={cert.id} className="bg-gray-900/50 rounded-lg p-3 border border-gray-600 flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <FileText className="h-4 w-4 text-emerald-400" />
+                        <span className="text-white font-medium text-sm">{cert.certificationName || cert.fileName}</span>
+                      </div>
+                      <div className="text-xs text-gray-400 space-y-0.5">
+                        <p>Size: {(cert.fileSize / 1024).toFixed(1)} KB</p>
+                        <p>Type: {cert.fileType || 'Unknown'}</p>
+                        {cert.uploadedAt && (
+                          <p>Uploaded: {cert.uploadedAt.toDate ? cert.uploadedAt.toDate().toLocaleDateString() : 'Unknown'}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={cert.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
+                      >
+                        <FileText className="h-3 w-3" />
+                        View
+                      </a>
+                      <button
+                        onClick={async () => {
+                          if (!window.confirm('Are you sure you want to delete this document?')) return;
+
+                          setDeletingCertId(cert.id);
+                          try {
+                            // Delete from Firestore
+                            await deleteDoc(doc(db, isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications', cert.id));
+
+                            // Delete from Storage
+                            try {
+                              // Extract storage path from URL
+                              // URL format: https://firebasestorage.googleapis.com/v0/b/bucket/o/path%2Fto%2Ffile
+                              const url = new URL(cert.fileUrl);
+                              const pathMatch = url.pathname.match(/\/o\/(.+)/);
+                              if (pathMatch) {
+                                const storagePath = decodeURIComponent(pathMatch[1]);
+                                const fileRef = sRef(storage, storagePath);
+                                await deleteObject(fileRef);
+                              }
+                            } catch (storageError) {
+                              console.error('Error deleting file from storage:', storageError);
+                              // Continue even if storage delete fails
+                            }
+
+                            setMessage({ type: 'success', text: 'Document deleted successfully!' });
+                            setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+                          } catch (error) {
+                            console.error('Error deleting document:', error);
+                            setMessage({ type: 'error', text: 'Failed to delete document. Please try again.' });
+                            setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+                          } finally {
+                            setDeletingCertId(null);
+                          }
+                        }}
+                        disabled={deletingCertId === cert.id}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      >
+                        {deletingCertId === cert.id ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <X className="h-3 w-3" />
+                            Delete
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

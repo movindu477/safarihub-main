@@ -1324,7 +1324,8 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
       {/* Home Content with All Sections */}
       <div className="pt--1 space-y-1">
         <Section1>
-          {/* Booking Panel - Positioned in hero section, scrolls with page */}
+          {/* Booking Panel - Only show for tourists, not for service providers */}
+          {/* BookingSection component handles its own visibility based on user role */}
           {user && <BookingSection user={user} />}
         </Section1>
         <Section2 />
@@ -1618,33 +1619,6 @@ function App() {
     <Router>
       <ScrollToTop />
 
-      {/* Welcome Message - Shows on all pages */}
-      {showWelcomeMessage && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
-          <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-4 min-w-[300px] max-w-md">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-lg">Welcome back!</h3>
-              <p className="text-sm text-green-100">Hello, {welcomeUserName || 'User'}! 👋</p>
-            </div>
-            <button
-              onClick={() => setShowWelcomeMessage(false)}
-              className="flex-shrink-0 text-white/80 hover:text-white transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
       <Routes>
         <Route
           path="/"
@@ -1833,6 +1807,8 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   const [msg, setMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successUserName, setSuccessUserName] = useState('');
 
   // Common Fields
   const [email, setEmail] = useState("");
@@ -2093,137 +2069,215 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       await setDoc(doc(db, collectionName, uid), userData);
       console.log("✅ User data saved to Firestore successfully!");
 
-      // Handle profile picture upload
-      let photoURL = null;
+      // Update profile display name immediately
+      await updateProfile(userCredential.user, {
+        displayName: fullName
+      });
+
+      // Handle profile picture upload in background (non-blocking)
       if (profileFile) {
-        try {
-          console.log("📸 Uploading profile picture...");
-          const ext = profileFile.name.split(".").pop();
-          const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
-          const snap = await uploadBytes(storageRef, profileFile);
-          photoURL = await getDownloadURL(snap.ref);
+        // Upload profile picture in background
+        setTimeout(async () => {
+          try {
+            console.log("📸 Uploading profile picture in background...");
+            const ext = profileFile.name.split(".").pop();
+            const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
 
-          await setDoc(doc(db, collectionName, uid), {
-            profilePicture: photoURL,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
+            // Upload with timeout (20 seconds)
+            const uploadPromise = uploadBytes(storageRef, profileFile);
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Upload timeout after 20 seconds')), 20000)
+            );
 
-          await updateProfile(userCredential.user, {
-            displayName: fullName,
-            photoURL: photoURL
-          });
+            const snap = await Promise.race([uploadPromise, timeoutPromise]);
+            const photoURL = await getDownloadURL(snap.ref);
 
-          console.log("✅ Profile picture uploaded successfully");
-        } catch (uploadError) {
-          console.error("❌ Profile image upload failed:", uploadError);
-          // Continue without profile picture
-        }
-      } else {
-        await updateProfile(userCredential.user, {
-          displayName: fullName
-        });
-      }
-
-      // Handle certification files upload (Jeep Drivers) - Save to separate collection
-      if (serviceType !== "Tour Guide" && Object.keys(certificationFiles).length > 0) {
-        try {
-          console.log("📄 Uploading certification files for Jeep Driver...");
-          const certificationUrls = {};
-          const certificationDocs = [];
-
-          for (const [certName, file] of Object.entries(certificationFiles)) {
-            try {
-              const ext = file.name.split(".").pop();
-              const sanitizedCertName = certName.replace(/[^a-zA-Z0-9]/g, '_');
-              const storageRef = sRef(storage, `jeep-driver-certifications/${uid}/${sanitizedCertName}.${ext}`);
-              const snap = await uploadBytes(storageRef, file);
-              const fileURL = await getDownloadURL(snap.ref);
-              certificationUrls[certName] = fileURL;
-
-              // Create document in jeepDriverCertifications collection
-              const certDocRef = doc(db, 'jeepDriverCertifications', `${uid}_${sanitizedCertName}`);
-              await setDoc(certDocRef, {
-                providerId: uid,
-                certificationName: certName,
-                fileName: file.name,
-                fileUrl: fileURL,
-                fileSize: file.size,
-                fileType: file.type || `application/${ext}`,
-                uploadedAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-              });
-              certificationDocs.push(certDocRef.id);
-              console.log(`✅ Uploaded and saved certification: ${certName}`);
-            } catch (fileError) {
-              console.error(`❌ Failed to upload certification ${certName}:`, fileError);
-            }
-          }
-
-          // Also update serviceProviders document with URLs for backward compatibility
-          if (Object.keys(certificationUrls).length > 0) {
             await setDoc(doc(db, collectionName, uid), {
-              certificationUrls: certificationUrls,
+              profilePicture: photoURL,
               updatedAt: serverTimestamp(),
             }, { merge: true });
-            console.log("✅ Certification files uploaded and saved to Firestore collections successfully");
+
+            await updateProfile(userCredential.user, {
+              displayName: fullName,
+              photoURL: photoURL
+            });
+
+            console.log("✅ Profile picture uploaded successfully");
+          } catch (uploadError) {
+            console.error("❌ Profile image upload failed:", uploadError);
+            // Profile picture can be uploaded later via profile settings
           }
-        } catch (uploadError) {
-          console.error("❌ Certification files upload failed:", uploadError);
-          // Continue without certification files
-        }
+        }, 100);
       }
 
-      // Handle verification document files upload (Tour Guides) - Save to separate collection
-      if (serviceType === "Tour Guide" && Object.keys(verificationDocumentFiles).length > 0) {
-        try {
-          console.log("📄 Uploading verification document files for Tour Guide...");
-          const verificationDocumentUrls = {};
-          const verificationDocs = [];
-
-          for (const [docName, file] of Object.entries(verificationDocumentFiles)) {
-            try {
-              const ext = file.name.split(".").pop();
-              const sanitizedDocName = docName.replace(/[^a-zA-Z0-9]/g, '_');
-              const storageRef = sRef(storage, `guide-certifications/${uid}/${sanitizedDocName}.${ext}`);
-              const snap = await uploadBytes(storageRef, file);
-              const fileURL = await getDownloadURL(snap.ref);
-              verificationDocumentUrls[docName] = fileURL;
-
-              // Create document in guideCertifications collection
-              const certDocRef = doc(db, 'guideCertifications', `${uid}_${sanitizedDocName}`);
-              await setDoc(certDocRef, {
-                providerId: uid,
-                certificationName: docName,
-                fileName: file.name,
-                fileUrl: fileURL,
-                fileSize: file.size,
-                fileType: file.type || `application/${ext}`,
-                uploadedAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-              });
-              verificationDocs.push(certDocRef.id);
-              console.log(`✅ Uploaded and saved verification document: ${docName}`);
-            } catch (fileError) {
-              console.error(`❌ Failed to upload verification document ${docName}:`, fileError);
-            }
-          }
-
-          // Also update serviceProviders document with URLs for backward compatibility
-          if (Object.keys(verificationDocumentUrls).length > 0) {
-            await setDoc(doc(db, collectionName, uid), {
-              verificationDocumentUrls: verificationDocumentUrls,
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-            console.log("✅ Verification document files uploaded and saved to Firestore collections successfully");
-          }
-        } catch (uploadError) {
-          console.error("❌ Verification document files upload failed:", uploadError);
-          // Continue without verification document files
-        }
-      }
-
+      // Complete account creation first, then upload files in background
       setMsg("🎉 Account created successfully! Redirecting to login...");
       setBusy(false);
+
+      // Upload certification files in background (non-blocking)
+      if (serviceType !== "Tour Guide" && Object.keys(certificationFiles).length > 0) {
+        // Start background upload without blocking
+        setTimeout(async () => {
+          try {
+            console.log("📄 Starting background upload of certification files for Jeep Driver...");
+            const certificationUrls = {};
+            let uploadedCount = 0;
+
+            for (const [certName, file] of Object.entries(certificationFiles)) {
+              try {
+                const ext = file.name.split(".").pop();
+                const timestamp = Date.now();
+                const fileName = `${uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                const storageRef = sRef(storage, `certifications/jeepDriverCertifications/${fileName}`);
+
+                console.log(`📤 Uploading ${certName} to storage...`);
+
+                // Upload with timeout (30 seconds per file)
+                const uploadPromise = uploadBytes(storageRef, file);
+                const timeoutPromise = new Promise((_, reject) =>
+                  setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000)
+                );
+
+                const snap = await Promise.race([uploadPromise, timeoutPromise]);
+                console.log(`✅ File uploaded to storage: ${certName}`);
+
+                const fileURL = await getDownloadURL(snap.ref);
+                console.log(`✅ Got download URL for: ${certName}`);
+
+                certificationUrls[certName] = fileURL;
+
+                // Create document in jeepDriverCertifications collection using addDoc for unique IDs
+                const certDocRef = await addDoc(collection(db, 'jeepDriverCertifications'), {
+                  providerId: uid,
+                  certificationName: certName,
+                  fileName: fileName,
+                  fileUrl: fileURL,
+                  fileSize: file.size,
+                  fileType: file.type || `application/${ext}`,
+                  uploadedAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                });
+                console.log(`✅ Saved to Firestore with ID: ${certDocRef.id} for certification: ${certName}`);
+                uploadedCount++;
+              } catch (fileError) {
+                console.error(`❌ Failed to upload certification ${certName}:`, fileError);
+                console.error('Error details:', {
+                  message: fileError.message,
+                  code: fileError.code,
+                  stack: fileError.stack
+                });
+
+                // Log CORS-specific error guidance
+                if (fileError.message && (fileError.message.includes('CORS') || fileError.message.includes('blocked'))) {
+                  console.error('⚠️ CORS ERROR DETECTED:');
+                  console.error('   Firebase Storage CORS is not configured.');
+                  console.error('   To fix: Run "gsutil cors set cors.json gs://safarihub-a80bd.firebasestorage.app"');
+                  console.error('   Or use Google Cloud Console: https://console.cloud.google.com/storage/browser');
+                  console.error('   See STORAGE_CORS_SETUP.md or QUICK_FIX_CORS.md for detailed instructions.');
+                }
+                // Continue with other files
+              }
+            }
+
+            // Update serviceProviders document with URLs for backward compatibility
+            if (uploadedCount > 0) {
+              await setDoc(doc(db, collectionName, uid), {
+                certificationUrls: certificationUrls,
+                updatedAt: serverTimestamp(),
+              }, { merge: true });
+              console.log(`✅ Successfully uploaded ${uploadedCount} certification file(s) and saved to Firestore`);
+            } else {
+              console.warn("⚠️ No certification files were successfully uploaded");
+            }
+          } catch (uploadError) {
+            console.error("❌ Certification files upload failed:", uploadError);
+            console.error('Upload error details:', {
+              message: uploadError.message,
+              code: uploadError.code,
+              stack: uploadError.stack
+            });
+            // Files will be uploaded later via admin panel if needed
+          }
+        }, 500); // Increased delay to ensure account creation completes
+      }
+
+      // Upload verification document files in background (non-blocking) for Tour Guides
+      if (serviceType === "Tour Guide" && Object.keys(verificationDocumentFiles).length > 0) {
+        // Start background upload without blocking
+        setTimeout(async () => {
+          try {
+            console.log("📄 Starting background upload of verification document files for Tour Guide...");
+            const verificationDocumentUrls = {};
+            let uploadedCount = 0;
+
+            for (const [docName, file] of Object.entries(verificationDocumentFiles)) {
+              try {
+                const ext = file.name.split(".").pop();
+                const timestamp = Date.now();
+                const fileName = `${uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                const storageRef = sRef(storage, `certifications/guideCertifications/${fileName}`);
+
+                console.log(`📤 Uploading ${docName} to storage...`);
+
+                // Upload with timeout (30 seconds per file)
+                const uploadPromise = uploadBytes(storageRef, file);
+                const timeoutPromise = new Promise((_, reject) =>
+                  setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000)
+                );
+
+                const snap = await Promise.race([uploadPromise, timeoutPromise]);
+                console.log(`✅ File uploaded to storage: ${docName}`);
+
+                const fileURL = await getDownloadURL(snap.ref);
+                console.log(`✅ Got download URL for: ${docName}`);
+
+                verificationDocumentUrls[docName] = fileURL;
+
+                // Create document in guideCertifications collection using addDoc for unique IDs
+                const certDocRef = await addDoc(collection(db, 'guideCertifications'), {
+                  providerId: uid,
+                  certificationName: docName,
+                  fileName: fileName,
+                  fileUrl: fileURL,
+                  fileSize: file.size,
+                  fileType: file.type || `application/${ext}`,
+                  uploadedAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                });
+                console.log(`✅ Saved to Firestore with ID: ${certDocRef.id} for verification document: ${docName}`);
+                uploadedCount++;
+              } catch (fileError) {
+                console.error(`❌ Failed to upload verification document ${docName}:`, fileError);
+                console.error('Error details:', {
+                  message: fileError.message,
+                  code: fileError.code,
+                  stack: fileError.stack
+                });
+                // Continue with other files
+              }
+            }
+
+            // Update serviceProviders document with URLs for backward compatibility
+            if (uploadedCount > 0) {
+              await setDoc(doc(db, collectionName, uid), {
+                verificationDocumentUrls: verificationDocumentUrls,
+                updatedAt: serverTimestamp(),
+              }, { merge: true });
+              console.log(`✅ Successfully uploaded ${uploadedCount} verification document file(s) and saved to Firestore`);
+            } else {
+              console.warn("⚠️ No verification document files were successfully uploaded");
+            }
+          } catch (uploadError) {
+            console.error("❌ Verification document files upload failed:", uploadError);
+            console.error('Upload error details:', {
+              message: uploadError.message,
+              code: uploadError.code,
+              stack: uploadError.stack
+            });
+            // Files will be uploaded later via admin panel if needed
+          }
+        }, 500); // Increased delay to ensure account creation completes
+      }
 
       setTimeout(() => {
         signOut(auth);
@@ -2258,11 +2312,34 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     setBusy(true);
     setMsg("");
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      setMsg("✅ Welcome back! Redirecting...");
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Fetch user's name for success message
+      let userName = user.displayName || '';
+      try {
+        const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
+        if (touristDoc.exists()) {
+          userName = touristDoc.data().fullName || touristDoc.data().name || userName;
+        } else {
+          const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+          if (providerDoc.exists()) {
+            userName = providerDoc.data().fullName || providerDoc.data().name || userName;
+          }
+        }
+      } catch (nameError) {
+        console.log('Could not fetch user name:', nameError);
+      }
+
+      // Show success popup with user's name
+      setSuccessUserName(userName || 'User');
+      setShowSuccessPopup(true);
+      setBusy(false);
+
       setTimeout(() => {
+        setShowSuccessPopup(false);
         onAuthSuccess(returnToPath);
-      }, 1000);
+      }, 2500);
     } catch (error) {
       let errorMessage = "❌ Login failed! ";
 
@@ -2277,7 +2354,6 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       }
 
       setMsg(errorMessage);
-    } finally {
       setBusy(false);
     }
   };
@@ -2300,6 +2376,26 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   if (screen === "login")
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
+        {/* Success Popup */}
+        {showSuccessPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-gradient-to-br from-green-600 to-green-700 text-white rounded-2xl p-8 shadow-2xl max-w-md w-full mx-4 animate-scaleIn">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold mb-2">Welcome Back!</h3>
+                  <p className="text-lg text-green-100">Hello, {successUserName}!</p>
+                  <p className="text-sm text-green-200 mt-2">Login successful. Redirecting...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative w-full max-w-md">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
             {/* Back Button */}
@@ -2393,12 +2489,10 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
               </div>
             </form>
 
-            {msg && (
-              <div className={`mt-4 p-3 rounded-xl text-center text-sm font-medium ${msg.includes("❌")
-                ? "bg-red-500/20 text-red-300 border border-red-500/30"
-                : "bg-green-500/20 text-green-300 border border-green-500/30"
-                }`}>
-                {msg}
+            {/* Error messages only - success shows as popup */}
+            {msg && msg.includes("❌") && (
+              <div className="mt-4 p-4 rounded-xl text-center animate-slideUp bg-red-500/20 text-red-300 border border-red-500/30">
+                <p className="text-sm font-medium">{msg}</p>
               </div>
             )}
           </div>
