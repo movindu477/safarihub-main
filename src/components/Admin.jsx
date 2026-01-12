@@ -1829,9 +1829,10 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           </>
                         )}
                       </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
