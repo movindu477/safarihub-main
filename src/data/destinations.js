@@ -2,7 +2,7 @@
 // Single source of truth for all destination data
 
 // Import local images
-import yalaBackground from '../assets/yala.avif';
+import yalaBackground from '../assets/yalaback.jpg';
 import yala1 from '../assets/yala1.jpg';
 import yala2 from '../assets/yala2.webp';
 import yala3 from '../assets/yala3.jpg';
@@ -13,6 +13,9 @@ import yala7 from '../assets/yala7.jpg';
 import yala8 from '../assets/yala8.jpg';
 import yala9 from '../assets/yala9.jpg';
 import yala10 from '../assets/yala10.webp';
+import yala11 from '../assets/yala11.jpg';
+import yala12 from '../assets/yala12.jpg';
+import back4ori2 from '../assets/back4ori2.avif';
 import wilpattuBackground from '../assets/wilpattu.avif';
 import mirissaBackground from '../assets/mirissa.avif';
 import unaBackground from '../assets/una.avif';
@@ -51,7 +54,7 @@ Best visited during the dry season (February to June), the park provides excelle
     animals: [
       {
         name: 'Sri Lankan Leopard',
-        image: yala1,
+        image: back4ori2,
         description: 'The apex predator of Yala and the park’s most iconic species.',
         populationEstimate: '250–300',
         abundance: 'One of the highest leopard densities in the world. Block 1 alone hosts ~25–40 individuals.'
@@ -118,6 +121,20 @@ Best visited during the dry season (February to June), the park provides excelle
         description: 'A medium-sized wild cat adapted to wetland habitats, known for its exceptional fishing abilities.',
         populationEstimate: '20–40',
         abundance: 'Rare. Nocturnal and elusive, mostly found near water bodies and wetlands.'
+      },
+      {
+        name: 'Painted Stork',
+        image: yala11,
+        description: 'Among the over 200 bird species, the painted stork is one of the common and beautiful waterbirds attracted to the park\'s lagoons.',
+        populationEstimate: 'Common',
+        abundance: 'Frequently seen in lagoons and wetland areas during the dry season.'
+      },
+      {
+        name: 'Land Monitor',
+        image: yala12,
+        description: 'These large, slow-moving lizards are often visible near the safari roads.',
+        populationEstimate: 'Common',
+        abundance: 'Frequently spotted basking on roads and rocks, especially during warm weather.'
       }
     ],
     accommodations: [
@@ -145,7 +162,8 @@ Best visited during the dry season (February to June), the park provides excelle
       'Early morning (6-10 AM) and late afternoon (3-7 PM) are the best times for wildlife spotting',
       'Wear neutral colors (beige, khaki, olive) to blend with the environment',
       'Bring binoculars and a good camera with zoom lens for photography',
-      'Carry sufficient water, sunscreen, and insect repellent'
+      'Carry sufficient water, sunscreen, and insect repellent',
+      'Respect wildlife by maintaining a safe distance and following park regulations'
     ],
     mapZoom: 12,
     mapEmbedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14185.313161698377!2d81.46158493853646!3d6.463982517866302!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae5d3a62ffb9359%3A0x3bb623d70b5a3314!2sYala%20National%20Park!5e1!3m2!1sen!2slk!4v1765894171601!5m2!1sen!2slk'

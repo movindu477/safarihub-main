@@ -15,7 +15,7 @@ export default function Section5() {
           <div className="flex flex-col space-y-4 sm:space-y-6 order-1 lg:order-1 text-center lg:text-left lg:mr-20">
             {/* Title - One Line */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold lg:font-semibold text-black leading-tight">
-                Rental Locations
+                Rental Gears
             </h1>
 
             {/* Paragraph Text */}

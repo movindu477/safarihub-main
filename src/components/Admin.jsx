@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X } from 'lucide-react';
 import Navbar from './home/Navbar';
@@ -268,30 +268,30 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
     try {
       const isJeepDriver = userData.serviceType === 'Jeep Driver';
       const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
-      const certificationsQuery = query(
-        collection(db, collectionName),
-        where('providerId', '==', currentUser.uid)
-      );
+      const userCertDocRef = doc(db, collectionName, currentUser.uid);
 
       const unsubscribe = onSnapshot(
-        certificationsQuery,
+        userCertDocRef,
         (snapshot) => {
-          const certs = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              certificationName: data.certificationName || data.fileName || 'Unknown',
-              fileName: data.fileName || 'Unknown',
-              fileUrl: data.fileUrl || '',
-              fileSize: data.fileSize || 0,
-              fileType: data.fileType || 'Unknown',
-              uploadedAt: data.uploadedAt || null,
-              updatedAt: data.updatedAt || null,
-              providerId: data.providerId || ''
-            };
-          });
-          console.log(`📄 Loaded ${certs.length} certification(s) for provider`);
-          setUploadedCertifications(certs);
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            const documents = data.documents || [];
+            const certs = documents.map((docItem, index) => ({
+              id: docItem.documentId || `${currentUser.uid}_${index}`,
+              certificationName: docItem.certificationName || docItem.fileName || 'Unknown',
+              fileName: docItem.fileName || 'Unknown',
+              fileUrl: docItem.fileUrl || '',
+              fileSize: docItem.fileSize || 0,
+              fileType: docItem.fileType || 'Unknown',
+              uploadedAt: docItem.uploadedAt || null,
+              documentId: docItem.documentId || `${currentUser.uid}_${index}`,
+              providerId: data.providerId || currentUser.uid
+            }));
+            console.log(`📄 Loaded ${certs.length} certification(s) for provider`);
+            setUploadedCertifications(certs);
+          } else {
+            setUploadedCertifications([]);
+          }
         },
         (error) => {
           console.error('Error fetching certifications:', error);
@@ -1546,7 +1546,9 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
 
                   try {
                     const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                    const userCertDocRef = doc(db, collectionName, currentUser.uid);
                     const uploaded = [];
+                    const newDocuments = [];
 
                     for (const file of newCertificationFiles) {
                       try {
@@ -1572,19 +1574,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         const fileUrl = await getDownloadURL(snap.ref);
                         console.log(`✅ Got download URL for: ${file.name}`);
 
-                        // Save to Firestore
-                        const docRef = await addDoc(collection(db, collectionName), {
-                          providerId: currentUser.uid,
+                        // Add to new documents array
+                        newDocuments.push({
                           certificationName: file.name,
                           fileName: fileName,
                           fileUrl: fileUrl,
                           fileSize: file.size,
                           fileType: file.type || `application/${ext}`,
                           uploadedAt: serverTimestamp(),
-                          updatedAt: serverTimestamp()
+                          documentId: `${currentUser.uid}_${timestamp}`
                         });
 
-                        console.log(`✅ Saved to Firestore with ID: ${docRef.id} for: ${file.name}`);
                         uploaded.push(file.name);
                       } catch (error) {
                         console.error(`❌ Error uploading ${file.name}:`, error);
@@ -1594,33 +1594,84 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           stack: error.stack
                         });
 
-                        // Check if it's a CORS error
-                        if (error.message.includes('CORS') || error.code === 'storage/unauthorized' || error.code === 'storage/canceled') {
+                        // Check for CORS error
+                        if (error.message && (error.message.includes('CORS') || error.message.includes('blocked') || error.code === 'storage/unauthorized')) {
+                          console.error('⚠️ CORS ERROR: Firebase Storage CORS is not configured.');
                           setMessage({
                             type: 'error',
-                            text: `CORS Error: Please configure Firebase Storage CORS. See STORAGE_CORS_SETUP.md for instructions.`
+                            text: 'CORS Error: Please configure Firebase Storage CORS. See CORS_CONFIG.md for instructions.'
                           });
                         }
+
+                        // Save document metadata even if upload fails
+                        newDocuments.push({
+                          certificationName: file.name,
+                          fileName: fileName,
+                          fileUrl: '', // Empty URL indicates upload failed
+                          fileSize: file.size,
+                          fileType: file.type || `application/${ext}`,
+                          uploadedAt: serverTimestamp(),
+                          documentId: `${currentUser.uid}_${timestamp}`,
+                          uploadStatus: 'failed',
+                          uploadError: error.message || 'Upload failed'
+                        });
                       }
                     }
 
-                    if (uploaded.length > 0) {
-                      setMessage({ type: 'success', text: `Successfully uploaded ${uploaded.length} document(s)!` });
+                    // Update Firestore with new documents
+                    if (newDocuments.length > 0) {
+                      const existingDoc = await getDoc(userCertDocRef);
+                      
+                      if (existingDoc.exists()) {
+                        // Update existing document - merge with existing documents
+                        const existingData = existingDoc.data();
+                        const existingDocuments = existingData.documents || [];
+                        await setDoc(userCertDocRef, {
+                          providerId: currentUser.uid,
+                          documents: [...existingDocuments, ...newDocuments],
+                          updatedAt: serverTimestamp()
+                        }, { merge: true });
+                      } else {
+                        // Create new document
+                        await setDoc(userCertDocRef, {
+                          providerId: currentUser.uid,
+                          documents: newDocuments,
+                          createdAt: serverTimestamp(),
+                          updatedAt: serverTimestamp()
+                        });
+                      }
+                      console.log(`✅ Saved ${newDocuments.length} document(s) to Firestore under user ID: ${currentUser.uid}`);
+                    }
+
+                    if (newDocuments.length > 0) {
+                      const successCount = uploaded.length;
+                      const failedCount = newDocuments.length - successCount;
+                      let messageText = '';
+                      
+                      if (successCount > 0 && failedCount === 0) {
+                        messageText = `Successfully uploaded ${successCount} document(s)!`;
+                      } else if (successCount > 0 && failedCount > 0) {
+                        messageText = `Uploaded ${successCount} document(s), ${failedCount} failed (saved metadata to Firestore). Check CORS configuration.`;
+                      } else {
+                        messageText = `Upload failed for all documents (saved metadata to Firestore). Please configure Firebase Storage CORS. See CORS_CONFIG.md`;
+                      }
+                      
+                      setMessage({ 
+                        type: successCount > 0 ? 'success' : 'error', 
+                        text: messageText 
+                      });
                       setNewCertificationFiles([]);
-                      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+                      setTimeout(() => setMessage({ type: '', text: '' }), 5000);
                     } else {
                       setMessage({
                         type: 'error',
-                        text: 'Failed to upload documents. If you see CORS errors in console, please configure Firebase Storage CORS (see STORAGE_CORS_SETUP.md).'
+                        text: 'No documents to upload. Please select files first.'
                       });
+                      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
                     }
                   } catch (error) {
                     console.error('Error uploading documents:', error);
-                    let errorMessage = 'Failed to upload documents. Please try again.';
-                    if (error.message && (error.message.includes('CORS') || error.message.includes('blocked'))) {
-                      errorMessage = 'CORS Error: Firebase Storage CORS is not configured. Please run: gsutil cors set cors.json gs://safarihub-a80bd.firebasestorage.app (See STORAGE_CORS_SETUP.md)';
-                    }
-                    setMessage({ type: 'error', text: errorMessage });
+                    setMessage({ type: 'error', text: 'Failed to upload documents. Please try again.' });
                   } finally {
                     setUploadingCertifications(false);
                   }
@@ -1654,54 +1705,103 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
               <p className="text-gray-400 text-sm text-center py-8">No documents uploaded yet</p>
             ) : (
               <div className="space-y-2">
-                {uploadedCertifications.map((cert) => (
-                  <div key={cert.id} className="bg-gray-900/50 rounded-lg p-3 border border-gray-600 flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <FileText className="h-4 w-4 text-emerald-400" />
-                        <span className="text-white font-medium text-sm">{cert.certificationName || cert.fileName}</span>
+                {uploadedCertifications.map((cert) => {
+                  const hasError = !cert.fileUrl || cert.uploadStatus === 'failed';
+                  return (
+                    <div key={cert.id} className={`bg-gray-900/50 rounded-lg p-3 border ${hasError ? 'border-red-600' : 'border-gray-600'} flex items-center justify-between`}>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <FileText className={`h-4 w-4 ${hasError ? 'text-red-400' : 'text-emerald-400'}`} />
+                          <span className="text-white font-medium text-sm">{cert.certificationName || cert.fileName}</span>
+                          {hasError && (
+                            <span className="px-2 py-0.5 bg-red-600 text-white text-xs rounded">Upload Failed</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400 space-y-0.5">
+                          <p>Size: {(cert.fileSize / 1024).toFixed(1)} KB</p>
+                          <p>Type: {cert.fileType || 'Unknown'}</p>
+                          {cert.uploadedAt && (
+                            <p>Uploaded: {cert.uploadedAt.toDate ? cert.uploadedAt.toDate().toLocaleDateString() : 'Unknown'}</p>
+                          )}
+                          {hasError && cert.uploadError && (
+                            <p className="text-red-400">Error: {cert.uploadError}</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400 space-y-0.5">
-                        <p>Size: {(cert.fileSize / 1024).toFixed(1)} KB</p>
-                        <p>Type: {cert.fileType || 'Unknown'}</p>
-                        {cert.uploadedAt && (
-                          <p>Uploaded: {cert.uploadedAt.toDate ? cert.uploadedAt.toDate().toLocaleDateString() : 'Unknown'}</p>
+                      <div className="flex items-center gap-2">
+                        {hasError ? (
+                          <span className="px-3 py-1.5 bg-gray-600 text-gray-300 rounded text-xs font-medium cursor-not-allowed flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            Upload Failed
+                          </span>
+                        ) : (
+                          <a
+                            href={cert.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
+                          >
+                            <FileText className="h-3 w-3" />
+                            View
+                          </a>
                         )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={cert.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
-                      >
-                        <FileText className="h-3 w-3" />
-                        View
-                      </a>
                       <button
                         onClick={async () => {
                           if (!window.confirm('Are you sure you want to delete this document?')) return;
 
                           setDeletingCertId(cert.id);
                           try {
-                            // Delete from Firestore
-                            await deleteDoc(doc(db, isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications', cert.id));
+                            const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                            const userCertDocRef = doc(db, collectionName, currentUser.uid);
+                            
+                            // Get current document
+                            const userCertDoc = await getDoc(userCertDocRef);
+                            if (!userCertDoc.exists()) {
+                              throw new Error('User certification document not found');
+                            }
+
+                            const data = userCertDoc.data();
+                            const documents = data.documents || [];
+                            
+                            // Find and remove the document from array
+                            const documentToDelete = documents.find(d => 
+                              d.documentId === cert.documentId || 
+                              d.fileName === cert.fileName ||
+                              d.fileUrl === cert.fileUrl
+                            );
+
+                            if (!documentToDelete) {
+                              throw new Error('Document not found in array');
+                            }
+
+                            // Remove from array
+                            const updatedDocuments = documents.filter(d => 
+                              !(d.documentId === cert.documentId || 
+                                d.fileName === cert.fileName ||
+                                d.fileUrl === cert.fileUrl)
+                            );
+
+                            // Update Firestore
+                            await setDoc(userCertDocRef, {
+                              providerId: currentUser.uid,
+                              documents: updatedDocuments,
+                              updatedAt: serverTimestamp()
+                            }, { merge: true });
 
                             // Delete from Storage
                             try {
                               // Extract storage path from URL
-                              // URL format: https://firebasestorage.googleapis.com/v0/b/bucket/o/path%2Fto%2Ffile
                               const url = new URL(cert.fileUrl);
                               const pathMatch = url.pathname.match(/\/o\/(.+)/);
                               if (pathMatch) {
                                 const storagePath = decodeURIComponent(pathMatch[1]);
                                 const fileRef = sRef(storage, storagePath);
                                 await deleteObject(fileRef);
+                                console.log(`✅ Deleted file from storage: ${storagePath}`);
                               }
                             } catch (storageError) {
                               console.error('Error deleting file from storage:', storageError);
-                              // Continue even if storage delete fails
+                              // Continue even if storage delete fails - document already removed from Firestore
                             }
 
                             setMessage({ type: 'success', text: 'Document deleted successfully!' });

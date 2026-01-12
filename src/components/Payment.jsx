@@ -33,6 +33,21 @@ import { Elements } from '@stripe/react-stripe-js';
 import { stripePromise } from '../payment/StripeProvider';
 import CheckoutForm from '../payment/CheckoutForm';
 
+// Park ticket prices
+const parkTicketPrices = {
+  'Yala National Park': 5000,
+  'Wilpattu National Park': 4500,
+  'Udawalawe National Park': 4000,
+  'Minneriya National Park': 3500,
+  'Kaudulla National Park': 3500,
+  'Bundala National Park': 3000,
+  'Kumana National Park': 3000
+};
+
+const getParkTicketPrice = (parkName) => {
+  return parkTicketPrices[parkName] || 0;
+};
+
 export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   const { bookingId } = useParams();
   const navigate = useNavigate();
@@ -595,9 +610,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
     { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
     { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
     { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
-    { number: 4, title: 'Vehicle & Preferences', shortTitle: 'Vehicle', icon: Car },
-    { number: 5, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
-    { number: 6, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
+    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
+    { number: 5, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
   ];
 
   const updateFormData = (field, value) => {
@@ -731,9 +745,31 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                 <input
                   type="number"
                   min="1"
-                  max="20"
+                  max="6"
                   value={formData.numberOfPassengers}
-                  onChange={(e) => updateFormData('numberOfPassengers', parseInt(e.target.value) || 1)}
+                  onChange={(e) => {
+                    const inputValue = e.target.value;
+                    // Allow empty string while typing
+                    if (inputValue === '') {
+                      updateFormData('numberOfPassengers', '');
+                      return;
+                    }
+                    const numValue = parseInt(inputValue);
+                    // Only allow numbers between 1 and 6
+                    if (!isNaN(numValue) && numValue >= 1 && numValue <= 6) {
+                      updateFormData('numberOfPassengers', numValue);
+                    } else if (numValue > 6) {
+                      updateFormData('numberOfPassengers', 6);
+                    } else if (numValue < 1 && inputValue !== '') {
+                      updateFormData('numberOfPassengers', 1);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Ensure value is between 1-6 on blur
+                    const value = parseInt(e.target.value) || 1;
+                    const clampedValue = Math.min(Math.max(value, 1), 6);
+                    updateFormData('numberOfPassengers', clampedValue);
+                  }}
                   className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
                     }`}
                 />
@@ -772,7 +808,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                 <select
                   value={formData.nationalPark}
                   onChange={(e) => updateFormData('nationalPark', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 appearance-none pr-10 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
                     }`}
                 >
                   <option value="">Select National Park</option>
@@ -785,6 +821,11 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                   <option value="Kumana National Park">Kumana National Park</option>
                 </select>
                 {formErrors.nationalPark && <p className="text-red-500 text-xs mt-1">{formErrors.nationalPark}</p>}
+                {formData.nationalPark && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Park Ticket: LKR {getParkTicketPrice(formData.nationalPark).toLocaleString()} per person
+                  </p>
+                )}
               </div>
 
               <div>
@@ -936,63 +977,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
           </div>
         )}
 
-        {/* Step 4: Vehicle & Driver Preferences */}
+        {/* Step 4: Additional Requests/Add-ons */}
         {currentStep === 4 && (
-          <div className="space-y-3 sm:space-y-4">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <Car className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
-              <span className="break-words">Vehicle & Driver Preferences</span>
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Jeep Type
-                </label>
-                <select
-                  value={formData.jeepType}
-                  onChange={(e) => updateFormData('jeepType', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none"
-                >
-                  <option value="Standard Jeep">Standard Jeep</option>
-                  <option value="Luxury Jeep">Luxury Jeep</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Driver Language Preference
-                </label>
-                <select
-                  value={formData.driverLanguage}
-                  onChange={(e) => updateFormData('driverLanguage', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="English">English</option>
-                  <option value="Sinhala">Sinhala</option>
-                  <option value="Tamil">Tamil</option>
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.needsNaturalist}
-                    onChange={(e) => updateFormData('needsNaturalist', e.target.checked)}
-                    className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    Request for a naturalist/guide with the jeep (optional)
-                  </span>
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 5: Additional Requests/Add-ons */}
-        {currentStep === 5 && (
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <Package className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
@@ -1000,111 +986,57 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
-              <label className="flex items-center gap-2 cursor-pointer p-2.5 sm:p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  checked={formData.needsBinoculars}
-                  onChange={(e) => updateFormData('needsBinoculars', e.target.checked)}
-                  className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 rounded focus:ring-green-500 flex-shrink-0"
-                />
-                <span className="text-xs sm:text-sm font-medium text-gray-700">Binoculars</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  checked={formData.needsCamera}
-                  onChange={(e) => updateFormData('needsCamera', e.target.checked)}
-                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Camera Hire</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  checked={formData.needsChildSeat}
-                  onChange={(e) => updateFormData('needsChildSeat', e.target.checked)}
-                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Child Seat</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  checked={formData.needsWater}
-                  onChange={(e) => updateFormData('needsWater', e.target.checked)}
-                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Water Bottles</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  checked={formData.needsSnacks}
-                  onChange={(e) => updateFormData('needsSnacks', e.target.checked)}
-                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Snacks / Meals</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  checked={formData.needsPhotographyPackage}
-                  onChange={(e) => updateFormData('needsPhotographyPackage', e.target.checked)}
-                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Photography Package</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50 md:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={formData.parkEntranceIncluded}
-                  onChange={(e) => updateFormData('parkEntranceIncluded', e.target.checked)}
-                  className="w-5 h-5 text-green-500 rounded focus:ring-green-500"
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  Park entrance tickets included in booking
-                </span>
-              </label>
-            </div>
-
-            <div className="mt-4 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Passport Number (Optional)
+              {[
+                { key: 'needsBinoculars', label: 'Binoculars', price: 500 },
+                { key: 'needsChildSeat', label: 'Child Seat', price: 1000 },
+                { key: 'needsWater', label: 'Water Bottles', price: 300 },
+                { key: 'needsSnacks', label: 'Snacks / Meals', price: 0 }
+              ].map(({ key, label, price }) => (
+                <label key={key} className="flex items-center justify-between cursor-pointer p-2.5 sm:p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData[key]}
+                      onChange={(e) => updateFormData(key, e.target.checked)}
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 rounded focus:ring-green-500 flex-shrink-0"
+                    />
+                    <span className="text-xs sm:text-sm font-medium text-gray-700">{label}</span>
+                  </div>
+                  {price > 0 && (
+                    <span className="text-xs sm:text-sm font-semibold text-green-600">+LKR {price.toLocaleString()}</span>
+                  )}
                 </label>
-                <input
-                  type="text"
-                  value={formData.passportNumber}
-                  onChange={(e) => updateFormData('passportNumber', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="For national park registration"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Park Ticket Proof (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.parkTicketProof}
-                  onChange={(e) => updateFormData('parkTicketProof', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="Reference number if purchased separately"
-                />
-              </div>
+              ))}
             </div>
+            {formData.needsSnacks && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Available Snacks & Meals:</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {['Biscuits', 'Chips', 'Fruits', 'Sandwiches', 'Rice & Curry', 'Fried Rice', 'Noodles', 'Soft Drinks'].map((item) => (
+                    <label key={item} className="flex items-center gap-2 cursor-pointer p-2 bg-white rounded border border-gray-200">
+                      <input
+                        type="checkbox"
+                        checked={formData.selectedSnacks?.includes(item) || false}
+                        onChange={(e) => {
+                          const currentSnacks = formData.selectedSnacks || [];
+                          const newSnacks = e.target.checked
+                            ? [...currentSnacks, item]
+                            : currentSnacks.filter(s => s !== item);
+                          updateFormData('selectedSnacks', newSnacks);
+                        }}
+                        className="w-4 h-4 text-green-500 rounded focus:ring-green-500"
+                      />
+                      <span className="text-xs text-gray-700">{item}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Step 6: Emergency Contact */}
-        {currentStep === 6 && (
+        {/* Step 5: Emergency Contact */}
+        {currentStep === 5 && (
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />

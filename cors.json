@@ -1,24 +1,8 @@
 [
   {
-    "origin": [
-      "http://localhost:3000",
-      "http://localhost:5173",
-      "http://localhost:5000",
-      "https://safarihub-a80bd.web.app",
-      "https://safarihub-a80bd.firebaseapp.com"
-    ],
-    "method": [
-      "GET",
-      "HEAD",
-      "PUT",
-      "POST",
-      "DELETE"
-    ],
+    "origin": ["*"],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
     "maxAgeSeconds": 3600,
-    "responseHeader": [
-      "Content-Type",
-      "Authorization",
-      "x-goog-resumable"
-    ]
+    "responseHeader": ["Content-Type", "Authorization", "Content-Length", "User-Agent", "x-goog-resumable"]
   }
 ]

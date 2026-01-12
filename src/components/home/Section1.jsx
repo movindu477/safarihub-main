@@ -1,22 +1,22 @@
 import React from "react";
 
 // Import image from src/assets
-import back4ori from "../../assets/back4ori2.avif";
+import back4ori from "../../assets/back6.jpg";
 
 export default function Section1({ children }) {
   return (
     <section className="relative w-full h-screen overflow-hidden">
       {/* Background Image */}
       <div className="absolute top-0 left-0 w-full h-full">
-          <div
+        <div
           className="absolute top-0 left-0 w-full h-full"
-            style={{
+          style={{
             backgroundImage: `url(${back4ori})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-            }}
-          ></div>
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        ></div>
       </div>
 
       {/* Content Section */}
@@ -28,11 +28,13 @@ export default function Section1({ children }) {
           text-white
           text-left md:items-start
           items-center text-center md:text-left
-          bg-black/40
         "
       >
+        {/* Left side black opacity overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent pointer-events-none"></div>
+
         {/* Title */}
-        <div>
+        <div className="relative z-10">
           <div className="text-2xl md:text-3xl font-thin -mb-2 leading-tight drop-shadow-lg">
             Welcome To
           </div>

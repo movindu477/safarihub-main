@@ -22,7 +22,7 @@ import {
   Lightbulb,
   AlertCircle,
   Calendar,
-  TruckIcon,
+  Car,
   UserCircle
 } from 'lucide-react';
 import Navbar from '../home/Navbar';
@@ -413,15 +413,21 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                 
                 {/* Navigation Buttons */}
                 <button
-                  onClick={handlePreviousAnimal}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-gray-900 p-2.5 rounded-full border border-gray-200 shadow-sm transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePreviousAnimal();
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-gray-900 p-2.5 rounded-full border border-gray-200 shadow-sm transition-all z-20 cursor-pointer"
                   aria-label="Previous animal"
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <button
-                  onClick={handleNextAnimal}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-gray-900 p-2.5 rounded-full border border-gray-200 shadow-sm transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNextAnimal();
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-gray-900 p-2.5 rounded-full border border-gray-200 shadow-sm transition-all z-20 cursor-pointer"
                   aria-label="Next animal"
                 >
                   <ChevronRight size={20} />
@@ -454,6 +460,30 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                       {destination.animals[selectedAnimal].abundance}
                     </p>
                   )}
+
+                  {/* Animal Button */}
+                  <div className="mt-4">
+                    {destination.id === 'yala-national-park' && destination.animals[selectedAnimal].name === 'Sri Lankan Leopard' ? (
+                      <a
+                        href="https://yalaleoparddiary.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 bg-white text-gray-900 rounded-lg font-medium text-sm"
+                      >
+                        Learn More
+                      </a>
+                    ) : (
+                      <button
+                        className="inline-flex items-center px-4 py-2 bg-white text-gray-900 rounded-lg font-medium text-sm"
+                        onClick={() => {
+                          // You can add functionality here for other animals
+                          console.log(`Learn more about ${destination.animals[selectedAnimal].name}`);
+                        }}
+                      >
+                        Learn More
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Indicator Dots */}
@@ -575,32 +605,33 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
         </div>
       </section>
 
-      {/* Available Service Providers Section */}
+      {/* Jeep Drivers and Guides Section */}
       <section className="py-20 md:py-24 bg-gradient-to-b from-gray-50 to-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 tracking-tight">
-              Available Service Providers
-              </h2>
-              <p className="text-base text-gray-600 max-w-xl mx-auto">
-              Professional jeep drivers and tour guides ready to assist your visit
-              </p>
-            </div>
+            {loadingProviders ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading service providers...</p>
+              </div>
+            ) : (
+              <>
+                {/* Main Title */}
+                {(jeepDrivers.length > 0 || tourGuides.length > 0) && (
+                  <div className="text-center mb-12">
+                    <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 tracking-tight flex items-center justify-center gap-3">
+                      <span className="text-4xl">🚙</span>
+                      <span>Jeep Drivers and Guides</span>
+                    </h2>
+                    <p className="text-base text-gray-600 max-w-xl mx-auto">
+                      Professional jeep drivers and tour guides ready to assist your visit
+                    </p>
+                  </div>
+                )}
 
-          {loadingProviders ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading service providers...</p>
-            </div>
-          ) : (
-            <div className="space-y-12">
-              {/* Jeep Drivers */}
-              {jeepDrivers.length > 0 && (
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                    <TruckIcon className="h-6 w-6 mr-2 text-green-600" />
-                    Jeep Drivers
-                  </h3>
+                {/* Jeep Drivers */}
+                {jeepDrivers.length > 0 && (
+                  <div className="mb-12">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-6">Jeep Drivers</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {jeepDrivers.map((driver) => (
                       <div
@@ -671,16 +702,16 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                       <ArrowLeft className="ml-2 rotate-180" size={18} />
                     </button>
                   </div>
-                </div>
-              )}
+                  </div>
+                )}
 
-              {/* Tour Guides */}
-              {tourGuides.length > 0 && (
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                    <UserCircle className="h-6 w-6 mr-2 text-green-600" />
-                    Tour Guides
-                  </h3>
+                {/* Tour Guides */}
+                {tourGuides.length > 0 && (
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                      <UserCircle className="h-6 w-6 mr-2 text-green-600" />
+                      <span>Tour Guides</span>
+                    </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {tourGuides.map((guide) => (
                       <div
@@ -733,29 +764,35 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                 </div>
               ))}
             </div>
-                  <div className="text-center mt-8">
-                    <button
-                      onClick={() => {
-                        navigate('/guide');
-                        // Scroll to guides section after navigation
-                        setTimeout(() => {
-                          const section = document.getElementById('guides-section');
-                          if (section) {
-                            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          }
-                        }, 100);
-                      }}
-                      className="inline-flex items-center text-green-600 hover:text-green-700 font-medium transition-colors"
-                    >
-                      View All Tour Guides
-                      <ArrowLeft className="ml-2 rotate-180" size={18} />
-                    </button>
+                    <div className="text-center mt-8">
+                      <button
+                        onClick={() => {
+                          navigate('/guide');
+                          // Scroll to guides section after navigation
+                          setTimeout(() => {
+                            const section = document.getElementById('guides-section');
+                            if (section) {
+                              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                          }, 100);
+                        }}
+                        className="inline-flex items-center text-green-600 hover:text-green-700 font-medium transition-colors"
+                      >
+                        View All Tour Guides
+                        <ArrowLeft className="ml-2 rotate-180" size={18} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </>
+            )}
+          </div>
+      </section>
 
-              {/* No providers found message */}
-              {jeepDrivers.length === 0 && tourGuides.length === 0 && (
+      {/* No providers found message */}
+      {!loadingProviders && jeepDrivers.length === 0 && tourGuides.length === 0 && (
+        <section className="py-20 md:py-24 bg-gradient-to-b from-gray-50 to-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center py-12">
                   <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -779,11 +816,9 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
           </div>
         </section>
+      )}
 
       {/* Weather Section */}
       <section className="py-20 md:py-24 bg-white">

@@ -279,34 +279,40 @@ service cloud.firestore {
 
     // =========================
     // Jeep Driver Certifications
+    // Structure: jeepDriverCertifications/{userId} with documents array
     // =========================
-    match /jeepDriverCertifications/{certificationId} {
+    match /jeepDriverCertifications/{userId} {
       // Anyone can read certifications (for public profiles)
       allow read: if true;
 
-      // Only the provider can create/update their own certifications
+      // Only the provider can create/update their own certifications document
       allow create, update: if request.auth != null
-        && request.resource.data.providerId == request.auth.uid;
+        && request.auth.uid == userId
+        && request.resource.data.providerId == userId
+        && request.resource.data.documents is list;
 
-      // Only the provider can delete their own certifications
+      // Only the provider can delete their own certifications document
       allow delete: if request.auth != null
-        && resource.data.providerId == request.auth.uid;
+        && request.auth.uid == userId;
     }
 
     // =========================
     // Guide Certifications
+    // Structure: guideCertifications/{userId} with documents array
     // =========================
-    match /guideCertifications/{certificationId} {
+    match /guideCertifications/{userId} {
       // Anyone can read certifications (for public profiles)
       allow read: if true;
 
-      // Only the provider can create/update their own certifications
+      // Only the provider can create/update their own certifications document
       allow create, update: if request.auth != null
-        && request.resource.data.providerId == request.auth.uid;
+        && request.auth.uid == userId
+        && request.resource.data.providerId == userId
+        && request.resource.data.documents is list;
 
-      // Only the provider can delete their own certifications
+      // Only the provider can delete their own certifications document
       allow delete: if request.auth != null
-        && resource.data.providerId == request.auth.uid;
+        && request.auth.uid == userId;
     }
   }
 }

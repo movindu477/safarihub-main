@@ -4,7 +4,7 @@ import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Star, MapPin, Clock, Users, Shield, Award, Globe, Calendar } from 'lucide-react';
 
-const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
+const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDestination }) => {
   const [guides, setGuides] = useState([]);
   const [filteredGuides, setFilteredGuides] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +18,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
     priceRange: '',
     qualification: '',
     languages: [],
-    currency: '',
+    sortBy: '',
   });
 
   // Filter options
@@ -74,11 +74,13 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
       'French', 'German', 'Chinese', 'Japanese',
       'Spanish', 'Korean', 'Russian', 'Arabic'
     ],
-    currencies: [
-      'LKR - Sri Lankan Rupee',
-      'USD - US Dollar',
-      'EUR - Euro',
-      'GBP - British Pound'
+    sortBy: [
+      { value: 'rating-desc', label: 'Highest Rating' },
+      { value: 'rating-asc', label: 'Lowest Rating' },
+      { value: 'price-asc', label: 'Price: Low to High' },
+      { value: 'price-desc', label: 'Price: High to Low' },
+      { value: 'experience-desc', label: 'Most Experience' },
+      { value: 'name-asc', label: 'Name: A to Z' }
     ]
   };
 
@@ -237,13 +239,27 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
       );
     }
 
-    // Currency filter
-    if (filters.currency) {
-      filtered = filtered.filter(guide =>
-        guide.currencyPreference?.toLowerCase().includes(filters.currency.toLowerCase())
-      );
+    // Sort results
+    if (filters.sortBy) {
+      filtered.sort((a, b) => {
+        switch (filters.sortBy) {
+          case 'rating-desc':
+            return (b.rating || 0) - (a.rating || 0);
+          case 'rating-asc':
+            return (a.rating || 0) - (b.rating || 0);
+          case 'price-asc':
+            return (a.hourlyRate || 0) - (b.hourlyRate || 0);
+          case 'price-desc':
+            return (b.hourlyRate || 0) - (a.hourlyRate || 0);
+          case 'experience-desc':
+            return (b.experience || 0) - (a.experience || 0);
+          case 'name-asc':
+            return (a.guideName || '').localeCompare(b.guideName || '');
+          default:
+            return 0;
+        }
+      });
     }
-
 
     console.log('✅ Filtered results:', filtered.length);
     setFilteredGuides(filtered);
@@ -314,10 +330,15 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
       priceRange: '',
       qualification: '',
       languages: [],
-      currency: ''
+      sortBy: ''
     });
 
-    setFilteredGuides(guides);
+    // Clear destination filter if callback is provided
+    if (onClearDestination) {
+      onClearDestination();
+    }
+
+    // The useEffect will automatically update filteredGuides when filters change
     console.log('🧹 All filters cleared, showing all guides:', guides.length);
   };
 
@@ -397,15 +418,14 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           </div>
         )}
-        <img
-          src={guide.imageUrl}
-          alt={guide.guideName}
-          className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-          onError={handleImageError}
-          onLoad={handleImageLoad}
-          loading="lazy"
-        />
+          <img
+            src={guide.imageUrl}
+            alt={guide.guideName}
+            className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            onError={handleImageError}
+            onLoad={handleImageLoad}
+            loading="lazy"
+          />
       </div>
     );
   };
@@ -432,13 +452,13 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
           <div className="space-y-3">
             <button
               onClick={() => window.location.reload()}
-              className="w-full bg-blue-500 text-white py-3 px-6 rounded-lg hover:bg-blue-600 transition-colors font-semibold"
+              className="w-full bg-blue-500 text-white py-3 px-6 rounded-lg font-semibold"
             >
               Try Again
             </button>
             <button
               onClick={clearFilters}
-              className="w-full border border-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-50 transition-colors"
+              className="w-full border border-gray-300 text-gray-700 py-3 px-6 rounded-lg"
             >
               Clear Filters
             </button>
@@ -460,50 +480,45 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
         </div>
 
         {/* Filter Section */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Filter Tour Guides</h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Refine your search to find the perfect guide
-              </p>
-            </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-3">
+            <h2 className="text-lg font-semibold text-gray-800">Filters</h2>
             <button
               onClick={clearFilters}
-              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+              className="px-4 py-1.5 bg-white text-gray-700 rounded text-sm font-medium border border-gray-300"
             >
-              Clear All Filters
+              Clear All
             </button>
           </div>
 
-          {/* Single Row Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Expertise Area Filter */}
+          {/* Filter Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Area of Expertise */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">
                 Area of Expertise
               </label>
               <select
                 value={filters.expertise}
                 onChange={(e) => handleFilterChange('expertise', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
               >
-                <option value="">All Expertise Areas</option>
+                <option value="">All Areas</option>
                 {filterOptions.expertiseAreas.map(area => (
                   <option key={area} value={area}>{area}</option>
                 ))}
               </select>
             </div>
 
-            {/* Ratings Filter */}
+            {/* Rating */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">
                 Rating
               </label>
               <select
                 value={filters.rating}
                 onChange={(e) => handleFilterChange('rating', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
               >
                 <option value="">All Ratings</option>
                 {filterOptions.ratings.map(rating => (
@@ -514,17 +529,17 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
               </select>
             </div>
 
-            {/* Hourly Price Range Filter */}
+            {/* Price */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Hourly Rate
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                Price (Hourly)
               </label>
               <select
                 value={filters.priceRange}
                 onChange={(e) => handleFilterChange('priceRange', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
               >
-                <option value="">All Hourly Rates</option>
+                <option value="">All Prices</option>
                 {filterOptions.priceRanges.map(range => (
                   <option key={range.value} value={range.value}>
                     {range.label}
@@ -533,43 +548,39 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
               </select>
             </div>
 
-            {/* Qualification Filter */}
+            {/* Certifications */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Qualification
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                Certifications
               </label>
               <select
                 value={filters.qualification}
                 onChange={(e) => handleFilterChange('qualification', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
               >
-                <option value="">All Qualifications</option>
+                <option value="">All Certifications</option>
                 {filterOptions.qualifications.map(qual => (
                   <option key={qual} value={qual}>{qual}</option>
                 ))}
               </select>
             </div>
 
-          </div>
-
-          {/* Multi-select Filters */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            {/* Languages Filter */}
+            {/* Languages */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">
                 Languages
               </label>
-              <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-white">
+              <div className="max-h-32 overflow-y-auto border border-gray-300 rounded bg-white p-2">
                 {filterOptions.languages.map(language => (
-                  <div key={language} className="flex items-center mb-2">
+                  <div key={language} className="flex items-center mb-1.5">
                     <input
                       type="checkbox"
                       id={`lang-${language}`}
                       checked={filters.languages.includes(language)}
                       onChange={() => handleMultiSelectChange('languages', language)}
-                      className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="mr-2 h-3.5 w-3.5 text-blue-600 border-gray-300 rounded"
                     />
-                    <label htmlFor={`lang-${language}`} className="text-sm text-gray-700 flex-1">
+                    <label htmlFor={`lang-${language}`} className="text-xs text-gray-700">
                       {language}
                     </label>
                   </div>
@@ -577,20 +588,20 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
               </div>
             </div>
 
-            {/* Currency Preference Filter */}
+            {/* Sort By */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Currency Preference
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                Sort By
               </label>
               <select
-                value={filters.currency}
-                onChange={(e) => handleFilterChange('currency', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                value={filters.sortBy}
+                onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
               >
-                <option value="">All Currencies</option>
-                {filterOptions.currencies.map(currency => (
-                  <option key={currency} value={currency.split(' - ')[0]}>
-                    {currency}
+                <option value="">Default</option>
+                {filterOptions.sortBy.map(sort => (
+                  <option key={sort.value} value={sort.value}>
+                    {sort.label}
                   </option>
                 ))}
               </select>
@@ -623,7 +634,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
               <div
                 key={guide.id}
                 id={`guide-card-${guide.id}`}
-                className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
+                className="bg-white rounded-xl shadow border border-gray-200 cursor-pointer"
                 onClick={() => handleProfileClick(guide)}
               >
                 {/* Profile Image Section */}
@@ -665,7 +676,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
                       {/* Quick Chat Button - Show for all users except current user */}
                       {!guide.isCurrentUser && (
                         <button
-                          className="ml-2 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
+                          className="ml-2 p-2 bg-emerald-500 text-white rounded-full shadow"
                           onClick={(e) => handleChatClick(guide, e)}
                           title="Start Chat"
                         >
@@ -758,18 +769,18 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
               }
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={clearFilters}
-                className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold"
-              >
-                Clear All Filters
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
-              >
-                Refresh Page
-              </button>
+            <button
+              onClick={clearFilters}
+              className="px-8 py-3 bg-blue-500 text-white rounded-lg font-semibold"
+            >
+              Clear All Filters
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold"
+            >
+              Refresh Page
+            </button>
             </div>
           </div>
         )}
@@ -777,7 +788,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination }) => {
         {/* Load More Button (if many results) */}
         {filteredGuides.length > 12 && (
           <div className="text-center mt-8">
-            <button className="px-8 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors font-semibold cursor-pointer">
+            <button className="px-8 py-3 bg-gray-800 text-white rounded-lg font-semibold cursor-pointer">
               Load More Guides ({filteredGuides.length - 12} remaining)
             </button>
           </div>

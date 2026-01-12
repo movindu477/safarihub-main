@@ -907,9 +907,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     <span className="ml-3 text-sm font-semibold text-gray-700">
                       {guide.rating?.toFixed(1) || '0.0'}/5
                     </span>
-                    <span className="ml-2 text-xs text-gray-500">
-                      • {guide.totalReviews || 0} reviews
-                    </span>
+                    {guide.totalReviews > 0 && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        • {guide.totalReviews} reviews
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1028,7 +1030,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       : 'border-transparent text-gray-500'
                       }`}
                   >
-                    Reviews ({guide.totalReviews || 0})
+                    Reviews{guide.totalReviews > 0 && ` (${guide.totalReviews})`}
                     {activeTab === 'reviews' && (
                       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
                     )}
@@ -1192,99 +1194,72 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                 {activeTab === 'services' && (
                   <div className="space-y-6">
                     {/* Pricing */}
-                    <div className="p-8 rounded-2xl bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-white border-2 border-emerald-200 shadow-xl">
-                      <h3 className="font-bold text-gray-900 mb-6 flex items-center text-xl">
-                        <div className="p-2 bg-emerald-600 rounded-xl mr-3 shadow-lg">
-                          <DollarSign className="text-white" size={24} />
+                    {(guide.dailyRate > 0 || guide.hourlyRate > 0) && (
+                      <div className="p-8 rounded-2xl bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-white border-2 border-emerald-200 shadow-xl">
+                        <h3 className="font-bold text-gray-900 mb-6 flex items-center text-xl">
+                          <div className="p-2 bg-emerald-600 rounded-xl mr-3 shadow-lg">
+                            <DollarSign className="text-white" size={24} />
+                          </div>
+                          Rates
+                        </h3>
+                        <div className="space-y-4">
+                          {/* Full Day Price */}
+                          {(guide.dailyRate > 0 || (guide.hourlyRate > 0)) && (
+                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
+                              <div>
+                                <span className="text-gray-800 font-bold text-lg">Full Day Tour:</span>
+                                <p className="text-sm text-gray-600 mt-1">Full day guided tours</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-3xl font-black text-emerald-600">
+                                  {getCurrencySymbol(guide.currencyPreference)}
+                                  {(guide.dailyRate || (guide.hourlyRate * 8) || 0).toLocaleString()}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-500 block">/day</span>
+                              </div>
+                            </div>
+                          )}
+                          {/* Half Day Price */}
+                          {(guide.dailyRate > 0 || (guide.hourlyRate > 0)) && (
+                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
+                              <div>
+                                <span className="text-gray-800 font-bold text-lg">Half Day Tour:</span>
+                                <p className="text-sm text-gray-600 mt-1">Half day guided tours</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-3xl font-black text-emerald-600">
+                                  {getCurrencySymbol(guide.currencyPreference)}
+                                  {Math.round((guide.dailyRate || (guide.hourlyRate * 8) || 0) * 0.6).toLocaleString()}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-500 block">/half day</span>
+                              </div>
+                            </div>
+                          )}
+                          {guide.hourlyRate > 0 && (
+                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
+                              <div>
+                                <span className="text-gray-800 font-bold text-lg">Price per hour:</span>
+                                <p className="text-sm text-gray-600 mt-1">Hourly rate</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-2xl font-black text-emerald-600">
+                                  {getCurrencySymbol(guide.currencyPreference)}{guide.hourlyRate.toLocaleString()}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-500 block">/hour</span>
+                              </div>
+                            </div>
+                          )}
+                          {guide.specialPackageRates && (
+                            <div className="p-3 bg-white rounded-lg border border-emerald-100">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-gray-700 font-medium">Special Packages:</span>
+                              </div>
+                              <p className="text-gray-600 text-sm">{guide.specialPackageRates}</p>
+                            </div>
+                          )}
                         </div>
-                        Rates & Pricing
-                      </h3>
-                      <div className="space-y-4">
-                        {guide.hourlyRate > 0 && (
-                          <div className="flex items-center justify-between p-6 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
-                            <div>
-                              <span className="text-gray-800 font-bold text-lg">Hourly Rate:</span>
-                              <p className="text-sm text-gray-600 mt-1">Perfect for short tours and consultations</p>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-3xl font-black text-emerald-600">
-                                {getCurrencySymbol(guide.currencyPreference)}{guide.hourlyRate.toLocaleString()}
-                              </span>
-                              <span className="text-sm font-semibold text-gray-500 block">/hour</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {guide.dailyRate > 0 && (
-                          <div className="flex items-center justify-between p-6 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
-                            <div>
-                              <span className="text-gray-800 font-bold text-lg">Daily Rate:</span>
-                              <p className="text-sm text-gray-600 mt-1">Full day guided tours (8+ hours)</p>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-3xl font-black text-emerald-600">
-                                {getCurrencySymbol(guide.currencyPreference)}{guide.dailyRate.toLocaleString()}
-                              </span>
-                              <span className="text-sm font-semibold text-gray-500 block">/day</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {guide.specialPackageRates && (
-                          <div className="p-3 bg-white rounded-lg border border-emerald-100">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-gray-700 font-medium">Special Packages:</span>
-                            </div>
-                            <p className="text-gray-600 text-sm">{guide.specialPackageRates}</p>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between text-sm text-gray-600">
-                          <span>Currency Preference:</span>
-                          <span className="font-medium">{guide.currencyPreference || 'LKR - Sri Lankan Rupee'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Service Description */}
-                    {guide.description && (
-                      <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-                        <h3 className="font-semibold text-gray-900 mb-2">Service Details</h3>
-                        <p className="text-gray-600 leading-relaxed">{guide.description}</p>
                       </div>
                     )}
-
-                    {/* Availability */}
-                    <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                        <CalendarIcon className="text-emerald-600 mr-2" size={20} />
-                        Availability
-                      </h3>
-                      {guide.availableDates && guide.availableDates.length > 0 ? (
-                        <div className="space-y-3">
-                          <p className="text-gray-600">
-                            Available on {guide.availableDates.length} dates
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {guide.availableDates.slice(0, 6).map((date, index) => (
-                              <span
-                                key={index}
-                                className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded text-sm border border-emerald-200 font-medium"
-                              >
-                                {new Date(date).toLocaleDateString()}
-                              </span>
-                            ))}
-                            {guide.availableDates.length > 6 && (
-                              <span className="text-gray-500 text-sm font-medium">
-                                +{guide.availableDates.length - 6} more dates
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-gray-600">Contact for availability</p>
-                      )}
-                    </div>
                   </div>
                 )}
 

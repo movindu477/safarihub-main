@@ -1,23 +1,17 @@
 import React from "react";
-import destinationVideo from "../../assets/desti.mp4"; // Import from assets
+import destiImage from "../../assets/desti.jpg"; // Import from assets
 
 export default function DestinationHero() {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background Video */}
+      {/* Background Image */}
       <div className="absolute inset-0 w-full h-full">
-        <video
-          autoPlay
-          muted
-          loop
+        <img
+          src={destiImage}
+          alt="Destination background"
           className="w-full h-full object-cover"
-        >
-          <source src={destinationVideo} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-        <div className="absolute inset-0 bg-black/50"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/50"></div>
+        />
       </div>
 
       {/* Content */}

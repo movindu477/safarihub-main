@@ -258,9 +258,8 @@ const BookingFormModal = ({
     { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
     { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
     { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
-    { number: 4, title: 'Vehicle & Preferences', shortTitle: 'Vehicle', icon: Car },
-    { number: 5, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
-    { number: 6, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
+    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
+    { number: 5, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
   ];
 
   const updateFormData = (field, value) => {
@@ -291,8 +290,8 @@ const BookingFormModal = ({
       if (!formData.email.trim()) errors.email = 'Email is required';
       if (!formData.phone.trim()) errors.phone = 'Phone number is required';
       if (!formData.country.trim()) errors.country = 'Country is required';
-      if (!formData.numberOfPassengers || formData.numberOfPassengers < 1) {
-        errors.numberOfPassengers = 'Number of passengers must be at least 1';
+      if (!formData.numberOfPassengers || formData.numberOfPassengers < 1 || formData.numberOfPassengers > 6) {
+        errors.numberOfPassengers = 'Number of passengers must be between 1 and 6';
       }
     } else if (currentStep === 2) {
       if (!formData.nationalPark.trim()) errors.nationalPark = 'National park is required';
@@ -305,7 +304,7 @@ const BookingFormModal = ({
         if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
         if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
       }
-    } else if (currentStep === 6) {
+    } else if (currentStep === 5) {
       if (!formData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
       if (!formData.emergencyContactPhone.trim()) {
         errors.emergencyContactPhone = 'Emergency contact phone is required';
@@ -468,9 +467,31 @@ const BookingFormModal = ({
                     name="numberOfPassengers"
                     id="numberOfPassengers"
                     min="1"
-                    max="20"
+                    max="6"
                     value={formData.numberOfPassengers}
-                    onChange={(e) => updateFormData('numberOfPassengers', parseInt(e.target.value) || 1)}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      // Allow empty string while typing
+                      if (inputValue === '') {
+                        updateFormData('numberOfPassengers', '');
+                        return;
+                      }
+                      const numValue = parseInt(inputValue);
+                      // Only allow numbers between 1 and 6
+                      if (!isNaN(numValue) && numValue >= 1 && numValue <= 6) {
+                        updateFormData('numberOfPassengers', numValue);
+                      } else if (numValue > 6) {
+                        updateFormData('numberOfPassengers', 6);
+                      } else if (numValue < 1 && inputValue !== '') {
+                        updateFormData('numberOfPassengers', 1);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Ensure value is between 1-6 on blur
+                      const value = parseInt(e.target.value) || 1;
+                      const clampedValue = Math.min(Math.max(value, 1), 6);
+                      updateFormData('numberOfPassengers', clampedValue);
+                    }}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
                       }`}
                   />
@@ -509,13 +530,18 @@ const BookingFormModal = ({
                     id="nationalPark"
                     value={formData.nationalPark}
                     onChange={(e) => updateFormData('nationalPark', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 appearance-none pr-10 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
                       }`}
                     disabled={!!(driver?.destinations && driver.destinations.length > 0)}
                   >
                     <option value={formData.nationalPark}>{formData.nationalPark || 'Select National Park'}</option>
                   </select>
                   {formErrors.nationalPark && <p className="text-red-500 text-xs mt-1">{formErrors.nationalPark}</p>}
+                  {formData.nationalPark && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Park Ticket: LKR {getParkTicketPrice(formData.nationalPark).toLocaleString()} per person
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -537,46 +563,64 @@ const BookingFormModal = ({
                 </div>
               </div>
 
-              {/* Selected Dates with Half Day/Full Day */}
+              {/* Selected Dates with Half Day/Full Day and Safari Type */}
               {selectedDates.length > 0 && (
                 <div className="mt-4 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
                   <h3 className="font-semibold text-gray-900 mb-3">Selected Dates & Type:</h3>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {selectedDates.map((date, index) => {
                       const dateString = date.toDateString();
                       const dateType = selectedDatesWithType[dateString] || 'full-day';
+                      const dateSafariType = formData.dateSafariTypes?.[dateString] || formData.safariType || 'Morning Safari';
                       return (
-                        <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-emerald-200">
-                          <span className="text-sm font-medium text-gray-700">
-                            {date.toLocaleDateString()}
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
+                        <div key={index} className="bg-white p-3 rounded-lg border border-emerald-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">
+                              {date.toLocaleDateString()}
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
+                                }}
+                                className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
+                                  ? 'bg-emerald-600 text-white shadow-md'
+                                  : 'bg-gray-100 text-gray-600'
+                                  }`}
+                              >
+                                Half Day
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
+                                }}
+                                className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
+                                  ? 'bg-emerald-600 text-white shadow-md'
+                                  : 'bg-gray-100 text-gray-600'
+                                  }`}
+                              >
+                                Full Day
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Safari Type:</label>
+                            <select
+                              value={dateSafariType}
+                              onChange={(e) => {
+                                const newSafariTypes = { ...(formData.dateSafariTypes || {}), [dateString]: e.target.value };
+                                updateFormData('dateSafariTypes', newSafariTypes);
                               }}
-                              className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
-                                ? 'bg-emerald-600 text-white shadow-md'
-                                : 'bg-gray-100 text-gray-600'
-                                }`}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
-                              Half Day
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
-                              }}
-                              className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
-                                ? 'bg-emerald-600 text-white shadow-md'
-                                : 'bg-gray-100 text-gray-600'
-                                }`}
-                            >
-                              Full Day
-                            </button>
+                              <option value="Morning Safari">Morning Safari</option>
+                              <option value="Evening Safari">Evening Safari</option>
+                              <option value="Full-day Safari">Full-day Safari</option>
+                            </select>
                           </div>
                         </div>
                       );
@@ -676,54 +720,8 @@ const BookingFormModal = ({
             </div>
           )}
 
-          {/* Step 4: Vehicle & Driver Preferences - Abbreviated */}
+          {/* Step 4: Additional Requests - Abbreviated */}
           {currentStep === 4 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Car className="h-5 w-5 text-emerald-500" />
-                Vehicle & Driver Preferences
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Jeep Type</label>
-                  <select
-                    value={formData.jeepType}
-                    onChange={(e) => updateFormData('jeepType', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    disabled
-                  >
-                    <option value={formData.jeepType}>{formData.jeepType}</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Driver Language</label>
-                  <select
-                    value={formData.driverLanguage}
-                    onChange={(e) => updateFormData('driverLanguage', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value="English">English</option>
-                    <option value="Sinhala">Sinhala</option>
-                    <option value="Tamil">Tamil</option>
-                  </select>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.needsNaturalist}
-                      onChange={(e) => updateFormData('needsNaturalist', e.target.checked)}
-                      className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Request for a naturalist/guide with the jeep (optional)</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 5: Additional Requests - Abbreviated */}
-          {currentStep === 5 && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Package className="h-5 w-5 text-emerald-500" />
@@ -731,50 +729,56 @@ const BookingFormModal = ({
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
-                  { key: 'needsBinoculars', label: 'Binoculars' },
-                  { key: 'needsCamera', label: 'Camera Hire' },
-                  { key: 'needsChildSeat', label: 'Child Seat' },
-                  { key: 'needsWater', label: 'Water Bottles' },
-                  { key: 'needsSnacks', label: 'Snacks / Meals' },
-                  { key: 'needsPhotographyPackage', label: 'Photography Package' },
-                  { key: 'parkEntranceIncluded', label: 'Park Entrance Tickets' }
-                ].map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer p-3 border border-gray-300 rounded-lg">
-                    <input
-                      type="checkbox"
-                      checked={formData[key]}
-                      onChange={(e) => updateFormData(key, e.target.checked)}
-                      className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">{label}</span>
+                  { key: 'needsBinoculars', label: 'Binoculars', price: 500 },
+                  { key: 'needsChildSeat', label: 'Child Seat', price: 1000 },
+                  { key: 'needsWater', label: 'Water Bottles', price: 300 },
+                  { key: 'needsSnacks', label: 'Snacks / Meals', price: 0 }
+                ].map(({ key, label, price }) => (
+                  <label key={key} className="flex items-center justify-between cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={formData[key]}
+                        onChange={(e) => updateFormData(key, e.target.checked)}
+                        className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">{label}</span>
+                    </div>
+                    {price > 0 && (
+                      <span className="text-sm font-semibold text-emerald-600">+LKR {price.toLocaleString()}</span>
+                    )}
                   </label>
                 ))}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Passport Number (Optional)</label>
-                  <input
-                    type="text"
-                    value={formData.passportNumber}
-                    onChange={(e) => updateFormData('passportNumber', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
+              {formData.needsSnacks && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Available Snacks & Meals:</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Biscuits', 'Chips', 'Fruits', 'Sandwiches', 'Rice & Curry', 'Fried Rice', 'Noodles', 'Soft Drinks'].map((item) => (
+                      <label key={item} className="flex items-center gap-2 cursor-pointer p-2 bg-white rounded border border-gray-200">
+                        <input
+                          type="checkbox"
+                          checked={formData.selectedSnacks?.includes(item) || false}
+                          onChange={(e) => {
+                            const currentSnacks = formData.selectedSnacks || [];
+                            const newSnacks = e.target.checked
+                              ? [...currentSnacks, item]
+                              : currentSnacks.filter(s => s !== item);
+                            updateFormData('selectedSnacks', newSnacks);
+                          }}
+                          className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500"
+                        />
+                        <span className="text-xs text-gray-700">{item}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Park Ticket Proof (Optional)</label>
-                  <input
-                    type="text"
-                    value={formData.parkTicketProof}
-                    onChange={(e) => updateFormData('parkTicketProof', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
+              )}
             </div>
           )}
 
-          {/* Step 6: Emergency Contact */}
-          {currentStep === 6 && (
+          {/* Step 5: Emergency Contact */}
+          {currentStep === 5 && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Phone className="h-5 w-5 text-emerald-500" />
@@ -874,6 +878,21 @@ const BookingFormModal = ({
 
 // Old ChatModal component removed - using Chat component instead
 
+// Park ticket prices
+const parkTicketPrices = {
+  'Yala National Park': 5000,
+  'Wilpattu National Park': 4500,
+  'Udawalawe National Park': 4000,
+  'Minneriya National Park': 3500,
+  'Kaudulla National Park': 3500,
+  'Bundala National Park': 3000,
+  'Kumana National Park': 3000
+};
+
+const getParkTicketPrice = (parkName) => {
+  return parkTicketPrices[parkName] || 0;
+};
+
 const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -917,21 +936,13 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     roomNumber: '',
     dropoffLocation: '',
     needsHotelPickup: true,
-    // Vehicle & Driver Preferences
-    jeepType: 'Standard Jeep',
-    driverLanguage: 'English',
-    needsNaturalist: false,
     // Additional Requests
     needsBinoculars: false,
-    needsCamera: false,
     needsChildSeat: false,
     needsWater: false,
     needsSnacks: false,
-    needsPhotographyPackage: false,
-    parkEntranceIncluded: false,
-    // Documents
-    passportNumber: '',
-    parkTicketProof: '',
+    selectedSnacks: [],
+    dateSafariTypes: {},
     // Emergency Contact
     emergencyContactName: '',
     emergencyContactPhone: ''
@@ -1073,8 +1084,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     if (!safeTrim(bookingFormData.email)) errors.email = 'Email is required';
     if (!safeTrim(bookingFormData.phone)) errors.phone = 'Phone number is required';
     if (!safeTrim(bookingFormData.country)) errors.country = 'Country is required';
-    if (!bookingFormData.numberOfPassengers || bookingFormData.numberOfPassengers < 1) {
-      errors.numberOfPassengers = 'Number of passengers must be at least 1';
+    if (!bookingFormData.numberOfPassengers || bookingFormData.numberOfPassengers < 1 || bookingFormData.numberOfPassengers > 6) {
+      errors.numberOfPassengers = 'Number of passengers must be between 1 and 6';
     }
 
     // Step 2: Safari Details
@@ -1275,10 +1286,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         return `${d.toLocaleDateString()} (${dateType === 'half-day' ? 'Half Day' : 'Full Day'})`;
       }).join(', ');
 
-      const datesWithTypes = selectedDates.map(d => ({
-        date: d.toISOString(),
-        type: selectedDatesWithType[d.toDateString()] || 'full-day'
-      }));
+      const datesWithTypes = selectedDates.map(d => {
+        const dateString = d.toDateString();
+        const dateType = selectedDatesWithType[dateString] || 'full-day';
+        const safariType = bookingFormData.dateSafariTypes?.[dateString] || bookingFormData.safariType || 'Morning Safari';
+        return {
+          date: d.toISOString(),
+          type: dateType,
+          safariType: safariType
+        };
+      });
 
       // Get driver email from driver data (could be contactEmail, email, or from auth)
       const driverEmail = driver.contactEmail || driver.email || '';
@@ -1508,11 +1525,25 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         bookingId: bookingId
       });
 
+      const datesWithTypesAndSafari = selectedDates.map(d => {
+        const dateString = d.toDateString();
+        const dateType = selectedDatesWithType[dateString] || 'full-day';
+        const safariType = bookingFormData.dateSafariTypes?.[dateString] || bookingFormData.safariType || 'Morning Safari';
+        return {
+          date: d.toISOString(),
+          type: dateType,
+          safariType: safariType
+        };
+      });
+
       setSuccessMessageData({
         driverName: driver.fullName,
         dates: datesString,
+        datesWithTypes: datesWithTypesAndSafari,
         totalPrice: totalPrice,
         numberOfDays: selectedDates.length,
+        numberOfPassengers: bookingFormData.numberOfPassengers,
+        nationalPark: bookingFormData.nationalPark,
         bookingId: bookingId
       });
 
@@ -1546,18 +1577,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         hotelAddress: '',
         dropoffLocation: '',
         needsHotelPickup: true,
-        jeepType: 'Standard Jeep',
-        driverLanguage: 'English',
-        needsNaturalist: false,
         needsBinoculars: false,
-        needsCamera: false,
         needsChildSeat: false,
         needsWater: false,
         needsSnacks: false,
-        needsPhotographyPackage: false,
-        parkEntranceIncluded: false,
-        passportNumber: '',
-        parkTicketProof: '',
+        selectedSnacks: [],
+        dateSafariTypes: {},
         emergencyContactName: '',
         emergencyContactPhone: ''
       });
@@ -1655,8 +1680,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         country: prev.country || userTouristData.country || userTouristData.location || '',
         // Auto-fill national park from driver's first destination
         nationalPark: prev.nationalPark || (driver?.destinations && driver.destinations.length > 0 ? driver.destinations[0] : ''),
-        // Auto-fill jeep type from driver's vehicle type
-        jeepType: prev.jeepType || driver?.vehicleType || 'Standard Safari Jeep'
+        // Vehicle type is auto-filled from driver's vehicle type (display only, not editable)
       }));
     }
   }, [showBookingForm, currentUser, userTouristData, driver]);
@@ -1870,22 +1894,35 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               )}
 
               {/* Booking Details */}
-              <div className="bg-emerald-50 rounded-xl p-4 mb-6 text-left space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Driver:</span>
-                  <span className="text-gray-900 font-semibold">{successMessageData.driverName}</span>
+              <div className="bg-emerald-50 rounded-xl p-4 mb-6 text-left space-y-3">
+                <div className="space-y-1">
+                  <span className="text-gray-600 font-medium block">Driver:</span>
+                  <span className="text-gray-900 font-semibold block">{successMessageData.driverName}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Dates:</span>
-                  <span className="text-gray-900 font-semibold">{successMessageData.dates}</span>
+                <div className="space-y-1">
+                  <span className="text-gray-600 font-medium block">Dates:</span>
+                  <div className="space-y-1">
+                    {successMessageData.datesWithTypes && Object.entries(successMessageData.datesWithTypes).map(([dateStr, dateInfo], idx) => (
+                      <div key={idx} className="text-gray-900 font-semibold text-sm">
+                        {new Date(dateInfo.date).toLocaleDateString()} - {dateInfo.type === 'half-day' ? 'Half Day' : 'Full Day'} {dateInfo.safariType ? `(${dateInfo.safariType})` : ''}
+                      </div>
+                    ))}
+                    {!successMessageData.datesWithTypes && (
+                      <span className="text-gray-900 font-semibold block">{successMessageData.dates}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Days:</span>
-                  <span className="text-gray-900 font-semibold">{successMessageData.numberOfDays} day(s)</span>
+                <div className="space-y-1">
+                  <span className="text-gray-600 font-medium block">Number of Passengers:</span>
+                  <span className="text-gray-900 font-semibold block">{successMessageData.numberOfPassengers || successMessageData.numberOfDays} {successMessageData.numberOfPassengers === 1 ? 'passenger' : 'passengers'}</span>
                 </div>
-                <div className="flex justify-between border-t border-emerald-200 pt-2 mt-2">
-                  <span className="text-gray-600 font-bold">Total:</span>
-                  <span className="text-emerald-600 font-bold text-lg">LKR {successMessageData.totalPrice.toLocaleString()}</span>
+                <div className="space-y-1">
+                  <span className="text-gray-600 font-medium block">National Park:</span>
+                  <span className="text-gray-900 font-semibold block">{successMessageData.nationalPark}</span>
+                </div>
+                <div className="space-y-1 border-t border-emerald-200 pt-2 mt-2">
+                  <span className="text-gray-600 font-bold block">Total:</span>
+                  <span className="text-emerald-600 font-bold text-lg block">LKR {successMessageData.totalPrice.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -1988,9 +2025,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     <span className="ml-3 text-sm font-semibold text-gray-700">
                       {driver.rating?.toFixed(1) || '0.0'}/5
                     </span>
-                    <span className="ml-2 text-xs text-gray-500">
-                      • {driver.totalReviews || 0} reviews
-                    </span>
+                    {driver.totalReviews > 0 && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        • {driver.totalReviews} reviews
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2080,7 +2119,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       : 'border-transparent text-gray-500'
                       }`}
                   >
-                    Reviews ({driver.totalReviews || 0})
+                    Reviews{driver.totalReviews > 0 && ` (${driver.totalReviews})`}
                     {activeTab === 'reviews' && (
                       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
                     )}
@@ -2266,9 +2305,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           Rates
                         </h3>
                         <div className="space-y-4">
+                          {/* Full Day Price */}
                           <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
                             <div>
-                              <span className="text-gray-800 font-bold text-lg">Price per day:</span>
+                              <span className="text-gray-800 font-bold text-lg">Full Day Safari:</span>
                               <p className="text-sm text-gray-600 mt-1">Full day safari tours</p>
                             </div>
                             <div className="text-right">
@@ -2276,6 +2316,19 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 LKR {driver.pricePerDay.toLocaleString()}
                               </span>
                               <span className="text-sm font-semibold text-gray-500 block">/day</span>
+                            </div>
+                          </div>
+                          {/* Half Day Price */}
+                          <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
+                            <div>
+                              <span className="text-gray-800 font-bold text-lg">Half Day Safari:</span>
+                              <p className="text-sm text-gray-600 mt-1">Half day safari tours</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-3xl font-black text-emerald-600">
+                                LKR {Math.round(driver.pricePerDay * 0.6).toLocaleString()}
+                              </span>
+                              <span className="text-sm font-semibold text-gray-500 block">/half day</span>
                             </div>
                           </div>
                           {driver.pricePerHour && (
@@ -2293,48 +2346,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Availability */}
-                    <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
-                      <h3 className="font-bold text-gray-900 mb-4 flex items-center text-lg">
-                        <div className="p-2 bg-emerald-600 rounded-xl mr-3 shadow-lg">
-                          <CalendarIcon className="text-white" size={22} />
-                        </div>
-                        Availability
-                      </h3>
-                      {driver.availableDates && driver.availableDates.length > 0 ? (
-                        <div className="space-y-3">
-                          <p className="text-gray-700 font-medium">
-                            Available on {driver.availableDates.length} dates
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {driver.availableDates.slice(0, 6).map((date, index) => (
-                              <span
-                                key={index}
-                                className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg text-sm border-2 border-emerald-200 font-semibold shadow-sm"
-                              >
-                                {new Date(date).toLocaleDateString()}
-                              </span>
-                            ))}
-                            {driver.availableDates.length > 6 && (
-                              <span className="text-gray-600 text-sm font-semibold">
-                                +{driver.availableDates.length - 6} more dates
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-gray-600">Contact for availability</p>
-                      )}
-                    </div>
-
-                    {/* Service Description */}
-                    {driver.description && (
-                      <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
-                        <h3 className="font-bold text-gray-900 mb-3 text-lg">Service Details</h3>
-                        <p className="text-gray-700 leading-relaxed text-base">{driver.description}</p>
                       </div>
                     )}
                   </div>

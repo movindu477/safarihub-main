@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 // Import background images
-import yalaBackground from "../../assets/yala.avif";
+import yalaBackground from "../../assets/yalaback.jpg";
 import wilpattuBackground from "../../assets/wilpattu.avif";
 import mirissaBackground from "../../assets/mirissa.avif";
 import unaBackground from "../../assets/una.avif";

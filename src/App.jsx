@@ -44,6 +44,7 @@ import Section2 from "./components/home/Section2";
 import Section3 from "./components/home/Section3";
 import Section4 from "./components/home/Section4";
 import Section5 from "./components/home/Section5";
+import Section6 from "./components/home/Section6";
 import Footer from "./components/home/Footer";
 import JeepDriversPage from "./components/jeepdrivers/JeepMain";
 import JeepProfile from "./components/jeepdrivers/JeepProfile";
@@ -1303,6 +1304,9 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
         onMarkAsRead={onMarkAsRead}
       />
 
+      {/* Scroll to Top Button - Always visible regardless of login status */}
+      <ScrollToTopButton />
+
       {/* Booking Section - Integrated into page */}
 
       <Navbar
@@ -1329,7 +1333,8 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
           {user && <BookingSection user={user} />}
         </Section1>
         <Section2 />
-        <Section3 />
+        <Section6 />
+        {/* <Section3 /> */}
         <Section4 />
         <Section5 />
         <Footer />
@@ -1618,6 +1623,9 @@ function App() {
   return (
     <Router>
       <ScrollToTop />
+
+      {/* Scroll to Top Button - Always visible on all pages regardless of login status */}
+      <ScrollToTopButton />
 
       <Routes>
         <Route
@@ -2120,7 +2128,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         setTimeout(async () => {
           try {
             console.log("📄 Starting background upload of certification files for Jeep Driver...");
-            const certificationUrls = {};
+            const documents = [];
             let uploadedCount = 0;
 
             for (const [certName, file] of Object.entries(certificationFiles)) {
@@ -2144,20 +2152,16 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                 const fileURL = await getDownloadURL(snap.ref);
                 console.log(`✅ Got download URL for: ${certName}`);
 
-                certificationUrls[certName] = fileURL;
-
-                // Create document in jeepDriverCertifications collection using addDoc for unique IDs
-                const certDocRef = await addDoc(collection(db, 'jeepDriverCertifications'), {
-                  providerId: uid,
+                // Add to documents array
+                documents.push({
                   certificationName: certName,
                   fileName: fileName,
                   fileUrl: fileURL,
                   fileSize: file.size,
                   fileType: file.type || `application/${ext}`,
                   uploadedAt: serverTimestamp(),
-                  updatedAt: serverTimestamp()
+                  documentId: `${uid}_${timestamp}` // Unique ID for this document
                 });
-                console.log(`✅ Saved to Firestore with ID: ${certDocRef.id} for certification: ${certName}`);
                 uploadedCount++;
               } catch (fileError) {
                 console.error(`❌ Failed to upload certification ${certName}:`, fileError);
@@ -2167,27 +2171,60 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                   stack: fileError.stack
                 });
 
-                // Log CORS-specific error guidance
-                if (fileError.message && (fileError.message.includes('CORS') || fileError.message.includes('blocked'))) {
+                // Check for CORS error
+                if (fileError.message && (fileError.message.includes('CORS') || fileError.message.includes('blocked') || fileError.code === 'storage/unauthorized')) {
                   console.error('⚠️ CORS ERROR DETECTED:');
                   console.error('   Firebase Storage CORS is not configured.');
                   console.error('   To fix: Run "gsutil cors set cors.json gs://safarihub-a80bd.firebasestorage.app"');
-                  console.error('   Or use Google Cloud Console: https://console.cloud.google.com/storage/browser');
-                  console.error('   See STORAGE_CORS_SETUP.md or QUICK_FIX_CORS.md for detailed instructions.');
+                  console.error('   Or configure CORS in Firebase Console: Storage > Settings > CORS');
                 }
+
+                // Save document metadata even if upload fails (with error status)
+                documents.push({
+                  certificationName: certName,
+                  fileName: `${uid}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+                  fileUrl: '', // Empty URL indicates upload failed
+                  fileSize: file.size,
+                  fileType: file.type || `application/${file.name.split('.').pop()}`,
+                  uploadedAt: serverTimestamp(),
+                  documentId: `${uid}_${Date.now()}`,
+                  uploadStatus: 'failed',
+                  uploadError: fileError.message || 'Upload failed'
+                });
                 // Continue with other files
               }
             }
 
-            // Update serviceProviders document with URLs for backward compatibility
-            if (uploadedCount > 0) {
-              await setDoc(doc(db, collectionName, uid), {
-                certificationUrls: certificationUrls,
-                updatedAt: serverTimestamp(),
-              }, { merge: true });
-              console.log(`✅ Successfully uploaded ${uploadedCount} certification file(s) and saved to Firestore`);
+            // Store all documents under one user ID in Firestore (even if some uploads failed)
+            if (documents.length > 0) {
+              try {
+                const userCertDocRef = doc(db, 'jeepDriverCertifications', uid);
+                const existingDoc = await getDoc(userCertDocRef);
+                
+                if (existingDoc.exists()) {
+                  // Update existing document - merge with existing documents
+                  const existingData = existingDoc.data();
+                  const existingDocuments = existingData.documents || [];
+                  await setDoc(userCertDocRef, {
+                    providerId: uid,
+                    documents: [...existingDocuments, ...documents],
+                    updatedAt: serverTimestamp()
+                  }, { merge: true });
+                } else {
+                  // Create new document
+                  await setDoc(userCertDocRef, {
+                    providerId: uid,
+                    documents: documents,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                  });
+                }
+                console.log(`✅ Saved ${documents.length} certification document(s) to Firestore under user ID: ${uid} (${uploadedCount} successfully uploaded to Storage)`);
+              } catch (firestoreError) {
+                console.error('❌ Failed to save to Firestore:', firestoreError);
+              }
             } else {
-              console.warn("⚠️ No certification files were successfully uploaded");
+              console.warn("⚠️ No certification files to save");
             }
           } catch (uploadError) {
             console.error("❌ Certification files upload failed:", uploadError);
@@ -2207,7 +2244,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         setTimeout(async () => {
           try {
             console.log("📄 Starting background upload of verification document files for Tour Guide...");
-            const verificationDocumentUrls = {};
+            const documents = [];
             let uploadedCount = 0;
 
             for (const [docName, file] of Object.entries(verificationDocumentFiles)) {
@@ -2231,20 +2268,16 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                 const fileURL = await getDownloadURL(snap.ref);
                 console.log(`✅ Got download URL for: ${docName}`);
 
-                verificationDocumentUrls[docName] = fileURL;
-
-                // Create document in guideCertifications collection using addDoc for unique IDs
-                const certDocRef = await addDoc(collection(db, 'guideCertifications'), {
-                  providerId: uid,
+                // Add to documents array
+                documents.push({
                   certificationName: docName,
                   fileName: fileName,
                   fileUrl: fileURL,
                   fileSize: file.size,
                   fileType: file.type || `application/${ext}`,
                   uploadedAt: serverTimestamp(),
-                  updatedAt: serverTimestamp()
+                  documentId: `${uid}_${timestamp}` // Unique ID for this document
                 });
-                console.log(`✅ Saved to Firestore with ID: ${certDocRef.id} for verification document: ${docName}`);
                 uploadedCount++;
               } catch (fileError) {
                 console.error(`❌ Failed to upload verification document ${docName}:`, fileError);
@@ -2253,19 +2286,61 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                   code: fileError.code,
                   stack: fileError.stack
                 });
+
+                // Check for CORS error
+                if (fileError.message && (fileError.message.includes('CORS') || fileError.message.includes('blocked') || fileError.code === 'storage/unauthorized')) {
+                  console.error('⚠️ CORS ERROR DETECTED:');
+                  console.error('   Firebase Storage CORS is not configured.');
+                  console.error('   To fix: Run "gsutil cors set cors.json gs://safarihub-a80bd.firebasestorage.app"');
+                  console.error('   Or configure CORS in Firebase Console: Storage > Settings > CORS');
+                }
+
+                // Save document metadata even if upload fails (with error status)
+                documents.push({
+                  certificationName: docName,
+                  fileName: `${uid}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+                  fileUrl: '', // Empty URL indicates upload failed
+                  fileSize: file.size,
+                  fileType: file.type || `application/${file.name.split('.').pop()}`,
+                  uploadedAt: serverTimestamp(),
+                  documentId: `${uid}_${Date.now()}`,
+                  uploadStatus: 'failed',
+                  uploadError: fileError.message || 'Upload failed'
+                });
                 // Continue with other files
               }
             }
 
-            // Update serviceProviders document with URLs for backward compatibility
-            if (uploadedCount > 0) {
-              await setDoc(doc(db, collectionName, uid), {
-                verificationDocumentUrls: verificationDocumentUrls,
-                updatedAt: serverTimestamp(),
-              }, { merge: true });
-              console.log(`✅ Successfully uploaded ${uploadedCount} verification document file(s) and saved to Firestore`);
+            // Store all documents under one user ID in Firestore (even if some uploads failed)
+            if (documents.length > 0) {
+              try {
+                const userCertDocRef = doc(db, 'guideCertifications', uid);
+                const existingDoc = await getDoc(userCertDocRef);
+                
+                if (existingDoc.exists()) {
+                  // Update existing document - merge with existing documents
+                  const existingData = existingDoc.data();
+                  const existingDocuments = existingData.documents || [];
+                  await setDoc(userCertDocRef, {
+                    providerId: uid,
+                    documents: [...existingDocuments, ...documents],
+                    updatedAt: serverTimestamp()
+                  }, { merge: true });
+                } else {
+                  // Create new document
+                  await setDoc(userCertDocRef, {
+                    providerId: uid,
+                    documents: documents,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                  });
+                }
+                console.log(`✅ Saved ${documents.length} verification document(s) to Firestore under user ID: ${uid} (${uploadedCount} successfully uploaded to Storage)`);
+              } catch (firestoreError) {
+                console.error('❌ Failed to save to Firestore:', firestoreError);
+              }
             } else {
-              console.warn("⚠️ No verification document files were successfully uploaded");
+              console.warn("⚠️ No verification document files to save");
             }
           } catch (uploadError) {
             console.error("❌ Verification document files upload failed:", uploadError);
@@ -2648,7 +2723,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
   const languages = [
     "English", "Sinhala", "Tamil", "Hindi",
-    "French", "German", "Chinese", "Japanese"
+    "French", "German", "Chinese", "Japanese",
+    "Spanish", "Korean", "Russian", "Arabic"
   ];
 
   const specialSkills = [
@@ -3042,6 +3118,34 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Languages Spoken (Multi-select) */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    Languages Spoken <span className="text-gray-400 text-xs">(Select all that apply)</span>
+                  </label>
+                  <div className="max-h-32 overflow-y-auto border border-white/10 rounded-lg p-2.5 bg-white/5">
+                    {languages.map(language => (
+                      <div key={language} className="flex items-center mb-1.5">
+                        <input
+                          type="checkbox"
+                          id={`guide-lang-${language}`}
+                          checked={formData.languages?.includes(language) || false}
+                          onChange={(e) => handleMultiSelectChange('languages', language)}
+                          className="mr-2 h-3.5 w-3.5 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded cursor-pointer"
+                        />
+                        <label htmlFor={`guide-lang-${language}`} className="text-white text-xs cursor-pointer">
+                          {language}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {formData.languages && formData.languages.length > 0 && (
+                    <p className="text-xs text-gray-300 mt-1">
+                      Selected: {formData.languages.length} language{formData.languages.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
                 </div>
 
                 {/* Verification Documents (Multi-select) */}

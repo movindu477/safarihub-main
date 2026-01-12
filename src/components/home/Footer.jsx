@@ -41,7 +41,7 @@ export default function Footer() {
 
   // Contact Item Component
   const ContactItem = ({ icon, text, subtext }) => (
-    <div className="flex items-start space-x-3 mb-4 group cursor-pointer">
+    <div className="flex items-start justify-center md:justify-start space-x-3 mb-3 group cursor-pointer">
       <div className="mt-1 transform group-hover:scale-110 transition-transform duration-300">
         {icon}
       </div>
@@ -50,7 +50,7 @@ export default function Footer() {
           {text}
         </p>
         {subtext && (
-          <p className="text-gray-400 text-xs mt-1">{subtext}</p>
+          <p className="text-gray-400 text-xs mt-0.5">{subtext}</p>
         )}
       </div>
     </div>
@@ -61,7 +61,7 @@ export default function Footer() {
     <li>
       <a
         href={href}
-        className="flex items-center text-gray-300 hover:text-green-400 transition-all duration-300 group py-1"
+        className="flex items-center justify-center md:justify-start text-gray-300 hover:text-green-400 transition-all duration-300 group py-0.5"
       >
         <span className="mr-2 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-1 transition-all duration-300">
           {icon}
@@ -80,86 +80,88 @@ export default function Footer() {
         <div className="w-full h-full bg-gradient-to-br from-green-500 to-blue-500"></div>
       </div>
 
-      <div className="relative z-10 py-12 px-6 lg:px-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 pb-10">
-          {/* Brand Section */}
-          <div className="lg:col-span-1">
-            <div className="flex items-center mb-4">
-              <img
-                src={logo}
-                alt="SafariHub Logo"
-                className="w-40 h-auto transform hover:scale-105 transition-transform duration-300 cursor-pointer"
-                onClick={() => window.location.href = '/'}
-              />
+      <div className="relative z-10 py-10 px-4 sm:px-6 lg:px-12">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 pb-8">
+            {/* Brand Section */}
+            <div className="text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start mb-3">
+                <img
+                  src={logo}
+                  alt="SafariHub Logo"
+                  className="w-32 h-auto transform hover:scale-105 transition-transform duration-300 cursor-pointer"
+                  onClick={() => window.location.href = '/'}
+                />
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Your All in One Gateway to Adventure. Discover the wild, embrace the journey.
+              </p>
             </div>
-            <p className="text-gray-300 text-sm leading-relaxed mb-6">
-              Your All in One Gateway to Adventure. Discover the wild, embrace the journey.
-            </p>
+
+            {/* Quick Links Section */}
+            <div className="text-center md:text-left">
+              <h3 className="text-lg font-bold mb-4 text-white">
+                Quick Links
+              </h3>
+              <ul className="space-y-1.5">
+                {quickLinks.map((link, index) => (
+                  <QuickLinkItem key={index} {...link} />
+                ))}
+              </ul>
+            </div>
+
+            {/* Contact Us Section */}
+            <div className="text-center md:text-left">
+              <h3 className="text-lg font-bold mb-4 text-white">
+                Contact Us
+              </h3>
+              <div className="space-y-1">
+                {contactInfo.map((item, index) => (
+                  <ContactItem key={index} {...item} />
+                ))}
+              </div>
+            </div>
+
+            {/* Social Media Section */}
+            <div className="text-center md:text-left">
+              <h3 className="text-lg font-bold mb-4 text-white">
+                Follow Us
+              </h3>
+              <p className="text-gray-300 text-sm mb-3">
+                Stay connected with our latest adventures and offers
+              </p>
+              <div className="flex justify-center md:justify-start space-x-3 mb-4">
+                {socialLinks.map((social, index) => (
+                  <a
+                    key={index}
+                    href={social.href}
+                    className={`w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-white transition-all duration-300 transform hover:scale-110 ${social.color} hover:bg-gray-700 cursor-pointer`}
+                  >
+                    {social.icon}
+                  </a>
+                ))}
+              </div>
+
+              {/* Opening Hours */}
+              <div className="bg-gray-800 rounded-lg p-3 border-l-4 border-green-500">
+                <h4 className="font-semibold text-white mb-1.5 text-sm">Opening Hours</h4>
+                <p className="text-gray-300 text-sm">Mon - Sun: 24/7</p>
+                <p className="text-gray-300 text-sm">Customer Support</p>
+              </div>
+            </div>
           </div>
 
-          {/* Quick Links Section */}
-          <div>
-            <h3 className="text-lg font-bold mb-6 text-white">
-              Quick Links
-            </h3>
-            <ul className="space-y-2">
-              {quickLinks.map((link, index) => (
-                <QuickLinkItem key={index} {...link} />
-              ))}
-            </ul>
-          </div>
-
-          {/* Contact Us Section */}
-          <div>
-            <h3 className="text-lg font-bold mb-6 text-white">
-              Contact Us
-            </h3>
-            <div className="space-y-1">
-              {contactInfo.map((item, index) => (
-                <ContactItem key={index} {...item} />
-              ))}
-            </div>
-          </div>
-
-          {/* Social Media Section */}
-          <div>
-            <h3 className="text-lg font-bold mb-6 text-white">
-              Follow Us
-            </h3>
-            <p className="text-gray-300 text-sm mb-4">
-              Stay connected with our latest adventures and offers
-            </p>
-            <div className="flex space-x-3 mb-6">
-              {socialLinks.map((social, index) => (
-                <a
-                  key={index}
-                  href={social.href}
-                  className={`w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-white transition-all duration-300 transform hover:scale-110 ${social.color} hover:bg-gray-700 cursor-pointer`}
-                >
-                  {social.icon}
-                </a>
-              ))}
-            </div>
-
-            {/* Opening Hours */}
-            <div className="bg-gray-800 rounded-lg p-4 border-l-4 border-green-500">
-              <h4 className="font-semibold text-white mb-2 text-sm">Opening Hours</h4>
-              <p className="text-gray-300 text-sm">Mon - Sun: 24/7</p>
-              <p className="text-gray-300 text-sm">Customer Support</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="border-t border-gray-700 pt-6">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="text-gray-400 text-sm">
-              Copyright © 2024 - <span className="text-white font-semibold">SAFARIHUB</span> - All Rights Reserved.
-            </div>
-            <div className="flex space-x-6 text-sm text-gray-400">
-              <a href="/privacy" className="hover:text-green-400 transition-colors">Privacy Policy</a>
-              <a href="/terms" className="hover:text-green-400 transition-colors">Terms of Service</a>
-              <a href="/cookies" className="hover:text-green-400 transition-colors">Cookie Policy</a>
+          {/* Bottom Bar */}
+          <div className="border-t border-gray-700 pt-4">
+            <div className="flex flex-col md:flex-row justify-center items-center gap-4 md:gap-6 text-center">
+              <div className="text-gray-400 text-sm">
+                Copyright © 2024 - <span className="text-white font-semibold">SAFARIHUB</span> - All Rights Reserved.
+              </div>
+              <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-sm text-gray-400">
+                <a href="/privacy" className="hover:text-green-400 transition-colors">Privacy Policy</a>
+                <a href="/terms" className="hover:text-green-400 transition-colors">Terms of Service</a>
+                <a href="/cookies" className="hover:text-green-400 transition-colors">Cookie Policy</a>
+              </div>
             </div>
           </div>
         </div>

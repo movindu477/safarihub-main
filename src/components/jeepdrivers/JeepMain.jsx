@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { MessageCircle, X, Send, Check, CheckCheck, User } from "lucide-react";
+import { MessageCircle, X, Send, Check, CheckCheck, User, ChevronDown } from "lucide-react";
 import Navbar from "../home/Navbar";
 import JeepHero from "./JeepHero";
 import JeepSection2 from "./JeepSection2";
@@ -519,28 +519,31 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
           <div className="bg-white rounded-xl shadow-lg border border-emerald-200 p-5 max-w-lg w-full">
             <h2 className="text-xl font-bold text-emerald-700 mb-1.5 text-center">Select a Destination</h2>
             <p className="text-gray-600 text-sm mb-4 text-center">Choose a destination to find available jeep drivers</p>
-            <select
-              value={selectedDestination || ''}
-              onChange={(e) => {
-                const value = e.target.value || null;
-                setSelectedDestination(value);
-                setShowDestinationSelector(false);
-                // Save to sessionStorage
-                if (value) {
-                  sessionStorage.setItem('selectedDestination', value);
-                  sessionStorage.setItem('showDestinationSelector', 'false');
-                } else {
-                  sessionStorage.removeItem('selectedDestination');
-                  sessionStorage.setItem('showDestinationSelector', 'true');
-                }
-              }}
-              className="w-full p-2.5 text-base border-2 border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white appearance-none"
-            >
-              <option value="">All Destinations</option>
-              {allDestinations.map(dest => (
-                <option key={dest} value={dest}>{dest}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={selectedDestination || ''}
+                onChange={(e) => {
+                  const value = e.target.value || null;
+                  setSelectedDestination(value);
+                  setShowDestinationSelector(false);
+                  // Save to sessionStorage
+                  if (value) {
+                    sessionStorage.setItem('selectedDestination', value);
+                    sessionStorage.setItem('showDestinationSelector', 'false');
+                  } else {
+                    sessionStorage.removeItem('selectedDestination');
+                    sessionStorage.setItem('showDestinationSelector', 'true');
+                  }
+                }}
+                className="w-full p-2.5 pr-10 text-base border-2 border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white appearance-none cursor-pointer"
+              >
+                <option value="">All Destinations</option>
+                {allDestinations.map(dest => (
+                  <option key={dest} value={dest}>{dest}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-emerald-600 pointer-events-none" />
+            </div>
             <button
               onClick={() => {
                 setSelectedDestination(null);
@@ -580,7 +583,15 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
               </div>
             </div>
           )}
-          <JeepSection2 currentUser={user} selectedDestination={selectedDestination} />
+          <JeepSection2 
+            currentUser={user} 
+            selectedDestination={selectedDestination}
+            onClearDestination={() => {
+              setSelectedDestination(null);
+              sessionStorage.removeItem('selectedDestination');
+              sessionStorage.setItem('showDestinationSelector', 'true');
+            }}
+          />
           <div className="h-1 bg-black"></div>
           <Footer />
         </>

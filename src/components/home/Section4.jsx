@@ -1,13 +1,13 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-// Import videos from src/assets
-import parkImage from "../../assets/park.avif";
-import sanImage from "../../assets/san.jpg";
+// Import images from src/assets
+import parkImage from "../../assets/park2.jpg";
+import sanImage from "../../assets/san3.jpg";
 import beachImage from "../../assets/beach.avif";
 import forestImage from "../../assets/forest.avif";
 import campImage from "../../assets/camp.avif";
-import cameraImage from "../../assets/camera1.avif";
+import jeepImage from "../../assets/peke.jpg";
 
 export default function Section4() {
   const navigate = useNavigate();
@@ -15,13 +15,13 @@ export default function Section4() {
   const handleBoxClick = (sectionId) => {
     // Navigate to destination page with hash fragment
     navigate(`/destination#${sectionId}`);
-    
+
     // Wait for navigation and page render, then scroll to section
     setTimeout(() => {
       const element = document.getElementById(sectionId);
       if (element) {
-        element.scrollIntoView({ 
-          behavior: 'smooth', 
+        element.scrollIntoView({
+          behavior: 'smooth',
           block: 'start',
           inline: 'nearest'
         });
@@ -30,35 +30,35 @@ export default function Section4() {
   };
 
   const videos = [
-    { 
-      src: parkImage, 
+    {
+      src: parkImage,
       title: "National Parks",
       sectionId: "national-parks"
     },
-    { 
-      src: sanImage, 
+    {
+      src: sanImage,
       title: "Sanctuaries",
       sectionId: "sanctuaries"
     },
-    { 
-      src: beachImage, 
+    {
+      src: beachImage,
       title: "Beaches",
       sectionId: "beaches"
     },
-    { 
-      src: forestImage, 
+    {
+      src: forestImage,
       title: "Forest Reserves",
       sectionId: "forest-reserves"
     },
-    { 
-      src: campImage, 
+    {
+      src: campImage,
       title: "Camp Sites",
       sectionId: "camping-sites"
     },
-    { 
-      src: cameraImage, 
-      title: "Gear Rentings",
-      sectionId: "gear-rentings"
+    {
+      src: jeepImage,
+      title: "Pekoe Trail",
+      sectionId: "Pekoe Trail."
     },
   ];
 
@@ -88,8 +88,8 @@ export default function Section4() {
               loading="lazy"
             />
 
-            {/* Black Overlay - Responsive slides up on hover */}
-            <div className="absolute bottom-0 left-0 w-full h-0 bg-black bg-opacity-80 group-hover:h-full transition-all duration-500 ease-in-out origin-bottom"></div>
+            {/* Glassy Overlay - Responsive slides up on hover */}
+            <div className="absolute bottom-0 left-0 w-full h-0 bg-white/10 backdrop-blur-sm group-hover:h-full transition-all duration-500 ease-in-out origin-bottom"></div>
 
             {/* Title Container */}
             <div className="absolute inset-0 flex items-center justify-center">
@@ -97,7 +97,7 @@ export default function Section4() {
               <div className="text-white text-xl sm:text-2xl lg:text-2xl font-semibold text-center transition-all duration-300 group-hover:opacity-0 group-hover:translate-y-3 sm:group-hover:translate-y-4 group-hover:scale-95 px-4">
                 {item.title}
               </div>
-              
+
               {/* Hover Content - Responsive slides up */}
               <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 transform translate-y-6 sm:translate-y-8 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 ease-in-out delay-75 px-4 sm:px-6">
                 {/* Hover Title - Responsive sizing */}

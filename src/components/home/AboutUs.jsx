@@ -15,6 +15,7 @@ import {
 import Navbar from './Navbar';
 import Footer from './Footer';
 import ChatList from '../ChatList';
+import aboutback1 from '../../assets/aboutback1.avif';
 
 const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
@@ -97,41 +98,62 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
       )}
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 text-white pt-24 pb-20 overflow-hidden">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-emerald-400/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-teal-400/20 rounded-full blur-3xl"></div>
+      <section className="relative w-full h-screen overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute top-0 left-0 w-full h-full">
+          <div
+            className="absolute top-0 left-0 w-full h-full"
+            style={{
+              backgroundImage: `url(${aboutback1})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+          ></div>
         </div>
-        
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
+
+        {/* Content Section */}
+        <div
+          className="
+            absolute inset-0 z-10 
+            flex flex-col justify-center 
+            px-8 md:px-20
+            text-white
+            text-left md:items-start
+            items-center text-center md:text-left
+          "
+        >
+          {/* Title */}
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-4 md:mb-6">
               <Sparkles className="h-4 w-4" />
               <span className="text-sm font-medium">About SafariHub</span>
             </div>
             
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 md:mb-6 leading-tight drop-shadow-lg">
               Connecting Adventure Seekers with
               <span className="block text-emerald-200">Nature's Wonders</span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-emerald-100 mb-8 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-sm md:text-base lg:text-lg xl:text-xl text-white/90 mb-6 md:mb-8 max-w-2xl leading-relaxed drop-shadow-md">
               Your trusted platform for discovering authentic wildlife safaris, expert tour guides, 
               and unforgettable adventures across Sri Lanka's pristine national parks.
             </p>
 
-            <div className="flex flex-wrap justify-center gap-4">
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-6 py-3">
-                <MapPin className="h-5 w-5 inline-block mr-2" />
-                <span className="font-semibold">Sri Lanka</span>
+            <div className="flex flex-wrap gap-4">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 md:px-6 py-2 md:py-3">
+                <MapPin className="h-4 w-4 md:h-5 md:w-5 inline-block mr-2" />
+                <span className="font-semibold text-sm md:text-base">Sri Lanka</span>
               </div>
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-6 py-3">
-                <span className="font-semibold">Since 2024</span>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 md:px-6 py-2 md:py-3">
+                <span className="font-semibold text-sm md:text-base">Since 2024</span>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Optional gradient fade at the bottom for elegance */}
+        <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/40 to-transparent pointer-events-none z-10"></div>
       </section>
 
       {/* Mission Section */}

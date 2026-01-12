@@ -4,7 +4,7 @@ import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Star, MapPin, Clock, Users, Shield } from 'lucide-react';
 
-const JeepSection2 = ({ currentUser, selectedDestination }) => {
+const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) => {
   const [jeeps, setJeeps] = useState([]);
   const [filteredJeeps, setFilteredJeeps] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -286,7 +286,12 @@ const JeepSection2 = ({ currentUser, selectedDestination }) => {
       certifications: [],
     });
     
-    setFilteredJeeps(jeeps);
+    // Clear destination filter if callback is provided
+    if (onClearDestination) {
+      onClearDestination();
+    }
+
+    // The useEffect will automatically update filteredJeeps when filters change
     console.log('🧹 All filters cleared, showing all jeeps:', jeeps.length);
   };
 
