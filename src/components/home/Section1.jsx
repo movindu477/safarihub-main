@@ -1,20 +1,22 @@
 import React from "react";
 
 // Import image from src/assets
-import back4ori from "../../assets/back6.jpg";
+import heroImage from "../../assets/IMG_4804.jpg";
+import logo from "../../assets/logo - Copy.png";
 
 export default function Section1({ children }) {
   return (
     <section className="relative w-full h-screen overflow-hidden">
       {/* Background Image */}
-      <div className="absolute top-0 left-0 w-full h-full">
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
         <div
           className="absolute top-0 left-0 w-full h-full"
           style={{
-            backgroundImage: `url(${back4ori})`,
+            backgroundImage: `url(${heroImage})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
+            animation: "zoomIn 20s ease-in-out infinite alternate",
           }}
         ></div>
       </div>
@@ -38,14 +40,14 @@ export default function Section1({ children }) {
           <div className="text-2xl md:text-3xl font-thin -mb-2 leading-tight drop-shadow-lg">
             Welcome To
           </div>
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold -mb-2 leading-tight drop-shadow-lg">
-            SafariHub
-          </h1>
-
-          {/* Description */}
-          <p className="text-lg md:text-xl lg:text-2xl max-w-2xl text-gray-300 font-light leading-tight drop-shadow-md">
-            Create Memories That Last a Lifetime
-          </p>
+          {/* Logo - Replaces SafariHub text */}
+          <div className="-mb-2 leading-tight drop-shadow-lg -ml-2 md:-ml-4 lg:-ml-6">
+            <img
+              src={logo}
+              alt="SafariHub Logo"
+              className="h-14 md:h-20 lg:h-28 xl:h-36 w-auto drop-shadow-lg"
+            />
+          </div>
         </div>
       </div>
 

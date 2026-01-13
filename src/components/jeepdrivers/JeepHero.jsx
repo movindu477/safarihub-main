@@ -1,5 +1,5 @@
 import React from "react";
-import jeepImage from "../../assets/jeepori.jpg"; // Import from assets
+import jeepImage from "../../assets/jeepori3.avif"; // Import from assets
 
 export default function DriverHero() {
 
@@ -12,30 +12,39 @@ export default function DriverHero() {
           alt="Jeep Safari Adventure"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/50"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/50"></div>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div className="space-y-4 sm:space-y-6 md:space-y-8">
-          
-          {/* Main Title */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black text-white leading-tight">
-            Premium{" "}
-            <span className="bg-gradient-to-r from-green-400 to-cyan-600 bg-clip-text text-transparent">
-              Jeep Safaris
-            </span>
-          </h1>
+      {/* Content Section */}
+      <div
+        className="
+          absolute inset-0 z-10 
+          flex flex-col justify-center 
+          px-8 md:px-20
+          text-white
+          text-left md:items-start
+          items-center text-center md:text-left
+        "
+      >
+        {/* Left side black opacity overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent pointer-events-none"></div>
 
-          {/* Description */}
-          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed font-light">
-            Experience the wild like never before with our expert jeep drivers.
-            Explore hidden trails and witness nature's majesty in comfort and safety.
-          </p>
+        {/* Content */}
+        <div className="relative z-10 max-w-3xl">
+          <div className="space-y-4 sm:space-y-6 md:space-y-8">
+            {/* Main Title */}
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black text-white leading-tight drop-shadow-lg">
+              Premium{" "}
+              <span className="bg-gradient-to-r from-green-400 to-cyan-600 bg-clip-text text-transparent">
+                Jeep Safaris
+              </span>
+            </h1>
 
-          {/* Buttons removed */}
-
+            {/* Description */}
+            <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/90 max-w-2xl leading-relaxed font-light drop-shadow-md">
+              Experience the wild like never before with our expert jeep drivers.
+              Explore hidden trails and witness nature's majesty in comfort and safety.
+            </p>
+          </div>
         </div>
       </div>
 

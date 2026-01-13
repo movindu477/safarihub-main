@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 
 // Import background image
-import backgroundImage from "../../assets/about2ori.avif";
+import backgroundImage from "../../assets/about2ori.jpg";
 
 export default function Section2() {
   const navigate = useNavigate();
@@ -23,10 +23,9 @@ export default function Section2() {
       {/* Content Overlay - Centered */}
       <div className="relative z-10 w-full flex justify-center items-center min-h-[500px] sm:min-h-[600px] md:min-h-[700px] lg:min-h-[800px] px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full text-center">
-          {/* Title - Two Lines */}
-          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white leading-tight mb-6 sm:mb-8">
-            <span className="block">Our</span>
-            <span className="block">Story</span>
+          {/* Title - One Line */}
+          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white leading-tight mb-6 sm:mb-8 whitespace-nowrap">
+            Our Story
           </h1>
 
           {/* Paragraph Text */}
@@ -38,7 +37,7 @@ export default function Section2() {
           <div className="flex justify-center">
             <button
               onClick={() => navigate('/about')}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 sm:py-3.5 sm:px-10 rounded-lg transition-colors duration-300 cursor-pointer text-sm sm:text-base"
+              className="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-3 px-8 sm:py-3.5 sm:px-10 rounded-lg transition-colors duration-300 cursor-pointer text-sm sm:text-base touch-manipulation"
             >
               Learn More
             </button>

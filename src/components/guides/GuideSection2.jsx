@@ -630,21 +630,21 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
         {/* Guides Grid */}
         {filteredGuides.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredGuides.slice(0, 12).map((guide, index) => (
+            {filteredGuides.map((guide, index) => (
               <div
                 key={guide.id}
                 id={`guide-card-${guide.id}`}
-                className="bg-white rounded-xl shadow border border-gray-200 cursor-pointer"
+                className="bg-white rounded-none shadow border border-gray-200 cursor-pointer"
                 onClick={() => handleProfileClick(guide)}
               >
                 {/* Profile Image Section */}
-                <div className="h-48 relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700">
+                <div className="h-48 relative overflow-hidden bg-gradient-to-br from-black via-black to-black">
                   <ProfileImage guide={guide} />
-                  <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-black/35 pointer-events-none"></div>
 
                   {/* Experience Badge */}
                   {guide.experience > 0 && (
-                    <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                    <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {guide.experience}+ years
                     </div>
                   )}
@@ -676,7 +676,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
                       {/* Quick Chat Button - Show for all users except current user */}
                       {!guide.isCurrentUser && (
                         <button
-                          className="ml-2 p-2 bg-emerald-500 text-white rounded-full shadow"
+                          className="ml-2 p-2 bg-black text-white rounded-full shadow hover:bg-gray-800 transition-colors"
                           onClick={(e) => handleChatClick(guide, e)}
                           title="Start Chat"
                         >
@@ -694,7 +694,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
                   <div className="flex justify-between items-center mb-3">
                     {renderStars(guide.rating || 0)}
                     <div className="text-right">
-                      <div className="text-lg font-bold text-green-600">
+                      <div className="text-lg font-bold text-black">
                         {guide.hourlyRate > 0 ? (
                           <>{getCurrencySymbol(guide.currencyPreference)}{formatPrice(guide.hourlyRate)}<span className="text-sm font-normal text-gray-500">/hour</span></>
                         ) : (
@@ -782,15 +782,6 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
               Refresh Page
             </button>
             </div>
-          </div>
-        )}
-
-        {/* Load More Button (if many results) */}
-        {filteredGuides.length > 12 && (
-          <div className="text-center mt-8">
-            <button className="px-8 py-3 bg-gray-800 text-white rounded-lg font-semibold cursor-pointer">
-              Load More Guides ({filteredGuides.length - 12} remaining)
-            </button>
           </div>
         )}
       </div>

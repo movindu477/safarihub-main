@@ -589,21 +589,21 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
         {/* Jeep Grid */}
         {filteredJeeps.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredJeeps.slice(0, 12).map((jeep, index) => (
+            {filteredJeeps.map((jeep, index) => (
               <div 
                 key={jeep.id}
                 id={`driver-card-${jeep.id}`}
-                className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
+                className="bg-white rounded-none shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
                 onClick={() => handleProfileClick(jeep)}
               >
                 {/* Profile Image Section */}
-                <div className="h-48 relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700">
+                <div className="h-48 relative overflow-hidden bg-gradient-to-br from-black via-black to-black">
                   <ProfileImage jeep={jeep} />
-                  <div className="absolute inset-0 bg-emerald-900/35 pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-black/35 pointer-events-none"></div>
                   
                   {/* Experience Badge */}
                   {jeep.experience > 0 && (
-                    <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                    <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                       {jeep.experience}+ years
                     </div>
                   )}
@@ -628,7 +628,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                       {/* Quick Chat Button - Show for all users except current user */}
                       {!jeep.isCurrentUser && (
                         <button 
-                          className="ml-2 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
+                          className="ml-2 p-2 bg-black text-white rounded-full hover:bg-gray-800 transition-colors shadow-lg"
                           onClick={(e) => handleChatClick(jeep, e)}
                           title="Start Chat"
                         >
@@ -645,7 +645,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                   {/* Rating and Price */}
                   <div className="flex justify-between items-center mb-3">
                     {renderStars(jeep.rating || 0)}
-                    <div className="text-lg font-bold text-green-600">
+                    <div className="text-lg font-bold text-black">
                       {jeep.pricePerDay > 0 ? (
                         <>LKR {formatPrice(jeep.pricePerDay)}<span className="text-sm font-normal text-gray-500">/day</span></>
                       ) : (
@@ -725,15 +725,6 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                 Refresh Page
               </button>
             </div>
-          </div>
-        )}
-
-        {/* Load More Button (if many results) */}
-        {filteredJeeps.length > 12 && (
-          <div className="text-center mt-8">
-            <button className="px-8 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors font-semibold cursor-pointer">
-              Load More Jeeps ({filteredJeeps.length - 12} remaining)
-            </button>
           </div>
         )}
       </div>

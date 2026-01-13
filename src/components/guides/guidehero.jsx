@@ -12,31 +12,40 @@ export default function GuideHero() {
           alt="Professional Tour Guides"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/50"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/50"></div>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div className="space-y-4 sm:space-y-6 md:space-y-8">
-          
-          {/* Main Title */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black text-white leading-tight">
-            Meet Your{" "}
-            <span className="bg-gradient-to-r from-green-400 to-cyan-600 bg-clip-text text-transparent">
-              Expert Guides
-            </span>
-          </h1>
+      {/* Content Section */}
+      <div
+        className="
+          absolute inset-0 z-10 
+          flex flex-col justify-center 
+          px-8 md:px-20
+          text-white
+          text-left md:items-start
+          items-center text-center md:text-left
+        "
+      >
+        {/* Left side black opacity overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent pointer-events-none"></div>
 
-          {/* Description */}
-          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed font-light">
-            Connect with passionate local experts who bring destinations to life. 
-            Discover hidden stories, cultural insights, and personalized experiences 
-            that transform your journey into an unforgettable adventure.
-          </p>
+        {/* Content */}
+        <div className="relative z-10 max-w-3xl">
+          <div className="space-y-4 sm:space-y-6 md:space-y-8">
+            {/* Main Title */}
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black text-white leading-tight drop-shadow-lg">
+              Meet Your{" "}
+              <span className="bg-gradient-to-r from-green-400 to-cyan-600 bg-clip-text text-transparent">
+                Expert Guides
+              </span>
+            </h1>
 
-          {/* Buttons removed */}
-
+            {/* Description */}
+            <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-white/90 max-w-2xl leading-relaxed font-light drop-shadow-md">
+              Connect with passionate local experts who bring destinations to life. 
+              Discover hidden stories, cultural insights, and personalized experiences 
+              that transform your journey into an unforgettable adventure.
+            </p>
+          </div>
         </div>
       </div>
 
