@@ -173,11 +173,11 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
               className={`
                 h-8 text-sm rounded-lg
                 ${selected
-                  ? 'bg-emerald-600 text-white font-medium shadow-lg'
+                  ? 'bg-black text-white font-medium shadow-lg'
                   : isPast
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : isToday
-                      ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300 font-semibold'
+                      ? 'bg-gray-100 text-black border-2 border-gray-300 font-semibold'
                       : 'bg-gray-50 text-gray-700'
                 }
               `}
@@ -189,19 +189,19 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
       </div>
 
       {selectedDates.length > 0 && (
-        <div className="mt-4 p-4 bg-emerald-50 rounded-xl border-2 border-emerald-200">
-          <h4 className="font-bold text-emerald-800 mb-3">Selected Dates:</h4>
+        <div className="mt-4 p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+          <h4 className="font-bold text-black mb-3">Selected Dates:</h4>
           <div className="space-y-2">
             {selectedDates.map((date, index) => {
               const dateString = date.toDateString();
               const dateType = selectedDatesWithType?.[dateString] || 'full-day';
               return (
-                <div key={index} className="flex items-center justify-between bg-white p-2 rounded-lg border border-emerald-200">
+                <div key={index} className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-200">
                   <div className="flex-1">
                     <span className="text-sm font-medium text-gray-700">
                       {date.toLocaleDateString()}
                     </span>
-                    <span className="ml-2 text-xs text-emerald-600 font-semibold">
+                    <span className="ml-2 text-xs text-black font-semibold">
                       ({dateType === 'half-day' ? 'Half Day' : 'Full Day'})
                     </span>
                   </div>
@@ -212,7 +212,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
                         if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
                       }}
                       className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
-                        ? 'bg-emerald-600 text-white shadow-md'
+                        ? 'bg-black text-white shadow-md'
                         : 'bg-gray-100 text-gray-600'
                         }`}
                     >
@@ -224,7 +224,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
                         if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
                       }}
                       className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
-                        ? 'bg-emerald-600 text-white shadow-md'
+                        ? 'bg-black text-white shadow-md'
                         : 'bg-gray-100 text-gray-600'
                         }`}
                     >
@@ -326,7 +326,7 @@ const BookingFormModal = ({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-4xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
+        <div className="bg-gradient-to-r from-black to-gray-900 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -334,7 +334,7 @@ const BookingFormModal = ({
               </div>
               <div className="min-w-0 flex-1">
                 <h1 className="text-base sm:text-xl font-bold truncate">Booking Details</h1>
-                <p className="text-emerald-100 text-xs sm:text-sm hidden sm:block">Complete your booking information</p>
+                <p className="text-gray-300 text-xs sm:text-sm hidden sm:block">Complete your booking information</p>
               </div>
             </div>
             <button
@@ -358,8 +358,8 @@ const BookingFormModal = ({
               return (
                 <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
                   <div className="flex flex-col items-center w-full">
-                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 ${isActive ? 'bg-emerald-500 border-emerald-500 text-white' :
-                      isCompleted ? 'bg-emerald-100 border-emerald-500 text-emerald-600' :
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 ${isActive ? 'bg-black border-black text-white' :
+                      isCompleted ? 'bg-gray-100 border-black text-black' :
                         'bg-gray-100 border-gray-300 text-gray-400'
                       }`}>
                       {isCompleted ? (
@@ -368,14 +368,14 @@ const BookingFormModal = ({
                         <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                       )}
                     </div>
-                    <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${isActive ? 'text-emerald-600' : 'text-gray-500'
+                    <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${isActive ? 'text-black' : 'text-gray-500'
                       }`}>
                       <span className="hidden sm:inline">{step.title}</span>
                       <span className="sm:hidden">{step.shortTitle}</span>
                     </span>
                   </div>
                   {index < steps.length - 1 && (
-                    <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${isCompleted ? 'bg-emerald-500' : 'bg-gray-200'
+                    <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${isCompleted ? 'bg-black' : 'bg-gray-200'
                       }`} />
                   )}
                 </div>
@@ -390,7 +390,7 @@ const BookingFormModal = ({
           {currentStep === 1 && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="h-5 w-5 text-emerald-500" />
+                <User className="h-5 w-5 text-black" />
                 Personal Details
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -404,7 +404,7 @@ const BookingFormModal = ({
                     id="fullName"
                     value={formData.fullName}
                     onChange={(e) => updateFormData('fullName', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                     placeholder="Enter your full name"
                   />
@@ -420,7 +420,7 @@ const BookingFormModal = ({
                     id="email"
                     value={formData.email}
                     onChange={(e) => updateFormData('email', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                     placeholder="your.email@example.com"
                   />
@@ -439,7 +439,7 @@ const BookingFormModal = ({
                       const value = e.target.value.replace(/[^0-9+]/g, '');
                       updateFormData('phone', value);
                     }}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                     placeholder="+94 77 123 4567"
                   />
@@ -455,7 +455,7 @@ const BookingFormModal = ({
                     id="country"
                     value={formData.country}
                     onChange={(e) => updateFormData('country', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                     placeholder="e.g., United States"
                   />
@@ -495,7 +495,7 @@ const BookingFormModal = ({
                       const clampedValue = Math.min(Math.max(value, 1), 6);
                       updateFormData('numberOfPassengers', clampedValue);
                     }}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                   />
                   {formErrors.numberOfPassengers && <p className="text-red-500 text-xs mt-1">{formErrors.numberOfPassengers}</p>}
@@ -507,7 +507,7 @@ const BookingFormModal = ({
                   <textarea
                     value={formData.specialAssistance}
                     onChange={(e) => updateFormData('specialAssistance', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
                     rows="3"
                     placeholder="Any special requirements"
                   />
@@ -520,7 +520,7 @@ const BookingFormModal = ({
           {currentStep === 2 && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-emerald-500" />
+                <Calendar className="h-5 w-5 text-black" />
                 Safari Booking Details
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -533,7 +533,7 @@ const BookingFormModal = ({
                     id="nationalPark"
                     value={formData.nationalPark}
                     onChange={(e) => updateFormData('nationalPark', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 appearance-none pr-10 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 appearance-none pr-10 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                     disabled={!!(driver?.destinations && driver.destinations.length > 0)}
                   >
@@ -555,7 +555,7 @@ const BookingFormModal = ({
                     id="safariType"
                     value={formData.safariType}
                     onChange={(e) => updateFormData('safariType', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.safariType ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                   >
                     <option value="Morning Safari">Morning Safari</option>
@@ -568,7 +568,7 @@ const BookingFormModal = ({
 
               {/* Selected Dates with Half Day/Full Day and Safari Type */}
               {selectedDates.length > 0 && (
-                <div className="mt-4 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <h3 className="font-semibold text-gray-900 mb-3">Selected Dates & Type:</h3>
                   <div className="space-y-3">
                     {selectedDates.map((date, index) => {
@@ -576,7 +576,7 @@ const BookingFormModal = ({
                       const dateType = selectedDatesWithType[dateString] || 'full-day';
                       const dateSafariType = formData.dateSafariTypes?.[dateString] || formData.safariType || 'Morning Safari';
                       return (
-                        <div key={index} className="bg-white p-3 rounded-lg border border-emerald-200">
+                        <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-gray-700">
                               {date.toLocaleDateString()}
@@ -589,7 +589,7 @@ const BookingFormModal = ({
                                   if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
                                 }}
                                 className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
-                                  ? 'bg-emerald-600 text-white shadow-md'
+                                  ? 'bg-black text-white shadow-md'
                                   : 'bg-gray-100 text-gray-600'
                                   }`}
                               >
@@ -602,7 +602,7 @@ const BookingFormModal = ({
                                   if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
                                 }}
                                 className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
-                                  ? 'bg-emerald-600 text-white shadow-md'
+                                  ? 'bg-black text-white shadow-md'
                                   : 'bg-gray-100 text-gray-600'
                                   }`}
                               >
@@ -618,7 +618,7 @@ const BookingFormModal = ({
                                 const newSafariTypes = { ...(formData.dateSafariTypes || {}), [dateString]: e.target.value };
                                 updateFormData('dateSafariTypes', newSafariTypes);
                               }}
-                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
                             >
                               <option value="Morning Safari">Morning Safari</option>
                               <option value="Evening Safari">Evening Safari</option>
@@ -638,7 +638,7 @@ const BookingFormModal = ({
           {currentStep === 3 && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Navigation className="h-5 w-5 text-emerald-500" />
+                <Navigation className="h-5 w-5 text-black" />
                 Pickup & Drop-off Information
               </h2>
               <div className="space-y-4">
@@ -647,7 +647,7 @@ const BookingFormModal = ({
                     type="checkbox"
                     checked={formData.needsHotelPickup}
                     onChange={(e) => updateFormData('needsHotelPickup', e.target.checked)}
-                    className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
+                    className="w-5 h-5 text-black rounded focus:ring-black"
                   />
                   <span className="text-sm font-medium text-gray-700">Do you need hotel pickup?</span>
                 </label>
@@ -663,7 +663,7 @@ const BookingFormModal = ({
                         id="hotelName"
                         value={formData.hotelName}
                         onChange={(e) => updateFormData('hotelName', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                           }`}
                       />
                       {formErrors.hotelName && <p className="text-red-500 text-xs mt-1">{formErrors.hotelName}</p>}
@@ -678,7 +678,7 @@ const BookingFormModal = ({
                         id="hotelAddress"
                         value={formData.hotelAddress}
                         onChange={(e) => updateFormData('hotelAddress', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                           }`}
                       />
                       {formErrors.hotelAddress && <p className="text-red-500 text-xs mt-1">{formErrors.hotelAddress}</p>}
@@ -697,7 +697,7 @@ const BookingFormModal = ({
                         id="pickupLocation"
                         value={formData.pickupLocation}
                         onChange={(e) => updateFormData('pickupLocation', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                           }`}
                       />
                       {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
@@ -712,7 +712,7 @@ const BookingFormModal = ({
                         id="dropoffLocation"
                         value={formData.dropoffLocation}
                         onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                           }`}
                       />
                       {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
@@ -727,7 +727,7 @@ const BookingFormModal = ({
           {currentStep === 4 && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Package className="h-5 w-5 text-emerald-500" />
+                <Package className="h-5 w-5 text-black" />
                 Additional Requests / Add-Ons
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -743,12 +743,12 @@ const BookingFormModal = ({
                         type="checkbox"
                         checked={formData[key]}
                         onChange={(e) => updateFormData(key, e.target.checked)}
-                        className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
+                        className="w-5 h-5 text-black rounded focus:ring-black"
                       />
                       <span className="text-sm font-medium text-gray-700">{label}</span>
                     </div>
                     {price > 0 && (
-                      <span className="text-sm font-semibold text-emerald-600">+LKR {price.toLocaleString()}</span>
+                      <span className="text-sm font-semibold text-black">+LKR {price.toLocaleString()}</span>
                     )}
                   </label>
                 ))}
@@ -769,7 +769,7 @@ const BookingFormModal = ({
                               : currentSnacks.filter(s => s !== item);
                             updateFormData('selectedSnacks', newSnacks);
                           }}
-                          className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500"
+                          className="w-4 h-4 text-emerald-500 rounded focus:ring-black"
                         />
                         <span className="text-xs text-gray-700">{item}</span>
                       </label>
@@ -784,7 +784,7 @@ const BookingFormModal = ({
           {currentStep === 5 && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Phone className="h-5 w-5 text-emerald-500" />
+                <Phone className="h-5 w-5 text-black" />
                 Emergency Contact
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -798,7 +798,7 @@ const BookingFormModal = ({
                     id="emergencyContactName"
                     value={formData.emergencyContactName}
                     onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                   />
                   {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
@@ -818,7 +818,7 @@ const BookingFormModal = ({
                       updateFormData('emergencyContactPhone', value);
                     }}
                     maxLength={10}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
                     placeholder="771234567"
                   />
@@ -846,7 +846,7 @@ const BookingFormModal = ({
                   handleNext();
                 }
               }}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-lg font-medium flex-1 sm:flex-none"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-black text-white rounded-lg font-medium flex-1 sm:flex-none hover:bg-gray-800 transition-colors"
             >
               Next
             </button>
@@ -868,7 +868,7 @@ const BookingFormModal = ({
                   console.warn('⚠️ Step validation failed');
                 }
               }}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-emerald-500 text-white rounded-none font-medium flex-1 sm:flex-none cursor-pointer"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-black text-white rounded-none font-medium flex-1 sm:flex-none cursor-pointer hover:bg-gray-800 transition-colors"
             >
               Confirm Booking
             </button>
@@ -1857,7 +1857,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">Loading driver profile...</p>
         </div>
       </div>
@@ -1866,14 +1866,14 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
   if (error || !driver) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Driver Not Found</h2>
           <p className="text-gray-600 mb-4">{error || "The driver you're looking for doesn't exist."}</p>
           <button
             onClick={() => navigate(-1)}
-            className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg"
+            className="bg-gradient-to-r from-black to-gray-800 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:from-gray-800 hover:to-gray-700 transition-colors"
           >
             Go Back
           </button>
@@ -1890,8 +1890,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
             <div className="text-center space-y-4">
               <div className="flex justify-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-10 h-10 text-green-600" />
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-10 h-10 text-black" />
                 </div>
               </div>
 
@@ -1901,7 +1901,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               <p className="text-gray-600 mb-2">
                 Your booking request has been successfully submitted.
               </p>
-              <p className="text-sm text-emerald-600 font-semibold mb-6">
+              <p className="text-sm text-black font-semibold mb-6">
                 Please wait for the service provider's acceptance.
               </p>
               {successMessageData.bookingId && (
@@ -1911,7 +1911,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               )}
 
               {/* Booking Details */}
-              <div className="bg-emerald-50 rounded-xl p-4 mb-6 text-left space-y-3">
+              <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left space-y-3">
                 <div className="space-y-1">
                   <span className="text-gray-600 font-medium block">Driver:</span>
                   <span className="text-gray-900 font-semibold block">{successMessageData.driverName}</span>
@@ -1937,9 +1937,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   <span className="text-gray-600 font-medium block">National Park:</span>
                   <span className="text-gray-900 font-semibold block">{successMessageData.nationalPark}</span>
                 </div>
-                <div className="space-y-1 border-t border-emerald-200 pt-2 mt-2">
+                <div className="space-y-1 border-t border-gray-200 pt-2 mt-2">
                   <span className="text-gray-600 font-bold block">Total:</span>
-                  <span className="text-emerald-600 font-bold text-lg block">LKR {successMessageData.totalPrice.toLocaleString()}</span>
+                  <span className="text-black font-bold text-lg block">LKR {successMessageData.totalPrice.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -1957,7 +1957,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     navigate('/driver', { replace: true });
                   }
                 }}
-                className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg font-semibold shadow-lg"
+                className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold shadow-lg hover:bg-gray-800 transition-colors"
               >
                 Got it!
               </button>
@@ -2003,7 +2003,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       />
 
 
-      <div className="bg-gradient-to-r from-green-500 via-green-400 to-green-500 border-b border-green-300 shadow-lg">
+      <div className="bg-gradient-to-r from-black via-gray-900 to-black border-b border-gray-700 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-5 md:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-18 md:h-20">
             <div className="flex items-center">
@@ -2013,12 +2013,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   navigate('/driver');
                   // The scroll will be handled by JeepSection2 component
                 }}
-                className="flex items-center text-green-50 mr-3 sm:mr-4 md:mr-6 font-medium hover:text-green-100 transition-colors touch-manipulation"
+                className="flex items-center text-white mr-3 sm:mr-4 md:mr-6 font-medium hover:text-gray-300 transition-colors touch-manipulation"
               >
                 <ArrowLeft size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-2.5" />
                 <span className="text-sm sm:text-base md:text-lg">Back</span>
               </button>
-              <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-green-50">Jeep Driver Profile</h1>
+              <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-white">Jeep Driver Profile</h1>
             </div>
           </div>
         </div>
@@ -2028,26 +2028,26 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         <div className="w-full lg:flex-1 lg:overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6 lg:gap-8 px-4 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-5 md:py-6">
           {/* Sidebar */}
           <div className="lg:col-span-1 flex flex-col min-h-0">
-            <div className="bg-gradient-to-b from-green-100 to-green-200 border-2 border-green-300 rounded-lg p-4 sm:p-5 md:p-6 lg:p-8 flex flex-col lg:h-full shadow-xl">
+            <div className="bg-gradient-to-b from-white to-gray-50 border-2 border-gray-300 rounded-lg p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col lg:h-full shadow-xl">
               {/* Profile Header */}
-              <div className="text-center mb-4 sm:mb-5 md:mb-6">
+              <div className="text-center mb-2 sm:mb-3 md:mb-4">
                 <img
                   src={driver.profilePicture || "/api/placeholder/120/120"}
                   alt={driver.fullName}
-                  className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full object-cover border-4 border-green-400 shadow-2xl mx-auto mb-3 sm:mb-4 md:mb-5"
+                  className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full object-cover border-4 border-black shadow-2xl mx-auto mb-2 sm:mb-2.5 md:mb-3"
                 />
-                <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-800 mb-2">{driver.fullName}</h2>
-                <p className="text-green-700 font-medium mb-3 sm:mb-4 md:mb-5 text-sm sm:text-base md:text-lg">{driver.serviceType}</p>
+                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-black mb-1">{driver.fullName}</h2>
+                <p className="text-gray-700 font-medium mb-2 sm:mb-2.5 md:mb-3 text-xs sm:text-sm md:text-base">{driver.serviceType}</p>
 
                 {/* Rating */}
-                <div className="flex items-center justify-center mt-3 sm:mt-4 bg-green-50 rounded-lg p-3 sm:p-3.5 md:p-4 border border-green-300">
-                  <div className="flex items-center flex-wrap justify-center gap-2 sm:gap-2.5">
+                <div className="flex items-center justify-center mt-2 sm:mt-2.5 bg-gray-100 rounded-lg p-2 sm:p-2.5 md:p-3 border border-gray-300">
+                  <div className="flex items-center flex-wrap justify-center gap-1.5 sm:gap-2">
                     {renderStars(driver.rating || 0)}
-                    <span className="text-sm sm:text-base font-semibold text-green-800">
+                    <span className="text-xs sm:text-sm font-semibold text-black">
                       {driver.rating?.toFixed(1) || '0.0'}/5
                     </span>
                     {driver.totalReviews > 0 && (
-                      <span className="text-sm text-green-600">
+                      <span className="text-xs text-gray-600">
                         • {driver.totalReviews} reviews
                       </span>
                     )}
@@ -2056,37 +2056,37 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               </div>
 
               {/* Contact Info */}
-              <div className="space-y-3 sm:space-y-3.5 md:space-y-4 mb-4 sm:mb-5 md:mb-6 flex-1">
+              <div className="space-y-2 sm:space-y-2.5 md:space-y-3 mb-2 sm:mb-3 md:mb-4 flex-1">
                 {driver.contactPhone && (
-                  <div className="flex items-center text-green-800 p-3 sm:p-3.5 md:p-4 rounded-lg bg-green-50 border border-green-300">
-                    <div className="p-2 sm:p-2.5 md:p-3 bg-green-400 rounded-lg mr-3 sm:mr-3.5 md:mr-4 flex-shrink-0">
-                      <Phone size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+                  <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
+                      <Phone size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-sm sm:text-base md:text-lg text-green-800 break-words">{driver.contactPhone}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{driver.contactPhone}</span>
                   </div>
                 )}
 
                 {driver.contactEmail && (
-                  <div className="flex items-center text-green-800 p-3 sm:p-3.5 md:p-4 rounded-lg bg-green-50 border border-green-300">
-                    <div className="p-2 sm:p-2.5 md:p-3 bg-green-400 rounded-lg mr-3 sm:mr-3.5 md:mr-4 flex-shrink-0">
-                      <Mail size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+                  <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
+                      <Mail size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-sm sm:text-base md:text-lg text-green-800 break-words">{driver.contactEmail}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{driver.contactEmail}</span>
                   </div>
                 )}
 
                 {driver.location && (
-                  <div className="flex items-center text-green-800 p-3 sm:p-3.5 md:p-4 rounded-lg bg-green-50 border border-green-300">
-                    <div className="p-2 sm:p-2.5 md:p-3 bg-green-400 rounded-lg mr-3 sm:mr-3.5 md:mr-4 flex-shrink-0">
-                      <MapPin size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+                  <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
+                      <MapPin size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-sm sm:text-base md:text-lg text-green-800 break-words">{driver.location}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{driver.location}</span>
                   </div>
                 )}
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-2 sm:space-y-2.5">
                 {!currentUser && (
                   <button
                     onClick={() => {
@@ -2094,7 +2094,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         onShowAuth('login');
                       }
                     }}
-                    className="w-full bg-gradient-to-r from-green-500 to-green-400 text-white py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 rounded-lg font-semibold text-sm sm:text-base md:text-lg shadow-lg hover:from-green-400 hover:to-green-300 transition-all touch-manipulation min-h-[44px]"
+                    className="w-full bg-gradient-to-r from-black to-gray-800 text-white py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 rounded-lg font-semibold text-xs sm:text-sm md:text-base shadow-lg hover:from-gray-800 hover:to-gray-700 transition-all touch-manipulation min-h-[40px]"
                   >
                     Login to Book or Message
                   </button>
@@ -2106,23 +2106,23 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           {/* Main Content */}
           <div className="lg:col-span-2 flex flex-col min-h-0">
             {/* Tabs */}
-            <div className="bg-gradient-to-b from-green-100 to-green-200 rounded-lg shadow-2xl border-2 border-green-300 overflow-hidden flex flex-col lg:flex-1 min-h-0 w-full">
-              <div className="border-b border-green-300 bg-gradient-to-r from-green-200 to-green-100">
+            <div className="bg-gradient-to-b from-white to-gray-50 rounded-lg shadow-2xl border-2 border-gray-300 overflow-hidden flex flex-col lg:flex-1 min-h-0 w-full">
+              <div className="border-b border-gray-300 bg-gradient-to-r from-gray-100 to-white">
                 <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'overview'
-                      ? 'border-green-500 text-green-800 bg-green-50'
-                      : 'border-transparent text-green-600 hover:text-green-800'
+                    className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'overview'
+                      ? 'border-black text-black bg-white'
+                      : 'border-transparent text-gray-600 hover:text-black'
                       }`}
                   >
                     Overview
                   </button>
                   <button
                     onClick={() => setActiveTab('reviews')}
-                    className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'reviews'
-                      ? 'border-green-500 text-green-800 bg-green-50'
-                      : 'border-transparent text-green-600 hover:text-green-800'
+                    className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'reviews'
+                      ? 'border-black text-black bg-white'
+                      : 'border-transparent text-gray-600 hover:text-black'
                       }`}
                   >
                     <span className="hidden sm:inline">Reviews</span>
@@ -2132,12 +2132,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   {currentUser && userRole === 'tourist' && (
                     <button
                       onClick={() => setActiveTab('booking')}
-                      className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'booking'
-                        ? 'border-green-500 text-green-800 bg-green-50'
-                        : 'border-transparent text-green-600 hover:text-green-800'
+                      className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'booking'
+                        ? 'border-black text-black bg-white'
+                        : 'border-transparent text-gray-600 hover:text-black'
                         }`}
                     >
-                      <CalendarIcon size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6 inline mr-2 sm:mr-2.5 md:mr-3" />
+                      <CalendarIcon size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 inline mr-1.5 sm:mr-2 md:mr-2.5" />
                       <span className="hidden sm:inline">Book Now</span>
                       <span className="sm:hidden">Book</span>
                     </button>
@@ -2150,9 +2150,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           handleOpenChatModal();
                         }
                       }}
-                      className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'chat'
-                        ? 'border-green-500 text-green-800 bg-green-50'
-                        : 'border-transparent text-green-600 hover:text-green-800'
+                      className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'chat'
+                        ? 'border-black text-black bg-white'
+                        : 'border-transparent text-gray-600 hover:text-black'
                         }`}
                     >
                       <span className="hidden sm:inline">Messages</span>
@@ -2163,18 +2163,18 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               </div>
 
               {/* Tab Content */}
-              <div className="p-4 sm:p-5 md:p-6 lg:p-8 lg:overflow-hidden lg:flex-1 bg-gradient-to-b from-green-50 to-green-100 text-green-800">
+              <div className="p-2.5 sm:p-3 md:p-4 lg:p-5 lg:overflow-hidden lg:flex-1 bg-gradient-to-b from-white to-gray-50 text-black">
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
-                  <div className="space-y-3.5 sm:space-y-4 md:space-y-5 lg:h-full lg:overflow-y-auto pr-2 sm:pr-3">
+                  <div className="space-y-2 sm:space-y-2.5 md:space-y-3 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
                     {/* Experience */}
-                    <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
-                      <div className="p-2.5 sm:p-3 md:p-3.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 md:mr-4 flex-shrink-0">
-                        <Clock className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
+                    <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                      <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
+                        <Clock className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Experience</h3>
-                        <p className="text-green-700 text-sm sm:text-base leading-relaxed">
+                        <h3 className="font-bold text-black mb-1 text-xs sm:text-sm md:text-base">Experience</h3>
+                        <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
                           {driver.experienceYears || 0} years of experience as a {driver.serviceType}
                         </p>
                       </div>
@@ -2182,9 +2182,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Description */}
                     {driver.description && (
-                      <div className="p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
-                        <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">About</h3>
-                        <p className="text-green-700 leading-relaxed text-sm sm:text-base line-clamp-3">
+                      <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <h3 className="font-bold text-black mb-1 text-xs sm:text-sm md:text-base">About</h3>
+                        <p className="text-gray-700 leading-relaxed text-xs sm:text-sm line-clamp-2">
                           {driver.description}
                         </p>
                       </div>
@@ -2192,64 +2192,64 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Vehicle Type */}
                     {driver.vehicleType && (
-                      <div className="p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
-                        <h3 className="font-bold text-green-800 mb-2 flex items-center text-sm sm:text-base md:text-lg">
-                          <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
-                            <Car className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
+                      <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <h3 className="font-bold text-black mb-1 flex items-center text-xs sm:text-sm md:text-base">
+                          <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                            <Car className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                           </div>
                           Vehicle Type
                         </h3>
-                        <p className="text-green-700 text-base sm:text-lg md:text-xl font-bold mt-2">{driver.vehicleType}</p>
+                        <p className="text-gray-700 text-sm sm:text-base md:text-lg font-bold mt-1">{driver.vehicleType}</p>
                       </div>
                     )}
 
                     {/* Pricing */}
                     {driver.pricePerDay && (
-                      <div className="p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
-                        <h3 className="font-bold text-green-800 mb-3 sm:mb-4 flex items-center text-sm sm:text-base md:text-lg">
-                          <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
-                            <DollarSign className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
+                      <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <h3 className="font-bold text-black mb-2 sm:mb-2.5 flex items-center text-xs sm:text-sm md:text-base">
+                          <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                            <DollarSign className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                           </div>
                           Rates
                         </h3>
-                        <div className="space-y-2.5 sm:space-y-3">
+                        <div className="space-y-1.5 sm:space-y-2">
                           {/* Full Day Price */}
-                          <div className="flex items-center justify-between p-3 sm:p-3.5 md:p-4 bg-green-50 rounded-lg border border-green-300">
-                            <div className="flex-1 min-w-0 pr-3">
-                              <span className="text-green-800 font-bold text-sm sm:text-base block">Full Day Safari:</span>
-                              <p className="text-sm text-green-600 mt-1">Full day safari tours</p>
+                          <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
+                            <div className="flex-1 min-w-0 pr-2">
+                              <span className="text-black font-bold text-xs sm:text-sm block">Full Day Safari:</span>
+                              <p className="text-xs text-gray-600 mt-0.5">Full day safari tours</p>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <span className="text-lg sm:text-xl md:text-2xl font-black text-green-700">
+                              <span className="text-sm sm:text-base md:text-lg font-black text-black">
                                 LKR {driver.pricePerDay.toLocaleString()}
                               </span>
-                              <span className="text-sm font-semibold text-green-600 block">/day</span>
+                              <span className="text-xs font-semibold text-gray-600 block">/day</span>
                             </div>
                           </div>
                           {/* Half Day Price */}
-                          <div className="flex items-center justify-between p-3 sm:p-3.5 md:p-4 bg-green-50 rounded-lg border border-green-300">
-                            <div className="flex-1 min-w-0 pr-3">
-                              <span className="text-green-800 font-bold text-sm sm:text-base block">Half Day Safari:</span>
-                              <p className="text-sm text-green-600 mt-1">Half day safari tours</p>
+                          <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
+                            <div className="flex-1 min-w-0 pr-2">
+                              <span className="text-black font-bold text-xs sm:text-sm block">Half Day Safari:</span>
+                              <p className="text-xs text-gray-600 mt-0.5">Half day safari tours</p>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <span className="text-lg sm:text-xl md:text-2xl font-black text-green-700">
+                              <span className="text-sm sm:text-base md:text-lg font-black text-black">
                                 LKR {Math.round(driver.pricePerDay * 0.6).toLocaleString()}
                               </span>
-                              <span className="text-sm font-semibold text-green-600 block">/half day</span>
+                              <span className="text-xs font-semibold text-gray-600 block">/half day</span>
                             </div>
                           </div>
                           {driver.pricePerHour && (
-                            <div className="flex items-center justify-between p-3 sm:p-3.5 md:p-4 bg-green-50 rounded-lg border border-green-300">
-                              <div className="flex-1 min-w-0 pr-3">
-                                <span className="text-green-800 font-bold text-sm sm:text-base block">Price per hour:</span>
-                                <p className="text-sm text-green-600 mt-1">Hourly rate</p>
+                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="text-black font-bold text-xs sm:text-sm block">Price per hour:</span>
+                                <p className="text-xs text-gray-600 mt-0.5">Hourly rate</p>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <span className="text-base sm:text-lg md:text-xl font-black text-green-700">
+                                <span className="text-xs sm:text-sm md:text-base font-black text-black">
                                   LKR {driver.pricePerHour.toLocaleString()}
                                 </span>
-                                <span className="text-sm font-semibold text-green-600 block">/hour</span>
+                                <span className="text-xs font-semibold text-gray-600 block">/hour</span>
                               </div>
                             </div>
                           )}
@@ -2259,17 +2259,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Languages */}
                     {driver.languages && driver.languages.length > 0 && (
-                      <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
-                        <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
-                          <Languages className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
+                      <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                          <Languages className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Languages</h3>
-                          <div className="flex flex-wrap gap-2 sm:gap-2.5">
+                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Languages</h3>
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {driver.languages.map((lang, index) => (
                               <span
                                 key={index}
-                                className="bg-green-100 text-green-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-sm sm:text-base border border-green-300 font-semibold"
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
                               >
                                 {lang}
                               </span>
@@ -2281,17 +2281,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Destinations */}
                     {driver.destinations && driver.destinations.length > 0 && (
-                      <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
-                        <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
-                          <MapPin className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
+                      <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                          <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Destinations Covered</h3>
-                          <div className="flex flex-wrap gap-2 sm:gap-2.5">
+                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Destinations Covered</h3>
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {driver.destinations.map((destination, index) => (
                               <span
                                 key={index}
-                                className="bg-green-100 text-green-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-sm sm:text-base border border-green-300 font-semibold"
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
                               >
                                 {destination}
                               </span>
@@ -2303,17 +2303,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Certifications */}
                     {driver.certifications && driver.certifications.length > 0 && (
-                      <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
-                        <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
-                          <Award className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
+                      <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                          <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Certifications</h3>
-                          <div className="flex flex-wrap gap-2 sm:gap-2.5">
+                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Certifications</h3>
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {driver.certifications.map((cert, index) => (
                               <span
                                 key={index}
-                                className="bg-green-100 text-green-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-sm sm:text-base border border-green-300 font-semibold"
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
                               >
                                 {cert}
                               </span>
@@ -2325,17 +2325,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                     {/* Special Skills */}
                     {driver.specialSkills && driver.specialSkills.length > 0 && (
-                      <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
-                        <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
-                          <Shield className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
+                      <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                          <Shield className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Special Skills</h3>
-                          <div className="flex flex-wrap gap-2 sm:gap-2.5">
+                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Special Skills</h3>
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {driver.specialSkills.map((skill, index) => (
                               <span
                                 key={index}
-                                className="bg-green-100 text-green-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-sm sm:text-base border border-green-300 font-semibold"
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
                               >
                                 {skill}
                               </span>
@@ -2365,7 +2365,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
                       {/* Calendar */}
                       <div className="min-h-0">
-                        <h3 className="font-semibold text-green-800 mb-2 sm:mb-3 md:mb-4 text-xs sm:text-sm md:text-base">Select Your Dates</h3>
+                        <h3 className="font-semibold text-black mb-2 sm:mb-3 md:mb-4 text-xs sm:text-sm md:text-base">Select Your Dates</h3>
                         <div className="overflow-y-auto max-h-[300px] sm:max-h-[350px] md:max-h-[400px]">
                           <DatePickerCalendar
                             selectedDates={selectedDates}
@@ -2378,32 +2378,32 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                       {/* Booking Summary */}
                       <div className="space-y-2.5 sm:space-y-3 md:space-y-4 min-h-0">
-                        <div className="bg-white border border-green-300 rounded-lg p-2.5 sm:p-3 md:p-4">
-                          <h3 className="font-semibold text-green-800 mb-2 sm:mb-3 text-xs sm:text-sm md:text-base">Booking Summary</h3>
+                        <div className="bg-white border border-gray-300 rounded-lg p-2.5 sm:p-3 md:p-4">
+                          <h3 className="font-semibold text-black mb-2 sm:mb-3 text-xs sm:text-sm md:text-base">Booking Summary</h3>
 
                           {selectedDates.length === 0 ? (
-                            <p className="text-green-600 text-center py-3 sm:py-4 text-xs sm:text-sm">
+                            <p className="text-gray-600 text-center py-3 sm:py-4 text-xs sm:text-sm">
                               Select dates to see booking details
                             </p>
                           ) : (
                             <div className="space-y-2 sm:space-y-3">
                               <div className="flex justify-between items-center">
-                                <span className="text-green-700 text-xs sm:text-sm">Selected dates:</span>
-                                <span className="font-medium text-green-800 text-xs sm:text-sm">{selectedDates.length} day(s)</span>
+                                <span className="text-gray-700 text-xs sm:text-sm">Selected dates:</span>
+                                <span className="font-medium text-black text-xs sm:text-sm">{selectedDates.length} day(s)</span>
                               </div>
 
                               {/* Show breakdown of dates and their types */}
-                              <div className="space-y-1.5 sm:space-y-2 bg-green-50 p-2 sm:p-2.5 rounded-lg border border-green-300 max-h-[150px] sm:max-h-[180px] md:max-h-[200px] overflow-y-auto">
+                              <div className="space-y-1.5 sm:space-y-2 bg-gray-50 p-2 sm:p-2.5 rounded-lg border border-gray-300 max-h-[150px] sm:max-h-[180px] md:max-h-[200px] overflow-y-auto">
                                 {selectedDates.map((date, index) => {
                                   const dateString = date.toDateString();
                                   const dateType = selectedDatesWithType[dateString] || 'full-day';
                                   const dayPrice = dateType === 'half-day' ? (driver.pricePerDay || 0) * 0.6 : (driver.pricePerDay || 0);
                                   return (
                                     <div key={index} className="flex justify-between items-center text-xs">
-                                      <span className="text-green-700 flex-1 min-w-0 pr-2">
+                                      <span className="text-gray-700 flex-1 min-w-0 pr-2">
                                         {date.toLocaleDateString()} ({dateType === 'half-day' ? 'Half Day' : 'Full Day'})
                                       </span>
-                                      <span className="font-medium text-green-800 flex-shrink-0">
+                                      <span className="font-medium text-black flex-shrink-0">
                                         LKR {dayPrice.toLocaleString()}
                                       </span>
                                     </div>
@@ -2412,14 +2412,14 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                               </div>
 
                               <div className="flex justify-between items-center">
-                                <span className="text-green-700 text-xs sm:text-sm">Price per day:</span>
-                                <span className="font-medium text-green-800 text-xs sm:text-sm">LKR {driver.pricePerDay?.toLocaleString() || '0'}</span>
+                                <span className="text-gray-700 text-xs sm:text-sm">Price per day:</span>
+                                <span className="font-medium text-black text-xs sm:text-sm">LKR {driver.pricePerDay?.toLocaleString() || '0'}</span>
                               </div>
 
-                              <div className="border-t border-green-300 pt-2">
+                              <div className="border-t border-gray-300 pt-2">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-sm sm:text-base md:text-lg font-semibold text-green-800">Total:</span>
-                                  <span className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
+                                  <span className="text-sm sm:text-base md:text-lg font-semibold text-black">Total:</span>
+                                  <span className="text-lg sm:text-xl md:text-2xl font-bold text-black">
                                     LKR {calculateTotalPrice().toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                   </span>
                                 </div>
@@ -2439,7 +2439,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                   }
                                   setShowBookingForm(true);
                                 }}
-                                className="w-full bg-green-500 text-white py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 rounded-lg font-medium mt-2 sm:mt-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs sm:text-sm md:text-base"
+                                className="w-full bg-black text-white py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 rounded-lg font-medium mt-2 sm:mt-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs sm:text-sm md:text-base hover:bg-gray-800 transition-colors"
                                 disabled={selectedDates.length === 0}
                               >
                                 {selectedDates.length === 0 ? (
@@ -2453,9 +2453,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         </div>
 
                         {/* Driver Info */}
-                        <div className="bg-white border border-green-300 rounded-lg p-2.5 sm:p-3 md:p-4">
-                          <h3 className="font-semibold text-green-800 mb-1.5 sm:mb-2 text-xs sm:text-sm md:text-base">Driver Information</h3>
-                          <p className="text-green-700 text-xs sm:text-sm leading-relaxed">
+                        <div className="bg-white border border-gray-300 rounded-lg p-2.5 sm:p-3 md:p-4">
+                          <h3 className="font-semibold text-black mb-1.5 sm:mb-2 text-xs sm:text-sm md:text-base">Driver Information</h3>
+                          <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
                             You'll be booking with {driver.fullName}, an experienced {driver.serviceType} with {driver.experienceYears || 0} years of experience.
                           </p>
                         </div>
@@ -2469,16 +2469,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   <div className="min-h-[300px] lg:h-full flex flex-col items-center justify-center p-4 sm:p-6 md:p-8">
                     {currentUser ? (
                       <div className="text-center">
-                        <MessageCircle size={48} className="sm:w-16 sm:h-16 md:w-20 md:h-20 mx-auto mb-3 sm:mb-4 text-green-500" />
-                        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-green-800 mb-2">
+                        <MessageCircle size={48} className="sm:w-16 sm:h-16 md:w-20 md:h-20 mx-auto mb-3 sm:mb-4 text-black" />
+                        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-black mb-2">
                           Chat with {driver.fullName}
                         </h3>
-                        <p className="text-green-700 text-xs sm:text-sm md:text-base mb-4 sm:mb-6">
+                        <p className="text-gray-700 text-xs sm:text-sm md:text-base mb-4 sm:mb-6">
                           Click the button below to open the chat window
                         </p>
                         <button
                           onClick={handleOpenChatModal}
-                          className="bg-green-500 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg font-medium flex items-center gap-2 mx-auto text-xs sm:text-sm md:text-base"
+                          className="bg-black text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg font-medium flex items-center gap-2 mx-auto text-xs sm:text-sm md:text-base hover:bg-gray-800 transition-colors"
                         >
                           <MessageCircle size={16} className="sm:w-5 sm:h-5" />
                           Open Chat
@@ -2486,11 +2486,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       </div>
                     ) : (
                       <div className="text-center py-6 sm:py-8">
-                        <MessageCircle size={40} className="sm:w-12 sm:h-12 md:w-14 md:h-14 mx-auto mb-3 sm:mb-4 text-green-400" />
-                        <h3 className="text-sm sm:text-base md:text-lg font-semibold text-green-800 mb-2">
+                        <MessageCircle size={40} className="sm:w-12 sm:h-12 md:w-14 md:h-14 mx-auto mb-3 sm:mb-4 text-gray-400" />
+                        <h3 className="text-sm sm:text-base md:text-lg font-semibold text-black mb-2">
                           Login to Message
                         </h3>
-                        <p className="text-green-700 text-xs sm:text-sm mb-4">
+                        <p className="text-gray-700 text-xs sm:text-sm mb-4">
                           Please login to start a conversation with {driver.fullName}
                         </p>
                         <button
@@ -2499,7 +2499,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                               onShowAuth('login');
                             }
                           }}
-                          className="bg-green-500 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm"
+                          className="bg-black text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm hover:bg-gray-800 transition-colors"
                         >
                           Login Now
                         </button>

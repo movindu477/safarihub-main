@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Menu,
   X,
@@ -59,17 +59,36 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     return () => unsubscribe();
   }, [auth]);
 
-  // Add scroll effect for navbar
+  // Add scroll effect for navbar with optimized throttling
   useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+    
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          // Only update state if scroll position actually changed significantly
+          if (Math.abs(currentScrollY - lastScrollY) > 5) {
+            setIsScrolled(currentScrollY > 10);
+            lastScrollY = currentScrollY;
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
-    window.addEventListener('scroll', handleScroll);
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Fetch user data from Firestore when user changes (not just when profile opens)
   // Use real-time listener to automatically update when profilePicture changes
+  // Optimized with useRef to prevent unnecessary re-renders
+  const userDataRef = useRef(null);
+  const currentUserIdRef = useRef(null);
+
   useEffect(() => {
     const currentUser = user || authUser;
 
@@ -77,9 +96,17 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       console.log('🔍 No user found, clearing user data');
       setUserData(null);
       setLoading(false);
+      userDataRef.current = null;
+      currentUserIdRef.current = null;
       return;
     }
 
+    // Skip if same user to prevent unnecessary re-fetching
+    if (currentUserIdRef.current === currentUser.uid && userDataRef.current) {
+      return;
+    }
+
+    currentUserIdRef.current = currentUser.uid;
     console.log('🔍 Setting up database listeners for user:', currentUser.uid);
     let unsubscribeTourist = null;
     let unsubscribeProvider = null;
@@ -100,21 +127,23 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           });
 
           // Set initial data immediately
+          userDataRef.current = initialData;
           setUserData(initialData);
           setLoading(false);
 
-          // Set up real-time listener for tourists
+          // Set up real-time listener for tourists with debouncing
           unsubscribeTourist = onSnapshot(touristDocRef, (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data();
-              console.log('📸 User data updated (tourist):', {
-                profilePicture: data.profilePicture ? `✅ Has image: ${data.profilePicture.substring(0, 50)}...` : '❌ No image',
-                name: data.fullName,
-                fullData: data
-              });
-              setUserData(data);
+              // Only update if data actually changed
+              if (JSON.stringify(data) !== JSON.stringify(userDataRef.current)) {
+                console.log('📸 User data updated (tourist)');
+                userDataRef.current = data;
+                setUserData(data);
+              }
             } else {
               console.log('⚠️ Tourist document no longer exists');
+              userDataRef.current = null;
               setUserData(null);
             }
             setLoading(false);
@@ -138,22 +167,23 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             });
 
             // Set initial data immediately
+            userDataRef.current = initialData;
             setUserData(initialData);
             setLoading(false);
 
-            // Set up real-time listener for service providers
+            // Set up real-time listener for service providers with debouncing
             unsubscribeProvider = onSnapshot(providerDocRef, (snapshot) => {
               if (snapshot.exists()) {
                 const data = snapshot.data();
-                console.log('📸 User data updated (provider):', {
-                  profilePicture: data.profilePicture ? `✅ Has image: ${data.profilePicture.substring(0, 50)}...` : '❌ No image',
-                  name: data.fullName,
-                  serviceType: data.serviceType,
-                  fullData: data
-                });
-                setUserData(data);
+                // Only update if data actually changed
+                if (JSON.stringify(data) !== JSON.stringify(userDataRef.current)) {
+                  console.log('📸 User data updated (provider)');
+                  userDataRef.current = data;
+                  setUserData(data);
+                }
               } else {
                 console.log('⚠️ Provider document no longer exists');
+                userDataRef.current = null;
                 setUserData(null);
               }
               setLoading(false);
@@ -163,12 +193,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             });
           } else {
             console.log("⚠️ No user data found in Firestore for:", currentUser.uid);
+            userDataRef.current = null;
             setUserData(null);
             setLoading(false);
           }
         }
       } catch (error) {
         console.error("❌ Error setting up user data listeners:", error);
+        userDataRef.current = null;
         setUserData(null);
         setLoading(false);
       }
@@ -184,11 +216,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     };
   }, [user, authUser, db]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await signOut(auth);
       setProfileOpen(false);
       setUserData(null);
+      userDataRef.current = null;
+      currentUserIdRef.current = null;
       setMenuOpen(false);
 
       // Call the onLogout callback if provided
@@ -203,107 +237,115 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     } catch (error) {
       console.error("Logout error:", error);
     }
-  };
+  }, [auth, onLogout, navigate]);
 
-  // Handle login navigation
-  const handleLoginClick = () => {
+  // Handle login navigation - memoized for performance
+  const handleLoginClick = useCallback(() => {
     setMenuOpen(false);
     if (onLogin) {
       onLogin('login');
     }
-  };
+  }, [onLogin]);
 
-  // Handle register navigation
-  const handleRegisterClick = () => {
+  // Handle register navigation - memoized for performance
+  const handleRegisterClick = useCallback(() => {
     setMenuOpen(false);
     if (onRegister) {
       onRegister('register');
     }
-  };
+  }, [onRegister]);
 
-  // Function to handle Home navigation
-  const handleHomeClick = () => {
+  // Function to handle Home navigation - memoized for performance
+  const handleHomeClick = useCallback(() => {
     navigate('/');
     setServicesDropdownOpen(false);
     setMobileServicesOpen(false);
     setMenuOpen(false);
-  };
+  }, [navigate]);
 
-  // Function to handle Jeep Driver navigation
-  const handleJeepDriverClick = () => {
+  // Function to handle Jeep Driver navigation - memoized for performance
+  const handleJeepDriverClick = useCallback(() => {
     navigate('/driver');
     setServicesDropdownOpen(false);
     setMobileServicesOpen(false);
     setMenuOpen(false);
-  };
+  }, [navigate]);
 
-  // Function to handle Destination navigation
-  const handleDestinationClick = () => {
+  // Function to handle Destination navigation - memoized for performance
+  const handleDestinationClick = useCallback(() => {
     navigate('/destination');
     setServicesDropdownOpen(false);
     setMobileServicesOpen(false);
     setMenuOpen(false);
-  };
+  }, [navigate]);
 
-  // Function to handle Guide navigation
-  const handleGuideClick = () => {
+  // Function to handle Guide navigation - memoized for performance
+  const handleGuideClick = useCallback(() => {
     navigate('/guide');
     setServicesDropdownOpen(false);
     setMobileServicesOpen(false);
     setMenuOpen(false);
-  };
+  }, [navigate]);
 
   // Use parent user prop if available, otherwise use local auth state
   const currentUser = user || authUser;
 
-  const servicesItems = [
-    { icon: Map, label: "Find a Guide", onClick: handleGuideClick, path: "/guide" },
-    { icon: Compass, label: "Explore Destinations", onClick: handleDestinationClick, path: "/destination" },
-    { icon: Car, label: "Find a Jeep Driver", onClick: handleJeepDriverClick, path: "/driver" },
-    { icon: ShoppingBag, label: "Rent Equipment", href: "#equipment" },
-  ];
+  // Determine user role (must be after userData is set) - memoized
+  const userRole = useMemo(() => userData?.serviceType || null, [userData?.serviceType]);
+  const isServiceProvider = useMemo(() => 
+    Boolean(userData && (userRole === "Jeep Driver" || userRole === "Tour Guide")),
+    [userData, userRole]
+  );
 
-  // Determine user role (must be after userData is set)
-  // Service providers are Jeep Drivers or Tour Guides - hide "Our Services" for them
-  const userRole = userData?.serviceType || null;
-  // Mark as service provider if userData exists and serviceType matches exactly
-  const isServiceProvider = Boolean(userData && (userRole === "Jeep Driver" || userRole === "Tour Guide"));
+  // Memoize profile navigation handlers
+  const handleProfileClick = useCallback(() => {
+    setProfileOpen(false);
+    navigate('/profile');
+  }, [navigate]);
 
-  // Different menu items for service providers vs tourists
-  const getProfileMenuItems = () => {
+  const handleFavoritesClick = useCallback(() => {
+    setProfileOpen(false);
+    navigate('/favorites');
+  }, [navigate]);
+
+  // Memoize profile menu items
+  const profileMenuItems = useMemo(() => {
     if (isServiceProvider) {
-      // Service providers see fewer items - main items are in Admin page
       return [
         { icon: Heart, label: "My Favorites", href: "#" },
         { icon: Settings, label: "Settings", href: "#" },
         { icon: HelpCircle, label: "Help & Support", href: "#" },
       ];
     } else {
-      // Tourists see all menu items
       return [
-        { icon: User, label: "My Profile", href: "/profile", onClick: () => { setProfileOpen(false); navigate('/profile'); } },
-        { icon: Heart, label: "My Favorites", href: "/favorites", onClick: () => { setProfileOpen(false); navigate('/favorites'); } },
+        { icon: User, label: "My Profile", href: "/profile", onClick: handleProfileClick },
+        { icon: Heart, label: "My Favorites", href: "/favorites", onClick: handleFavoritesClick },
         { icon: Calendar, label: "My Bookings", href: "#" },
         { icon: CreditCard, label: "Payment Methods", href: "#" },
         { icon: Settings, label: "Settings", href: "#" },
         { icon: HelpCircle, label: "Help & Support", href: "#" },
       ];
     }
-  };
+  }, [isServiceProvider, handleProfileClick, handleFavoritesClick]);
 
-  const profileMenuItems = getProfileMenuItems();
+  // Memoize navigation handlers
+  const handleAdminClick = useCallback(() => navigate("/admin"), [navigate]);
+  const handleAboutClick = useCallback(() => navigate("/about"), [navigate]);
 
-  // Navigation items - Different for service providers vs tourists
-  const navItems = isServiceProvider
-    ? [
+  // Memoize navigation items
+  const navItems = useMemo(() => {
+    if (isServiceProvider) {
+      return [
+        { label: "HOME", onClick: handleHomeClick, path: "/" },
+        { label: "ABOUT US", onClick: handleAboutClick, path: "/about" },
+        { label: "ADMIN", onClick: handleAdminClick, path: "/admin" },
+      ];
+    }
+    return [
       { label: "HOME", onClick: handleHomeClick, path: "/" },
-      { label: "ABOUT US", onClick: () => navigate("/about"), path: "/about" },
-      { label: "ADMIN", onClick: () => navigate("/admin"), path: "/admin" },
-    ]
-    : [
-      { label: "HOME", onClick: handleHomeClick, path: "/" },
-      { label: "ABOUT US", onClick: () => navigate("/about"), path: "/about" },
+      { label: "ABOUT US", onClick: handleAboutClick, path: "/about" },
     ];
+  }, [isServiceProvider, handleHomeClick, handleAboutClick, handleAdminClick]);
 
   // Default user data if no user is logged in
   const defaultUserData = {
@@ -314,62 +356,80 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     avatar: userImage
   };
 
-  // Get profile picture from database - prioritize Firestore over Firebase Auth
-  const getProfilePicture = () => {
-    // First priority: Firestore profilePicture (from Supabase upload)
+  // Memoize profile picture getter
+  const getProfilePicture = useCallback(() => {
     if (userData?.profilePicture && userData.profilePicture.trim() !== '') {
-      console.log('📸 Using Firestore profilePicture:', userData.profilePicture.substring(0, 50) + '...');
       return userData.profilePicture;
     }
-    // Second priority: Firebase Auth photoURL
     if (currentUser?.photoURL && currentUser.photoURL.trim() !== '') {
-      console.log('📸 Using Firebase Auth photoURL:', currentUser.photoURL.substring(0, 50) + '...');
       return currentUser.photoURL;
     }
-    // Fallback: default user image
-    console.log('📸 No profile picture found, using default');
     return userImage;
-  };
+  }, [userData?.profilePicture, currentUser?.photoURL]);
 
-  const userProfileData = currentUser ? {
-    name: currentUser.displayName || userData?.fullName || userData?.fullname || "User",
-    email: currentUser.email || "No email",
-    membership: userData?.serviceType ? `${userData.serviceType}` : "Tourist",
-    joinDate: userData?.createdAt ? (userData.createdAt.toDate ? new Date(userData.createdAt.toDate()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : new Date(userData.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })) : "Recently",
-    // Get profile picture from database connection
-    avatar: getProfilePicture(),
-    phone: userData?.phone || userData?.phoneNumber || "Not provided",
-    location: userData?.location || userData?.country || "Not specified",
-    experience: userData?.experienceYears,
-    languages: userData?.languagesSpoken || userData?.preferredLanguage || "Not specified",
-    role: userData?.serviceType ? "Service Provider" : "Tourist"
-  } : defaultUserData;
+  // Memoize user profile data to prevent unnecessary recalculations
+  const userProfileData = useMemo(() => {
+    if (!currentUser) return defaultUserData;
+    
+    const joinDate = userData?.createdAt 
+      ? (userData.createdAt.toDate 
+          ? new Date(userData.createdAt.toDate()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+          : new Date(userData.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }))
+      : "Recently";
+    
+    return {
+      name: currentUser.displayName || userData?.fullName || userData?.fullname || "User",
+      email: currentUser.email || "No email",
+      membership: userData?.serviceType ? `${userData.serviceType}` : "Tourist",
+      joinDate,
+      avatar: getProfilePicture(),
+      phone: userData?.phone || userData?.phoneNumber || "Not provided",
+      location: userData?.location || userData?.country || "Not specified",
+      experience: userData?.experienceYears,
+      languages: userData?.languagesSpoken || userData?.preferredLanguage || "Not specified",
+      role: userData?.serviceType ? "Service Provider" : "Tourist"
+    };
+  }, [currentUser, userData, getProfilePicture]);
 
-  const normalizePath = (path) => {
+  // Memoize path normalization and active path checking
+  const normalizePath = useCallback((path) => {
     if (!path) return "";
     const trimmed = path === "/" ? "/" : path.replace(/\/+$/, "");
     return trimmed || "/";
-  };
+  }, []);
 
-  const isActivePath = (path) => {
+  const currentPath = useMemo(() => normalizePath(location.pathname || "/"), [location.pathname, normalizePath]);
+
+  const isActivePath = useCallback((path) => {
     if (!path) return false;
-    const current = normalizePath(location.pathname || "/");
     const target = normalizePath(path);
     if (target === "/") {
-      return current === "/";
+      return currentPath === "/";
     }
-    return current === target || current.startsWith(`${target}/`);
-  };
+    return currentPath === target || currentPath.startsWith(`${target}/`);
+  }, [currentPath, normalizePath]);
 
-  const isServicesActive = servicesItems.some(
-    (item) => item.path && isActivePath(item.path)
+  // Memoize services items to prevent recreation
+  const servicesItems = useMemo(() => [
+    { icon: Map, label: "Find a Guide", onClick: handleGuideClick, path: "/guide" },
+    { icon: Compass, label: "Explore Destinations", onClick: handleDestinationClick, path: "/destination" },
+    { icon: Car, label: "Find a Jeep Driver", onClick: handleJeepDriverClick, path: "/driver" },
+    { icon: ShoppingBag, label: "Rent Equipment", href: "#equipment" },
+  ], [handleGuideClick, handleDestinationClick, handleJeepDriverClick]);
+
+  const isServicesActive = useMemo(() => 
+    servicesItems.some((item) => item.path && isActivePath(item.path)),
+    [servicesItems, isActivePath]
   );
 
+  // Memoize dropdown handlers
+  const handleServicesMouseEnter = useCallback(() => setServicesDropdownOpen(true), []);
+  const handleServicesMouseLeave = useCallback(() => setServicesDropdownOpen(false), []);
 
   return (
     <>
-      {/* Navbar - Modern Full Width */}
-      <nav className={`fixed top-0 left-0 right-0 w-full text-white flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-12 py-3 z-50 h-16 border-b border-gray-700/40 transition-all duration-300 ${isScrolled
+      {/* Navbar - Modern Full Width - Optimized for performance */}
+      <nav className={`fixed top-0 left-0 right-0 w-full text-white flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-12 py-3 z-50 h-16 border-b border-gray-700/40 transition-[background-color,backdrop-filter,box-shadow] duration-200 ease-out will-change-[background-color,backdrop-filter,box-shadow] transform-gpu ${isScrolled
         ? 'bg-black/95 backdrop-blur-md shadow-lg shadow-black/20'
         : 'bg-black/90 backdrop-blur-sm shadow-md shadow-black/10'
         }`}>
@@ -378,8 +438,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           <img
             src={logo}
             alt="SafariHub Logo"
-            className="h-14 sm:h-16 md:h-16 lg:h-16 w-auto object-contain cursor-pointer transition-transform duration-300 hover:scale-105"
+            className="h-14 sm:h-16 md:h-16 lg:h-16 w-auto object-contain cursor-pointer transition-transform duration-200 ease-out will-change-transform"
             onClick={handleHomeClick}
+            loading="eager"
+            decoding="async"
           />
         </div>
 
@@ -389,7 +451,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             <button
               key={item.label}
               onClick={item.onClick}
-              className={`text-sm lg:text-base font-medium px-3 lg:px-4 py-2 rounded-lg transition-all duration-300 cursor-pointer whitespace-nowrap ${isActivePath(item.path)
+              className={`text-sm lg:text-base font-medium px-3 lg:px-4 py-2 rounded-lg transition-all duration-200 ease-out cursor-pointer whitespace-nowrap will-change-[background-color,color] ${isActivePath(item.path)
                 ? "bg-gray-800/70 text-gray-100 border border-gray-500/40 shadow-inner"
                 : "text-gray-100 hover:text-white hover:bg-gray-800/30"
                 }`}
@@ -402,31 +464,32 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           {!isServiceProvider && (
             <div
               className="relative"
-              onMouseEnter={() => setServicesDropdownOpen(true)}
-              onMouseLeave={() => setServicesDropdownOpen(false)}
+              onMouseEnter={handleServicesMouseEnter}
+              onMouseLeave={handleServicesMouseLeave}
             >
               <button
-                className={`text-sm lg:text-base font-medium px-3 lg:px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-1 cursor-pointer whitespace-nowrap ${isServicesActive
+                className={`text-sm lg:text-base font-medium px-3 lg:px-4 py-2 rounded-lg transition-all duration-200 ease-out flex items-center gap-1 cursor-pointer whitespace-nowrap will-change-[background-color,color] ${isServicesActive
                   ? "bg-gray-800/70 text-gray-100 border border-gray-500/40 shadow-inner"
                   : "text-gray-100 hover:text-white hover:bg-gray-800/30"
                   }`}
               >
                 OUR SERVICES
-                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ease-out will-change-transform ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Invisible connecting bridge to prevent gap */}
               <div
                 className="absolute top-full left-0 w-full h-2 bg-transparent"
-                onMouseEnter={() => setServicesDropdownOpen(true)}
+                onMouseEnter={handleServicesMouseEnter}
               ></div>
 
               {/* Dropdown Menu */}
               {servicesDropdownOpen && (
                 <div
-                  className="absolute top-full left-0 w-64 bg-black/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-700/40 overflow-hidden animate-fadeIn mt-2"
-                  onMouseEnter={() => setServicesDropdownOpen(true)}
-                  onMouseLeave={() => setServicesDropdownOpen(false)}
+                  className="absolute top-full left-0 w-64 bg-black/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-700/40 overflow-hidden animate-fadeIn mt-2 will-change-[opacity,transform] transform-gpu"
+                  style={{ contain: 'layout style paint' }}
+                  onMouseEnter={handleServicesMouseEnter}
+                  onMouseLeave={handleServicesMouseLeave}
                 >
                   <div className="py-2">
                     {servicesItems.map((item, index) => {
@@ -435,11 +498,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                         <button
                           key={item.label}
                           onClick={item.onClick}
-                          className={`flex items-center gap-3 px-4 py-3 text-white transition-all duration-300 group cursor-pointer w-full text-left ${item.path && isActivePath(item.path)
+                          className={`flex items-center gap-3 px-4 py-3 text-white transition-all duration-200 ease-out group cursor-pointer w-full text-left will-change-[background-color,color] ${item.path && isActivePath(item.path)
                             ? "bg-gray-800 text-gray-100"
                             : "hover:bg-gray-800 hover:text-white"
                             }`}
-                          style={{ animationDelay: `${index * 50}ms` }}
+                          style={{ animationDelay: `${index * 30}ms` }}
                         >
                           <IconComponent className="h-4 w-4 text-gray-200 group-hover:text-white" />
                           <span className="font-medium text-sm">{item.label}</span>
@@ -459,13 +522,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             <>
               <button
                 onClick={handleLoginClick}
-                className="bg-white hover:bg-gray-100 text-black px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm border border-gray-300 shadow-lg shadow-black/30 cursor-pointer text-sm lg:text-base whitespace-nowrap"
+                className="bg-white hover:bg-gray-100 text-black px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg font-semibold transition-all duration-200 ease-out hover:shadow-lg hover:scale-105 backdrop-blur-sm border border-gray-300 shadow-lg shadow-black/30 cursor-pointer text-sm lg:text-base whitespace-nowrap will-change-[background-color,transform,box-shadow]"
               >
                 Login
               </button>
               <button
                 onClick={handleRegisterClick}
-                className="border-2 border-white text-white hover:bg-white hover:text-black px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105 backdrop-blur-sm shadow-lg shadow-gray-400/20 cursor-pointer text-sm lg:text-base whitespace-nowrap"
+                className="border-2 border-white text-white hover:bg-white hover:text-black px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg font-semibold transition-all duration-200 ease-out hover:shadow-lg hover:scale-105 backdrop-blur-sm shadow-lg shadow-gray-400/20 cursor-pointer text-sm lg:text-base whitespace-nowrap will-change-[background-color,color,transform,box-shadow]"
               >
                 Register
               </button>
@@ -476,7 +539,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 <img
                   src={userProfileData.avatar}
                   alt="User"
-                  className="h-9 w-9 lg:h-10 lg:w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 object-cover"
+                  className="h-9 w-9 lg:h-10 lg:w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-200 ease-out border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 object-cover will-change-[opacity,border-color]"
                   onClick={() => setProfileOpen(true)}
                   onError={(e) => {
                     console.error('❌ Profile image failed to load in navbar:', userProfileData.avatar);
@@ -920,17 +983,17 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       <style>{`
         @keyframes slideInRight {
           from { 
-            transform: translateX(100%);
+            transform: translate3d(100%, 0, 0);
             opacity: 0;
           }
           to { 
-            transform: translateX(0);
+            transform: translate3d(0, 0, 0);
             opacity: 1;
           }
         }
         @keyframes slideInLeft {
-          from { transform: translateX(-100%); }
-          to { transform: translateX(0); }
+          from { transform: translate3d(-100%, 0, 0); }
+          to { transform: translate3d(0, 0, 0); }
         }
         @keyframes fadeIn {
           from { opacity: 0; }
@@ -939,25 +1002,35 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         @keyframes fadeInUp {
           from { 
             opacity: 0; 
-            transform: translateY(20px);
+            transform: translate3d(0, 20px, 0);
           }
           to { 
             opacity: 1; 
-            transform: translateY(0);
+            transform: translate3d(0, 0, 0);
           }
         }
         .animate-slideInRight { 
-          animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+          animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          will-change: transform, opacity;
+          transform: translateZ(0);
+          backface-visibility: hidden;
         }
         .animate-slideInLeft { 
-          animation: slideInLeft 0.3s ease-out forwards; 
+          animation: slideInLeft 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          will-change: transform;
+          transform: translateZ(0);
+          backface-visibility: hidden;
         }
         .animate-fadeIn { 
-          animation: fadeIn 0.3s ease-out forwards; 
+          animation: fadeIn 0.15s ease-out forwards;
+          will-change: opacity;
         }
         .animate-fadeInUp { 
-          animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+          animation: fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
           opacity: 0;
+          will-change: opacity, transform;
+          transform: translateZ(0);
+          backface-visibility: hidden;
         }
         .scrollbar-thin::-webkit-scrollbar {
           width: 6px;

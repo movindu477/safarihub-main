@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 // Import images from src/assets
 import parkImage from "../../assets/296811179_1216698719063054_6756487280100765789_n.jpg";
-import sanImage from "../../assets/back3ori.jpg";
+import sanImage from "../../assets/hero3.jpg";
 import beachImage from "../../assets/beach.avif";
 import forestImage from "../../assets/forest.avif";
 import campImage from "../../assets/camp.avif";
