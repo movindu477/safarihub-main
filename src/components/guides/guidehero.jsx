@@ -70,7 +70,7 @@ export default function GuideHero() {
       </div>
 
       {/* Mobile Optimization Styles */}
-      <style jsx>{`
+      <style>{`
         @media (max-width: 640px) {
           .text-2xl {
             font-size: 1.8rem;

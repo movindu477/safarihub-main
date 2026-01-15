@@ -279,7 +279,7 @@ const BookingSection = ({ user }) => {
 
   return (
     <div className="relative">
-      <section className="absolute top-28 right-4 z-40 w-80 h-[calc(100vh-180px)] bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
+      <section className="absolute top-28 right-4 z-40 w-96 h-[calc(100vh-180px)] bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4 flex items-center justify-between border-b border-green-800 flex-shrink-0">
@@ -290,10 +290,10 @@ const BookingSection = ({ user }) => {
           </div>
 
           {/* Status Filter Tabs */}
-          <div className="bg-gray-50 border-b border-gray-200 p-2 flex gap-1 overflow-x-auto flex-shrink-0">
+          <div className="bg-gray-50 border-b border-gray-200 p-2 flex gap-1 flex-shrink-0">
             <button
               onClick={() => setSelectedStatus('all')}
-              className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'all'
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'all'
                 ? 'bg-green-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
@@ -302,7 +302,7 @@ const BookingSection = ({ user }) => {
             </button>
             <button
               onClick={() => setSelectedStatus('pending')}
-              className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'pending'
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'pending'
                 ? 'bg-yellow-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
@@ -311,7 +311,7 @@ const BookingSection = ({ user }) => {
             </button>
             <button
               onClick={() => setSelectedStatus('accepted')}
-              className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'accepted'
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'accepted'
                 ? 'bg-green-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
@@ -320,7 +320,7 @@ const BookingSection = ({ user }) => {
             </button>
             <button
               onClick={() => setSelectedStatus('declined')}
-              className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'declined'
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'declined'
                 ? 'bg-red-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}

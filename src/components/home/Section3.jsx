@@ -410,7 +410,7 @@ export default function Section3() {
       </div>
 
       {/* Custom animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes scaleIn {
           from {
             opacity: 0;

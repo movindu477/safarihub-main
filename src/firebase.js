@@ -19,7 +19,7 @@ import {
   arrayRemove
 } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getStorage } from 'firebase/storage';
+// Firebase Storage removed - using Supabase Storage instead
 
 const firebaseConfig = {
   apiKey: "AIzaSyAXjQQ9BYX4upBJx_Ko5jTUq9nTCIDItSA",
@@ -34,7 +34,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const storage = getStorage(app);
+// Firebase Storage removed - using Supabase Storage instead
 
 // ==================== ENHANCED ONLINE STATUS MANAGEMENT ====================
 
@@ -1393,5 +1393,5 @@ export const getActiveListenerIds = () => {
 };
 
 // Export Firebase instances
-export { db, auth, storage };
+export { db, auth };
 export default app;

@@ -26,13 +26,9 @@ import {
   addDoc,
   getDocs,
 } from "firebase/firestore";
-import {
-  getStorage,
-  ref as sRef,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, Bell, X, Send, Check, CheckCheck, MessageCircle, ArrowUp } from "lucide-react";
+// Supabase Storage imports (replacing Firebase Storage)
+import { uploadProfileImage, uploadDocument } from "./lib/supabase";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, ChevronDown, Bell, X, Send, Check, CheckCheck, MessageCircle, ArrowUp } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
@@ -59,6 +55,8 @@ import GuideProfile from "./components/guides/GuideProfile";
 import Payment from "./components/Payment";
 import AboutUs from "./components/home/AboutUs";
 import Admin from "./components/Admin";
+import ProfileDashboard from "./components/ProfileDashboard";
+import Favorites from "./components/Favorites";
 
 // Import Chat components
 import Chat from "./components/Chat";
@@ -83,7 +81,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Firebase Storage removed - using Supabase Storage instead
 
 // Set persistence to local storage
 setPersistence(auth, browserLocalPersistence)
@@ -1063,10 +1061,10 @@ export const ScrollToTopButton = () => {
     >
       <button
         onClick={scrollToTop}
-        className="bg-green-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-600 cursor-pointer"
+        className="bg-green-400 p-2 sm:p-3 md:p-4 rounded-full shadow-lg border-2 border-green-300 hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-500 cursor-pointer"
         aria-label="Scroll to top"
       >
-        <ArrowUp className="h-6 w-6 text-white" />
+        <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
       </button>
     </div>
   );
@@ -1111,7 +1109,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
   if (!user) return null;
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 notification-container">
+    <div className="fixed bottom-6 right-6 z-50 notification-container">
       <div className="relative">
         {showNotifications && (
           <div className="absolute bottom-full left-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
@@ -1127,12 +1125,12 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
 
         <button
           onClick={handleBellClick}
-          className="relative bg-green-500 p-4 rounded-full shadow-lg border-2 border-white hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-600 cursor-pointer"
+          className="relative bg-green-400 p-2 sm:p-3 md:p-4 rounded-full shadow-lg border-2 border-green-300 hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-500 cursor-pointer"
         >
-          <Bell className="h-6 w-6 text-white" />
+          <Bell className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
           {notifications.filter(n => !n.read).length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-              {notifications.filter(n => !n.read).length}
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] sm:text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center animate-pulse font-bold">
+              {notifications.filter(n => !n.read).length > 9 ? '9+' : notifications.filter(n => !n.read).length}
             </span>
           )}
         </button>
@@ -1770,40 +1768,106 @@ function App() {
             />
           }
         />
+        <Route
+          path="/profile"
+          element={
+            <ProfileDashboard
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+            />
+          }
+        />
+        <Route
+          path="/favorites"
+          element={
+            <Favorites
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+            />
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
 }
 
-// Phone number formatting utility
+// Phone number formatting utility - Format: +94 743090367
 const formatPhoneNumber = (phone) => {
   if (!phone) return "";
 
-  let cleaned = phone.replace(/\D/g, '');
+  // Remove all non-digit characters except +
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // Remove + if present for processing
+  if (cleaned.startsWith('+')) {
+    cleaned = cleaned.substring(1);
+  }
 
+  // Handle different input formats
   if (cleaned.startsWith('94')) {
-    return `+${cleaned}`;
+    // Already has country code
+    const number = cleaned.substring(2);
+    if (number.length === 9) {
+      return `+94 ${number}`;
+    }
+    return `+94 ${number}`;
   }
 
   if (cleaned.startsWith('0')) {
-    return `+94${cleaned.substring(1)}`;
+    // Remove leading 0 and add country code
+    const number = cleaned.substring(1);
+    if (number.length === 9) {
+      return `+94 ${number}`;
+    }
+    return `+94 ${number}`;
   }
 
-  if (!cleaned.startsWith('+')) {
-    return `+94${cleaned}`;
+  // Just the number, add country code
+  if (cleaned.length === 9) {
+    return `+94 ${cleaned}`;
   }
 
-  return phone;
+  // Partial number, still format with country code
+  return `+94 ${cleaned}`;
 };
 
-// Phone number validation
+// Phone number validation - Format: +94 743090367 (deprecated - use isValidPhone with country code)
 const isValidSriLankanPhone = (phone) => {
   if (!phone) return false;
-
-  const formatted = formatPhoneNumber(phone);
+  const formatted = phone.replace(/\s/g, '');
   const sriLankanRegex = /^\+94[0-9]{9}$/;
   return sriLankanRegex.test(formatted);
+};
+
+// Country codes with phone number formats (shared across components)
+const countryCodes = [
+  { code: '+94', country: 'Sri Lanka', flag: '🇱🇰', maxLength: 10, pattern: /^0\d{9}$/ },
+  { code: '+1', country: 'United States', flag: '🇺🇸', maxLength: 10, pattern: /^\d{10}$/ },
+  { code: '+44', country: 'United Kingdom', flag: '🇬🇧', maxLength: 10, pattern: /^\d{10,11}$/ },
+  { code: '+91', country: 'India', flag: '🇮🇳', maxLength: 10, pattern: /^\d{10}$/ },
+  { code: '+61', country: 'Australia', flag: '🇦🇺', maxLength: 9, pattern: /^\d{9}$/ },
+  { code: '+86', country: 'China', flag: '🇨🇳', maxLength: 11, pattern: /^\d{11}$/ },
+  { code: '+81', country: 'Japan', flag: '🇯🇵', maxLength: 10, pattern: /^\d{10}$/ },
+  { code: '+65', country: 'Singapore', flag: '🇸🇬', maxLength: 8, pattern: /^\d{8}$/ },
+  { code: '+60', country: 'Malaysia', flag: '🇲🇾', maxLength: 10, pattern: /^\d{9,10}$/ },
+  { code: '+66', country: 'Thailand', flag: '🇹🇭', maxLength: 9, pattern: /^\d{9}$/ },
+  { code: '+971', country: 'UAE', flag: '🇦🇪', maxLength: 9, pattern: /^\d{9}$/ },
+  { code: '+92', country: 'Pakistan', flag: '🇵🇰', maxLength: 10, pattern: /^\d{10}$/ },
+  { code: '+880', country: 'Bangladesh', flag: '🇧🇩', maxLength: 10, pattern: /^\d{10}$/ },
+  { code: '+977', country: 'Nepal', flag: '🇳🇵', maxLength: 10, pattern: /^\d{10}$/ },
+  { code: '+27', country: 'South Africa', flag: '🇿🇦', maxLength: 9, pattern: /^\d{9}$/ },
+];
+
+// Validate phone number based on country code
+const isValidPhone = (phone, countryCode) => {
+  if (!phone) return false;
+  const country = countryCodes.find(c => c.code === countryCode);
+  if (!country) return false;
+  const digits = phone.replace(/\D/g, '');
+  return country.pattern.test(digits);
 };
 
 // Authentication Component
@@ -1851,10 +1915,21 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   const [dailyRate, setDailyRate] = useState("");
   const [specialPackageRates, setSpecialPackageRates] = useState("");
   const [currencyPreference, setCurrencyPreference] = useState("LKR");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+94"); // Default to Sri Lanka
 
-  // Handle phone number input with formatting
+  // Get selected country info
+  const getSelectedCountry = () => {
+    return countryCodes.find(c => c.code === phoneCountryCode) || countryCodes[0];
+  };
+
+  // Handle phone number input - only digits, limit by country
   const handlePhoneChange = (value) => {
-    const cleaned = value.replace(/[^\d+]/g, '');
+    const selectedCountry = getSelectedCountry();
+    // Only allow digits, limit to maxLength
+    let cleaned = value.replace(/\D/g, '');
+    if (cleaned.length > selectedCountry.maxLength) {
+      cleaned = cleaned.substring(0, selectedCountry.maxLength);
+    }
     setPhone(cleaned);
   };
 
@@ -1866,6 +1941,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     setConfirm("");
     setCountry("");
     setPhone("");
+    setPhoneCountryCode("+94");
     setLanguage("");
     setProfileFile(null);
     setProfilePreview(null);
@@ -1968,8 +2044,9 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     }
 
     // Phone validation for service providers
-    if (role === 'provider' && phone && !isValidSriLankanPhone(phone)) {
-      setMsg("❌ Please enter a valid Sri Lankan phone number (e.g., +94701234567)");
+    if (role === 'provider' && phone && !isValidPhone(phone, phoneCountryCode)) {
+      const selectedCountry = getSelectedCountry();
+      setMsg(`❌ Please enter a valid ${selectedCountry.country} phone number`);
       return;
     }
 
@@ -1983,8 +2060,8 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
       console.log("✅ User created with UID:", uid);
 
-      // Format phone number for storage
-      const formattedPhone = phone ? formatPhoneNumber(phone) : "";
+      // Format phone number for storage: countryCode + phone (e.g., +9407432090367)
+      const formattedPhone = phone ? `${phoneCountryCode}${phone}` : "";
 
       let userData = {
         uid,
@@ -2080,40 +2157,53 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         displayName: fullName
       });
 
-      // Handle profile picture upload in background (non-blocking)
+      // Handle profile picture upload - Upload immediately to ensure it's saved
       if (profileFile) {
-        // Upload profile picture in background
-        setTimeout(async () => {
+        // Upload profile picture immediately (don't wait)
+        (async () => {
           try {
-            console.log("📸 Uploading profile picture in background...");
-            const ext = profileFile.name.split(".").pop();
-            const storageRef = sRef(storage, `profile-pictures/${role === 'tourist' ? 'tourists' : 'service-providers'}/${uid}.${ext}`);
+            console.log("📸 Uploading profile picture to Supabase Storage...");
+            const { url: photoURL, error } = await uploadProfileImage(profileFile, uid);
 
-            // Upload with timeout (20 seconds)
-            const uploadPromise = uploadBytes(storageRef, profileFile);
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Upload timeout after 20 seconds')), 20000)
-            );
+            if (error) {
+              console.error("❌ Profile image upload failed:", error);
+              console.error("   Error details:", error.message || error);
+              // Profile picture can be uploaded later via profile settings
+              return;
+            }
 
-            const snap = await Promise.race([uploadPromise, timeoutPromise]);
-            const photoURL = await getDownloadURL(snap.ref);
+            if (!photoURL) {
+              console.error("❌ Profile image upload returned no URL");
+              return;
+            }
 
+            console.log("✅ Profile image uploaded to Supabase, URL:", photoURL);
+
+            // Update Firestore with profile picture URL immediately
             await setDoc(doc(db, collectionName, uid), {
               profilePicture: photoURL,
               updatedAt: serverTimestamp(),
             }, { merge: true });
 
-            await updateProfile(userCredential.user, {
-              displayName: fullName,
-              photoURL: photoURL
-            });
+            // Update Firebase Auth profile
+            try {
+              await updateProfile(userCredential.user, {
+                displayName: fullName,
+                photoURL: photoURL
+              });
+            } catch (authError) {
+              console.warn("⚠️ Could not update Firebase Auth photoURL:", authError);
+              // Continue - Firestore update is more important
+            }
 
-            console.log("✅ Profile picture uploaded successfully");
+            console.log("✅ Profile picture saved to Firestore (and Firebase Auth)");
+            console.log("   Profile image URL:", photoURL);
           } catch (uploadError) {
             console.error("❌ Profile image upload failed:", uploadError);
+            console.error("   Error details:", uploadError.message || uploadError);
             // Profile picture can be uploaded later via profile settings
           }
-        }, 100);
+        })(); // Immediately invoke async function
       }
 
       // Complete account creation first, then upload files in background
@@ -2121,7 +2211,8 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       setBusy(false);
 
       // Upload certification files in background (non-blocking)
-      if (serviceType !== "Tour Guide" && Object.keys(certificationFiles).length > 0) {
+      // For Jeep Driver and Renting service types
+      if ((serviceType === "Jeep Driver" || serviceType === "Renting") && Object.keys(certificationFiles).length > 0) {
         // Start background upload without blocking
         setTimeout(async () => {
           try {
@@ -2134,58 +2225,84 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                 const ext = file.name.split(".").pop();
                 const timestamp = Date.now();
                 const fileName = `${uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-                const storageRef = sRef(storage, `certifications/jeepDriverCertifications/${fileName}`);
 
-                console.log(`📤 Uploading ${certName} to storage...`);
+                console.log(`📤 Uploading ${certName} to Supabase Storage...`);
 
-                // Upload with timeout (30 seconds per file)
-                const uploadPromise = uploadBytes(storageRef, file);
-                const timeoutPromise = new Promise((_, reject) =>
-                  setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000)
-                );
+                // Upload to Supabase Storage
+                const { url: fileURL, error, path } = await uploadDocument(file, uid, fileName);
 
-                const snap = await Promise.race([uploadPromise, timeoutPromise]);
-                console.log(`✅ File uploaded to storage: ${certName}`);
+                if (error) {
+                  console.error(`❌ Failed to upload certification ${certName}:`, error);
 
-                const fileURL = await getDownloadURL(snap.ref);
-                console.log(`✅ Got download URL for: ${certName}`);
+                  // Save document metadata even if upload fails (with error status)
+                  documents.push({
+                    certificationName: certName,
+                    fileName: fileName,
+                    fileUrl: null, // No URL for failed uploads
+                    fileSize: file.size,
+                    fileType: file.type || `application/${ext}`,
+                    uploadedAt: new Date(),
+                    documentId: `${uid}_${timestamp}`,
+                    supabasePath: null, // No path for failed uploads
+                    uploadStatus: 'failed',
+                    uploadError: error.message || 'Upload failed'
+                  });
+                  // Continue with other files
+                  continue;
+                }
+
+                if (!path) {
+                  console.error(`❌ Upload succeeded but no path returned for ${certName}`);
+                  // Still save metadata but mark as failed
+                  documents.push({
+                    certificationName: certName,
+                    fileName: fileName,
+                    fileUrl: fileURL || null,
+                    fileSize: file.size,
+                    fileType: file.type || `application/${ext}`,
+                    uploadedAt: new Date(),
+                    documentId: `${uid}_${timestamp}`,
+                    supabasePath: null,
+                    uploadStatus: 'failed',
+                    uploadError: 'Upload succeeded but path not returned'
+                  });
+                  continue;
+                }
+
+                console.log(`✅ File uploaded to Supabase: ${certName}`);
+                console.log(`✅ Path stored: ${path}`);
 
                 // Add to documents array
+                // Note: fileURL might be null for private buckets, but supabasePath is always returned
                 documents.push({
                   certificationName: certName,
                   fileName: fileName,
-                  fileUrl: fileURL,
+                  fileUrl: fileURL || null, // May be null for private buckets
                   fileSize: file.size,
                   fileType: file.type || `application/${ext}`,
-                  uploadedAt: serverTimestamp(),
-                  documentId: `${uid}_${timestamp}` // Unique ID for this document
+                  uploadedAt: new Date(),
+                  documentId: `${uid}_${timestamp}`, // Unique ID for this document
+                  supabasePath: path, // Store Supabase path (REQUIRED for viewing/deleting)
+                  uploadStatus: 'uploaded' // ✅ Mark as successfully uploaded
                 });
                 uploadedCount++;
               } catch (fileError) {
                 console.error(`❌ Failed to upload certification ${certName}:`, fileError);
                 console.error('Error details:', {
                   message: fileError.message,
-                  code: fileError.code,
                   stack: fileError.stack
                 });
-
-                // Check for CORS error
-                if (fileError.message && (fileError.message.includes('CORS') || fileError.message.includes('blocked') || fileError.code === 'storage/unauthorized')) {
-                  console.error('⚠️ CORS ERROR DETECTED:');
-                  console.error('   Firebase Storage CORS is not configured.');
-                  console.error('   To fix: Run "gsutil cors set cors.json gs://safarihub-a80bd.firebasestorage.app"');
-                  console.error('   Or configure CORS in Firebase Console: Storage > Settings > CORS');
-                }
 
                 // Save document metadata even if upload fails (with error status)
                 documents.push({
                   certificationName: certName,
                   fileName: `${uid}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-                  fileUrl: '', // Empty URL indicates upload failed
+                  fileUrl: null, // No URL for failed uploads
                   fileSize: file.size,
                   fileType: file.type || `application/${file.name.split('.').pop()}`,
-                  uploadedAt: serverTimestamp(),
+                  uploadedAt: new Date(),
                   documentId: `${uid}_${Date.now()}`,
+                  supabasePath: null, // No path for failed uploads
                   uploadStatus: 'failed',
                   uploadError: fileError.message || 'Upload failed'
                 });
@@ -2198,16 +2315,28 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
               try {
                 const userCertDocRef = doc(db, 'jeepDriverCertifications', uid);
                 const existingDoc = await getDoc(userCertDocRef);
-                
+
+                console.log(`💾 Saving ${documents.length} document(s) to Firestore...`);
+                console.log('📋 Documents to save:', documents.map(d => ({
+                  name: d.certificationName,
+                  hasPath: !!d.supabasePath,
+                  hasUrl: !!d.fileUrl,
+                  status: d.uploadStatus
+                })));
+
                 if (existingDoc.exists()) {
                   // Update existing document - merge with existing documents
                   const existingData = existingDoc.data();
                   const existingDocuments = existingData.documents || [];
+                  const allDocuments = [...existingDocuments, ...documents];
+
                   await setDoc(userCertDocRef, {
                     providerId: uid,
-                    documents: [...existingDocuments, ...documents],
+                    documents: allDocuments,
                     updatedAt: serverTimestamp()
                   }, { merge: true });
+
+                  console.log(`✅ Updated Firestore: ${allDocuments.length} total documents (${existingDocuments.length} existing + ${documents.length} new)`);
                 } else {
                   // Create new document
                   await setDoc(userCertDocRef, {
@@ -2216,10 +2345,20 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp()
                   });
+
+                  console.log(`✅ Created new Firestore document with ${documents.length} document(s)`);
                 }
-                console.log(`✅ Saved ${documents.length} certification document(s) to Firestore under user ID: ${uid} (${uploadedCount} successfully uploaded to Storage)`);
+
+                console.log(`✅ Successfully saved ${documents.length} certification document(s) to Firestore`);
+                console.log(`   - ${uploadedCount} successfully uploaded to Supabase Storage`);
+                console.log(`   - ${documents.length - uploadedCount} failed or pending`);
               } catch (firestoreError) {
                 console.error('❌ Failed to save to Firestore:', firestoreError);
+                console.error('Error details:', {
+                  code: firestoreError.code,
+                  message: firestoreError.message,
+                  stack: firestoreError.stack
+                });
               }
             } else {
               console.warn("⚠️ No certification files to save");
@@ -2250,31 +2389,65 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                 const ext = file.name.split(".").pop();
                 const timestamp = Date.now();
                 const fileName = `${uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-                const storageRef = sRef(storage, `certifications/guideCertifications/${fileName}`);
 
-                console.log(`📤 Uploading ${docName} to storage...`);
+                console.log(`📤 Uploading ${docName} to Supabase Storage...`);
 
-                // Upload with timeout (30 seconds per file)
-                const uploadPromise = uploadBytes(storageRef, file);
-                const timeoutPromise = new Promise((_, reject) =>
-                  setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000)
-                );
+                // Upload to Supabase Storage
+                const { url: fileURL, error, path } = await uploadDocument(file, uid, fileName);
 
-                const snap = await Promise.race([uploadPromise, timeoutPromise]);
-                console.log(`✅ File uploaded to storage: ${docName}`);
+                if (error) {
+                  console.error(`❌ Failed to upload document ${docName}:`, error);
 
-                const fileURL = await getDownloadURL(snap.ref);
-                console.log(`✅ Got download URL for: ${docName}`);
+                  // Save document metadata even if upload fails (with error status)
+                  documents.push({
+                    certificationName: docName,
+                    fileName: fileName,
+                    fileUrl: null, // No URL for failed uploads
+                    fileSize: file.size,
+                    fileType: file.type || `application/${ext}`,
+                    uploadedAt: new Date(),
+                    documentId: `${uid}_${timestamp}`,
+                    supabasePath: null, // No path for failed uploads
+                    uploadStatus: 'failed',
+                    uploadError: error.message || 'Upload failed'
+                  });
+                  // Continue with other files
+                  continue;
+                }
+
+                if (!path) {
+                  console.error(`❌ Upload succeeded but no path returned for ${docName}`);
+                  // Still save metadata but mark as failed
+                  documents.push({
+                    certificationName: docName,
+                    fileName: fileName,
+                    fileUrl: fileURL || null,
+                    fileSize: file.size,
+                    fileType: file.type || `application/${ext}`,
+                    uploadedAt: new Date(),
+                    documentId: `${uid}_${timestamp}`,
+                    supabasePath: null,
+                    uploadStatus: 'failed',
+                    uploadError: 'Upload succeeded but path not returned'
+                  });
+                  continue;
+                }
+
+                console.log(`✅ File uploaded to Supabase: ${docName}`);
+                console.log(`✅ Path stored: ${path}`);
 
                 // Add to documents array
+                // Note: fileURL might be null for private buckets, but supabasePath is always returned
                 documents.push({
                   certificationName: docName,
                   fileName: fileName,
-                  fileUrl: fileURL,
+                  fileUrl: fileURL || null, // May be null for private buckets
                   fileSize: file.size,
                   fileType: file.type || `application/${ext}`,
-                  uploadedAt: serverTimestamp(),
-                  documentId: `${uid}_${timestamp}` // Unique ID for this document
+                  uploadedAt: new Date(),
+                  documentId: `${uid}_${timestamp}`, // Unique ID for this document
+                  supabasePath: path, // Store Supabase path (REQUIRED for viewing/deleting)
+                  uploadStatus: 'uploaded' // ✅ Mark as successfully uploaded
                 });
                 uploadedCount++;
               } catch (fileError) {
@@ -2297,11 +2470,12 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                 documents.push({
                   certificationName: docName,
                   fileName: `${uid}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-                  fileUrl: '', // Empty URL indicates upload failed
+                  fileUrl: null, // No URL for failed uploads
                   fileSize: file.size,
                   fileType: file.type || `application/${file.name.split('.').pop()}`,
-                  uploadedAt: serverTimestamp(),
+                  uploadedAt: new Date(),
                   documentId: `${uid}_${Date.now()}`,
+                  supabasePath: null, // No path for failed uploads
                   uploadStatus: 'failed',
                   uploadError: fileError.message || 'Upload failed'
                 });
@@ -2314,16 +2488,28 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
               try {
                 const userCertDocRef = doc(db, 'guideCertifications', uid);
                 const existingDoc = await getDoc(userCertDocRef);
-                
+
+                console.log(`💾 Saving ${documents.length} document(s) to Firestore...`);
+                console.log('📋 Documents to save:', documents.map(d => ({
+                  name: d.certificationName,
+                  hasPath: !!d.supabasePath,
+                  hasUrl: !!d.fileUrl,
+                  status: d.uploadStatus
+                })));
+
                 if (existingDoc.exists()) {
                   // Update existing document - merge with existing documents
                   const existingData = existingDoc.data();
                   const existingDocuments = existingData.documents || [];
+                  const allDocuments = [...existingDocuments, ...documents];
+
                   await setDoc(userCertDocRef, {
                     providerId: uid,
-                    documents: [...existingDocuments, ...documents],
+                    documents: allDocuments,
                     updatedAt: serverTimestamp()
                   }, { merge: true });
+
+                  console.log(`✅ Updated Firestore: ${allDocuments.length} total documents (${existingDocuments.length} existing + ${documents.length} new)`);
                 } else {
                   // Create new document
                   await setDoc(userCertDocRef, {
@@ -2332,10 +2518,20 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp()
                   });
+
+                  console.log(`✅ Created new Firestore document with ${documents.length} document(s)`);
                 }
-                console.log(`✅ Saved ${documents.length} verification document(s) to Firestore under user ID: ${uid} (${uploadedCount} successfully uploaded to Storage)`);
+
+                console.log(`✅ Successfully saved ${documents.length} verification document(s) to Firestore`);
+                console.log(`   - ${uploadedCount} successfully uploaded to Supabase Storage`);
+                console.log(`   - ${documents.length - uploadedCount} failed or pending`);
               } catch (firestoreError) {
                 console.error('❌ Failed to save to Firestore:', firestoreError);
+                console.error('Error details:', {
+                  code: firestoreError.code,
+                  message: firestoreError.message,
+                  stack: firestoreError.stack
+                });
               }
             } else {
               console.warn("⚠️ No verification document files to save");
@@ -2603,7 +2799,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
               role={role}
               serviceType={serviceType}
               formData={{
-                email, fullName, password, confirm, country, phone, language,
+                email, fullName, password, confirm, country, phone, phoneCountryCode, language,
                 locationBase, experience, languagesSpoken, serviceType,
                 vehicleType, pricePerDay,
                 destinations: typeof destinations === 'string' ? destinations : (destinations && destinations.length > 0 ? destinations[0] : ""), // Convert array to string for single select
@@ -2686,6 +2882,7 @@ const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
 const RegistrationForm = ({ role, serviceType, formData, handlers, profilePreview, onProfileImageSelect, certificationFiles, onCertificationFileSelect, verificationDocumentFiles, onVerificationDocumentFileSelect, onSubmit, busy, msg }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
 
   const isTourist = role === 'tourist';
   const isTourGuide = serviceType === "Tour Guide";
@@ -2778,18 +2975,13 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
     "GBP - British Pound"
   ];
 
-  // Phone input helper text
+  // Phone input helper text (deprecated - using inline validation now)
   const getPhoneHelperText = () => {
-    if (!formData.phone) return "Enter your Sri Lankan phone number";
-
-    const formatted = formData.phone.startsWith('+') ? formData.phone : `+94${formData.phone.replace(/^0/, '')}`;
-    const isValid = /^\+94[0-9]{9}$/.test(formatted);
-
-    if (isValid) {
-      return "✓ Valid Sri Lankan number";
-    } else {
-      return "Enter a valid Sri Lankan number (e.g., +94701234567)";
+    if (!formData.phone) {
+      const selectedCountry = countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94')) || countryCodes[0];
+      return `Enter ${selectedCountry.country} phone number`;
     }
+    return "";
   };
 
   // Handle multi-select changes
@@ -2907,17 +3099,90 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               <Phone className="h-3 w-3 text-yellow-400" />
               Phone Number {!isTourist && <span className="text-red-400">*</span>}
             </label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handlers.setPhone(e.target.value)}
-              required={!isTourist}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder="+94701234567"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              {getPhoneHelperText()}
-            </p>
+            <div className="flex gap-2">
+              {/* Country Code Dropdown */}
+              <div className="relative flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowCountryDropdown(!showCountryDropdown);
+                  }}
+                  className="flex items-center gap-1.5 px-2 py-2 text-xs border border-white/10 rounded-lg bg-white/5 hover:bg-white/10 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 min-w-[90px] text-white"
+                >
+                  <span className="text-sm">{countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.flag || '🇱🇰'}</span>
+                  <span className="text-xs font-medium">{formData.phoneCountryCode || '+94'}</span>
+                  <ChevronDown className="h-3 w-3 text-gray-400" />
+                </button>
+                {showCountryDropdown && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setShowCountryDropdown(false)}
+                    />
+                    <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto min-w-[200px]">
+                      {countryCodes.map((country) => (
+                        <button
+                          key={country.code}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (handlers && handlers.setPhoneCountryCode) {
+                              handlers.setPhoneCountryCode(country.code);
+                              if (handlers.setPhone) {
+                                handlers.setPhone(''); // Clear phone when country changes
+                              }
+                            }
+                            setShowCountryDropdown(false);
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${
+                            (formData.phoneCountryCode || '+94') === country.code ? 'bg-yellow-500/20' : ''
+                          }`}
+                        >
+                          <span className="text-sm">{country.flag}</span>
+                          <span className="flex-1 text-left">{country.country}</span>
+                          <span className="text-gray-300 font-medium">{country.code}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Phone Number Input */}
+              <div className="flex-1">
+                <input
+                  type="tel"
+                  value={formData.phone || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (handlers && handlers.setPhone) {
+                      handlers.setPhone(value);
+                    }
+                  }}
+                  required={!isTourist}
+                  maxLength={countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.maxLength || 10}
+                  className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-white placeholder-gray-400 focus:outline-none text-xs ${
+                    formData.phone && isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
+                      ? 'border-green-400 focus:border-green-400'
+                      : formData.phone
+                      ? 'border-red-400 focus:border-red-400'
+                      : 'border-white/10 focus:border-yellow-400'
+                  }`}
+                  placeholder={formData.phoneCountryCode === '+94' ? '0743090367' : 'Enter phone number'}
+                />
+              </div>
+            </div>
+            {formData.phone && (
+              <p className={`text-xs mt-1 ${
+                isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
+                  ? 'text-green-400'
+                  : 'text-red-400'
+              }`}>
+                {isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
+                  ? `✓ Valid ${countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.country || 'phone'} number`
+                  : `Invalid format`}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">

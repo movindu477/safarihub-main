@@ -8,6 +8,8 @@ import { dirname, join } from 'path';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, query, where, getDocs, getDoc, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import Stripe from 'stripe';
+import multer from 'multer';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -32,6 +34,36 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // TEMPORARY TEST: Verify Stripe Secret Key is loaded
 console.log("Stripe Secret Key Loaded:", !!process.env.STRIPE_SECRET_KEY);
 
+// Initialize Supabase with Service Role Key (Backend Only - NEVER expose to frontend)
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+let supabase = null;
+if (supabaseUrl && supabaseServiceRoleKey) {
+  try {
+    supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+    console.log('✅ Supabase initialized with Service Role (backend only)');
+  } catch (error) {
+    console.error('❌ Failed to initialize Supabase:', error);
+  }
+} else {
+  console.warn('⚠️ Supabase Service Role Key not configured. File uploads will fail.');
+  console.warn('⚠️ Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file');
+}
+
+// Configure multer for file uploads (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
 const app = express();
 const server = createServer(app);
 
@@ -45,6 +77,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ==================== Stripe Payment API ====================
 
@@ -218,8 +251,270 @@ app.get('/api/health', (req, res) => {
     smsProviders: {
       twilio: !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN),
       whatsapp: !!(WHATSAPP_PHONE_NUMBER_ID && WHATSAPP_ACCESS_TOKEN)
-    }
+    },
+    supabase: !!supabase
   });
+});
+
+// ==================== SUPABASE STORAGE UPLOAD API (Backend) ====================
+
+/**
+ * Upload Profile Image to Supabase Storage
+ * POST /api/upload-profile-image
+ * Body: FormData with 'file' and 'userId'
+ */
+app.post('/api/upload-profile-image', upload.single('file'), async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(500).json({ 
+        error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file' 
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const ext = req.file.originalname.split('.').pop();
+    const fileName = `profile.${ext}`;
+    const path = `users/${userId}/${fileName}`;
+
+    console.log(`📤 Uploading profile image to Supabase: ${path}`);
+
+    // Upload to Supabase Storage using service role (bypasses RLS)
+    const { data, error } = await supabase.storage
+      .from('profile-images')
+      .upload(path, req.file.buffer, {
+        upsert: true,
+        contentType: req.file.mimetype || `image/${ext}`
+      });
+
+    if (error) {
+      console.error('❌ Supabase upload error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('profile-images')
+      .getPublicUrl(path);
+
+    console.log(`✅ Profile image uploaded successfully: ${urlData.publicUrl}`);
+
+    res.json({
+      success: true,
+      url: urlData.publicUrl,
+      path: path
+    });
+
+  } catch (error) {
+    console.error('❌ Profile image upload error:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload profile image' });
+  }
+});
+
+/**
+ * Upload Document to Supabase Storage
+ * POST /api/upload-document
+ * Body: FormData with 'file', 'userId', and optional 'fileName'
+ */
+app.post('/api/upload-document', upload.single('file'), async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(500).json({ 
+        error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file' 
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const { userId, fileName: customFileName } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const timestamp = Date.now();
+    const ext = req.file.originalname.split('.').pop();
+    const finalFileName = customFileName || `${userId}_${timestamp}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const path = `users/${userId}/documents/${finalFileName}`;
+
+    console.log(`📤 Uploading document to Supabase: ${path}`);
+
+    // Upload to Supabase Storage using service role (bypasses RLS)
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .upload(path, req.file.buffer, {
+        upsert: false,
+        contentType: req.file.mimetype || `application/${ext}`
+      });
+
+    if (error) {
+      console.error('❌ Supabase upload error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    // For private buckets, we don't return a public URL
+    // Instead, return the path - signed URLs will be generated on-demand via /api/get-document-url
+    console.log(`✅ Document uploaded successfully: ${path}`);
+
+    res.json({
+      success: true,
+      url: null, // No public URL for private bucket
+      path: path
+    });
+
+  } catch (error) {
+    console.error('❌ Document upload error:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload document' });
+  }
+});
+
+/**
+ * Get Signed URL for Document (for viewing private documents)
+ * POST /api/get-document-url
+ * Body: { path: string } or { url: string }
+ */
+app.post('/api/get-document-url', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(500).json({ 
+        error: 'Supabase not configured' 
+      });
+    }
+
+    const { path, expiresIn = 300 } = req.body;
+
+    // 🔐 Safety check: Only accept path, reject URLs
+    if (!path) {
+      return res.status(400).json({ 
+        error: 'path is required. Path must be relative (e.g., users/userId/documents/file.pdf)' 
+      });
+    }
+
+    // Reject full URLs immediately
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return res.status(400).json({ 
+        error: 'Path must be relative (e.g., users/userId/documents/file.pdf), not a full URL' 
+      });
+    }
+
+    // Ensure path doesn't start with / (Supabase expects relative path)
+    let filePath = path.startsWith('/') ? path.substring(1) : path;
+
+    console.log(`🔗 Generating signed URL for path: ${filePath}`);
+    console.log(`   Expires in: ${expiresIn || 300} seconds`);
+
+    // Generate signed URL (works for private buckets)
+    // filePath should be: users/userId/documents/filename.pdf (relative path only)
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(filePath, expiresIn || 300);
+
+    if (error) {
+      console.error('❌ Signed URL error:', error);
+      console.error(`   Attempted path: ${filePath}`);
+      return res.status(500).json({ 
+        error: error.message,
+        details: `Failed to generate signed URL for path: ${filePath}`
+      });
+    }
+
+    console.log(`✅ Signed URL generated successfully for: ${filePath}`);
+
+    res.json({
+      success: true,
+      signedUrl: data.signedUrl,
+      path: filePath
+    });
+
+  } catch (error) {
+    console.error('❌ Get document URL error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get document URL' });
+  }
+});
+
+/**
+ * Delete Document from Supabase Storage
+ * DELETE /api/delete-document
+ * Body: { path: string } or { url: string }
+ */
+app.delete('/api/delete-document', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(500).json({ 
+        error: 'Supabase not configured' 
+      });
+    }
+
+    const { path, url } = req.body;
+
+    if (!path && !url) {
+      return res.status(400).json({ error: 'path or url is required' });
+    }
+
+    let filePath = path;
+
+    // If URL provided, extract path (relative path only, not full URL)
+    if (!filePath && url) {
+      if (url.includes('supabase.co')) {
+        // Extract path from Supabase public URL format:
+        // https://xxx.supabase.co/storage/v1/object/public/documents/users/...
+        // We need: users/... (everything after the bucket name)
+        const publicUrlMatch = url.match(/\/storage\/v1\/object\/public\/[^\/]+\/(.+?)(\?|$)/);
+        const signedUrlMatch = url.match(/\/storage\/v1\/object\/sign\/[^\/]+\/(.+?)(\?|$)/);
+        
+        if (publicUrlMatch) {
+          filePath = decodeURIComponent(publicUrlMatch[1]);
+        } else if (signedUrlMatch) {
+          filePath = decodeURIComponent(signedUrlMatch[1]);
+        } else {
+          return res.status(400).json({ error: 'Could not extract path from URL. Expected format: /storage/v1/object/public/bucket/path' });
+        }
+      } else {
+        // If URL doesn't contain supabase.co, treat it as a path
+        filePath = url;
+      }
+    }
+
+    // Validate that filePath doesn't contain full URL (safety check)
+    if (filePath && (filePath.startsWith('http://') || filePath.startsWith('https://'))) {
+      return res.status(400).json({ error: 'Path must be relative (e.g., users/userId/documents/file.pdf), not a full URL' });
+    }
+
+    // Ensure path doesn't start with / (Supabase expects relative path)
+    if (filePath && filePath.startsWith('/')) {
+      filePath = filePath.substring(1);
+    }
+
+    console.log(`🗑️ Deleting document from Supabase: ${filePath}`);
+
+    const { error } = await supabase.storage
+      .from('documents')
+      .remove([filePath]);
+
+    if (error) {
+      console.error('❌ Delete error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    console.log(`✅ Document deleted successfully: ${filePath}`);
+
+    res.json({
+      success: true,
+      message: 'Document deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Delete document error:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete document' });
+  }
 });
 
 // ==================== RECEIVE MESSAGES (Webhooks) ====================

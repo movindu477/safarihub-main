@@ -337,77 +337,8 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
     };
   }, [navigate]);
 
-  // Scroll to top when page loads or navigates (including back button)
-  useEffect(() => {
-    // Check if we should scroll to a specific guide card
-    const shouldScrollToGuide = sessionStorage.getItem('scrollToGuide') === 'true';
-    const lastViewedGuideId = sessionStorage.getItem('lastViewedGuideId');
-
-    if (shouldScrollToGuide && lastViewedGuideId && location.pathname === '/guide') {
-      // First scroll to top
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-
-      // Then scroll to the specific guide card after a short delay
-      setTimeout(() => {
-        const guideCard = document.getElementById(`guide-card-${lastViewedGuideId}`);
-        if (guideCard) {
-          guideCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Highlight the card briefly
-          guideCard.style.transition = 'box-shadow 0.3s ease';
-          guideCard.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.5)';
-          setTimeout(() => {
-            guideCard.style.boxShadow = '';
-          }, 2000);
-        }
-        // Clear the flag
-        sessionStorage.removeItem('scrollToGuide');
-        sessionStorage.removeItem('lastViewedGuideId');
-      }, 100);
-    } else {
-      // Normal scroll to top
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    }
-  }, [location.pathname]);
-
-  // Also handle popstate (back/forward button)
-  useEffect(() => {
-    const handlePopState = () => {
-      setTimeout(() => {
-        // Check if we should scroll to a specific guide card
-        const shouldScrollToGuide = sessionStorage.getItem('scrollToGuide') === 'true';
-        const lastViewedGuideId = sessionStorage.getItem('lastViewedGuideId');
-
-        if (shouldScrollToGuide && lastViewedGuideId && location.pathname === '/guide') {
-          // First scroll to top
-          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-
-          // Then scroll to the specific guide card
-          setTimeout(() => {
-            const guideCard = document.getElementById(`guide-card-${lastViewedGuideId}`);
-            if (guideCard) {
-              guideCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              // Highlight the card briefly
-              guideCard.style.transition = 'box-shadow 0.3s ease';
-              guideCard.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.5)';
-              setTimeout(() => {
-                guideCard.style.boxShadow = '';
-              }, 2000);
-            }
-            // Clear the flag
-            sessionStorage.removeItem('scrollToGuide');
-            sessionStorage.removeItem('lastViewedGuideId');
-          }, 100);
-        } else {
-          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        }
-      }, 0);
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [location.pathname]);
+  // Don't scroll to top automatically - let GuideSection2 handle scroll restoration
+  // This allows the scroll-to-element logic to work properly
 
   // Handle notification click
   const handleNotificationClick = async (notification) => {

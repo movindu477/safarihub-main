@@ -778,7 +778,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen lg:h-screen bg-gray-50 flex flex-col lg:overflow-hidden lg:max-h-screen">
       {/* Booking Success Message */}
       {showSuccessMessage && successMessageData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-40">
@@ -868,47 +868,54 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
       />
 
 
-      <div className="bg-white shadow-sm border-b border-emerald-100/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+      <div className="bg-gradient-to-r from-green-500 via-green-400 to-green-500 border-b border-green-300 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-5 md:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 sm:h-18 md:h-20">
             <div className="flex items-center">
               <button
-                onClick={() => navigate('/guide')}
-                className="flex items-center text-emerald-700 mr-6 font-medium"
+                onClick={() => {
+                  // Navigate back to guide listing page
+                  navigate('/guide');
+                  // The scroll will be handled by GuideSection2 component
+                }}
+                className="flex items-center text-green-50 mr-3 sm:mr-4 md:mr-6 font-medium hover:text-green-100 transition-colors touch-manipulation"
               >
-                <ArrowLeft size={20} className="mr-2" />
-                Back to Guides
+                <ArrowLeft size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-2.5" />
+                <span className="text-sm sm:text-base md:text-lg">
+                  <span className="hidden sm:inline">Back to Guides</span>
+                  <span className="sm:hidden">Back</span>
+                </span>
               </button>
-              <h1 className="text-3xl font-bold text-emerald-800">Tour Guide Profile</h1>
+              <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-green-50">Tour Guide Profile</h1>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="flex-1 lg:overflow-hidden flex flex-col">
+        <div className="w-full lg:flex-1 lg:overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6 lg:gap-8 px-4 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-5 md:py-6">
           {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-lg border border-emerald-100 p-8 sticky top-8">
+          <div className="lg:col-span-1 flex flex-col min-h-0">
+            <div className="bg-gradient-to-b from-green-100 to-green-200 border-2 border-green-300 rounded-lg p-4 sm:p-5 md:p-6 lg:p-8 flex flex-col lg:h-full shadow-xl">
               {/* Profile Header */}
-              <div className="text-center mb-8">
+              <div className="text-center mb-4 sm:mb-5 md:mb-6">
                 <img
                   src={guide.imageUrl || "/api/placeholder/120/120"}
                   alt={guide.guideName}
-                  className="w-32 h-32 rounded-full object-cover border-4 border-emerald-500 mx-auto mb-5 shadow-md"
+                  className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full object-cover border-4 border-green-400 shadow-2xl mx-auto mb-3 sm:mb-4 md:mb-5"
                 />
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">{guide.guideName}</h2>
-                <p className="text-emerald-600 font-medium mb-4">Professional Tour Guide</p>
+                <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-800 mb-2">{guide.guideName}</h2>
+                <p className="text-green-700 font-medium mb-3 sm:mb-4 md:mb-5 text-sm sm:text-base md:text-lg">Professional Tour Guide</p>
 
                 {/* Rating */}
-                <div className="flex items-center justify-center mt-3 bg-emerald-50 rounded-xl p-3 border border-emerald-100">
-                  <div className="flex items-center">
+                <div className="flex items-center justify-center mt-3 sm:mt-4 bg-green-50 rounded-lg p-3 sm:p-3.5 md:p-4 border border-green-300">
+                  <div className="flex items-center flex-wrap justify-center gap-2 sm:gap-2.5">
                     {renderStars(guide.rating || 0)}
-                    <span className="ml-3 text-sm font-semibold text-gray-700">
+                    <span className="text-sm sm:text-base font-semibold text-green-800">
                       {guide.rating?.toFixed(1) || '0.0'}/5
                     </span>
                     {guide.totalReviews > 0 && (
-                      <span className="ml-2 text-xs text-gray-500">
+                      <span className="text-sm text-green-600">
                         • {guide.totalReviews} reviews
                       </span>
                     )}
@@ -917,31 +924,31 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
               </div>
 
               {/* Contact Info */}
-              <div className="space-y-3 mb-8">
+              <div className="space-y-3 sm:space-y-3.5 md:space-y-4 mb-4 sm:mb-5 md:mb-6 flex-1">
                 {guide.contactPhone && guide.contactPhone !== 'Not provided' && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
-                      <Phone size={16} className="text-white" />
+                  <div className="flex items-center text-green-800 p-3 sm:p-3.5 md:p-4 rounded-lg bg-green-50 border border-green-300">
+                    <div className="p-2 sm:p-2.5 md:p-3 bg-green-400 rounded-lg mr-3 sm:mr-3.5 md:mr-4 flex-shrink-0">
+                      <Phone size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
                     </div>
-                    <span className="font-semibold">{guide.contactPhone}</span>
+                    <span className="font-semibold text-sm sm:text-base md:text-lg text-green-800 break-words">{guide.contactPhone}</span>
                   </div>
                 )}
 
                 {guide.contactEmail && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
-                      <Mail size={16} className="text-white" />
+                  <div className="flex items-center text-green-800 p-3 sm:p-3.5 md:p-4 rounded-lg bg-green-50 border border-green-300">
+                    <div className="p-2 sm:p-2.5 md:p-3 bg-green-400 rounded-lg mr-3 sm:mr-3.5 md:mr-4 flex-shrink-0">
+                      <Mail size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
                     </div>
-                    <span className="font-semibold">{guide.contactEmail}</span>
+                    <span className="font-semibold text-sm sm:text-base md:text-lg text-green-800 break-words">{guide.contactEmail}</span>
                   </div>
                 )}
 
                 {guide.location && (
-                  <div className="flex items-center text-gray-700 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200/50">
-                    <div className="p-2 bg-emerald-500 rounded-lg mr-3">
-                      <MapPin size={16} className="text-white" />
+                  <div className="flex items-center text-green-800 p-3 sm:p-3.5 md:p-4 rounded-lg bg-green-50 border border-green-300">
+                    <div className="p-2 sm:p-2.5 md:p-3 bg-green-400 rounded-lg mr-3 sm:mr-3.5 md:mr-4 flex-shrink-0">
+                      <MapPin size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
                     </div>
-                    <span className="font-semibold">{guide.location}</span>
+                    <span className="font-semibold text-sm sm:text-base md:text-lg text-green-800 break-words">{guide.location}</span>
                   </div>
                 )}
               </div>
@@ -994,60 +1001,52 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 flex flex-col min-h-0">
             {/* Tabs */}
-            <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-emerald-100/50 mb-8 overflow-hidden">
-              <div className="border-b border-emerald-100/50 bg-gradient-to-r from-emerald-50/50 to-transparent">
+            <div className="bg-gradient-to-b from-green-100 to-green-200 rounded-lg shadow-2xl border-2 border-green-300 overflow-hidden flex flex-col lg:flex-1 min-h-0 w-full">
+              <div className="border-b border-green-300 bg-gradient-to-r from-green-200 to-green-100">
                 <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'overview'
-                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                      : 'border-transparent text-gray-500'
+                    className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'overview'
+                      ? 'border-green-500 text-green-800 bg-green-50'
+                      : 'border-transparent text-green-600 hover:text-green-800'
                       }`}
                   >
                     Overview
-                    {activeTab === 'overview' && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
-                    )}
                   </button>
                   <button
                     onClick={() => setActiveTab('services')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'services'
-                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                      : 'border-transparent text-gray-500'
+                    className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'services'
+                      ? 'border-green-500 text-green-800 bg-green-50'
+                      : 'border-transparent text-green-600 hover:text-green-800'
                       }`}
                   >
-                    Services & Rates
-                    {activeTab === 'services' && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
-                    )}
+                    <span className="hidden sm:inline">Services & Rates</span>
+                    <span className="sm:hidden">Services</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('reviews')}
-                    className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'reviews'
-                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                      : 'border-transparent text-gray-500'
+                    className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'reviews'
+                      ? 'border-green-500 text-green-800 bg-green-50'
+                      : 'border-transparent text-green-600 hover:text-green-800'
                       }`}
                   >
-                    Reviews{guide.totalReviews > 0 && ` (${guide.totalReviews})`}
-                    {activeTab === 'reviews' && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
-                    )}
+                    <span className="hidden sm:inline">Reviews</span>
+                    <span className="sm:hidden">Rev</span>
+                    {guide.totalReviews > 0 && ` (${guide.totalReviews})`}
                   </button>
                   {currentUser && userRole === 'tourist' && (
                     <button
                       onClick={() => setActiveTab('booking')}
-                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'booking'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500'
+                      className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'booking'
+                        ? 'border-green-500 text-green-800 bg-green-50'
+                        : 'border-transparent text-green-600 hover:text-green-800'
                         }`}
                     >
-                      <CalendarIcon size={16} className="inline mr-2" />
-                      Book Now
-                      {activeTab === 'booking' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
-                      )}
+                      <CalendarIcon size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6 inline mr-2 sm:mr-2.5 md:mr-3" />
+                      <span className="hidden sm:inline">Book Now</span>
+                      <span className="sm:hidden">Book</span>
                     </button>
                   )}
                   {currentUser && (
@@ -1058,33 +1057,31 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                           handleOpenChatModal();
                         }
                       }}
-                      className={`py-5 px-8 text-center border-b-3 font-semibold text-sm whitespace-nowrap relative ${activeTab === 'chat'
-                        ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                        : 'border-transparent text-gray-500'
+                      className={`py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 lg:px-8 text-center border-b-2 font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap relative touch-manipulation min-h-[48px] flex items-center justify-center ${activeTab === 'chat'
+                        ? 'border-green-500 text-green-800 bg-green-50'
+                        : 'border-transparent text-green-600 hover:text-green-800'
                         }`}
                     >
-                      Messages
-                      {activeTab === 'chat' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
-                      )}
+                      <span className="hidden sm:inline">Messages</span>
+                      <span className="sm:hidden">Msg</span>
                     </button>
                   )}
                 </nav>
               </div>
 
               {/* Tab Content */}
-              <div className="p-8 max-h-[700px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-emerald-50">
+              <div className="p-4 sm:p-5 md:p-6 lg:p-8 lg:overflow-hidden lg:flex-1 bg-gradient-to-b from-green-50 to-green-100 text-green-800">
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
-                  <div className="space-y-6">
+                  <div className="space-y-3.5 sm:space-y-4 md:space-y-5 lg:h-full lg:overflow-y-auto pr-2 sm:pr-3">
                     {/* Experience */}
-                    <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
-                      <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
-                        <Clock className="text-white" size={22} />
+                    <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
+                      <div className="p-2.5 sm:p-3 md:p-3.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 md:mr-4 flex-shrink-0">
+                        <Clock className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-1">Experience</h3>
-                        <p className="text-gray-600">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Experience</h3>
+                        <p className="text-green-700 text-sm sm:text-base leading-relaxed">
                           {guide.experience || 0} years of experience as a professional tour guide
                         </p>
                       </div>
@@ -1092,9 +1089,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Description */}
                     {guide.description && (
-                      <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
-                        <h3 className="font-bold text-gray-900 mb-3 text-lg">About</h3>
-                        <p className="text-gray-700 leading-relaxed text-base">
+                      <div className="p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
+                        <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">About</h3>
+                        <p className="text-green-700 leading-relaxed text-sm sm:text-base line-clamp-3">
                           {guide.description}
                         </p>
                       </div>
@@ -1102,17 +1099,17 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Languages */}
                     {guide.languages && guide.languages.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
-                          <Languages className="text-white" size={22} />
+                      <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
+                        <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
+                          <Languages className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Languages</h3>
-                          <div className="flex flex-wrap gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Languages</h3>
+                          <div className="flex flex-wrap gap-2 sm:gap-2.5">
                             {guide.languages.map((lang, index) => (
                               <span
                                 key={index}
-                                className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-medium"
+                                className="bg-green-100 text-green-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-sm sm:text-base border border-green-300 font-semibold"
                               >
                                 {lang}
                               </span>
@@ -1124,17 +1121,17 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Areas of Expertise */}
                     {guide.areasOfExpertise && guide.areasOfExpertise.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
-                          <Globe className="text-white" size={22} />
+                      <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
+                        <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
+                          <Globe className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
                         </div>
-                        <div>
-                          <h3 className="font-bold text-gray-900 mb-3 text-lg">Areas of Expertise</h3>
-                          <div className="flex flex-wrap gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Areas of Expertise</h3>
+                          <div className="flex flex-wrap gap-2 sm:gap-2.5">
                             {guide.areasOfExpertise.map((area, index) => (
                               <span
                                 key={index}
-                                className="bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 px-4 py-2 rounded-full text-sm border-2 border-emerald-200 font-semibold shadow-sm"
+                                className="bg-green-100 text-green-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-sm sm:text-base border border-green-300 font-semibold"
                               >
                                 {area}
                               </span>
@@ -1146,17 +1143,17 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Special Qualifications */}
                     {guide.specialQualifications && guide.specialQualifications.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
-                          <GraduationCap className="text-white" size={22} />
+                      <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
+                        <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
+                          <GraduationCap className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
                         </div>
-                        <div>
-                          <h3 className="font-bold text-gray-900 mb-3 text-lg">Special Qualifications</h3>
-                          <div className="flex flex-wrap gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Special Qualifications</h3>
+                          <div className="flex flex-wrap gap-2 sm:gap-2.5">
                             {guide.specialQualifications.map((qual, index) => (
                               <span
                                 key={index}
-                                className="bg-gradient-to-r from-green-100 to-green-50 text-green-800 px-4 py-2 rounded-full text-sm border-2 border-green-200 font-semibold shadow-sm"
+                                className="bg-green-100 text-green-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-sm sm:text-base border border-green-300 font-semibold"
                               >
                                 {qual}
                               </span>
@@ -1168,17 +1165,17 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Verification Documents */}
                     {guide.verificationDocuments && guide.verificationDocuments.length > 0 && (
-                      <div className="flex items-start p-6 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border-2 border-emerald-100/50 shadow-md">
-                        <div className="p-3 bg-emerald-500 rounded-xl mr-4 flex-shrink-0 shadow-lg">
-                          <FileText className="text-white" size={22} />
+                      <div className="flex items-start p-3.5 sm:p-4 md:p-5 rounded-lg bg-white border border-green-300">
+                        <div className="p-2 sm:p-2.5 bg-green-400 rounded-lg mr-3 sm:mr-3.5 flex-shrink-0">
+                          <FileText className="text-white" size={20} style={{ width: '20px', height: '20px' }} />
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Verification Documents</h3>
-                          <div className="flex flex-wrap gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-green-800 mb-2 text-sm sm:text-base md:text-lg">Verification Documents</h3>
+                          <div className="flex flex-wrap gap-2 sm:gap-2.5">
                             {guide.verificationDocuments.map((doc, index) => (
                               <span
                                 key={index}
-                                className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-sm border border-purple-200 font-medium"
+                                className="bg-green-100 text-green-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-sm sm:text-base border border-green-300 font-semibold"
                               >
                                 {doc}
                               </span>
@@ -1192,69 +1189,69 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                 {/* Services & Rates Tab */}
                 {activeTab === 'services' && (
-                  <div className="space-y-6">
+                  <div className="space-y-2.5 sm:space-y-3 md:space-y-4 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
                     {/* Pricing */}
                     {(guide.dailyRate > 0 || guide.hourlyRate > 0) && (
-                      <div className="p-8 rounded-2xl bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-white border-2 border-emerald-200 shadow-xl">
-                        <h3 className="font-bold text-gray-900 mb-6 flex items-center text-xl">
-                          <div className="p-2 bg-emerald-600 rounded-xl mr-3 shadow-lg">
-                            <DollarSign className="text-white" size={24} />
+                      <div className="p-2.5 sm:p-3 md:p-4 lg:p-6 rounded-lg bg-white border border-green-300">
+                        <h3 className="font-bold text-green-800 mb-3 sm:mb-4 md:mb-6 flex items-center text-sm sm:text-base md:text-lg">
+                          <div className="p-1 sm:p-1.5 md:p-2 bg-green-400 rounded-lg mr-1.5 sm:mr-2 md:mr-3 flex-shrink-0">
+                            <DollarSign className="text-white" size={12} style={{ width: '12px', height: '12px' }} />
                           </div>
                           Rates
                         </h3>
-                        <div className="space-y-4">
+                        <div className="space-y-2 sm:space-y-2.5 md:space-y-3">
                           {/* Full Day Price */}
                           {(guide.dailyRate > 0 || (guide.hourlyRate > 0)) && (
-                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
-                              <div>
-                                <span className="text-gray-800 font-bold text-lg">Full Day Tour:</span>
-                                <p className="text-sm text-gray-600 mt-1">Full day guided tours</p>
+                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 lg:p-4 bg-green-50 rounded-lg border border-green-300">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="text-green-800 font-bold text-xs sm:text-sm md:text-base block">Full Day Tour:</span>
+                                <p className="text-xs sm:text-sm text-green-600 mt-0.5">Full day guided tours</p>
                               </div>
-                              <div className="text-right">
-                                <span className="text-3xl font-black text-emerald-600">
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-black text-green-700">
                                   {getCurrencySymbol(guide.currencyPreference)}
                                   {(guide.dailyRate || (guide.hourlyRate * 8) || 0).toLocaleString()}
                                 </span>
-                                <span className="text-sm font-semibold text-gray-500 block">/day</span>
+                                <span className="text-xs sm:text-sm font-semibold text-green-600 block">/day</span>
                               </div>
                             </div>
                           )}
                           {/* Half Day Price */}
                           {(guide.dailyRate > 0 || (guide.hourlyRate > 0)) && (
-                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
-                              <div>
-                                <span className="text-gray-800 font-bold text-lg">Half Day Tour:</span>
-                                <p className="text-sm text-gray-600 mt-1">Half day guided tours</p>
+                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 lg:p-4 bg-green-50 rounded-lg border border-green-300">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="text-green-800 font-bold text-xs sm:text-sm md:text-base block">Half Day Tour:</span>
+                                <p className="text-xs sm:text-sm text-green-600 mt-0.5">Half day guided tours</p>
                               </div>
-                              <div className="text-right">
-                                <span className="text-3xl font-black text-emerald-600">
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-black text-green-700">
                                   {getCurrencySymbol(guide.currencyPreference)}
                                   {Math.round((guide.dailyRate || (guide.hourlyRate * 8) || 0) * 0.6).toLocaleString()}
                                 </span>
-                                <span className="text-sm font-semibold text-gray-500 block">/half day</span>
+                                <span className="text-xs sm:text-sm font-semibold text-green-600 block">/half day</span>
                               </div>
                             </div>
                           )}
                           {guide.hourlyRate > 0 && (
-                            <div className="flex items-center justify-between p-5 bg-white rounded-xl border-2 border-emerald-100 shadow-md">
-                              <div>
-                                <span className="text-gray-800 font-bold text-lg">Price per hour:</span>
-                                <p className="text-sm text-gray-600 mt-1">Hourly rate</p>
+                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 lg:p-4 bg-green-50 rounded-lg border border-green-300">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="text-green-800 font-bold text-xs sm:text-sm md:text-base block">Price per hour:</span>
+                                <p className="text-xs sm:text-sm text-green-600 mt-0.5">Hourly rate</p>
                               </div>
-                              <div className="text-right">
-                                <span className="text-2xl font-black text-emerald-600">
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-sm sm:text-base md:text-lg lg:text-xl font-black text-green-700">
                                   {getCurrencySymbol(guide.currencyPreference)}{guide.hourlyRate.toLocaleString()}
                                 </span>
-                                <span className="text-sm font-semibold text-gray-500 block">/hour</span>
+                                <span className="text-xs sm:text-sm font-semibold text-green-600 block">/hour</span>
                               </div>
                             </div>
                           )}
                           {guide.specialPackageRates && (
-                            <div className="p-3 bg-white rounded-lg border border-emerald-100">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-gray-700 font-medium">Special Packages:</span>
+                            <div className="p-2 sm:p-2.5 md:p-3 bg-green-50 rounded-lg border border-green-300">
+                              <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                                <span className="text-green-800 font-medium text-xs sm:text-sm">Special Packages:</span>
                               </div>
-                              <p className="text-gray-600 text-sm">{guide.specialPackageRates}</p>
+                              <p className="text-green-700 text-xs sm:text-sm">{guide.specialPackageRates}</p>
                             </div>
                           )}
                         </div>
@@ -1265,45 +1262,47 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                 {/* Booking Tab */}
                 {activeTab === 'booking' && currentUser && userRole === 'tourist' && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-2.5 sm:space-y-3 md:space-y-4 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
                       {/* Calendar */}
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-4 text-lg">Select Your Dates</h3>
-                        <DatePickerCalendar
-                          selectedDates={selectedDates}
-                          onDateSelect={handleDateSelect}
-                          availableDates={guide.availableDates}
-                        />
+                      <div className="min-h-0">
+                        <h3 className="font-semibold text-green-800 mb-2 sm:mb-3 md:mb-4 text-xs sm:text-sm md:text-base">Select Your Dates</h3>
+                        <div className="overflow-y-auto max-h-[300px] sm:max-h-[350px] md:max-h-[400px]">
+                          <DatePickerCalendar
+                            selectedDates={selectedDates}
+                            onDateSelect={handleDateSelect}
+                            availableDates={guide.availableDates}
+                          />
+                        </div>
                       </div>
 
                       {/* Booking Summary */}
-                      <div className="space-y-4">
-                        <div className="bg-white border border-gray-200 rounded-lg p-4">
-                          <h3 className="font-semibold text-gray-900 mb-3">Booking Summary</h3>
+                      <div className="space-y-2.5 sm:space-y-3 md:space-y-4 min-h-0">
+                        <div className="bg-white border border-green-300 rounded-lg p-2.5 sm:p-3 md:p-4">
+                          <h3 className="font-semibold text-green-800 mb-2 sm:mb-3 text-xs sm:text-sm md:text-base">Booking Summary</h3>
 
                           {selectedDates.length === 0 ? (
-                            <p className="text-gray-500 text-center py-4">
+                            <p className="text-green-600 text-center py-3 sm:py-4 text-xs sm:text-sm">
                               Select dates to see booking details
                             </p>
                           ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-2 sm:space-y-3">
                               <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Selected dates:</span>
-                                <span className="font-medium text-emerald-700">{selectedDates.length} days</span>
+                                <span className="text-green-700 text-xs sm:text-sm">Selected dates:</span>
+                                <span className="font-medium text-green-800 text-xs sm:text-sm">{selectedDates.length} days</span>
                               </div>
 
                               <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Daily rate:</span>
-                                <span className="font-medium">
+                                <span className="text-green-700 text-xs sm:text-sm">Daily rate:</span>
+                                <span className="font-medium text-green-800 text-xs sm:text-sm">
                                   {getCurrencySymbol(guide.currencyPreference)}{guide.dailyRate?.toLocaleString() || (guide.hourlyRate * 8)?.toLocaleString() || '0'}
                                 </span>
                               </div>
 
-                              <div className="border-t border-gray-200 pt-2">
+                              <div className="border-t border-green-300 pt-2">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-lg font-semibold text-gray-900">Total:</span>
-                                  <span className="text-2xl font-bold text-emerald-600">
+                                  <span className="text-sm sm:text-base md:text-lg font-semibold text-green-800">Total:</span>
+                                  <span className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
                                     {getCurrencySymbol(guide.currencyPreference)}
                                     {(selectedDates.length * (guide.dailyRate || guide.hourlyRate * 8 || 0)).toLocaleString()}
                                   </span>
@@ -1313,9 +1312,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                               <button
                                 onClick={handleBooking}
                                 disabled={isBooking || selectedDates.length === 0}
-                                className={`w-full bg-emerald-600 text-white py-3 px-4 rounded-lg font-medium mt-4 shadow-md ${isBooking || selectedDates.length === 0
+                                className={`w-full bg-green-500 text-white py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 rounded-lg font-medium mt-2 sm:mt-3 md:mt-4 shadow-md text-xs sm:text-sm md:text-base ${isBooking || selectedDates.length === 0
                                   ? 'opacity-50 cursor-not-allowed'
-                                  : 'cursor-pointer'
+                                  : 'cursor-pointer hover:bg-green-400'
                                   }`}
                               >
                                 {isBooking ? 'Processing...' : 'Confirm Booking'}
@@ -1325,9 +1324,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                         </div>
 
                         {/* Guide Info */}
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                          <h3 className="font-semibold text-gray-900 mb-2">Guide Information</h3>
-                          <p className="text-gray-600 text-sm">
+                        <div className="bg-white border border-green-300 rounded-lg p-2.5 sm:p-3 md:p-4">
+                          <h3 className="font-semibold text-green-800 mb-1.5 sm:mb-2 text-xs sm:text-sm md:text-base">Guide Information</h3>
+                          <p className="text-green-700 text-xs sm:text-sm leading-relaxed">
                             You'll be booking with {guide.guideName}, an experienced tour guide with {guide.experience || 0} years of experience and expertise in {guide.areasOfExpertise?.slice(0, 2).join(', ') || 'various areas'}.
                           </p>
                         </div>
@@ -1338,41 +1337,43 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                 {/* Reviews Tab */}
                 {activeTab === 'reviews' && (
-                  <ReviewSection
-                    guideId={guideId}
-                    currentUser={currentUser}
-                    userRole={userRole}
-                    onReviewAdded={handleReviewAdded}
-                  />
+                  <div className="lg:h-full lg:overflow-y-auto">
+                    <ReviewSection
+                      guideId={guideId}
+                      currentUser={currentUser}
+                      userRole={userRole}
+                      onReviewAdded={handleReviewAdded}
+                    />
+                  </div>
                 )}
 
                 {/* Chat Tab - Opens Chat Modal */}
                 {activeTab === 'chat' && (
-                  <div className="h-96 flex flex-col items-center justify-center">
+                  <div className="min-h-[300px] lg:h-full flex flex-col items-center justify-center p-4 sm:p-6 md:p-8">
                     {currentUser ? (
                       <div className="text-center">
-                        <MessageCircle size={64} className="mx-auto mb-4 text-emerald-600" />
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        <MessageCircle size={48} className="sm:w-16 sm:h-16 md:w-20 md:h-20 mx-auto mb-3 sm:mb-4 text-green-500" />
+                        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-green-800 mb-2">
                           Chat with {guide.guideName || guide.fullName || 'Tour Guide'}
                         </h3>
-                        <p className="text-gray-600 mb-6">
+                        <p className="text-green-700 text-xs sm:text-sm md:text-base mb-4 sm:mb-6">
                           Click the button below to open the chat window
                         </p>
                         <button
                           onClick={handleOpenChatModal}
-                          className="bg-emerald-600 text-white px-8 py-3 rounded-lg font-medium flex items-center gap-2 mx-auto"
+                          className="bg-green-500 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg font-medium flex items-center gap-2 mx-auto text-xs sm:text-sm md:text-base"
                         >
-                          <MessageCircle size={20} />
+                          <MessageCircle size={16} className="sm:w-5 sm:h-5" />
                           Open Chat
                         </button>
                       </div>
                     ) : (
-                      <div className="text-center py-8">
-                        <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      <div className="text-center py-6 sm:py-8">
+                        <MessageCircle size={40} className="sm:w-12 sm:h-12 md:w-14 md:h-14 mx-auto mb-3 sm:mb-4 text-green-400" />
+                        <h3 className="text-sm sm:text-base md:text-lg font-semibold text-green-800 mb-2">
                           Login to Message
                         </h3>
-                        <p className="text-gray-600 mb-4">
+                        <p className="text-green-700 text-xs sm:text-sm mb-4">
                           Please login to start a conversation with {guide.guideName || guide.fullName || 'this guide'}
                         </p>
                         <button
@@ -1381,7 +1382,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                               onShowAuth('login');
                             }
                           }}
-                          className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium"
+                          className="bg-green-500 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm"
                         >
                           Login Now
                         </button>

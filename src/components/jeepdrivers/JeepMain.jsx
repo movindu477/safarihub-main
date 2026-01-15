@@ -327,77 +327,8 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
     };
   }, [navigate]);
 
-  // Scroll to top when page loads or navigates (including back button)
-  useEffect(() => {
-    // Check if we should scroll to a specific driver card
-    const shouldScrollToDriver = sessionStorage.getItem('scrollToDriver') === 'true';
-    const lastViewedDriverId = sessionStorage.getItem('lastViewedDriverId');
-
-    if (shouldScrollToDriver && lastViewedDriverId && location.pathname === '/driver') {
-      // First scroll to top
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-
-      // Then scroll to the specific driver card after a short delay
-      setTimeout(() => {
-        const driverCard = document.getElementById(`driver-card-${lastViewedDriverId}`);
-        if (driverCard) {
-          driverCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Highlight the card briefly
-          driverCard.style.transition = 'box-shadow 0.3s ease';
-          driverCard.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.5)';
-          setTimeout(() => {
-            driverCard.style.boxShadow = '';
-          }, 2000);
-        }
-        // Clear the flag
-        sessionStorage.removeItem('scrollToDriver');
-        sessionStorage.removeItem('lastViewedDriverId');
-      }, 100);
-    } else {
-      // Normal scroll to top
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    }
-  }, [location.pathname]);
-
-  // Also handle popstate (back/forward button)
-  useEffect(() => {
-    const handlePopState = () => {
-      setTimeout(() => {
-        // Check if we should scroll to a specific driver card
-        const shouldScrollToDriver = sessionStorage.getItem('scrollToDriver') === 'true';
-        const lastViewedDriverId = sessionStorage.getItem('lastViewedDriverId');
-
-        if (shouldScrollToDriver && lastViewedDriverId && location.pathname === '/driver') {
-          // First scroll to top
-          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-
-          // Then scroll to the specific driver card
-          setTimeout(() => {
-            const driverCard = document.getElementById(`driver-card-${lastViewedDriverId}`);
-            if (driverCard) {
-              driverCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              // Highlight the card briefly
-              driverCard.style.transition = 'box-shadow 0.3s ease';
-              driverCard.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.5)';
-              setTimeout(() => {
-                driverCard.style.boxShadow = '';
-              }, 2000);
-            }
-            // Clear the flag
-            sessionStorage.removeItem('scrollToDriver');
-            sessionStorage.removeItem('lastViewedDriverId');
-          }, 100);
-        } else {
-          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        }
-      }, 0);
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [location.pathname]);
+  // Don't scroll to top automatically - let JeepSection2 handle scroll restoration
+  // This allows the scroll-to-element logic to work properly
 
   // Handle notification click
   const handleNotificationClick = async (notification) => {

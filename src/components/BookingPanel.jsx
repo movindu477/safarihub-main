@@ -266,7 +266,7 @@ const BookingPanel = ({ user }) => {
   return (
     <>
       <div
-        className="fixed right-0 bg-gray-900 border-l border-gray-700 shadow-xl z-30 w-80 rounded-l-[10px] overflow-hidden"
+        className="fixed right-0 bg-gray-900 border-l border-gray-700 shadow-xl z-30 w-96 rounded-l-[10px] overflow-hidden"
         style={{
           top: '88px',
           height: 'calc(100vh - 180px)'
@@ -282,10 +282,10 @@ const BookingPanel = ({ user }) => {
 
         <div className="flex flex-col flex-1 overflow-hidden bg-gray-900 min-h-0">
           {/* Status Filter Tabs */}
-          <div className="bg-gray-800 border-b border-gray-700 p-2 flex gap-1 overflow-x-auto flex-shrink-0">
+          <div className="bg-gray-800 border-b border-gray-700 p-2 flex gap-1 flex-shrink-0">
             <button
               onClick={() => setSelectedStatus('all')}
-              className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'all'
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'all'
                 ? 'bg-green-600 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
@@ -294,7 +294,7 @@ const BookingPanel = ({ user }) => {
             </button>
             <button
               onClick={() => setSelectedStatus('pending')}
-              className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'pending'
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'pending'
                 ? 'bg-yellow-500 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
@@ -303,7 +303,7 @@ const BookingPanel = ({ user }) => {
             </button>
             <button
               onClick={() => setSelectedStatus('accepted')}
-              className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'accepted'
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'accepted'
                 ? 'bg-green-500 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
@@ -312,7 +312,7 @@ const BookingPanel = ({ user }) => {
             </button>
             <button
               onClick={() => setSelectedStatus('declined')}
-              className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'declined'
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'declined'
                 ? 'bg-red-500 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Menu, 
-  X, 
-  User, 
-  Settings, 
-  LogOut, 
-  Heart, 
-  Calendar, 
-  CreditCard, 
+import {
+  Menu,
+  X,
+  User,
+  Settings,
+  LogOut,
+  Heart,
+  Calendar,
+  CreditCard,
   HelpCircle,
   MapPin,
   Globe,
@@ -20,7 +20,7 @@ import {
   ShoppingBag
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // Import images from src/assets
@@ -49,7 +49,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       setAuthUser(user);
       setAuthLoading(false);
       console.log("Navbar auth state:", user ? "User logged in" : "No user");
-      
+
       if (!user) {
         setUserData(null);
         setProfileOpen(false);
@@ -69,43 +69,119 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   }, []);
 
   // Fetch user data from Firestore when user changes (not just when profile opens)
+  // Use real-time listener to automatically update when profilePicture changes
   useEffect(() => {
-    const fetchUserData = async () => {
-      const currentUser = user || authUser;
-      
-      if (currentUser) {
-        try {
-          let userDocRef;
-          
-          // Try tourists collection first
-          userDocRef = doc(db, "tourists", currentUser.uid);
-          let userDoc = await getDoc(userDocRef);
-          
-          // If not found in tourists, try serviceProviders
-          if (!userDoc.exists()) {
-            userDocRef = doc(db, "serviceProviders", currentUser.uid);
-            userDoc = await getDoc(userDocRef);
-          }
-          
-          if (userDoc.exists()) {
-            setUserData(userDoc.data());
-          } else {
-            console.log("No user data found in Firestore");
-            setUserData(null);
-          }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-          setUserData(null);
-        } finally {
+    const currentUser = user || authUser;
+
+    if (!currentUser) {
+      console.log('🔍 No user found, clearing user data');
+      setUserData(null);
+      setLoading(false);
+      return;
+    }
+
+    console.log('🔍 Setting up database listeners for user:', currentUser.uid);
+    let unsubscribeTourist = null;
+    let unsubscribeProvider = null;
+
+    const setupListeners = async () => {
+      try {
+        // Try tourists collection first
+        const touristDocRef = doc(db, "tourists", currentUser.uid);
+        const touristDoc = await getDoc(touristDocRef);
+
+        if (touristDoc.exists()) {
+          const initialData = touristDoc.data();
+          console.log('✅ Found user in tourists collection:', {
+            uid: currentUser.uid,
+            name: initialData.fullName,
+            profilePicture: initialData.profilePicture || '❌ No image',
+            hasProfilePicture: !!initialData.profilePicture
+          });
+
+          // Set initial data immediately
+          setUserData(initialData);
           setLoading(false);
+
+          // Set up real-time listener for tourists
+          unsubscribeTourist = onSnapshot(touristDocRef, (snapshot) => {
+            if (snapshot.exists()) {
+              const data = snapshot.data();
+              console.log('📸 User data updated (tourist):', {
+                profilePicture: data.profilePicture ? `✅ Has image: ${data.profilePicture.substring(0, 50)}...` : '❌ No image',
+                name: data.fullName,
+                fullData: data
+              });
+              setUserData(data);
+            } else {
+              console.log('⚠️ Tourist document no longer exists');
+              setUserData(null);
+            }
+            setLoading(false);
+          }, (error) => {
+            console.error("❌ Error in tourist listener:", error);
+            setLoading(false);
+          });
+        } else {
+          // Try serviceProviders collection
+          const providerDocRef = doc(db, "serviceProviders", currentUser.uid);
+          const providerDoc = await getDoc(providerDocRef);
+
+          if (providerDoc.exists()) {
+            const initialData = providerDoc.data();
+            console.log('✅ Found user in serviceProviders collection:', {
+              uid: currentUser.uid,
+              name: initialData.fullName,
+              serviceType: initialData.serviceType,
+              profilePicture: initialData.profilePicture || '❌ No image',
+              hasProfilePicture: !!initialData.profilePicture
+            });
+
+            // Set initial data immediately
+            setUserData(initialData);
+            setLoading(false);
+
+            // Set up real-time listener for service providers
+            unsubscribeProvider = onSnapshot(providerDocRef, (snapshot) => {
+              if (snapshot.exists()) {
+                const data = snapshot.data();
+                console.log('📸 User data updated (provider):', {
+                  profilePicture: data.profilePicture ? `✅ Has image: ${data.profilePicture.substring(0, 50)}...` : '❌ No image',
+                  name: data.fullName,
+                  serviceType: data.serviceType,
+                  fullData: data
+                });
+                setUserData(data);
+              } else {
+                console.log('⚠️ Provider document no longer exists');
+                setUserData(null);
+              }
+              setLoading(false);
+            }, (error) => {
+              console.error("❌ Error in provider listener:", error);
+              setLoading(false);
+            });
+          } else {
+            console.log("⚠️ No user data found in Firestore for:", currentUser.uid);
+            setUserData(null);
+            setLoading(false);
+          }
         }
-      } else {
+      } catch (error) {
+        console.error("❌ Error setting up user data listeners:", error);
         setUserData(null);
         setLoading(false);
       }
     };
 
-    fetchUserData();
+    setupListeners();
+
+    // Cleanup function
+    return () => {
+      console.log('🧹 Cleaning up database listeners');
+      if (unsubscribeTourist) unsubscribeTourist();
+      if (unsubscribeProvider) unsubscribeProvider();
+    };
   }, [user, authUser, db]);
 
   const handleLogout = async () => {
@@ -114,14 +190,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       setProfileOpen(false);
       setUserData(null);
       setMenuOpen(false);
-      
+
       // Call the onLogout callback if provided
       if (onLogout) {
         onLogout();
       }
-      
+
       console.log("User logged out successfully");
-      
+
       // Navigate to home page after logout
       navigate('/');
     } catch (error) {
@@ -205,13 +281,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     } else {
       // Tourists see all menu items
       return [
-    { icon: User, label: "My Profile", href: "#" },
-    { icon: Heart, label: "My Favorites", href: "#" },
-    { icon: Calendar, label: "My Bookings", href: "#" },
-    { icon: CreditCard, label: "Payment Methods", href: "#" },
-    { icon: Settings, label: "Settings", href: "#" },
-    { icon: HelpCircle, label: "Help & Support", href: "#" },
-  ];
+        { icon: User, label: "My Profile", href: "/profile", onClick: () => { setProfileOpen(false); navigate('/profile'); } },
+        { icon: Heart, label: "My Favorites", href: "/favorites", onClick: () => { setProfileOpen(false); navigate('/favorites'); } },
+        { icon: Calendar, label: "My Bookings", href: "#" },
+        { icon: CreditCard, label: "Payment Methods", href: "#" },
+        { icon: Settings, label: "Settings", href: "#" },
+        { icon: HelpCircle, label: "Help & Support", href: "#" },
+      ];
     }
   };
 
@@ -225,9 +301,9 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       { label: "ADMIN", onClick: () => navigate("/admin"), path: "/admin" },
     ]
     : [
-    { label: "HOME", onClick: handleHomeClick, path: "/" },
-    { label: "ABOUT US", onClick: () => navigate("/about"), path: "/about" },
-  ];
+      { label: "HOME", onClick: handleHomeClick, path: "/" },
+      { label: "ABOUT US", onClick: () => navigate("/about"), path: "/about" },
+    ];
 
   // Default user data if no user is logged in
   const defaultUserData = {
@@ -238,12 +314,30 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     avatar: userImage
   };
 
+  // Get profile picture from database - prioritize Firestore over Firebase Auth
+  const getProfilePicture = () => {
+    // First priority: Firestore profilePicture (from Supabase upload)
+    if (userData?.profilePicture && userData.profilePicture.trim() !== '') {
+      console.log('📸 Using Firestore profilePicture:', userData.profilePicture.substring(0, 50) + '...');
+      return userData.profilePicture;
+    }
+    // Second priority: Firebase Auth photoURL
+    if (currentUser?.photoURL && currentUser.photoURL.trim() !== '') {
+      console.log('📸 Using Firebase Auth photoURL:', currentUser.photoURL.substring(0, 50) + '...');
+      return currentUser.photoURL;
+    }
+    // Fallback: default user image
+    console.log('📸 No profile picture found, using default');
+    return userImage;
+  };
+
   const userProfileData = currentUser ? {
     name: currentUser.displayName || userData?.fullName || userData?.fullname || "User",
     email: currentUser.email || "No email",
     membership: userData?.serviceType ? `${userData.serviceType}` : "Tourist",
-    joinDate: userData?.createdAt ? new Date(userData.createdAt.toDate()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Recently",
-    avatar: currentUser.photoURL || userData?.profilePicture || userImage,
+    joinDate: userData?.createdAt ? (userData.createdAt.toDate ? new Date(userData.createdAt.toDate()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : new Date(userData.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })) : "Recently",
+    // Get profile picture from database connection
+    avatar: getProfilePicture(),
     phone: userData?.phone || userData?.phoneNumber || "Not provided",
     location: userData?.location || userData?.country || "Not specified",
     experience: userData?.experienceYears,
@@ -276,9 +370,9 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     <>
       {/* Navbar - Modern Full Width */}
       <nav className={`fixed top-0 left-0 right-0 w-full text-white flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-12 py-3 z-50 h-16 border-b border-gray-700/40 transition-all duration-300 ${isScrolled
-          ? 'bg-black/95 backdrop-blur-md shadow-lg shadow-black/20' 
-          : 'bg-black/90 backdrop-blur-sm shadow-md shadow-black/10'
-      }`}>
+        ? 'bg-black/95 backdrop-blur-md shadow-lg shadow-black/20'
+        : 'bg-black/90 backdrop-blur-sm shadow-md shadow-black/10'
+        }`}>
         {/* Left side - Logo */}
         <div className="flex items-center space-x-3 flex-shrink-0 z-10">
           <img
@@ -296,9 +390,9 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               key={item.label}
               onClick={item.onClick}
               className={`text-sm lg:text-base font-medium px-3 lg:px-4 py-2 rounded-lg transition-all duration-300 cursor-pointer whitespace-nowrap ${isActivePath(item.path)
-                  ? "bg-gray-800/70 text-gray-100 border border-gray-500/40 shadow-inner"
-                  : "text-gray-100 hover:text-white hover:bg-gray-800/30"
-              }`}
+                ? "bg-gray-800/70 text-gray-100 border border-gray-500/40 shadow-inner"
+                : "text-gray-100 hover:text-white hover:bg-gray-800/30"
+                }`}
             >
               {item.label}
             </button>
@@ -306,56 +400,56 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
           {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers & guides) */}
           {!isServiceProvider && (
-          <div 
-            className="relative"
-            onMouseEnter={() => setServicesDropdownOpen(true)}
-            onMouseLeave={() => setServicesDropdownOpen(false)}
-          >
-            <button
+            <div
+              className="relative"
+              onMouseEnter={() => setServicesDropdownOpen(true)}
+              onMouseLeave={() => setServicesDropdownOpen(false)}
+            >
+              <button
                 className={`text-sm lg:text-base font-medium px-3 lg:px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-1 cursor-pointer whitespace-nowrap ${isServicesActive
                   ? "bg-gray-800/70 text-gray-100 border border-gray-500/40 shadow-inner"
                   : "text-gray-100 hover:text-white hover:bg-gray-800/30"
-              }`}
-            >
-              OUR SERVICES
-              <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Invisible connecting bridge to prevent gap */}
-            <div 
-              className="absolute top-full left-0 w-full h-2 bg-transparent"
-              onMouseEnter={() => setServicesDropdownOpen(true)}
-            ></div>
-
-            {/* Dropdown Menu */}
-            {servicesDropdownOpen && (
-              <div 
-                className="absolute top-full left-0 w-64 bg-black/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-700/40 overflow-hidden animate-fadeIn mt-2"
-                onMouseEnter={() => setServicesDropdownOpen(true)}
-                onMouseLeave={() => setServicesDropdownOpen(false)}
+                  }`}
               >
-                <div className="py-2">
-                  {servicesItems.map((item, index) => {
-                    const IconComponent = item.icon;
-                    return (
-                      <button
-                        key={item.label}
-                        onClick={item.onClick}
+                OUR SERVICES
+                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Invisible connecting bridge to prevent gap */}
+              <div
+                className="absolute top-full left-0 w-full h-2 bg-transparent"
+                onMouseEnter={() => setServicesDropdownOpen(true)}
+              ></div>
+
+              {/* Dropdown Menu */}
+              {servicesDropdownOpen && (
+                <div
+                  className="absolute top-full left-0 w-64 bg-black/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-700/40 overflow-hidden animate-fadeIn mt-2"
+                  onMouseEnter={() => setServicesDropdownOpen(true)}
+                  onMouseLeave={() => setServicesDropdownOpen(false)}
+                >
+                  <div className="py-2">
+                    {servicesItems.map((item, index) => {
+                      const IconComponent = item.icon;
+                      return (
+                        <button
+                          key={item.label}
+                          onClick={item.onClick}
                           className={`flex items-center gap-3 px-4 py-3 text-white transition-all duration-300 group cursor-pointer w-full text-left ${item.path && isActivePath(item.path)
                             ? "bg-gray-800 text-gray-100"
                             : "hover:bg-gray-800 hover:text-white"
-                        }`}
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <IconComponent className="h-4 w-4 text-gray-200 group-hover:text-white" />
-                        <span className="font-medium text-sm">{item.label}</span>
-                      </button>
-                    );
-                  })}
+                            }`}
+                          style={{ animationDelay: `${index * 50}ms` }}
+                        >
+                          <IconComponent className="h-4 w-4 text-gray-200 group-hover:text-white" />
+                          <span className="font-medium text-sm">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -378,12 +472,30 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             </>
           ) : (
             <div className="relative">
-              <img
-                src={userProfileData.avatar}
-                alt="User"
-                className="h-9 w-9 lg:h-10 lg:w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30"
-                onClick={() => setProfileOpen(true)}
-              />
+              {userProfileData.avatar && userProfileData.avatar !== userImage ? (
+                <img
+                  src={userProfileData.avatar}
+                  alt="User"
+                  className="h-9 w-9 lg:h-10 lg:w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 object-cover"
+                  onClick={() => setProfileOpen(true)}
+                  onError={(e) => {
+                    console.error('❌ Profile image failed to load in navbar:', userProfileData.avatar);
+                    console.error('   Attempting fallback to default image');
+                    e.target.src = userImage;
+                    e.target.onerror = null; // Prevent infinite loop
+                  }}
+                  onLoad={() => {
+                    console.log('✅ Profile image loaded successfully in navbar');
+                  }}
+                />
+              ) : (
+                <div
+                  className="h-9 w-9 lg:h-10 lg:w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 bg-gray-700 flex items-center justify-center"
+                  onClick={() => setProfileOpen(true)}
+                >
+                  <User className="h-5 w-5 lg:h-6 lg:w-6 text-gray-400" />
+                </div>
+              )}
               {/* Online indicator */}
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-gray-700 shadow-sm"></div>
             </div>
@@ -396,12 +508,25 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             <div className="flex items-center space-x-2">
               {/* User Profile for Mobile */}
               <div className="relative">
-                <img
-                  src={userProfileData.avatar}
-                  alt="User"
-                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30"
-                  onClick={() => setProfileOpen(true)}
-                />
+                {userProfileData.avatar && userProfileData.avatar !== userImage ? (
+                  <img
+                    src={userProfileData.avatar}
+                    alt="User"
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 object-cover"
+                    onClick={() => setProfileOpen(true)}
+                    onError={(e) => {
+                      console.error('❌ Profile image failed to load:', userProfileData.avatar);
+                      e.target.src = userImage;
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 bg-gray-700 flex items-center justify-center"
+                    onClick={() => setProfileOpen(true)}
+                  >
+                    <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  </div>
+                )}
                 <div className="absolute bottom-0 right-0 w-2 h-2 bg-gray-400 rounded-full border-2 border-gray-700"></div>
               </div>
             </div>
@@ -456,7 +581,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     className={`block transition-all duration-300 py-5 border-b border-gray-700/20 font-medium text-xl w-full text-left animate-fadeInUp group cursor-pointer ${isActivePath(item.path)
                       ? "text-gray-100 bg-gray-900/60"
                       : "text-white hover:text-gray-200 hover:border-gray-600"
-                    }`}
+                      }`}
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <span className="flex items-center">
@@ -468,51 +593,51 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
                 {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers & guides) */}
                 {!isServiceProvider && (
-                <div className="border-b border-gray-700/40">
-                  <button
-                    onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
-                    className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group cursor-pointer"
-                    style={{ animationDelay: "200ms" }}
-                  >
-                    <span className="flex items-center">
-                      OUR SERVICES
-                      <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
-                    </span>
-                    <ChevronDown className={`h-5 w-5 transition-transform duration-300 ${mobileServicesOpen ? 'rotate-180' : ''}`} />
-                  </button>
+                  <div className="border-b border-gray-700/40">
+                    <button
+                      onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
+                      className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group cursor-pointer"
+                      style={{ animationDelay: "200ms" }}
+                    >
+                      <span className="flex items-center">
+                        OUR SERVICES
+                        <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+                      </span>
+                      <ChevronDown className={`h-5 w-5 transition-transform duration-300 ${mobileServicesOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-                  {mobileServicesOpen && (
-                    <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-gray-700/40 ml-2">
-                      {servicesItems.map((item, index) => {
-                        const IconComponent = item.icon;
-                        return (
-                          <button
-                            key={item.label}
-                            onClick={() => {
-                              if (item.onClick) item.onClick();
-                              setMenuOpen(false);
-                            }}
+                    {mobileServicesOpen && (
+                      <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-gray-700/40 ml-2">
+                        {servicesItems.map((item, index) => {
+                          const IconComponent = item.icon;
+                          return (
+                            <button
+                              key={item.label}
+                              onClick={() => {
+                                if (item.onClick) item.onClick();
+                                setMenuOpen(false);
+                              }}
                               className={`flex items-center gap-3 transition-all duration-300 py-4 border-b border-gray-800/40 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer ${item.path && isActivePath(item.path)
                                 ? "text-gray-100 bg-gray-900/60 border-gray-700"
                                 : "text-white hover:text-gray-200 hover:border-gray-700"
-                            }`}
-                            style={{ animationDelay: `${index * 50 + 300}ms` }}
-                          >
-                            <IconComponent className="h-4 w-4 text-gray-200" />
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                                }`}
+                              style={{ animationDelay: `${index * 50 + 300}ms` }}
+                            >
+                              <IconComponent className="h-4 w-4 text-gray-200" />
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
               {/* Authentication Buttons for Mobile - Show when NOT logged in */}
               {!currentUser && (
                 <div className="space-y-3 py-4 border-t border-gray-700/20 pt-6 animate-fadeInUp"
-                     style={{ animationDelay: "400ms" }}>
+                  style={{ animationDelay: "400ms" }}>
                   <button
                     onClick={handleLoginClick}
                     className="w-full bg-white hover:bg-gray-100 text-black py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-gray-300 shadow-lg shadow-black/30 cursor-pointer"
@@ -540,11 +665,21 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     }}
                   >
                     <div className="relative">
-                      <img
-                        src={userProfileData.avatar}
-                        alt="User"
-                        className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 group-hover:border-gray-200 shadow-lg shadow-gray-500/30"
-                      />
+                      {userProfileData.avatar && userProfileData.avatar !== userImage ? (
+                        <img
+                          src={userProfileData.avatar}
+                          alt="User"
+                          className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 group-hover:border-gray-200 shadow-lg shadow-gray-500/30 object-cover"
+                          onError={(e) => {
+                            console.error('❌ Profile image failed to load:', userProfileData.avatar);
+                            e.target.src = userImage;
+                          }}
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 group-hover:border-gray-200 shadow-lg shadow-gray-500/30 bg-gray-700 flex items-center justify-center">
+                          <User className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
                       <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-gray-800"></div>
                     </div>
                     <div>
@@ -588,14 +723,30 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                   <div className="absolute top-0 right-0 w-64 h-64 bg-gray-600/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
                   <div className="absolute bottom-0 left-0 w-48 h-48 bg-gray-700/10 rounded-full -ml-24 -mb-24 blur-2xl"></div>
                 </div>
-                
+
                 <div className="px-6 pb-6 -mt-20 relative z-10">
                   <div className="relative inline-block">
-                    <img
-                      src={userProfileData.avatar}
-                      alt="User"
-                      className="relative h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900 shadow-2xl shadow-gray-900/50"
-                    />
+                    {userProfileData.avatar && userProfileData.avatar !== userImage ? (
+                      <img
+                        src={userProfileData.avatar}
+                        alt="User"
+                        className="relative h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900 shadow-2xl shadow-gray-900/50 object-cover"
+                        onError={(e) => {
+                          console.error('❌ Profile image failed to load in slide panel:', userProfileData.avatar);
+                          console.error('   User data:', userData);
+                          console.error('   Current user:', currentUser);
+                          e.target.src = userImage;
+                          e.target.onerror = null; // Prevent infinite loop
+                        }}
+                        onLoad={() => {
+                          console.log('✅ Profile image loaded successfully in slide panel');
+                        }}
+                      />
+                    ) : (
+                      <div className="relative h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-800 shadow-2xl shadow-gray-900/50 flex items-center justify-center">
+                        <User className="h-12 w-12 text-gray-400" />
+                      </div>
+                    )}
                     <div className="absolute bottom-2 right-2 w-4 h-4 bg-gray-400 rounded-full border-2 border-gray-900 shadow-lg shadow-gray-500/50 animate-pulse"></div>
                   </div>
 
@@ -633,7 +784,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                         <span className="text-white">{userProfileData.phone}</span>
                       </div>
                     )}
-                    
+
                     {userProfileData.location !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                         <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
@@ -645,7 +796,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                         <span className="text-white">{userProfileData.location}</span>
                       </div>
                     )}
-                    
+
                     {userProfileData.languages !== "Not specified" && (
                       <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                         <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
@@ -657,7 +808,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                         <span className="text-white">{userProfileData.languages}</span>
                       </div>
                     )}
-                    
+
                     {userProfileData.experience && (
                       <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                         <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
@@ -667,16 +818,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                         <span className="text-white">{userProfileData.experience} years</span>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
                       <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
                         <User className="h-3.5 w-3.5 text-gray-400" />
                       </div>
                       <span className="text-gray-300 font-medium">Role: </span>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${userProfileData.role === "Service Provider"
-                          ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg shadow-gray-700/50 border border-gray-500/30" 
-                          : "bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg shadow-gray-600/50 border border-gray-400/30"
-                      }`}>
+                        ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg shadow-gray-700/50 border border-gray-500/30"
+                        : "bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg shadow-gray-600/50 border border-gray-400/30"
+                        }`}>
                         {userProfileData.role}
                       </span>
                     </div>
@@ -728,9 +879,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     <a
                       key={item.label}
                       href={item.href}
-                      className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-700/30 animate-fadeInUp"
+                      className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-700/30 animate-fadeInUp hover:bg-gray-800/30 transition-colors"
                       style={{ animationDelay: `${index * 50 + 500}ms` }}
-                      onClick={() => setProfileOpen(false)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (item.onClick) {
+                          item.onClick();
+                        } else {
+                          setProfileOpen(false);
+                        }
+                      }}
                     >
                       <div className="p-2 bg-gray-800/30 rounded-lg border border-gray-700/30">
                         <IconComponent className="h-5 w-5 text-gray-400" />
@@ -744,7 +902,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
               </div>
 
               <div className="px-6 py-5 border-t border-gray-700/30 bg-gradient-to-b from-gray-900 to-black mt-auto animate-fadeInUp" style={{ animationDelay: "600ms" }}>
-                <button 
+                <button
                   onClick={handleLogout}
                   className="flex items-center gap-4 p-3.5 rounded-xl text-red-400 w-full border border-red-700/30 cursor-pointer"
                 >
@@ -759,7 +917,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         </>
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes slideInRight {
           from { 
             transform: translateX(100%);

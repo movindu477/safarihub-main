@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+// Supabase Storage imports (replacing Firebase Storage)
+import { uploadProfileImage, uploadDocument, deleteDocument, getDocumentUrl } from '../lib/supabase';
 import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
@@ -12,7 +13,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   const navigate = useNavigate();
   const auth = getAuth();
   const db = getFirestore();
-  const storage = getStorage();
+  // Firebase Storage removed - using Supabase Storage instead
   const [currentUser, setCurrentUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -266,35 +267,105 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
     }
 
     try {
-      const isJeepDriver = userData.serviceType === 'Jeep Driver';
+      // Determine collection based on service type
+      // Jeep Driver and Renting use jeepDriverCertifications
+      // Tour Guide uses guideCertifications
+      const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
       const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
       const userCertDocRef = doc(db, collectionName, currentUser.uid);
+
+      console.log('📄 Setting up documents listener:', {
+        userId: currentUser.uid,
+        serviceType: userData.serviceType,
+        isJeepDriver,
+        collectionName
+      });
 
       const unsubscribe = onSnapshot(
         userCertDocRef,
         (snapshot) => {
+          console.log('📄 Documents snapshot received:', {
+            exists: snapshot.exists(),
+            hasData: !!snapshot.data()
+          });
+          
           if (snapshot.exists()) {
             const data = snapshot.data();
             const documents = data.documents || [];
-            const certs = documents.map((docItem, index) => ({
-              id: docItem.documentId || `${currentUser.uid}_${index}`,
-              certificationName: docItem.certificationName || docItem.fileName || 'Unknown',
-              fileName: docItem.fileName || 'Unknown',
-              fileUrl: docItem.fileUrl || '',
-              fileSize: docItem.fileSize || 0,
-              fileType: docItem.fileType || 'Unknown',
-              uploadedAt: docItem.uploadedAt || null,
-              documentId: docItem.documentId || `${currentUser.uid}_${index}`,
-              providerId: data.providerId || currentUser.uid
-            }));
-            console.log(`📄 Loaded ${certs.length} certification(s) for provider`);
+            
+            console.log(`📄 Found ${documents.length} document(s) in Firestore`);
+            console.log('📋 Raw documents:', documents.map((d, i) => ({
+              index: i,
+              certificationName: d.certificationName,
+              fileName: d.fileName,
+              hasSupabasePath: !!d.supabasePath,
+              hasFileUrl: !!d.fileUrl,
+              uploadStatus: d.uploadStatus,
+              documentId: d.documentId
+            })));
+            
+            const certs = documents.map((docItem, index) => {
+              // Determine status: if path exists and no failed status, mark as uploaded
+              const hasValidPath = (docItem.supabasePath && docItem.supabasePath.trim()) || (docItem.fileUrl && docItem.fileUrl.trim());
+              const status = docItem.uploadStatus === 'failed' 
+                ? 'failed' 
+                : hasValidPath 
+                  ? 'uploaded' 
+                  : (docItem.uploadStatus === 'uploaded' ? 'uploaded' : null); // Preserve 'uploaded' status if set
+              
+              // Handle uploadedAt - can be Date, Timestamp, or null
+              let uploadedAt = null;
+              if (docItem.uploadedAt) {
+                if (docItem.uploadedAt.toDate) {
+                  // Firestore Timestamp
+                  uploadedAt = docItem.uploadedAt;
+                } else if (docItem.uploadedAt instanceof Date) {
+                  // JavaScript Date
+                  uploadedAt = docItem.uploadedAt;
+                } else {
+                  // Try to convert if it's a number (timestamp)
+                  uploadedAt = new Date(docItem.uploadedAt);
+                }
+              }
+              
+              return {
+                id: docItem.documentId || `${currentUser.uid}_${index}`,
+                certificationName: docItem.certificationName || docItem.fileName || 'Unknown',
+                fileName: docItem.fileName || 'Unknown',
+                fileUrl: docItem.fileUrl || null,
+                supabasePath: docItem.supabasePath || null, // Include supabasePath
+                fileSize: docItem.fileSize || 0,
+                fileType: docItem.fileType || 'Unknown',
+                uploadedAt: uploadedAt,
+                documentId: docItem.documentId || `${currentUser.uid}_${index}`,
+                providerId: data.providerId || currentUser.uid,
+                uploadStatus: status, // ✅ Force correct status based on path existence
+                uploadError: docItem.uploadError || null // Include uploadError
+              };
+            });
+            
+            console.log(`✅ Processed ${certs.length} certification(s) for display`);
+            console.log('📋 Processed documents:', certs.map(c => ({
+              name: c.certificationName,
+              hasSupabasePath: !!c.supabasePath,
+              hasFileUrl: !!c.fileUrl,
+              uploadStatus: c.uploadStatus,
+              id: c.id
+            })));
+            
             setUploadedCertifications(certs);
           } else {
+            console.log('⚠️ No documents found in Firestore for user:', currentUser.uid);
             setUploadedCertifications([]);
           }
         },
         (error) => {
-          console.error('Error fetching certifications:', error);
+          console.error('❌ Error fetching certifications:', error);
+          console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+          });
           setUploadedCertifications([]);
         }
       );
@@ -419,14 +490,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
         };
       }
 
-      // Handle profile picture upload
+      // Handle profile picture upload - Using Supabase
       if (profileFile) {
         try {
-          const ext = profileFile.name.split('.').pop();
-          const storageRef = sRef(storage, `profile-pictures/service-providers/${uid}.${ext}`);
-          const snap = await uploadBytes(storageRef, profileFile);
-          const photoURL = await getDownloadURL(snap.ref);
-          updateData.profilePicture = photoURL;
+          const { url: photoURL, error } = await uploadProfileImage(profileFile, uid);
+          
+          if (error) {
+            console.error('Profile image upload failed:', error);
+            setMessage({ type: 'error', text: 'Profile updated but image upload failed. Please try uploading again.' });
+          } else {
+            updateData.profilePicture = photoURL;
+          }
         } catch (uploadError) {
           console.error('Profile image upload failed:', uploadError);
           setMessage({ type: 'error', text: 'Profile updated but image upload failed. Please try uploading again.' });
@@ -1042,14 +1116,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
 
                         for (const file of certificationFiles) {
                           try {
-                            // Upload file to storage
-                            const ext = file.name.split('.').pop();
-                            const fileName = `${currentUser.uid}_${Date.now()}_${file.name}`;
-                            const storageRef = sRef(storage, `certifications/${collectionName}/${fileName}`);
-                            const snap = await uploadBytes(storageRef, file);
-                            const fileUrl = await getDownloadURL(snap.ref);
+                            // Upload file to Supabase Storage
+                            const timestamp = Date.now();
+                            const fileName = `${currentUser.uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                            const { url: fileUrl, error: uploadError, path } = await uploadDocument(file, currentUser.uid, fileName);
 
-                            // Save to Firestore
+                            if (uploadError) {
+                              console.error(`Error uploading ${file.name}:`, uploadError);
+                              continue;
+                            }
+
+                            // Save to Firestore (legacy structure - keeping for compatibility)
                             await addDoc(collection(db, collectionName), {
                               providerId: currentUser.uid,
                               certificationName: file.name,
@@ -1058,7 +1135,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               fileSize: file.size,
                               fileType: file.type,
                               uploadedAt: serverTimestamp(),
-                              updatedAt: serverTimestamp()
+                              updatedAt: serverTimestamp(),
+                              supabasePath: path
                             });
 
                             uploaded.push(file.name);
@@ -1554,24 +1632,39 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       try {
                         console.log(`📤 Starting upload for: ${file.name}`);
 
-                        // Upload file to storage
+                        // Upload file to Supabase Storage
                         const ext = file.name.split('.').pop();
                         const timestamp = Date.now();
                         const fileName = `${currentUser.uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-                        const storageRef = sRef(storage, `certifications/${collectionName}/${fileName}`);
 
-                        console.log(`📤 Uploading to: certifications/${collectionName}/${fileName}`);
+                        console.log(`📤 Uploading to Supabase: ${file.name}`);
 
-                        // Upload with timeout
-                        const uploadPromise = uploadBytes(storageRef, file);
-                        const timeoutPromise = new Promise((_, reject) =>
-                          setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000)
-                        );
+                        // Upload to Supabase Storage
+                        const { url: fileUrl, error: uploadError, path } = await uploadDocument(file, currentUser.uid, fileName);
 
-                        const snap = await Promise.race([uploadPromise, timeoutPromise]);
-                        console.log(`✅ File uploaded to storage: ${file.name}`);
+                        if (uploadError) {
+                          console.error(`❌ Error uploading ${file.name}:`, uploadError);
+                          console.error('Error details:', {
+                            message: uploadError.message,
+                            stack: uploadError.stack
+                          });
 
-                        const fileUrl = await getDownloadURL(snap.ref);
+                          // Save document metadata even if upload fails
+                          newDocuments.push({
+                            certificationName: file.name,
+                            fileName: fileName,
+                            fileUrl: '', // Empty URL indicates upload failed
+                            fileSize: file.size,
+                            fileType: file.type || `application/${ext}`,
+                            uploadedAt: new Date(),
+                            documentId: `${currentUser.uid}_${timestamp}`,
+                            uploadStatus: 'failed',
+                            uploadError: uploadError.message || 'Upload failed'
+                          });
+                          continue;
+                        }
+
+                        console.log(`✅ File uploaded to Supabase: ${file.name}`);
                         console.log(`✅ Got download URL for: ${file.name}`);
 
                         // Add to new documents array
@@ -1581,8 +1674,10 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           fileUrl: fileUrl,
                           fileSize: file.size,
                           fileType: file.type || `application/${ext}`,
-                          uploadedAt: serverTimestamp(),
-                          documentId: `${currentUser.uid}_${timestamp}`
+                          uploadedAt: new Date(),
+                          documentId: `${currentUser.uid}_${timestamp}`,
+                          supabasePath: path, // Store Supabase path for deletion
+                          uploadStatus: 'uploaded' // ✅ Mark as successfully uploaded
                         });
 
                         uploaded.push(file.name);
@@ -1590,27 +1685,18 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         console.error(`❌ Error uploading ${file.name}:`, error);
                         console.error('Error details:', {
                           message: error.message,
-                          code: error.code,
                           stack: error.stack
                         });
 
-                        // Check for CORS error
-                        if (error.message && (error.message.includes('CORS') || error.message.includes('blocked') || error.code === 'storage/unauthorized')) {
-                          console.error('⚠️ CORS ERROR: Firebase Storage CORS is not configured.');
-                          setMessage({
-                            type: 'error',
-                            text: 'CORS Error: Please configure Firebase Storage CORS. See CORS_CONFIG.md for instructions.'
-                          });
-                        }
-
                         // Save document metadata even if upload fails
+                        const timestamp = Date.now();
                         newDocuments.push({
                           certificationName: file.name,
-                          fileName: fileName,
+                          fileName: `${currentUser.uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
                           fileUrl: '', // Empty URL indicates upload failed
                           fileSize: file.size,
-                          fileType: file.type || `application/${ext}`,
-                          uploadedAt: serverTimestamp(),
+                          fileType: file.type || `application/${file.name.split('.').pop()}`,
+                          uploadedAt: new Date(),
                           documentId: `${currentUser.uid}_${timestamp}`,
                           uploadStatus: 'failed',
                           uploadError: error.message || 'Upload failed'
@@ -1649,11 +1735,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       let messageText = '';
                       
                       if (successCount > 0 && failedCount === 0) {
-                        messageText = `Successfully uploaded ${successCount} document(s)!`;
+                        messageText = `Successfully uploaded ${successCount} document(s) to Supabase!`;
                       } else if (successCount > 0 && failedCount > 0) {
-                        messageText = `Uploaded ${successCount} document(s), ${failedCount} failed (saved metadata to Firestore). Check CORS configuration.`;
+                        messageText = `Uploaded ${successCount} document(s) to Supabase, ${failedCount} failed (saved metadata to Firestore).`;
                       } else {
-                        messageText = `Upload failed for all documents (saved metadata to Firestore). Please configure Firebase Storage CORS. See CORS_CONFIG.md`;
+                        messageText = `Upload failed for all documents (saved metadata to Firestore). Please check Supabase configuration.`;
                       }
                       
                       setMessage({ 
@@ -1696,17 +1782,61 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
 
           {/* Existing Documents List */}
           <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-emerald-400" />
-              Uploaded Documents
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <FileText className="h-4 w-4 text-emerald-400" />
+                Uploaded Documents
+                {uploadedCertifications.length > 0 && (
+                  <span className="text-sm text-gray-400 font-normal">
+                    ({uploadedCertifications.length})
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={async () => {
+                  // Manually refresh documents
+                  if (!currentUser || !userData) return;
+                  try {
+                    const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
+                    const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                    const userCertDocRef = doc(db, collectionName, currentUser.uid);
+                    const docSnapshot = await getDoc(userCertDocRef);
+                    
+                    if (docSnapshot.exists()) {
+                      const data = docSnapshot.data();
+                      const documents = data.documents || [];
+                      console.log('🔄 Manually refreshed documents:', documents.length);
+                      // The real-time listener will update the state automatically
+                    } else {
+                      console.log('⚠️ No documents found when refreshing');
+                    }
+                  } catch (error) {
+                    console.error('❌ Error refreshing documents:', error);
+                  }
+                }}
+                className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
+                title="Refresh documents list"
+              >
+                🔄 Refresh
+              </button>
+            </div>
 
             {uploadedCertifications.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-8">No documents uploaded yet</p>
+              <div className="text-center py-8">
+                <p className="text-gray-400 text-sm mb-2">No documents uploaded yet</p>
+                <p className="text-gray-500 text-xs">
+                  Documents uploaded during registration will appear here automatically
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {uploadedCertifications.map((cert) => {
-                  const hasError = !cert.fileUrl || cert.uploadStatus === 'failed';
+                  // Use status to determine error state
+                  // Status can be: 'uploaded' | 'failed' | null (legacy/unknown)
+                  // Show error only if status is explicitly 'failed'
+                  // If status is 'uploaded' or null but has valid path, show as valid
+                  const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
+                  const hasError = cert.uploadStatus === 'failed' || (!hasValidPath && cert.uploadStatus !== 'uploaded');
                   return (
                     <div key={cert.id} className={`bg-gray-900/50 rounded-lg p-3 border ${hasError ? 'border-red-600' : 'border-gray-600'} flex items-center justify-between`}>
                       <div className="flex-1">
@@ -1721,7 +1851,15 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           <p>Size: {(cert.fileSize / 1024).toFixed(1)} KB</p>
                           <p>Type: {cert.fileType || 'Unknown'}</p>
                           {cert.uploadedAt && (
-                            <p>Uploaded: {cert.uploadedAt.toDate ? cert.uploadedAt.toDate().toLocaleDateString() : 'Unknown'}</p>
+                            <p>Uploaded: {
+                              cert.uploadedAt.toDate 
+                                ? cert.uploadedAt.toDate().toLocaleDateString() 
+                                : cert.uploadedAt instanceof Date
+                                  ? cert.uploadedAt.toLocaleDateString()
+                                  : typeof cert.uploadedAt === 'number'
+                                    ? new Date(cert.uploadedAt).toLocaleDateString()
+                                    : 'Unknown'
+                            }</p>
                           )}
                           {hasError && cert.uploadError && (
                             <p className="text-red-400">Error: {cert.uploadError}</p>
@@ -1735,15 +1873,50 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                             Upload Failed
                           </span>
                         ) : (
-                          <a
-                            href={cert.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={async () => {
+                              try {
+                                // ✅ ONLY use supabasePath (relative path)
+                                // ❌ NEVER use fileUrl (could be full URL)
+                                // supabasePath format: users/userId/documents/filename.pdf
+                                const documentPath = cert.supabasePath;
+                                
+                                if (!documentPath) {
+                                  alert('Document path not found. Please re-upload the document.');
+                                  return;
+                                }
+
+                                // Validate it's not a URL (safety check)
+                                if (documentPath.startsWith('http://') || documentPath.startsWith('https://')) {
+                                  console.error('❌ Invalid path format (URL detected):', documentPath);
+                                  alert('Document path is invalid. Please re-upload the document.');
+                                  return;
+                                }
+
+                                console.log('📄 Requesting signed URL for path:', documentPath);
+
+                                // Generate signed URL using ONLY the relative path
+                                const { signedUrl, error } = await getDocumentUrl(documentPath, 300);
+                                
+                                if (error || !signedUrl) {
+                                  console.error('❌ Error getting signed URL:', error);
+                                  alert(`Failed to open document: ${error?.message || 'Unknown error'}`);
+                                  return;
+                                }
+
+                                console.log('✅ Signed URL generated, opening document');
+                                // Open signed URL in new window
+                                window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                              } catch (error) {
+                                console.error('❌ Error viewing document:', error);
+                                alert(`Failed to open document: ${error.message || 'Unknown error'}`);
+                              }
+                            }}
                             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
                           >
                             <FileText className="h-3 w-3" />
                             View
-                          </a>
+                          </button>
                         )}
                       <button
                         onClick={async () => {
@@ -1788,19 +1961,22 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               updatedAt: serverTimestamp()
                             }, { merge: true });
 
-                            // Delete from Storage
+                            // Delete from Supabase Storage
+                            // ✅ Prefer supabasePath (relative path) over fileUrl
                             try {
-                              // Extract storage path from URL
-                              const url = new URL(cert.fileUrl);
-                              const pathMatch = url.pathname.match(/\/o\/(.+)/);
-                              if (pathMatch) {
-                                const storagePath = decodeURIComponent(pathMatch[1]);
-                                const fileRef = sRef(storage, storagePath);
-                                await deleteObject(fileRef);
-                                console.log(`✅ Deleted file from storage: ${storagePath}`);
+                              const { success, error: deleteError } = await deleteDocument(
+                                cert.supabasePath || cert.fileUrl,
+                                currentUser.uid
+                              );
+                              
+                              if (deleteError) {
+                                console.error('Error deleting file from Supabase:', deleteError);
+                              } else {
+                                console.log(`✅ Deleted file from Supabase Storage`);
                               }
+                              // Continue even if storage delete fails - document already removed from Firestore
                             } catch (storageError) {
-                              console.error('Error deleting file from storage:', storageError);
+                              console.error('Error deleting file from Supabase:', storageError);
                               // Continue even if storage delete fails - document already removed from Firestore
                             }
 

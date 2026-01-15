@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where, orderBy, limit, getDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Star, MapPin, Clock, Users, Shield, Award, Globe, Calendar } from 'lucide-react';
@@ -9,7 +10,83 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
   const [filteredGuides, setFilteredGuides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [favoriteMessage, setFavoriteMessage] = useState(null);
+  const [userFavorites, setUserFavorites] = useState([]); // Track user's favorites
   const navigate = useNavigate();
+  const auth = getAuth();
+
+  // Scroll to guide card and restore scroll position when returning from profile page
+  useEffect(() => {
+    const shouldScroll = sessionStorage.getItem('scrollToGuide');
+    const guideId = sessionStorage.getItem('lastViewedGuideId');
+    
+    if (shouldScroll === 'true' && filteredGuides.length > 0 && guideId) {
+      console.log('🔄 Attempting to scroll to guide card:', guideId);
+      
+      // Function to scroll to the element
+      const scrollToElement = () => {
+        const element = document.getElementById(`guide-card-${guideId}`);
+        if (element) {
+          console.log('✅ Found guide card element, scrolling...');
+          
+          // Use scrollIntoView for reliable scrolling
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          });
+          
+          // Add a slight delay for smooth scroll, then highlight
+          setTimeout(() => {
+            // Highlight the card briefly
+            element.style.transition = 'box-shadow 0.3s ease-in-out';
+            element.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.5)';
+            
+            // Remove highlight after 2 seconds
+            setTimeout(() => {
+              element.style.boxShadow = '';
+            }, 2000);
+          }, 500);
+          
+          // Clear the flag after successful scroll
+          sessionStorage.removeItem('scrollToGuide');
+          return true;
+        }
+        console.log('❌ Guide card element not found yet');
+        return false;
+      };
+      
+      // Wait for DOM to be fully rendered with multiple retry attempts
+      const attemptScroll = (attempt = 0) => {
+        const maxAttempts = 8;
+        const delays = [200, 300, 500, 700, 1000, 1500, 2000, 2500]; // Increasing delays
+        
+        if (attempt < maxAttempts) {
+          setTimeout(() => {
+            if (!scrollToElement() && attempt < maxAttempts - 1) {
+              console.log(`🔄 Retry attempt ${attempt + 1}/${maxAttempts}`);
+              attemptScroll(attempt + 1);
+            } else if (attempt >= maxAttempts - 1) {
+              // Clear flag even if element not found after all attempts
+              sessionStorage.removeItem('scrollToGuide');
+              console.log('⚠️ Could not find guide card after all attempts');
+            }
+          }, delays[attempt]);
+        }
+      };
+      
+      // Start attempting to scroll after initial delay
+      setTimeout(() => {
+        attemptScroll();
+      }, 100);
+      
+      // Clean up saved scroll position after use
+      const savedScrollPosition = sessionStorage.getItem('guideListingScrollPosition');
+      if (savedScrollPosition) {
+        sessionStorage.removeItem('guideListingScrollPosition');
+      }
+    }
+  }, [filteredGuides]);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -282,9 +359,14 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
   };
 
   // Handle profile box click - Navigate to guide profile with guide data
-  // Handle profile box click - Navigate to guide profile with guide data
   const handleProfileClick = (guide) => {
     console.log('👤 Navigating to guide profile:', guide.id, guide.guideName);
+
+    // Save current scroll position before navigating
+    sessionStorage.setItem('guideListingScrollPosition', window.scrollY.toString());
+
+    // Save current scroll position before navigating
+    sessionStorage.setItem('guideListingScrollPosition', window.scrollY.toString());
 
     // Store the guide data in sessionStorage to pass to the profile page
     sessionStorage.setItem('currentGuideData', JSON.stringify(guide));
@@ -300,6 +382,104 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
 
     // Navigate to guide profile - FIXED NAVIGATION
     navigate(`/guide-profile/${guide.id}`);
+  };
+
+  // Load user's favorites on mount
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      setUserFavorites([]);
+      return;
+    }
+
+    const touristDocRef = doc(db, 'tourists', user.uid);
+    const unsubscribe = onSnapshot(touristDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setUserFavorites(data.favoriteGuides || []);
+      } else {
+        setUserFavorites([]);
+      }
+    }, (error) => {
+      console.error('Error loading favorites:', error);
+      setUserFavorites([]);
+    });
+
+    return () => unsubscribe();
+  }, [auth, db]);
+
+  // Toggle favorite (add or remove)
+  const handleToggleFavorite = async (guideId) => {
+    const user = auth.currentUser;
+    if (!user) {
+      return;
+    }
+
+    try {
+      const touristDocRef = doc(db, 'tourists', user.uid);
+      const touristDoc = await getDoc(touristDocRef);
+      
+      const existingFavorites = touristDoc.exists() 
+        ? (touristDoc.data().favoriteGuides || [])
+        : [];
+      
+      const isFavorited = existingFavorites.includes(guideId);
+      
+      if (touristDoc.exists()) {
+        if (isFavorited) {
+          // Remove from favorites
+          await updateDoc(touristDocRef, {
+            favoriteGuides: arrayRemove(guideId),
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+          setFavoriteMessage('Removed from favorites');
+        } else {
+          // Add to favorites
+          await updateDoc(touristDocRef, {
+            favoriteGuides: arrayUnion(guideId),
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+          setFavoriteMessage('Service provider added to favorite');
+        }
+      } else {
+        // Create document if it doesn't exist
+        await updateDoc(touristDocRef, {
+          favoriteGuides: [guideId],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        setFavoriteMessage('Service provider added to favorite');
+      }
+      
+      setTimeout(() => setFavoriteMessage(null), 2000);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      setFavoriteMessage('Failed to update favorite');
+      setTimeout(() => setFavoriteMessage(null), 3000);
+    }
+  };
+
+  // Favorite message overlay
+  const FavoriteMessage = () => {
+    if (!favoriteMessage) return null;
+    return (
+      <>
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fadeIn">
+            <p className="font-medium">{favoriteMessage}</p>
+          </div>
+        </div>
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-fadeIn {
+            animation: fadeIn 0.3s ease-out;
+          }
+        `}</style>
+      </>
+    );
   };
 
   // Handle chat button click
@@ -381,7 +561,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     );
   };
 
-  // Profile Image Component with proper error handling
+  // Profile Image Component with proper error handling - Round fit
   const ProfileImage = ({ guide }) => {
     const [imageError, setImageError] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
@@ -399,10 +579,10 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     // If no image URL or image failed to load, show placeholder
     if (!guide.imageUrl || imageError) {
       return (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
           <div className="text-center">
-            <div className="w-16 h-16 bg-blue-400 rounded-full flex items-center justify-center mx-auto mb-2">
-              <span className="text-2xl">🧭</span>
+            <div className="w-20 h-20 bg-gray-400 rounded-full flex items-center justify-center mx-auto mb-2">
+              <span className="text-3xl">🧭</span>
             </div>
             <p className="text-sm font-medium text-gray-600">No Photo</p>
           </div>
@@ -410,22 +590,22 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
       );
     }
 
-    // Show image with proper loading states
+    // Show image with proper loading states - fit to round
     return (
       <div className="w-full h-full relative">
         {!imageLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-500"></div>
           </div>
         )}
-          <img
-            src={guide.imageUrl}
-            alt={guide.guideName}
-            className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-            onError={handleImageError}
-            onLoad={handleImageLoad}
-            loading="lazy"
-          />
+        <img
+          src={guide.imageUrl}
+          alt={guide.guideName}
+          className={`w-full h-full object-cover rounded-full transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onError={handleImageError}
+          onLoad={handleImageLoad}
+          loading="lazy"
+        />
       </div>
     );
   };
@@ -470,6 +650,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
 
   return (
     <div id="guides-section" className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
+      <FavoriteMessage />
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-12">
@@ -634,31 +815,57 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
               <div
                 key={guide.id}
                 id={`guide-card-${guide.id}`}
-                className="bg-white rounded-none shadow border border-gray-200 cursor-pointer"
+                className="bg-white rounded-none shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 cursor-pointer group"
                 onClick={() => handleProfileClick(guide)}
               >
-                {/* Profile Image Section */}
-                <div className="h-48 relative overflow-hidden bg-gradient-to-br from-black via-black to-black">
-                  <ProfileImage guide={guide} />
-                  <div className="absolute inset-0 bg-black/35 pointer-events-none"></div>
+                {/* Profile Image Section - Big Rounded */}
+                <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center group-hover:from-green-200 group-hover:to-green-300 transition-all duration-300">
+                  {/* Rounded Profile Image Container */}
+                  <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-300 shadow-xl relative group-hover:border-green-400 group-hover:shadow-2xl transition-all duration-300">
+                    <ProfileImage guide={guide} />
+                  </div>
 
                   {/* Experience Badge */}
                   {guide.experience > 0 && (
-                    <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                    <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
                       {guide.experience}+ years
                     </div>
                   )}
 
+                  {/* Favorite Button */}
+                  {currentUser && !guide.isCurrentUser && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleFavorite(guide.id);
+                      }}
+                      className={`absolute top-3 left-3 p-2 rounded-full shadow-lg transition-colors z-10 ${
+                        userFavorites.includes(guide.id)
+                          ? 'bg-red-50 hover:bg-red-100'
+                          : 'bg-white hover:bg-red-50'
+                      }`}
+                      title={userFavorites.includes(guide.id) ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      <Heart 
+                        className={`h-5 w-5 transition-colors ${
+                          userFavorites.includes(guide.id)
+                            ? 'text-red-500 fill-red-500'
+                            : 'text-gray-400 hover:text-red-500'
+                        }`} 
+                      />
+                    </button>
+                  )}
+
                   {/* Featured Badge */}
                   {guide.featured && (
-                    <div className="absolute top-3 left-3 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg">
+                    <div className="absolute top-3 left-3 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
                       ⭐ Featured
                     </div>
                   )}
 
                   {/* Current User Badge */}
                   {guide.isCurrentUser && (
-                    <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg">
+                    <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
                       Your Profile
                     </div>
                   )}
