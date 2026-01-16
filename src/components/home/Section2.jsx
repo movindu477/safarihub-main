@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 
 // Import background image
-import backgroundImage from "../../assets/about2ori.jpg";
+import backgroundImage from "../../assets/heroour.avif";
 
 export default function Section2() {
   const navigate = useNavigate();

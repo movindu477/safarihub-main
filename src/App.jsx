@@ -1329,10 +1329,10 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
           {/* BookingSection component handles its own visibility based on user role */}
           {user && <BookingSection user={user} />}
         </Section1>
-        {/* <Section3 /> */}
+        <Section3 />
         <Section4 />
-        <Section6 />
         <Section5 />
+        <Section6 />
         <Footer />
       </div>
 

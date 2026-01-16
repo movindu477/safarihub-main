@@ -1,430 +1,48 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 
-// Import image from src/assets
-import lankamap from "../../assets/lankamapori.png";
-
-const LocationDot = ({ type, position, label, isHovered, onHover, onClick }) => {
-  const dotColors = {
-    darkGreen: "bg-green-500 shadow-green-500/70",
-    brown: "bg-amber-600 shadow-amber-600/70",
-    lightGreen: "bg-green-300 shadow-green-300/70",
-    lightBrown: "bg-amber-400 shadow-amber-400/70",
-    blue: "bg-blue-400 shadow-blue-400/70",
-  };
-
-  const pulseAnimation = isHovered ? "animate-pulse" : "";
-
-  return (
-    <div
-      className={`absolute w-3 h-3 sm:w-4 sm:h-4 rounded-full ${dotColors[type]} shadow-lg 
-        transition-all duration-300 transform hover:scale-125 cursor-pointer
-        ${pulseAnimation}`}
-      style={{
-        left: position.left,
-        top: position.top,
-      }}
-      onMouseEnter={() => onHover(label)}
-      onMouseLeave={() => onHover(null)}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(label, position);
-      }}
-    >
-      <div className="absolute inset-0 rounded-full bg-white/40 animate-ping"></div>
-      
-      <span
-        className={`absolute -top-8 left-1/2 -translate-x-1/2 
-          text-xs font-semibold text-white whitespace-nowrap
-          bg-gray-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg
-          border border-white/20 pointer-events-none transition-all duration-300
-          ${isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
-      >
-        {label}
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1.5 
-          w-2 h-2 bg-gray-900/90 rotate-45"></div>
-      </span>
-    </div>
-  );
-};
-
-const LocationPopup = ({ location, position, onClose }) => {
-  if (!location) return null;
-
-  const locationDescriptions = {
-    "Yala": "Famous for leopards and diverse wildlife in Sri Lanka's most visited national park.",
-    "Wilpattu": "Largest national park known for natural lakes and leopard sightings.",
-    "Unawatuna Beach": "World-class surfing destination with pristine beaches and laid-back vibe.",
-    "Mirissa Beach": "Beautiful beach famous for whale watching and stunning sunsets.",
-    "Kumana National Park": "Bird watcher's paradise with numerous migratory bird species.",
-    "Lunugamvehera National Park": "Ramsar wetland site hosting flocks of migratory birds.",
-    "Sinharaja Forest Reserve": "UNESCO World Heritage Site with endemic rainforest biodiversity.",
-    "Knuckles Forest Reserve": "Mountain range offering challenging hikes and misty landscapes.",
-    "Horton Plains National Park": "Popular hiking destination with panoramic views of hill country.",
-    "Knuckles Mountain Range": "Sacred mountain with iconic sunrise pilgrimage experience."
-  };
-
-  // Calculate optimal popup position relative to the dot
-  const getPopupPosition = () => {
-    if (!position) return { left: "50%", top: "50%", placement: "bottom" };
-    
-    const leftPos = parseFloat(position.left);
-    const topPos = parseFloat(position.top);
-    
-    // Determine best placement based on dot position
-    let placement = "bottom";
-    let adjustedLeft = leftPos;
-    let adjustedTop = topPos;
-    
-    if (topPos < 25) {
-      // If dot is near top, show popup below
-      placement = "bottom";
-      adjustedTop = topPos + 4;
-    } else if (topPos > 75) {
-      // If dot is near bottom, show popup above
-      placement = "top";
-      adjustedTop = topPos - 4;
-    } else if (leftPos > 70) {
-      // If dot is on right side, show popup to the left
-      placement = "left";
-      adjustedLeft = leftPos - 12;
-    } else if (leftPos < 30) {
-      // If dot is on left side, show popup to the right
-      placement = "right";
-      adjustedLeft = leftPos + 12;
-    } else {
-      // Default: show above the dot
-      placement = "top";
-      adjustedTop = topPos - 4;
-    }
-    
-    return {
-      left: `${adjustedLeft}%`,
-      top: `${adjustedTop}%`,
-      placement
-    };
-  };
-
-  const { left, top, placement } = getPopupPosition();
-
-  // Calculate transform based on placement
-  const getTransform = () => {
-    switch (placement) {
-      case "top":
-        return "-translate-x-1/2 -translate-y-full";
-      case "bottom":
-        return "-translate-x-1/2 translate-y-4";
-      case "left":
-        return "-translate-x-full -translate-y-1/2";
-      case "right":
-        return "translate-x-4 -translate-y-1/2";
-      default:
-        return "-translate-x-1/2 -translate-y-full";
-    }
-  };
-
-  // Calculate arrow position based on placement
-  const getArrowPosition = () => {
-    switch (placement) {
-      case "top":
-        return "bottom-0 left-1/2 -translate-x-1/2 translate-y-1.5 rotate-45";
-      case "bottom":
-        return "top-0 left-1/2 -translate-x-1/2 -translate-y-1.5 rotate-45";
-      case "left":
-        return "right-0 top-1/2 -translate-y-1/2 translate-x-1.5 rotate-45";
-      case "right":
-        return "left-0 top-1/2 -translate-y-1/2 -translate-x-1.5 rotate-45";
-      default:
-        return "bottom-0 left-1/2 -translate-x-1/2 translate-y-1.5 rotate-45";
-    }
-  };
-
-  return (
-    <div 
-      className="absolute z-40 animate-scaleIn"
-      style={{ left, top }}
-    >
-      <div 
-        className={`bg-gradient-to-br from-green-600 to-green-700 text-white rounded-2xl p-4 w-48
-          shadow-2xl border border-green-400 relative ${getTransform()}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close button */}
-        <button 
-          onClick={onClose}
-          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full 
-            flex items-center justify-center text-xs font-bold hover:bg-red-600 transition-colors
-            shadow-lg z-10 cursor-pointer"
-        >
-          ×
-        </button>
-        
-        <div className="mb-2">
-          <h3 className="text-sm font-bold">{location}</h3>
-        </div>
-        
-        <p className="text-white/90 text-xs mb-3 leading-relaxed">
-          {locationDescriptions[location] || "Discover this amazing destination in Sri Lanka."}
-        </p>
-        
-        <a 
-          href="#destinations" 
-          className="w-full bg-white text-green-700 font-semibold py-1.5 px-3 rounded-xl 
-            hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 
-            flex items-center justify-center gap-1 text-xs cursor-pointer no-underline"
-        >
-          <span>Explore</span>
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-          </svg>
-        </a>
-        
-        {/* Arrow pointing to dot */}
-        <div className={`absolute w-3 h-3 bg-green-600 ${getArrowPosition()}`}></div>
-      </div>
-    </div>
-  );
-};
-
-const LegendItem = ({ color, label, count, isActive, onClick }) => (
-  <div 
-    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-300
-      ${isActive ? 'bg-white shadow-lg border border-gray-200' : 'hover:bg-gray-50'}`}
-    onClick={onClick}
-  >
-    <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full ${color} shadow-md ${isActive ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}></div>
-    <div className="flex-1">
-      <span className="text-gray-800 font-semibold text-sm sm:text-base">{label}</span>
-      <span className="text-gray-500 text-xs sm:text-sm ml-2">({count})</span>
-    </div>
-  </div>
-);
+// Import map image from src/assets
+import mapImage from "../../assets/map-desktop-v2.png";
 
 export default function Section3() {
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [hoveredLocation, setHoveredLocation] = useState(null);
-  const [selectedLocation, setSelectedLocation] = useState(null);
-  const [selectedPosition, setSelectedPosition] = useState(null);
-
-  const locations = {
-    nationalParks: [
-      { label: "Yala", position: { left: "71%", top: "84%" } },
-      { label: "Wilpattu", position: { left: "25%", top: "38%" } }
-    ],
-    beaches: [
-      { label: "Unawatuna Beach", position: { left: "35%", top: "97%" } },
-      { label: "Mirissa Beach", position: { left: "40%", top: "98%" } }
-    ],
-    wildlifeSanctuaries: [
-      { label: "Kumana National Park", position: { left: "79%", top: "81%" } },
-      { label: "Lunugamvehera National Park", position: { left: "61%", top: "86%" } },
-    ],
-    forestReserves: [
-      { label: "Sinharaja Forest Reserve", position: { left: "40%", top: "87%" } },
-      { label: "Knuckles Forest Reserve", position: { left: "46%", top: "69%" } },
-    ],
-    campingSites: [
-      { label: "Horton Plains National Park", position: { left: "50%", top: "77%" } },
-      { label: "Knuckles Mountain Range", position: { left: "46%", top: "65%" } },
-    ]
-  };
-
-  const legendItems = [
-    { color: "bg-green-500", label: "National Parks", key: "nationalParks", count: locations.nationalParks.length },
-    { color: "bg-amber-600", label: "Wildlife Sanctuaries", key: "wildlifeSanctuaries", count: locations.wildlifeSanctuaries.length },
-    { color: "bg-blue-400", label: "Famous Beaches", key: "beaches", count: locations.beaches.length },
-    { color: "bg-green-300", label: "Forest Reserves", key: "forestReserves", count: locations.forestReserves.length },
-    { color: "bg-amber-400", label: "Camping Sites", key: "campingSites", count: locations.campingSites.length },
-  ];
-
-  const getFilteredLocations = () => {
-    if (activeFilter === "all") {
-      return Object.entries(locations).flatMap(([type, items]) =>
-        items.map(loc => ({ ...loc, type }))
-      );
-    }
-    return locations[activeFilter]?.map(loc => ({ ...loc, type: activeFilter })) || [];
-  };
-
-  const getDotType = (locationType) => {
-    switch (locationType) {
-      case "nationalParks":
-        return "darkGreen";
-      case "wildlifeSanctuaries":
-        return "brown";
-      case "forestReserves":
-        return "lightGreen";
-      case "campingSites":
-        return "lightBrown";
-      case "beaches":
-        return "blue";
-      default:
-        return "blue";
-    }
-  };
-
-  const handleDotClick = (locationLabel, position) => {
-    setSelectedLocation(locationLabel);
-    setSelectedPosition(position);
-  };
-
-  const handleClosePopup = () => {
-    setSelectedLocation(null);
-    setSelectedPosition(null);
-  };
-
-  // Close popup when clicking escape key
-  useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        handleClosePopup();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, []);
-
-  // Close popup when clicking anywhere on the map container
-  const handleMapClick = () => {
-    handleClosePopup();
-  };
-
   return (
-    <section
-      className="w-full bg-gradient-to-br from-white to-gray-50 text-black 
-      flex flex-col lg:flex-row items-center justify-center 
-      py-12 sm:py-20 px-4 sm:px-6 lg:px-20 relative overflow-hidden"
-    >
-      {/* Background decoration */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-[0.02]"></div>
-      
-      {/* Left Side - Map */}
-      <div className="relative w-full lg:w-1/2 flex justify-center mb-8 lg:mb-0 select-none">
-        <div className="relative w-full max-w-2xl flex justify-center">
-          {/* Map Container with modern border */}
-          <div 
-            className="relative bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl sm:shadow-2xl border border-gray-200 w-full"
-            onClick={handleMapClick}
-          >
-            {/* Map Container with fixed aspect ratio to maintain dot positions */}
-            <div className="relative w-full" style={{ paddingBottom: '125%' }}> {/* 4:5 aspect ratio */}
+    <section className="w-full bg-white text-black py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-12 xl:px-16">
+      {/* Title Section - Centered at the top */}
+      <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900">
+          Sri Lanka – Asia's Premier Wildlife Destination
+        </h2>
+      </div>
+
+      {/* Two-Column Layout: Text on Left, Map on Right */}
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 xl:gap-16 items-center lg:items-start">
+          {/* Left Column - Text Content */}
+          <div className="w-full lg:w-1/2 space-y-6 sm:space-y-8">
+            <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed">
+              Sri Lanka stands proudly as one of the world's ten recognized biodiversity hotspots, making it a true treasure for nature lovers. Often described as Asia's premier wildlife destination, the island offers an extraordinary combination of landscapes and species diversity—ranking just behind Africa in terms of variety and spectacle. What makes the Wildlife and Bio Diversity of Sri Lanka so special is the incredible concentration of ecosystems packed into such a small island. Within a few hours' drive, travelers can move from misty cloud forests to lush rainforests, arid dry-zone savannahs, vast wetlands, and even vibrant coral-rich marine habitats.
+            </p>
+            
+            <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed">
+              The Wildlife and Bio Diversity of Sri Lanka are showcased through the island's iconic species. Majestic Asian elephants roam freely in herds across national parks, while leopards stealthily patrol the jungles of Yala and Wilpattu. Offshore, the surrounding waters host giants of the ocean such as blue whales and sperm whales, alongside playful pods of dolphins. Bird enthusiasts will also be amazed by the wealth of resident and migratory species, many of which are endemic to the island, making Sri Lanka a paradise for ornithologists and nature photographers alike.
+            </p>
+          </div>
+
+          {/* Right Column - Map Image */}
+          <div className="w-full lg:w-1/2 flex justify-center items-center">
+            <div className="relative w-full max-w-full">
               <img
-                src={lankamap}
-                alt="Sri Lanka Adventure Destinations Map"
-                className="absolute inset-0 w-full h-full object-contain transform hover:scale-105 transition-transform duration-500"
-              />
-
-              {/* Animated Dots - Positions remain exactly the same across all devices */}
-              <div className="absolute inset-0">
-                {getFilteredLocations().map((loc, i) => (
-                  <LocationDot
-                    key={`${loc.type}-${i}`}
-                    type={getDotType(loc.type)}
-                    position={loc.position}
-                    label={loc.label}
-                    isHovered={hoveredLocation === loc.label}
-                    onHover={setHoveredLocation}
-                    onClick={handleDotClick}
-                  />
-                ))}
-              </div>
-
-              {/* Location Popup - Inside the map container */}
-              <LocationPopup 
-                location={selectedLocation} 
-                position={selectedPosition}
-                onClose={handleClosePopup}
+                src={mapImage}
+                alt="Sri Lanka Wildlife and Biodiversity Map"
+                className="w-full h-auto object-contain rounded-lg shadow-lg"
+                style={{
+                  maxWidth: '100%',
+                  height: 'auto',
+                }}
               />
             </div>
           </div>
         </div>
       </div>
-
-      {/* Right Side - Content */}
-      <div className="w-full lg:w-1/2 text-center lg:text-left lg:pl-8 xl:pl-16 space-y-6 sm:space-y-8 max-w-2xl">
-        <div className="space-y-4 sm:space-y-6">
-          <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium">
-            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse"></span>
-            Explore Sri Lanka
-          </div>
-          
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 leading-tight">
-            Discover Your Next
-            <span className="text-green-600 block">Adventure</span>
-          </h2>
-          
-          <div className="w-20 sm:w-24 h-1 sm:h-1.5 bg-gradient-to-r from-green-500 to-green-600 rounded-full mx-auto lg:mx-0"></div>
-        </div>
-
-        <p className="text-base sm:text-lg lg:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-          Journey through Sri Lanka's diverse landscapes — from pristine national parks 
-          and tranquil wildlife sanctuaries to breathtaking beaches and lush forest reserves. 
-          Your perfect adventure awaits.
-        </p>
-
-        {/* Interactive Legend */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 border border-gray-200 shadow-lg">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
-              Destination Types
-            </h3>
-            <button 
-              onClick={() => setActiveFilter("all")}
-              className={`text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all cursor-pointer ${
-                activeFilter === "all" 
-                  ? "bg-green-500 text-white" 
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              Show All
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-            {legendItems.map((item, index) => (
-              <LegendItem 
-                key={index} 
-                color={item.color} 
-                label={item.label}
-                count={item.count}
-                isActive={activeFilter === item.key}
-                onClick={() => setActiveFilter(activeFilter === item.key ? "all" : item.key)}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* CTA Button - Matching Section2 Style */}
-        <div className="pt-2 sm:pt-4 flex justify-center lg:justify-start">
-          <button
-            className="group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 
-            text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 
-            transform hover:scale-105 hover:shadow-2xl shadow-lg flex items-center justify-center gap-3
-            border border-green-500/30 cursor-pointer"
-          >
-            <span>Explore All Destinations</span>
-            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Custom animations */}
-      <style>{`
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.8);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .animate-scaleIn {
-          animation: scaleIn 0.2s ease-out forwards;
-        }
-      `}</style>
     </section>
   );
 }

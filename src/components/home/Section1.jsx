@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 // Import all hero images from src/assets
 import hero1 from "../../assets/hero1.avif";
@@ -8,6 +9,7 @@ import hero4 from "../../assets/hero4.jpg";
 import logo from "../../assets/logo - Copy.png";
 
 export default function Section1({ children }) {
+  const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [contentVisible, setContentVisible] = useState(false);
@@ -112,46 +114,65 @@ export default function Section1({ children }) {
         })}
       </div>
 
-      {/* Content Section - Fixed position, no zoom */}
+      {/* Content Section - Centered */}
       <div
         className="
           absolute inset-0 z-20 
-          flex flex-col justify-center 
-          px-8 md:px-20
-          text-white
-          text-left md:items-start
-          items-center text-center md:text-left
+          flex flex-col justify-center items-center
+          px-4 sm:px-6 md:px-8
+          text-white text-center
         "
         style={{
-          transform: 'none', // Ensure content doesn't zoom
-          willChange: 'auto', // No animation needed for content
+          transform: 'none',
+          willChange: 'auto',
         }}
       >
-        {/* Left side black opacity overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent pointer-events-none"></div>
+        {/* Center dark overlay for better text readability */}
+        <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
-        {/* Title - Slide in from left animation */}
+        {/* Content Container - Fade in animation */}
         <div 
-          className="relative z-10"
+          className="relative z-10 flex flex-col items-center space-y-4 sm:space-y-6 max-w-4xl"
           style={{
-            transform: contentVisible ? 'translateX(0)' : 'translateX(-100px)',
             opacity: contentVisible ? 1 : 0,
-            transition: 'transform 1s cubic-bezier(0.4, 0, 0.2, 1), opacity 1s ease-in',
-            willChange: 'transform, opacity',
+            transition: 'opacity 1s ease-in',
+            willChange: 'opacity',
           }}
         >
-          <div className="text-2xl md:text-3xl font-thin -mb-2 leading-tight drop-shadow-lg">
+          {/* Welcome To Text */}
+          <div className="text-xl sm:text-2xl md:text-3xl font-thin leading-tight drop-shadow-lg">
             Welcome To
           </div>
-          {/* Logo - Replaces SafariHub text - Slide in from left */}
-          <div className="-mb-2 leading-tight drop-shadow-lg -ml-2 md:-ml-4 lg:-ml-6">
+          
+          {/* SafariHub Logo */}
+          <div className="leading-tight drop-shadow-lg">
             <img
               src={logo}
               alt="SafariHub Logo"
-              className="h-14 md:h-20 lg:h-28 xl:h-36 w-auto drop-shadow-lg"
-              style={{ transform: 'none' }} // Ensure logo doesn't zoom
+              className="h-16 sm:h-20 md:h-24 lg:h-32 xl:h-40 w-auto drop-shadow-lg mx-auto"
+              style={{ transform: 'none' }}
             />
           </div>
+
+          {/* Tagline */}
+          <div className="text-base sm:text-lg md:text-xl font-light drop-shadow-lg -mt-2">
+            Your All in One Gateway to Adventure.
+          </div>
+
+          {/* Description Paragraph */}
+          <p className="text-sm sm:text-base md:text-lg text-white/90 leading-relaxed max-w-2xl px-4 drop-shadow-md">
+            Embark on unforgettable journeys through Sri Lanka's breathtaking landscapes. From majestic wildlife to pristine beaches, discover your next adventure.
+          </p>
+
+          {/* Explore Destinations Button */}
+          <button
+            onClick={() => navigate('/destination')}
+            className="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold 
+              py-3 px-8 sm:py-3.5 sm:px-10 rounded-lg transition-all duration-300 
+              transform hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base touch-manipulation mt-2"
+          >
+            Explore Destinations
+          </button>
         </div>
       </div>
 
