@@ -22,7 +22,8 @@ import {
   Camera,
   Package,
   FileText,
-  UserCircle
+  UserCircle,
+  Check
 } from 'lucide-react';
 import { getDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -425,41 +426,147 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
               <div className="lg:col-span-2 space-y-3 sm:space-y-4 order-2 lg:order-1">
                 {/* Booking Summary */}
                 <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200">
-                  <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
                     <span>Booking Summary</span>
                   </h2>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-gray-500 text-xs">Service Provider</p>
-                        <p className="font-semibold text-gray-900">{booking.driverName || booking.guideName || 'N/A'}</p>
-                        <p className="text-xs text-gray-500">{serviceType}</p>
+                  <div className="space-y-4">
+                    {/* Service & Booking Info */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <div>
+                          <p className="text-gray-500 text-xs">Service Provider</p>
+                          <p className="font-semibold text-gray-900">{booking.driverName || booking.guideName || 'N/A'}</p>
+                          <p className="text-xs text-gray-500">{serviceType}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-gray-500 text-xs">Selected Dates</p>
-                        <p className="font-semibold text-gray-900 text-xs">{formatDates(booking.selectedDates)}</p>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <div>
+                          <p className="text-gray-500 text-xs">Selected Dates</p>
+                          <p className="font-semibold text-gray-900 text-xs">{formatDates(booking.selectedDates)}</p>
+                          <p className="text-xs text-gray-500">{booking.numberOfDays || 0} day(s)</p>
+                        </div>
                       </div>
+                      {booking.nationalPark && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-gray-500 text-xs">National Park</p>
+                            <p className="font-semibold text-gray-900">{booking.nationalPark}</p>
+                          </div>
+                        </div>
+                      )}
+                      {booking.safariType && (
+                        <div className="flex items-start gap-2">
+                          <Camera className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-gray-500 text-xs">Safari Type</p>
+                            <p className="font-semibold text-gray-900">{booking.safariType}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-gray-500 text-xs">Location</p>
-                        <p className="font-semibold text-gray-900">{booking.location || 'N/A'}</p>
+
+                    {/* Personal Information */}
+                    {(booking.fullName || booking.email || booking.phone || booking.country) && (
+                      <div className="border-t border-gray-300 pt-3">
+                        <h3 className="text-sm font-bold text-gray-900 mb-2">Personal Information</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {booking.fullName && (
+                            <div><span className="text-gray-500">Name:</span> <span className="font-medium text-gray-900">{booking.fullName}</span></div>
+                          )}
+                          {booking.email && (
+                            <div><span className="text-gray-500">Email:</span> <span className="font-medium text-gray-900 break-all">{booking.email}</span></div>
+                          )}
+                          {booking.phone && (
+                            <div><span className="text-gray-500">Phone:</span> <span className="font-medium text-gray-900">{booking.phone}</span></div>
+                          )}
+                          {booking.country && (
+                            <div><span className="text-gray-500">Country:</span> <span className="font-medium text-gray-900">{booking.country}</span></div>
+                          )}
+                          {booking.numberOfPassengers && (
+                            <div><span className="text-gray-500">Passengers:</span> <span className="font-medium text-gray-900">{booking.numberOfPassengers}</span></div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-gray-500 text-xs">Duration</p>
-                        <p className="font-semibold text-gray-900">{booking.numberOfDays || 0} day(s)</p>
+                    )}
+
+                    {/* Pickup & Drop-off */}
+                    {(booking.pickupLocation || booking.dropoffLocation || booking.hotelName) && (
+                      <div className="border-t border-gray-300 pt-3">
+                        <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1">
+                          <Navigation className="h-4 w-4 text-green-600" />
+                          Pickup & Drop-off
+                        </h3>
+                        <div className="space-y-1.5 text-xs">
+                          {booking.pickupLocation && (
+                            <div><span className="text-gray-500">Pickup:</span> <span className="font-medium text-gray-900">{booking.pickupLocation}</span></div>
+                          )}
+                          {booking.dropoffLocation && (
+                            <div><span className="text-gray-500">Drop-off:</span> <span className="font-medium text-gray-900">{booking.dropoffLocation}</span></div>
+                          )}
+                          {booking.needsHotelPickup && booking.hotelName && (
+                            <div className="bg-blue-50 p-2 rounded border border-blue-200 mt-2">
+                              <div className="font-medium text-gray-900">Hotel: {booking.hotelName}</div>
+                              {booking.hotelAddress && <div className="text-gray-600 mt-0.5">{booking.hotelAddress}</div>}
+                              {booking.roomNumber && <div className="text-gray-600">Room: {booking.roomNumber}</div>}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Add-ons & Extras */}
+                    {(booking.needsBinoculars || booking.needsChildSeat || booking.needsWater || booking.needsSnacks) && (
+                      <div className="border-t border-gray-300 pt-3">
+                        <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1">
+                          <Package className="h-4 w-4 text-green-600" />
+                          Add-ons & Extras
+                        </h3>
+                        <div className="space-y-1 text-xs">
+                          {booking.needsBinoculars && <div className="flex items-center gap-1"><Check className="h-3 w-3 text-green-600" /> Binoculars <span className="text-gray-500 ml-auto">+LKR 500</span></div>}
+                          {booking.needsChildSeat && <div className="flex items-center gap-1"><Check className="h-3 w-3 text-green-600" /> Child Seat <span className="text-gray-500 ml-auto">+LKR 1,000</span></div>}
+                          {booking.needsWater && <div className="flex items-center gap-1"><Check className="h-3 w-3 text-green-600" /> Water Bottles <span className="text-gray-500 ml-auto">+LKR 300</span></div>}
+                          {booking.needsSnacks && booking.selectedSnacks && booking.selectedSnacks.length > 0 && (
+                            <div className="mt-1 pl-4">
+                              <div className="font-medium text-gray-700">Snacks/Meals:</div>
+                              {booking.selectedSnacks.map((snack, idx) => (
+                                <div key={idx} className="text-gray-600">• {snack}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Emergency Contact */}
+                    {(booking.emergencyContactName || booking.emergencyContactPhone) && (
+                      <div className="border-t border-gray-300 pt-3">
+                        <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1">
+                          <Phone className="h-4 w-4 text-green-600" />
+                          Emergency Contact
+                        </h3>
+                        <div className="text-xs space-y-1">
+                          {booking.emergencyContactName && <div><span className="text-gray-500">Name:</span> <span className="font-medium text-gray-900">{booking.emergencyContactName}</span></div>}
+                          {booking.emergencyContactPhone && <div><span className="text-gray-500">Phone:</span> <span className="font-medium text-gray-900">{booking.emergencyContactPhone}</span></div>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Special Requests */}
+                    {(booking.specialRequests || booking.specialAssistance || booking.additionalNotes) && (
+                      <div className="border-t border-gray-300 pt-3">
+                        <h3 className="text-sm font-bold text-gray-900 mb-2">Special Requests & Notes</h3>
+                        <div className="text-xs space-y-1 text-gray-700">
+                          {booking.specialRequests && <div className="bg-yellow-50 p-2 rounded border border-yellow-200">{booking.specialRequests}</div>}
+                          {booking.specialAssistance && <div className="bg-blue-50 p-2 rounded border border-blue-200 mt-1">{booking.specialAssistance}</div>}
+                          {booking.additionalNotes && <div className="bg-gray-100 p-2 rounded border border-gray-300 mt-1">{booking.additionalNotes}</div>}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -488,6 +595,8 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                     <Elements stripe={stripePromise}>
                       <CheckoutForm
                         booking={booking}
+                        userId={user?.uid}
+                        userEmail={user?.email}
                         onPaymentSuccess={async () => {
                           // Update booking status and create notifications
                           try {
@@ -541,26 +650,81 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-4 sm:p-5 lg:sticky lg:top-4">
                   <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Payment Summary</h2>
 
-                  <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-5 text-xs sm:text-sm">
-                    <div className="flex justify-between text-gray-600">
-                      <span>Subtotal</span>
-                      <span className="font-medium">LKR {((booking.totalPrice || 0) / (booking.numberOfDays || 1)).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-600">
-                      <span>Days</span>
-                      <span className="font-medium">{booking.numberOfDays || 0}</span>
-                    </div>
-                    <div className="border-t border-gray-300 pt-3">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-gray-900">Total</span>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                          <span className="text-lg sm:text-2xl font-bold text-green-600">
-                            LKR {(booking.totalPrice || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="space-y-2 text-xs sm:text-sm mb-4">
+                    {/* Calculate proper pricing */}
+                    {(() => {
+                      // Get the actual price per day from booking (driver's/guide's rate)
+                      const actualPricePerDay = booking.pricePerDay || 0;
+                      
+                      // Calculate base service charge (from driver/guide rate)
+                      const baseServiceCharge = actualPricePerDay * (booking.numberOfDays || 1);
+                      
+                      // Calculate add-ons total
+                      let addOnsTotal = 0;
+                      if (booking.needsBinoculars) addOnsTotal += 500;
+                      if (booking.needsChildSeat) addOnsTotal += 1000;
+                      if (booking.needsWater) addOnsTotal += 300;
+                      
+                      // Calculate actual total (base + add-ons)
+                      const calculatedTotal = baseServiceCharge + addOnsTotal;
+                      
+                      return (
+                        <>
+                          {/* Base Service Charge */}
+                          <div className="flex justify-between text-gray-700">
+                            <span>Service Charge (per day)</span>
+                            <span className="font-medium">LKR {actualPricePerDay.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-gray-600">
+                            <span className="text-xs">× {booking.numberOfDays || 1} day(s)</span>
+                            <span className="font-medium">LKR {baseServiceCharge.toLocaleString()}</span>
+                          </div>
+
+                          {/* Add-ons */}
+                          {(booking.needsBinoculars || booking.needsChildSeat || booking.needsWater) && (
+                            <>
+                              <div className="border-t border-gray-300 pt-2 mt-2"></div>
+                              <div className="text-xs font-semibold text-gray-700 mb-1">Add-ons</div>
+                              {booking.needsBinoculars && (
+                                <div className="flex justify-between text-gray-600">
+                                  <span className="text-xs pl-2">Binoculars</span>
+                                  <span className="font-medium">+LKR 500</span>
+                                </div>
+                              )}
+                              {booking.needsChildSeat && (
+                                <div className="flex justify-between text-gray-600">
+                                  <span className="text-xs pl-2">Child Seat</span>
+                                  <span className="font-medium">+LKR 1,000</span>
+                                </div>
+                              )}
+                              {booking.needsWater && (
+                                <div className="flex justify-between text-gray-600">
+                                  <span className="text-xs pl-2">Water Bottles</span>
+                                  <span className="font-medium">+LKR 300</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between text-gray-700 pt-1 mt-1">
+                                <span className="text-xs font-semibold">Add-ons Subtotal</span>
+                                <span className="font-medium">LKR {addOnsTotal.toLocaleString()}</span>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Total */}
+                          <div className="border-t-2 border-gray-400 pt-3 mt-3">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-gray-900 text-sm sm:text-base">Total Amount</span>
+                              <div className="flex items-center gap-1">
+                                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                                <span className="text-lg sm:text-2xl font-bold text-green-600">
+                                  LKR {calculatedTotal.toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* Only show old payment button if not using Stripe card payment */}

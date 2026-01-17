@@ -55,13 +55,22 @@ import GuideProfile from "./components/guides/GuideProfile";
 import Payment from "./components/Payment";
 import AboutUs from "./components/home/AboutUs";
 import Admin from "./components/Admin";
+import AdminPanel from "./components/AdminPanel";
 import ProfileDashboard from "./components/ProfileDashboard";
 import Favorites from "./components/Favorites";
+import PaymentWallet from "./components/PaymentWallet";
+import BookingHistory from "./components/BookingHistory";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 // Import Chat components
 import Chat from "./components/Chat";
 import ChatList from "./components/ChatList";
 import BookingSection from "./components/BookingSection";
+
+// Import Stripe
+import { Elements } from '@stripe/react-stripe-js';
+import { stripePromise } from "./payment/StripeProvider";
 
 // Import online status functions
 import { setUserOnline, setUserOffline } from "./firebase";
@@ -1112,7 +1121,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
     <div className="fixed bottom-6 right-6 z-50 notification-container">
       <div className="relative">
         {showNotifications && (
-          <div className="absolute bottom-full left-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
+          <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
             <NotificationPanel
               notifications={notifications}
               onClose={() => setShowNotifications(false)}
@@ -1509,10 +1518,21 @@ function App() {
   const handleAuthSuccess = async (returnPath) => {
     setShowAuth(false);
 
-    // Check if user is a service provider and redirect to home if they're on restricted pages
     const currentUser = auth.currentUser;
     if (currentUser) {
       try {
+        // Step 1: Check if user is admin (ONLY by document existence)
+        const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
+        if (adminDoc.exists()) {
+          console.log('✅ Admin user logged in, redirecting to admin panel');
+          setTimeout(() => {
+            window.location.href = '/admin-panel';
+          }, 500);
+          setReturnToPath(null);
+          return;
+        }
+
+        // Step 2: Check if user is a service provider
         const providerDoc = await getDoc(doc(db, 'serviceProviders', currentUser.uid));
         if (providerDoc.exists()) {
           const providerData = providerDoc.data();
@@ -1617,8 +1637,9 @@ function App() {
   };
 
   return (
-    <Router>
-      <ScrollToTop />
+    <AuthProvider>
+      <Router>
+        <ScrollToTop />
 
       {/* Scroll to Top Button - Always visible on all pages regardless of login status */}
       <ScrollToTopButton />
@@ -1769,6 +1790,14 @@ function App() {
           }
         />
         <Route
+          path="/admin-panel"
+          element={
+            <ProtectedRoute requireAdmin={true}>
+              <AdminPanel />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/profile"
           element={
             <ProfileDashboard
@@ -1788,9 +1817,32 @@ function App() {
             />
           }
         />
+        <Route
+          path="/payment-wallet"
+          element={
+            <Elements stripe={stripePromise}>
+              <PaymentWallet
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+              />
+            </Elements>
+          }
+        />
+        <Route
+          path="/booking-history"
+          element={
+            <BookingHistory
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+            />
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 }
 

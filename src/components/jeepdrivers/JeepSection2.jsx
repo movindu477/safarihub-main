@@ -203,15 +203,22 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             // Mark if this is the current user's profile
             isCurrentUser: currentUser && currentUser.uid === providerId,
 
+            // Certification status
+            certificationStatus: providerData.certificationStatus || 'uncertified',
+            certifiedAt: providerData.certifiedAt || null,
+            certifiedBy: providerData.certifiedBy || null,
+
           });
         }
       });
 
       const currentUserJeep = updatedJeeps.find(j => j.isCurrentUser);
+      const certifiedCount = updatedJeeps.filter(j => j.certificationStatus === 'certified').length;
+      const uncertifiedCount = updatedJeeps.filter(j => j.certificationStatus !== 'certified').length;
       
-      console.log(`🚙 Real-time data: ${updatedJeeps.length} jeep drivers`);
+      console.log(`🚙 Real-time data: ${updatedJeeps.length} jeep drivers (${certifiedCount} certified, ${uncertifiedCount} uncertified)`);
       if (currentUserJeep) {
-        console.log(`👤 Current user jeep: ${currentUserJeep.driverName}`);
+        console.log(`👤 Current user jeep: ${currentUserJeep.driverName} (Status: ${currentUserJeep.certificationStatus})`);
       }
       
       setJeeps(updatedJeeps);
@@ -765,137 +772,292 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
           </div>
         </div>
 
-        {/* Jeep Grid */}
+        {/* Jeep Grid - Divided into Certified and Uncertified */}
         {filteredJeeps.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredJeeps.map((jeep, index) => (
-              <div 
-                key={jeep.id}
-                id={`driver-card-${jeep.id}`}
-                className="bg-white rounded-none shadow-lg overflow-hidden border border-gray-200 cursor-pointer"
-                onClick={() => handleProfileClick(jeep)}
-              >
-                {/* Profile Image Section - Big Rounded */}
-                <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                  {/* Rounded Profile Image Container */}
-                  <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-300 shadow-xl relative">
-                    <ProfileImage jeep={jeep} />
-                  </div>
-                  
-                  {/* Experience Badge */}
-                  {jeep.experience > 0 && (
-                    <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
-                      {jeep.experience}+ years
-                    </div>
-                  )}
-
-
-                  {/* Current User Badge */}
-                  {jeep.isCurrentUser && (
-                    <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
-                      Your Profile
-                    </div>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="p-4">
-                  {/* Name and Location */}
-                  <div className="mb-3">
-                    <div className="flex items-start justify-between mb-1">
-                      <h3 className="text-xl font-bold text-gray-900 line-clamp-1 flex-1">
-                        {jeep.driverName}
-                        {jeep.isCurrentUser && <span className="ml-1 text-purple-600 text-sm">(You)</span>}
-                      </h3>
-                      {/* Quick Chat Button - Show for all users except current user */}
-                      {!jeep.isCurrentUser && (
-                        <button 
-                          className="ml-2 p-2 bg-black text-white rounded-full shadow-lg"
-                          onClick={(e) => handleChatClick(jeep, e)}
-                          title="Start Chat"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center text-gray-600 text-sm">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      <span className="line-clamp-1">{jeep.location}</span>
+          <div className="space-y-12">
+            {/* Certified Drivers Section - Always Show */}
+            <div>
+              <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-6 w-6 text-green-600 flex-shrink-0" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        Certified Drivers
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Verified and certified by our admin team
+                      </p>
                     </div>
                   </div>
-
-                  {/* Rating and Price */}
-                  <div className="flex justify-between items-center mb-3">
-                    {renderStars(jeep.rating || 0)}
-                    <div className="text-lg font-bold text-black">
-                      {jeep.pricePerDay > 0 ? (
-                        <>LKR {formatPrice(jeep.pricePerDay)}<span className="text-sm font-normal text-gray-500">/day</span></>
-                      ) : (
-                        <span className="text-sm text-gray-500">Contact for price</span>
-                      )}
-                    </div>
+                  <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    {filteredJeeps.filter(jeep => jeep.certificationStatus === 'certified').length}
                   </div>
-
-                  {/* Quick Stats */}
-                  <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <Clock className="h-3 w-3" />
-                      <span>{jeep.experience || 0}y</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <Users className="h-3 w-3" />
-                      <span>6-8 seats</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <Shield className="h-3 w-3" />
-                      <span>Verified</span>
-                    </div>
-                  </div>
-
-                  {/* Vehicle Type */}
-                  <div className="mb-3">
-                    <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Type:</p>
-                    <p className="text-sm text-gray-600 line-clamp-1">
-                      {jeep.vehicleType}
-                    </p>
-                  </div>
-
-                  {/* Destinations */}
-                  <div className="mb-3">
-                    <p className="text-sm font-semibold text-gray-700 mb-1">Destinations:</p>
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {jeep.destinations?.join(', ')}
-                    </p>
-                  </div>
-
-                  {/* Languages */}
-                  <div className="mb-3">
-                    <p className="text-sm font-semibold text-gray-700 mb-1">Languages:</p>
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {jeep.languages?.slice(0, 3).join(', ')}
-                      {jeep.languages?.length > 3 && '...'}
-                    </p>
-                  </div>
-
-                  {/* Favorite Button */}
-                  {currentUser && !jeep.isCurrentUser && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleFavorite(jeep.id);
-                      }}
-                      className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors ${
-                        userFavorites.includes(jeep.id)
-                          ? 'bg-gray-800 text-white hover:bg-gray-900'
-                          : 'bg-black text-white hover:bg-gray-800'
-                      }`}
-                    >
-                      {userFavorites.includes(jeep.id) ? 'Remove from Favorites' : 'Add to Favorites'}
-                    </button>
-                  )}
                 </div>
               </div>
-            ))}
+              {filteredJeeps.filter(jeep => jeep.certificationStatus === 'certified').length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredJeeps
+                    .filter(jeep => jeep.certificationStatus === 'certified')
+                    .map((jeep, index) => (
+                      <div 
+                        key={jeep.id}
+                        id={`driver-card-${jeep.id}`}
+                        className="bg-white rounded-none shadow-lg overflow-hidden border-2 border-green-500 cursor-pointer hover:shadow-2xl transition-shadow"
+                        onClick={() => handleProfileClick(jeep)}
+                      >
+                        {/* Profile Image Section - Big Rounded */}
+                        <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                          {/* Rounded Profile Image Container */}
+                          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-500 shadow-xl relative">
+                            <ProfileImage jeep={jeep} />
+                          </div>
+                          
+                          {/* Certified Badge */}
+                          <div className="absolute top-3 left-3 bg-green-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg z-10 flex items-center gap-1.5">
+                            <Shield className="h-3.5 w-3.5" />
+                            CERTIFIED
+                          </div>
+
+                          {/* Experience Badge */}
+                          {jeep.experience > 0 && (
+                            <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
+                              {jeep.experience}+ years
+                            </div>
+                          )}
+
+                          {/* Current User Badge */}
+                          {jeep.isCurrentUser && (
+                            <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
+                              Your Profile
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Driver Details */}
+                        <div className="p-5">
+                          {/* Name */}
+                          <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1">
+                            {jeep.driverName}
+                          </h3>
+
+                          {/* Location */}
+                          <div className="flex items-center gap-2 text-gray-600 mb-3">
+                            <MapPin className="h-4 w-4 flex-shrink-0" />
+                            <p className="text-sm line-clamp-1">{jeep.location}</p>
+                          </div>
+
+                          {/* Rating */}
+                          <div className="flex items-center gap-2 mb-3">
+                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                            <span className="text-sm font-semibold text-gray-700">
+                              {jeep.rating || 'New'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({jeep.reviewCount || 0} reviews)
+                            </span>
+                          </div>
+
+                          {/* Verified Badge */}
+                          <div className="mb-3">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                              <Shield className="h-3 w-3" />
+                              <span>Verified Driver</span>
+                            </div>
+                          </div>
+
+                          {/* Vehicle Type */}
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Type:</p>
+                            <p className="text-sm text-gray-600 line-clamp-1">
+                              {jeep.vehicleType}
+                            </p>
+                          </div>
+
+                          {/* Destinations */}
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Destinations:</p>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {jeep.destinations?.join(', ')}
+                            </p>
+                          </div>
+
+                          {/* Languages */}
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Languages:</p>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {jeep.languages?.slice(0, 3).join(', ')}
+                              {jeep.languages?.length > 3 && '...'}
+                            </p>
+                          </div>
+
+                          {/* Favorite Button */}
+                          {currentUser && !jeep.isCurrentUser && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleFavorite(jeep.id);
+                              }}
+                              className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors ${
+                                userFavorites.includes(jeep.id)
+                                  ? 'bg-gray-800 text-white hover:bg-gray-900'
+                                  : 'bg-black text-white hover:bg-gray-800'
+                              }`}
+                            >
+                              {userFavorites.includes(jeep.id) ? 'Remove from Favorites' : 'Add to Favorites'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                  <Shield className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">No certified drivers yet</p>
+                  <p className="text-sm text-gray-400 mt-1">Drivers will appear here once certified by admin</p>
+                </div>
+              )}
+            </div>
+
+            {/* Uncertified/Pending Drivers Section - Always Show */}
+            <div>
+              <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-6 w-6 text-yellow-600 flex-shrink-0" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        Other Drivers
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Drivers pending certification review
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-yellow-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    {filteredJeeps.filter(jeep => jeep.certificationStatus !== 'certified').length}
+                  </div>
+                </div>
+              </div>
+              {filteredJeeps.filter(jeep => jeep.certificationStatus !== 'certified').length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredJeeps
+                    .filter(jeep => jeep.certificationStatus !== 'certified')
+                    .map((jeep, index) => (
+                      <div 
+                        key={jeep.id}
+                        id={`driver-card-${jeep.id}`}
+                        className="bg-white rounded-none shadow-lg overflow-hidden border border-gray-200 cursor-pointer"
+                        onClick={() => handleProfileClick(jeep)}
+                      >
+                        {/* Profile Image Section - Big Rounded */}
+                        <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                          {/* Rounded Profile Image Container */}
+                          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-300 shadow-xl relative">
+                            <ProfileImage jeep={jeep} />
+                          </div>
+                          
+                          {/* Experience Badge */}
+                          {jeep.experience > 0 && (
+                            <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
+                              {jeep.experience}+ years
+                            </div>
+                          )}
+
+                          {/* Current User Badge */}
+                          {jeep.isCurrentUser && (
+                            <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
+                              Your Profile
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Driver Details */}
+                        <div className="p-5">
+                          {/* Name */}
+                          <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1">
+                            {jeep.driverName}
+                          </h3>
+
+                          {/* Location */}
+                          <div className="flex items-center gap-2 text-gray-600 mb-3">
+                            <MapPin className="h-4 w-4 flex-shrink-0" />
+                            <p className="text-sm line-clamp-1">{jeep.location}</p>
+                          </div>
+
+                          {/* Rating */}
+                          <div className="flex items-center gap-2 mb-3">
+                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                            <span className="text-sm font-semibold text-gray-700">
+                              {jeep.rating || 'New'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({jeep.reviewCount || 0} reviews)
+                            </span>
+                          </div>
+
+                          {/* Pending Badge */}
+                          <div className="mb-3">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
+                              <Clock className="h-3 w-3" />
+                              <span>Pending Review</span>
+                            </div>
+                          </div>
+
+                          {/* Vehicle Type */}
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Type:</p>
+                            <p className="text-sm text-gray-600 line-clamp-1">
+                              {jeep.vehicleType}
+                            </p>
+                          </div>
+
+                          {/* Destinations */}
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Destinations:</p>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {jeep.destinations?.join(', ')}
+                            </p>
+                          </div>
+
+                          {/* Languages */}
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Languages:</p>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {jeep.languages?.slice(0, 3).join(', ')}
+                              {jeep.languages?.length > 3 && '...'}
+                            </p>
+                          </div>
+
+                          {/* Favorite Button */}
+                          {currentUser && !jeep.isCurrentUser && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleFavorite(jeep.id);
+                              }}
+                              className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors ${
+                                userFavorites.includes(jeep.id)
+                                  ? 'bg-gray-800 text-white hover:bg-gray-900'
+                                  : 'bg-black text-white hover:bg-gray-800'
+                              }`}
+                            >
+                              {userFavorites.includes(jeep.id) ? 'Remove from Favorites' : 'Add to Favorites'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">No pending drivers</p>
+                  <p className="text-sm text-gray-400 mt-1">All drivers have been certified</p>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           /* No Results Message */

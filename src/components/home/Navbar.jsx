@@ -17,7 +17,8 @@ import {
   Map,
   Compass,
   Car,
-  ShoppingBag
+  ShoppingBag,
+  FileText
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
@@ -308,6 +309,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     navigate('/favorites');
   }, [navigate]);
 
+  const handlePaymentWalletClick = useCallback(() => {
+    setProfileOpen(false);
+    navigate('/payment-wallet');
+  }, [navigate]);
+
+  const handleBookingHistoryClick = useCallback(() => {
+    setProfileOpen(false);
+    navigate('/booking-history');
+  }, [navigate]);
+
   // Memoize profile menu items
   const profileMenuItems = useMemo(() => {
     if (isServiceProvider) {
@@ -320,13 +331,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       return [
         { icon: User, label: "My Profile", href: "/profile", onClick: handleProfileClick },
         { icon: Heart, label: "My Favorites", href: "/favorites", onClick: handleFavoritesClick },
-        { icon: Calendar, label: "My Bookings", href: "#" },
-        { icon: CreditCard, label: "Payment Methods", href: "#" },
+        { icon: Calendar, label: "Booking History & Receipts", href: "/booking-history", onClick: handleBookingHistoryClick },
+        { icon: CreditCard, label: "Payment Wallet", href: "/payment-wallet", onClick: handlePaymentWalletClick },
         { icon: Settings, label: "Settings", href: "#" },
         { icon: HelpCircle, label: "Help & Support", href: "#" },
       ];
     }
-  }, [isServiceProvider, handleProfileClick, handleFavoritesClick]);
+  }, [isServiceProvider, handleProfileClick, handleFavoritesClick, handlePaymentWalletClick, handleBookingHistoryClick]);
 
   // Memoize navigation handlers
   const handleAdminClick = useCallback(() => navigate("/admin"), [navigate]);
@@ -338,7 +349,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       return [
         { label: "HOME", onClick: handleHomeClick, path: "/" },
         { label: "ABOUT US", onClick: handleAboutClick, path: "/about" },
-        { label: "ADMIN", onClick: handleAdminClick, path: "/admin" },
+        { label: "PROFILE DASHBOARD", onClick: handleAdminClick, path: "/admin" },
       ];
     }
     return [
@@ -461,7 +472,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           ))}
 
           {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers & guides) */}
-          {!isServiceProvider && (
+          {/* Wait for user data to load before showing to prevent glitch */}
+          {!loading && !isServiceProvider && (
             <div
               className="relative"
               onMouseEnter={handleServicesMouseEnter}
@@ -655,7 +667,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 ))}
 
                 {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers & guides) */}
-                {!isServiceProvider && (
+                {/* Wait for user data to load before showing to prevent glitch */}
+                {!loading && !isServiceProvider && (
                   <div className="border-b border-gray-700/40">
                     <button
                       onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
@@ -793,7 +806,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       <img
                         src={userProfileData.avatar}
                         alt="User"
-                        className="relative h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-900 shadow-2xl shadow-gray-900/50 object-cover"
+                        className="relative h-32 w-32 rounded-full border-4 border-gray-900 bg-gray-900 shadow-2xl shadow-gray-900/50 object-cover"
                         onError={(e) => {
                           console.error('❌ Profile image failed to load in slide panel:', userProfileData.avatar);
                           console.error('   User data:', userData);
@@ -806,8 +819,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                         }}
                       />
                     ) : (
-                      <div className="relative h-24 w-24 rounded-full border-4 border-gray-900 bg-gray-800 shadow-2xl shadow-gray-900/50 flex items-center justify-center">
-                        <User className="h-12 w-12 text-gray-400" />
+                      <div className="relative h-32 w-32 rounded-full border-4 border-gray-900 bg-gray-800 shadow-2xl shadow-gray-900/50 flex items-center justify-center">
+                        <User className="h-16 w-16 text-gray-400" />
                       </div>
                     )}
                     <div className="absolute bottom-2 right-2 w-4 h-4 bg-gray-400 rounded-full border-2 border-gray-900 shadow-lg shadow-gray-500/50 animate-pulse"></div>

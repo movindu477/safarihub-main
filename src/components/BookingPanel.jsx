@@ -385,20 +385,41 @@ const BookingPanel = ({ user }) => {
                   )}
 
                   {/* Price */}
-                  {booking.totalPrice && (
-                    <div className="flex items-center gap-2 mb-2 text-xs">
-                      <DollarSign className="h-3 w-3 text-green-500" />
-                      <span className="font-semibold text-green-400">
-                        LKR {booking.totalPrice.toLocaleString()}
-                      </span>
-                      {(booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus !== 'paid' && (
-                        <span className="ml-auto text-red-400 text-xs font-medium">Payment Pending</span>
-                      )}
-                      {booking.paymentStatus === 'paid' && (
-                        <span className="ml-auto text-green-400 text-xs font-medium">✓ Paid</span>
-                      )}
-                    </div>
-                  )}
+                  {booking.totalPrice && (() => {
+                    // Calculate the correct total based on half-day/full-day + add-ons
+                    const actualPricePerDay = booking.pricePerDay || 0;
+                    let serviceCharge = 0;
+                    
+                    if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
+                      booking.datesWithTypes.forEach(dateObj => {
+                        serviceCharge += dateObj.type === 'half-day' ? actualPricePerDay * 0.5 : actualPricePerDay;
+                      });
+                    } else {
+                      serviceCharge = actualPricePerDay * (booking.numberOfDays || 1);
+                    }
+                    
+                    let addOns = 0;
+                    if (booking.needsBinoculars) addOns += 500;
+                    if (booking.needsChildSeat) addOns += 1000;
+                    if (booking.needsWater) addOns += 300;
+                    
+                    const correctTotal = serviceCharge + addOns;
+                    
+                    return (
+                      <div className="flex items-center gap-2 mb-2 text-xs">
+                        <DollarSign className="h-3 w-3 text-green-500" />
+                        <span className="font-semibold text-green-400">
+                          LKR {correctTotal.toLocaleString()}
+                        </span>
+                        {(booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus !== 'paid' && (
+                          <span className="ml-auto text-red-400 text-xs font-medium">Payment Pending</span>
+                        )}
+                        {booking.paymentStatus === 'paid' && (
+                          <span className="ml-auto text-green-400 text-xs font-medium">✓ Paid</span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 </div>
               ))
@@ -423,9 +444,9 @@ const BookingPanel = ({ user }) => {
             className="bg-white rounded-lg shadow-2xl z-50 overflow-hidden transition-all duration-300 pointer-events-auto flex flex-col"
             style={{
               position: 'absolute',
-              width: '420px',
-              maxHeight: '400px',
-              right: clickedCardRef ? `${Math.max(10, window.innerWidth - clickedCardRef.getBoundingClientRect().right - 430)}px` : '50%',
+              width: '450px',
+              maxHeight: '520px',
+              right: clickedCardRef ? `${Math.max(10, window.innerWidth - clickedCardRef.getBoundingClientRect().right - 460)}px` : '50%',
               top: clickedCardRef ? `${Math.max(10, clickedCardRef.getBoundingClientRect().top)}px` : '50%',
               transform: clickedCardRef ? 'none' : 'translate(50%, -50%)'
             }}
@@ -450,122 +471,237 @@ const BookingPanel = ({ user }) => {
               </button>
             </div>
 
-            {/* Booking Details Content */}
-            <div className="p-3 space-y-2 bg-white overflow-y-auto flex-1" style={{ maxHeight: '280px' }}>
+            {/* Booking Details Content - Enhanced */}
+            <div className="p-3 space-y-2 bg-white overflow-y-auto flex-1" style={{ maxHeight: '420px' }}>
               {/* Status Badge */}
               <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border ${getStatusColor(selectedBooking.status)}`}>
                 {getStatusIcon(selectedBooking.status)}
                 <span className="uppercase text-xs">{selectedBooking.status || 'Pending'}</span>
-              </div>
-
-              {/* Service Provider Info */}
-              <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                  <User className="h-3.5 w-3.5 text-green-600" />
-                  Service Provider
-                </h4>
-                <p className="text-xs text-gray-700">{selectedBooking.driverName || selectedBooking.guideName || 'Service Provider'}</p>
-                {selectedBooking.driverEmail || selectedBooking.guideEmail ? (
-                  <p className="text-xs text-gray-600 mt-0.5">{selectedBooking.driverEmail || selectedBooking.guideEmail}</p>
-                ) : null}
-              </div>
-
-              {/* Booking Dates */}
-              <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                  <Calendar className="h-3.5 w-3.5 text-green-600" />
-                  Booking Dates
-                </h4>
-                <p className="text-xs text-gray-700">{selectedBooking.datesString || formatDates(selectedBooking.selectedDates)}</p>
-                {selectedBooking.numberOfDays && (
-                  <p className="text-xs text-gray-600 mt-0.5">{selectedBooking.numberOfDays} day{selectedBooking.numberOfDays > 1 ? 's' : ''}</p>
+                {selectedBooking.paymentStatus === 'paid' && (
+                  <span className="ml-2 bg-green-600 text-white px-2 py-0.5 rounded-full">PAID</span>
                 )}
               </div>
 
-              {/* Destination */}
-              {selectedBooking.nationalPark && (
-                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                    <MapPin className="h-3.5 w-3.5 text-green-600" />
-                    Destination
-                  </h4>
-                  <p className="text-xs text-gray-700">{selectedBooking.nationalPark}</p>
-                </div>
-              )}
-
-              {/* Price */}
-              {selectedBooking.totalPrice && (
-                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                    <DollarSign className="h-3.5 w-3.5 text-green-600" />
-                    Total Price
-                  </h4>
-                  <p className="text-lg font-bold text-green-700">LKR {selectedBooking.totalPrice.toLocaleString()}</p>
-                  {selectedBooking.status === 'accepted' && !selectedBooking.paid && (
-                    <p className="text-xs text-red-600 mt-0.5 font-medium">Payment Pending</p>
+              {/* Service Provider/Customer Info */}
+              <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
+                  <User className="h-3.5 w-3.5 text-green-600" />
+                  {userRole === 'provider' ? 'Customer Information' : 'Service Provider'}
+                </h4>
+                <div className="space-y-0.5 text-xs">
+                  <p className="font-medium text-gray-900">
+                    {userRole === 'provider' 
+                      ? (selectedBooking.customerName || selectedBooking.fullName || 'N/A')
+                      : (selectedBooking.driverName || selectedBooking.guideName || 'Service Provider')}
+                  </p>
+                  {userRole === 'provider' && selectedBooking.email && (
+                    <p className="text-gray-600">{selectedBooking.email}</p>
+                  )}
+                  {userRole === 'provider' && selectedBooking.phone && (
+                    <p className="text-gray-600">{selectedBooking.phone}</p>
+                  )}
+                  {userRole === 'provider' && selectedBooking.country && (
+                    <p className="text-gray-600">{selectedBooking.country}</p>
                   )}
                 </div>
-              )}
+              </div>
 
-              {/* Customer Info (for service providers) */}
-              {userRole === 'provider' && (
-                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
-                    <User className="h-3.5 w-3.5 text-green-600" />
-                    Customer Information
-                  </h4>
-                  <div className="space-y-1 text-xs">
-                    <p><span className="font-medium text-gray-600">Name:</span> <span className="text-gray-900">{selectedBooking.customerName || 'N/A'}</span></p>
-                    {selectedBooking.customerEmail && (
-                      <p><span className="font-medium text-gray-600">Email:</span> <span className="text-gray-900">{selectedBooking.customerEmail}</span></p>
-                    )}
-                    {selectedBooking.customerPhone && (
-                      <p><span className="font-medium text-gray-600">Phone:</span> <span className="text-gray-900">{selectedBooking.customerPhone}</span></p>
-                    )}
-                    {selectedBooking.emergencyContactName && (
-                      <p><span className="font-medium text-gray-600">Emergency:</span> <span className="text-gray-900">{selectedBooking.emergencyContactName}</span></p>
-                    )}
-                    {selectedBooking.emergencyContactPhone && (
-                      <p className="text-xs text-gray-500 ml-3">{selectedBooking.emergencyContactPhone}</p>
-                    )}
-                  </div>
+              {/* Safari Details */}
+              <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
+                  <Calendar className="h-3.5 w-3.5 text-green-600" />
+                  Safari Details
+                </h4>
+                <div className="space-y-0.5 text-xs">
+                  <p><span className="font-medium text-gray-600">Dates:</span> <span className="text-gray-900">{selectedBooking.datesString || formatDates(selectedBooking.selectedDates)}</span></p>
+                  {selectedBooking.numberOfDays && (
+                    <p><span className="font-medium text-gray-600">Duration:</span> <span className="text-gray-900">{selectedBooking.numberOfDays} day{selectedBooking.numberOfDays > 1 ? 's' : ''}</span></p>
+                  )}
+                  {selectedBooking.nationalPark && (
+                    <p><span className="font-medium text-gray-600">Park:</span> <span className="text-gray-900">{selectedBooking.nationalPark}</span></p>
+                  )}
+                  {selectedBooking.safariType && (
+                    <p><span className="font-medium text-gray-600">Type:</span> <span className="text-gray-900">{selectedBooking.safariType}</span></p>
+                  )}
+                  {selectedBooking.preferredTime && (
+                    <p><span className="font-medium text-gray-600">Time:</span> <span className="text-gray-900">{new Date(selectedBooking.preferredTime).toLocaleString()}</span></p>
+                  )}
+                  {selectedBooking.numberOfPassengers && (
+                    <p><span className="font-medium text-gray-600">Passengers:</span> <span className="text-gray-900">{selectedBooking.numberOfPassengers}</span></p>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {/* Additional Details - Compact */}
-              {(selectedBooking.pickupLocation || selectedBooking.hotelName || selectedBooking.numberOfPassengers || selectedBooking.needsHotelPickup) && (
+              {/* Pickup & Drop-off */}
+              {(selectedBooking.pickupLocation || selectedBooking.dropoffLocation || selectedBooking.hotelName) && (
                 <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-1.5 text-xs">Additional Details</h4>
-                  <div className="space-y-1 text-xs">
-                    {selectedBooking.numberOfPassengers && (
-                      <p><span className="font-medium text-gray-600">Passengers:</span> <span className="text-gray-900">{selectedBooking.numberOfPassengers}</span></p>
-                    )}
-                    {selectedBooking.needsHotelPickup && (
-                      <p><span className="font-medium text-gray-600">Hotel Pickup:</span> <span className="text-gray-900">Yes</span></p>
-                    )}
+                  <h4 className="font-semibold text-gray-900 mb-1.5 text-xs">Pickup & Drop-off</h4>
+                  <div className="space-y-0.5 text-xs">
                     {selectedBooking.pickupLocation && (
                       <p><span className="font-medium text-gray-600">Pickup:</span> <span className="text-gray-900">{selectedBooking.pickupLocation}</span></p>
                     )}
                     {selectedBooking.dropoffLocation && (
                       <p><span className="font-medium text-gray-600">Drop-off:</span> <span className="text-gray-900">{selectedBooking.dropoffLocation}</span></p>
                     )}
-                    {selectedBooking.hotelName && (
-                      <>
-                        <p><span className="font-medium text-gray-600">Hotel:</span> <span className="text-gray-900">{selectedBooking.hotelName}</span></p>
-                        {selectedBooking.hotelAddress && (
-                          <p className="text-xs text-gray-600 ml-3">{selectedBooking.hotelAddress}</p>
-                        )}
-                      </>
-                    )}
-                    {selectedBooking.vehicleType && (
-                      <p><span className="font-medium text-gray-600">Vehicle:</span> <span className="text-gray-900">{selectedBooking.vehicleType}</span></p>
-                    )}
-                    {selectedBooking.additionalNotes && (
-                      <div className="mt-1.5 pt-1.5 border-t border-gray-300">
-                        <p className="font-medium text-gray-600 mb-0.5 text-xs">Notes:</p>
-                        <p className="text-xs text-gray-900 whitespace-pre-wrap">{selectedBooking.additionalNotes}</p>
+                    {selectedBooking.needsHotelPickup && selectedBooking.hotelName && (
+                      <div className="bg-blue-50 p-1.5 rounded border border-blue-200 mt-1">
+                        <p className="font-medium text-gray-900">{selectedBooking.hotelName}</p>
+                        {selectedBooking.hotelAddress && <p className="text-gray-600">{selectedBooking.hotelAddress}</p>}
+                        {selectedBooking.roomNumber && <p className="text-gray-600">Room: {selectedBooking.roomNumber}</p>}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Add-ons & Extras */}
+              {(selectedBooking.needsBinoculars || selectedBooking.needsChildSeat || selectedBooking.needsWater || selectedBooking.needsSnacks) && (
+                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-1.5 text-xs">Add-ons & Extras</h4>
+                  <div className="space-y-0.5 text-xs">
+                    {selectedBooking.needsBinoculars && <p>• Binoculars <span className="text-gray-500">(LKR 500)</span></p>}
+                    {selectedBooking.needsChildSeat && <p>• Child Seat <span className="text-gray-500">(LKR 1,000)</span></p>}
+                    {selectedBooking.needsWater && <p>• Water Bottles <span className="text-gray-500">(LKR 300)</span></p>}
+                    {selectedBooking.needsSnacks && selectedBooking.selectedSnacks && selectedBooking.selectedSnacks.length > 0 && (
+                      <div className="pl-2 mt-1">
+                        <p className="font-medium text-gray-700">Snacks/Meals:</p>
+                        {selectedBooking.selectedSnacks.map((snack, idx) => (
+                          <p key={idx} className="text-gray-600">- {snack}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Emergency Contact */}
+              {(selectedBooking.emergencyContactName || selectedBooking.emergencyContactPhone) && (
+                <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-1.5 text-xs">Emergency Contact</h4>
+                  <div className="space-y-0.5 text-xs">
+                    {selectedBooking.emergencyContactName && (
+                      <p><span className="font-medium text-gray-600">Name:</span> <span className="text-gray-900">{selectedBooking.emergencyContactName}</span></p>
+                    )}
+                    {selectedBooking.emergencyContactPhone && (
+                      <p><span className="font-medium text-gray-600">Phone:</span> <span className="text-gray-900">{selectedBooking.emergencyContactPhone}</span></p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Price Breakdown */}
+              {selectedBooking.totalPrice && (() => {
+                // Get the actual price per day from booking (driver's/guide's rate)
+                const actualPricePerDay = selectedBooking.pricePerDay || 0;
+                
+                // Calculate base service charge based on full-day and half-day bookings
+                let baseServiceCharge = 0;
+                let fullDayCount = 0;
+                let halfDayCount = 0;
+                
+                // Check if we have datesWithTypes (which includes half-day/full-day info)
+                if (selectedBooking.datesWithTypes && selectedBooking.datesWithTypes.length > 0) {
+                  selectedBooking.datesWithTypes.forEach(dateObj => {
+                    if (dateObj.type === 'half-day') {
+                      halfDayCount++;
+                      baseServiceCharge += actualPricePerDay * 0.5; // Half-day is 50% of full-day rate
+                    } else {
+                      fullDayCount++;
+                      baseServiceCharge += actualPricePerDay; // Full-day rate
+                    }
+                  });
+                } else {
+                  // Fallback: if no datesWithTypes, assume all are full days
+                  fullDayCount = selectedBooking.numberOfDays || 1;
+                  baseServiceCharge = actualPricePerDay * fullDayCount;
+                }
+                
+                // Calculate add-ons total
+                let addOnsTotal = 0;
+                if (selectedBooking.needsBinoculars) addOnsTotal += 500;
+                if (selectedBooking.needsChildSeat) addOnsTotal += 1000;
+                if (selectedBooking.needsWater) addOnsTotal += 300;
+                
+                // Calculate actual total (base + add-ons)
+                const calculatedTotal = baseServiceCharge + addOnsTotal;
+                
+                return (
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2 border-2 border-green-300">
+                    <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">
+                      <DollarSign className="h-3.5 w-3.5 text-green-600" />
+                      Payment Details
+                    </h4>
+                    <div className="space-y-0.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Base Rate:</span>
+                        <span className="font-medium">LKR {actualPricePerDay.toLocaleString()}/day</span>
+                      </div>
+                      {fullDayCount > 0 && (
+                        <div className="flex justify-between text-gray-600">
+                          <span className="text-xs pl-2">Full Day × {fullDayCount}</span>
+                          <span className="font-medium">LKR {(actualPricePerDay * fullDayCount).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {halfDayCount > 0 && (
+                        <div className="flex justify-between text-gray-600">
+                          <span className="text-xs pl-2">Half Day × {halfDayCount}</span>
+                          <span className="font-medium">LKR {(actualPricePerDay * 0.5 * halfDayCount).toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-gray-700 font-medium border-t border-green-200 pt-0.5 mt-0.5">
+                        <span className="text-xs">Service Subtotal:</span>
+                        <span>LKR {baseServiceCharge.toLocaleString()}</span>
+                      </div>
+                      {(selectedBooking.needsBinoculars || selectedBooking.needsChildSeat || selectedBooking.needsWater) && (
+                        <>
+                          <div className="border-t border-green-200 pt-1 mt-1"></div>
+                          <div className="text-xs font-semibold text-gray-700">Add-ons:</div>
+                          {selectedBooking.needsBinoculars && (
+                            <div className="flex justify-between text-gray-600">
+                              <span className="pl-2">Binoculars:</span>
+                              <span>+LKR 500</span>
+                            </div>
+                          )}
+                          {selectedBooking.needsChildSeat && (
+                            <div className="flex justify-between text-gray-600">
+                              <span className="pl-2">Child Seat:</span>
+                              <span>+LKR 1,000</span>
+                            </div>
+                          )}
+                          {selectedBooking.needsWater && (
+                            <div className="flex justify-between text-gray-600">
+                              <span className="pl-2">Water:</span>
+                              <span>+LKR 300</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-gray-700 pt-0.5">
+                            <span className="text-xs font-semibold">Add-ons Subtotal:</span>
+                            <span className="font-medium">LKR {addOnsTotal.toLocaleString()}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="border-t border-green-300 pt-1 mt-1 flex justify-between">
+                        <span className="font-bold text-gray-900">Total:</span>
+                        <span className="text-lg font-bold text-green-700">LKR {calculatedTotal.toLocaleString()}</span>
+                      </div>
+                      {selectedBooking.paymentStatus === 'paid' ? (
+                        <p className="text-xs text-green-600 font-medium text-center mt-1">✓ Payment Completed</p>
+                      ) : selectedBooking.status === 'accepted' ? (
+                        <p className="text-xs text-red-600 font-medium text-center mt-1">Payment Pending</p>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Special Requests */}
+              {(selectedBooking.specialRequests || selectedBooking.specialAssistance || selectedBooking.additionalNotes) && (
+                <div className="bg-yellow-50 rounded-lg p-2 border border-yellow-300">
+                  <h4 className="font-semibold text-gray-900 mb-1 text-xs">Special Requests & Notes</h4>
+                  <div className="space-y-1 text-xs text-gray-700">
+                    {selectedBooking.specialRequests && <p className="bg-white p-1 rounded">• {selectedBooking.specialRequests}</p>}
+                    {selectedBooking.specialAssistance && <p className="bg-white p-1 rounded">• {selectedBooking.specialAssistance}</p>}
+                    {selectedBooking.additionalNotes && <p className="bg-white p-1 rounded">• {selectedBooking.additionalNotes}</p>}
                   </div>
                 </div>
               )}

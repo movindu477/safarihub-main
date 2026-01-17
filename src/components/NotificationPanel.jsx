@@ -186,22 +186,24 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <p className={`font-medium text-sm ${
+                      <p className={`font-medium text-sm truncate ${
                         notification.read ? 'text-gray-600' : 'text-gray-900'
                       }`}>
-                        {notification.senderName || 'System'}
+                        {notification.title || notification.senderName || 'System'}
                       </p>
-                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                      <div className="flex items-center space-x-1 text-xs text-gray-500 flex-shrink-0 ml-2">
                         <Clock className="h-3 w-3" />
-                        <span>{formatTime(notification.timestamp)}</span>
+                        <span className="whitespace-nowrap">{formatTime(notification.timestamp)}</span>
                       </div>
                     </div>
                     
                     <p
-                      className={`text-sm text-gray-600 mb-2 ${
+                      className={`text-sm mb-2 break-words ${
+                        notification.read ? 'text-gray-500' : 'text-gray-700'
+                      } ${
                         notification.type === 'booking' && notification.bookingData
                           ? 'whitespace-pre-line'
-                          : 'line-clamp-2'
+                          : 'line-clamp-3'
                       }`}
                     >
                       {notification.message || 'New notification'}
@@ -216,18 +218,31 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                         <p className="text-green-800">
                           <strong>Dates:</strong>{' '}
                           {notification.bookingData.dates ||
-                            (notification.bookingData.selectedDates
-                              ? notification.bookingData.selectedDates
-                                  .map((d) => {
+                            (notification.bookingData.datesWithTypes && notification.bookingData.datesWithTypes.length > 0
+                              ? notification.bookingData.datesWithTypes
+                                  .map((dateObj) => {
                                     try {
-                                      const date = new Date(d);
-                                      return date.toLocaleDateString();
+                                      const date = new Date(dateObj.date);
+                                      const dateStr = date.toLocaleDateString();
+                                      const typeStr = dateObj.type === 'half-day' ? ' (Half-day)' : ' (Full-day)';
+                                      return dateStr + typeStr;
                                     } catch {
-                                      return d;
+                                      return dateObj.date;
                                     }
                                   })
                                   .join(', ')
-                              : 'N/A')}
+                              : notification.bookingData.selectedDates
+                                ? notification.bookingData.selectedDates
+                                    .map((d) => {
+                                      try {
+                                        const date = new Date(d);
+                                        return date.toLocaleDateString();
+                                      } catch {
+                                        return d;
+                                      }
+                                    })
+                                    .join(', ')
+                                : 'N/A')}
                         </p>
                         <p className="text-green-800">
                           <strong>Days:</strong> {notification.bookingData.numberOfDays || 0}

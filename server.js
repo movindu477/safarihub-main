@@ -6,7 +6,7 @@ import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, getDoc, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, getDoc, doc, updateDoc, serverTimestamp, addDoc, Timestamp } from 'firebase/firestore';
 import Stripe from 'stripe';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
@@ -1011,6 +1011,191 @@ app.post('/api/create-payment-intent', async (req, res) => {
   } catch (error) {
     console.error('Stripe PaymentIntent creation error:', error);
     res.status(500).json({ error: error.message || 'Failed to create payment intent' });
+  }
+});
+
+// ==================== Payment Methods Management API ====================
+
+// Get all payment methods for a user
+app.get('/api/payment-methods/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Get user's Stripe customer ID from Firestore
+    const touristRef = doc(db, 'tourists', userId);
+    const touristSnap = await getDoc(touristRef);
+
+    if (!touristSnap.exists()) {
+      return res.json({ paymentMethods: [], defaultPaymentMethod: null });
+    }
+
+    const touristData = touristSnap.data();
+    const stripeCustomerId = touristData.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      return res.json({ paymentMethods: [], defaultPaymentMethod: null });
+    }
+
+    // Fetch payment methods from Stripe
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: stripeCustomerId,
+      type: 'card',
+    });
+
+    // Get customer to check default payment method
+    const customer = await stripe.customers.retrieve(stripeCustomerId);
+
+    console.log(`✅ Retrieved ${paymentMethods.data.length} payment methods for user ${userId}`);
+
+    res.json({
+      paymentMethods: paymentMethods.data,
+      defaultPaymentMethod: customer.invoice_settings?.default_payment_method || null,
+    });
+  } catch (error) {
+    console.error('❌ Error fetching payment methods:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add a new payment method
+app.post('/api/payment-methods', async (req, res) => {
+  try {
+    const { userId, paymentMethodId, email } = req.body;
+
+    console.log('💳 Adding payment method:', { userId, paymentMethodId, email });
+
+    if (!userId || !paymentMethodId) {
+      console.error('❌ Missing required fields');
+      return res.status(400).json({ error: 'User ID and payment method ID are required' });
+    }
+
+    // Get or create Stripe customer
+    const touristRef = doc(db, 'tourists', userId);
+    const touristSnap = await getDoc(touristRef);
+
+    if (!touristSnap.exists()) {
+      console.error('❌ User not found in Firestore:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let touristData = touristSnap.data();
+    let stripeCustomerId = touristData.stripeCustomerId;
+    
+    console.log('📋 User data:', { userId, hasStripeId: !!stripeCustomerId });
+
+    // Create Stripe customer if doesn't exist
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: email || touristData.email,
+        name: touristData.fullName || 'Safari Customer',
+        metadata: {
+          userId: userId,
+        },
+      });
+
+      stripeCustomerId = customer.id;
+
+      // Save Stripe customer ID to Firestore
+      await updateDoc(touristRef, {
+        stripeCustomerId: stripeCustomerId,
+        updatedAt: serverTimestamp(),
+      });
+
+      console.log(`✅ Created new Stripe customer: ${stripeCustomerId}`);
+    }
+
+    // Attach payment method to customer
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: stripeCustomerId,
+    });
+
+    // Set as default if it's the first payment method
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: stripeCustomerId,
+      type: 'card',
+    });
+
+    if (paymentMethods.data.length === 1) {
+      await stripe.customers.update(stripeCustomerId, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId,
+        },
+      });
+      console.log(`✅ Set as default payment method: ${paymentMethodId}`);
+    }
+
+    console.log(`✅ Payment method added for user ${userId}`);
+
+    res.json({ success: true, paymentMethodId });
+  } catch (error) {
+    console.error('❌ Error adding payment method:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a payment method
+app.delete('/api/payment-methods/:paymentMethodId', async (req, res) => {
+  try {
+    const { paymentMethodId } = req.params;
+    const { userId } = req.body;
+
+    if (!paymentMethodId || !userId) {
+      return res.status(400).json({ error: 'Payment method ID and user ID are required' });
+    }
+
+    // Detach payment method from customer
+    await stripe.paymentMethods.detach(paymentMethodId);
+
+    console.log(`✅ Payment method ${paymentMethodId} removed for user ${userId}`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error removing payment method:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Set default payment method
+app.post('/api/payment-methods/set-default', async (req, res) => {
+  try {
+    const { userId, paymentMethodId } = req.body;
+
+    if (!userId || !paymentMethodId) {
+      return res.status(400).json({ error: 'User ID and payment method ID are required' });
+    }
+
+    // Get user's Stripe customer ID from Firestore
+    const touristRef = doc(db, 'tourists', userId);
+    const touristSnap = await getDoc(touristRef);
+
+    if (!touristSnap.exists()) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const touristData = touristSnap.data();
+    const stripeCustomerId = touristData.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      return res.status(400).json({ error: 'No Stripe customer found' });
+    }
+
+    // Update customer's default payment method
+    await stripe.customers.update(stripeCustomerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    console.log(`✅ Default payment method set to ${paymentMethodId} for user ${userId}`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error setting default payment method:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
