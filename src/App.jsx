@@ -28,7 +28,7 @@ import {
 } from "firebase/firestore";
 // Supabase Storage imports (replacing Firebase Storage)
 import { uploadProfileImage, uploadDocument } from "./lib/supabase";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, ChevronDown, Bell, X, Send, Check, CheckCheck, MessageCircle, ArrowUp } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, ChevronDown, Bell, X, Send, Check, CheckCheck, MessageCircle, ArrowUp, Calendar } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
@@ -52,6 +52,9 @@ import DestinationDetails from "./components/destination/DestinationDetails";
 // Import Guide App
 import GuideApp from "./components/guides/App";
 import GuideProfile from "./components/guides/GuideProfile";
+
+// Import Renting App
+import RentingMain from "./components/renting/RentingMain";
 import Payment from "./components/Payment";
 import AboutUs from "./components/home/AboutUs";
 import Admin from "./components/Admin";
@@ -67,6 +70,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Chat from "./components/Chat";
 import ChatList from "./components/ChatList";
 import BookingSection from "./components/BookingSection";
+
+// Import Availability Calendar
+import AvailabilityCalendar from "./components/AvailabilityCalendar";
 
 // Import Stripe
 import { Elements } from '@stripe/react-stripe-js';
@@ -1751,6 +1757,20 @@ function App() {
             />
           }
         />
+        {/* Renting Route */}
+        <Route
+          path="/rent"
+          element={
+            <RentingMain
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          }
+        />
         {/* Payment Route */}
         <Route
           path="/payment/:bookingId"
@@ -1956,7 +1976,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   const [certifications, setCertifications] = useState([]);
   const [certificationFiles, setCertificationFiles] = useState({}); // Map of cert name to File
   const [description, setDescription] = useState("");
-  const [availableDates, setAvailableDates] = useState([]);
+  const [availableDates, setAvailableDates] = useState({}); // Object: { "YYYY-MM-DD": "busy"|"halfday"|"unavailable" }
 
   // Tour Guide specific fields
   const [specialQualifications, setSpecialQualifications] = useState([]);
@@ -2009,7 +2029,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     setCertifications([]);
     setCertificationFiles({});
     setDescription("");
-    setAvailableDates([]);
+    setAvailableDates({});
     setSpecialQualifications([]);
     setAreasOfExpertise([]);
     setVerificationDocuments([]);
@@ -2161,7 +2181,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
           contactPhone: formattedPhone,
         };
 
-        // Service type specific data
+          // Service type specific data
         if (serviceType === "Tour Guide") {
           // Convert single destination to array format for Firestore compatibility
           const destinationsArray = destinations ? [destinations] : [];
@@ -2177,6 +2197,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             specialPackageRates: specialPackageRates || "",
             currencyPreference: currencyPreference || "LKR",
             languages: languages || [],
+            availability: availableDates || {}, // Object mapping dates to status (busy, halfday, unavailable)
             description: description?.trim() || "",
             featured: false,
           };
@@ -2191,7 +2212,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             specialSkills: specialSkills || [],
             certifications: certifications || [],
             certificationUrls: {}, // Will be populated after file uploads
-            availableDates: availableDates || [],
+            availability: availableDates || {}, // Object mapping dates to status (busy, halfday, unavailable)
             description: description?.trim() || "",
             featured: false,
           };
@@ -3711,6 +3732,29 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
                 placeholder={isTourGuide ? "Describe your guiding services, expertise, and what makes you unique..." : "Describe your services, expertise, and what makes you unique..."}
               />
+            </div>
+
+            {/* Availability Calendar */}
+            <div className="space-y-2 mt-4" onClick={(e) => e.stopPropagation()}>
+              <label className="flex items-center gap-2 text-white font-medium text-xs">
+                <Calendar className="h-3 w-3 text-yellow-400" />
+                Mark Your Availability (Optional)
+              </label>
+              <p className="text-xs text-gray-400">
+                Click on dates to mark as Busy, Half Day, or Unavailable. This helps tourists see when you're available for bookings.
+              </p>
+              <div onClick={(e) => e.stopPropagation()}>
+                <AvailabilityCalendar
+                  availability={formData.availableDates || {}}
+                  onChange={(availability) => {
+                    console.log('📅 Availability changed:', availability);
+                    if (handlers && handlers.setAvailableDates) {
+                      handlers.setAvailableDates(availability);
+                    }
+                  }}
+                  readOnly={false}
+                />
+              </div>
             </div>
           </>
         )}

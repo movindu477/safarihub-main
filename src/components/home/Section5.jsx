@@ -38,7 +38,7 @@ export default function Section5() {
 
           {/* Rent Now Button */}
           <button
-            onClick={() => navigate('/about')}
+            onClick={() => navigate('/rent')}
             className="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold 
               py-3 px-8 sm:py-3.5 sm:px-10 rounded-lg transition-all duration-300 
               transform hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base touch-manipulation mt-2"

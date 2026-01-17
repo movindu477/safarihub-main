@@ -288,6 +288,14 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     setMenuOpen(false);
   }, [navigate]);
 
+  // Function to handle Renting navigation - memoized for performance
+  const handleRentClick = useCallback(() => {
+    navigate('/rent');
+    setServicesDropdownOpen(false);
+    setMobileServicesOpen(false);
+    setMenuOpen(false);
+  }, [navigate]);
+
   // Use parent user prop if available, otherwise use local auth state
   const currentUser = user || authUser;
 
@@ -425,8 +433,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     { icon: Map, label: "Find a Guide", onClick: handleGuideClick, path: "/guide" },
     { icon: Compass, label: "Explore Destinations", onClick: handleDestinationClick, path: "/destination" },
     { icon: Car, label: "Find a Jeep Driver", onClick: handleJeepDriverClick, path: "/driver" },
-    { icon: ShoppingBag, label: "Rent Equipment", href: "#equipment" },
-  ], [handleGuideClick, handleDestinationClick, handleJeepDriverClick]);
+    { icon: ShoppingBag, label: "Rent Equipment", onClick: handleRentClick, path: "/rent" },
+  ], [handleGuideClick, handleDestinationClick, handleJeepDriverClick, handleRentClick]);
 
   const isServicesActive = useMemo(() => 
     servicesItems.some((item) => item.path && isActivePath(item.path)),

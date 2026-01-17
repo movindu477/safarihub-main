@@ -66,8 +66,8 @@ import {
   GlobalNotificationBell
 } from "../../App";
 
-// Calendar Component for Date Selection
-const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => {
+// Calendar Component for Date Selection with Availability Display
+const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates, availabilityCalendar }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const getDaysInMonth = (date) => {
@@ -75,8 +75,14 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
     const month = date.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
+    const startDay = firstDay.getDay();
 
     const days = [];
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startDay; i++) {
+      days.push(null);
+    }
+    // Add all days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
     }
@@ -92,14 +98,44 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
     });
   };
 
-  const isDateAvailable = (date) => {
-    if (!availableDates || availableDates.length === 0) return true;
+  const getDateKey = (date) => {
+    if (!date) return null;
+    return date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+  };
 
-    const dateString = date.toISOString().split('T')[0];
-    return availableDates.some(availableDate => {
-      const availableDateString = new Date(availableDate).toISOString().split('T')[0];
-      return availableDateString === dateString;
-    });
+  const getAvailabilityStatus = (date) => {
+    if (!date) return null;
+    const dateKey = getDateKey(date);
+    
+    // Check new availability calendar format (object)
+    if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
+      const status = availabilityCalendar[dateKey];
+      // Return status if it exists, otherwise return null (which means available)
+      if (status && ['busy', 'halfday', 'unavailable'].includes(status)) {
+        return status;
+      }
+      // If no status marked, return null (available by default)
+      return null;
+    }
+    
+    // Fallback to old availableDates array format
+    if (availableDates && Array.isArray(availableDates)) {
+      const dateString = date.toISOString().split('T')[0];
+      const isInArray = availableDates.some(availableDate => {
+        const availableDateString = new Date(availableDate).toISOString().split('T')[0];
+        return availableDateString === dateString;
+      });
+      return isInArray ? null : 'unavailable'; // If in array = available, if not = unavailable
+    }
+    
+    // Default: no status means available
+    return null;
+  };
+
+  const isDateAvailable = (date) => {
+    const status = getAvailabilityStatus(date);
+    // Available if status is null/undefined or 'available' (not marked as busy/unavailable)
+    return status === null || status === 'available' || status === 'halfday';
   };
 
   const isDateSelected = (date) => {
@@ -108,74 +144,153 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates }) => 
     );
   };
 
+  const isDatePast = (date) => {
+    if (!date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+  };
+
   const handleDateClick = (date) => {
-    if (!isDateAvailable(date)) return;
+    if (!date || isDatePast(date)) return;
+    if (!isDateAvailable(date)) return; // Don't allow selection of unavailable dates
     onDateSelect(date);
+  };
+
+  const getDateClassName = (date) => {
+    if (!date) return '';
+    const status = getAvailabilityStatus(date);
+    const selected = isDateSelected(date);
+    const isToday = date.toDateString() === new Date().toDateString();
+    const isPast = isDatePast(date);
+
+    const baseClasses = 'relative w-full h-8 sm:h-10 text-xs sm:text-sm rounded-lg transition-all duration-200 font-medium flex items-center justify-center';
+
+    if (isPast) {
+      return `${baseClasses} bg-gray-800/50 text-gray-600 cursor-not-allowed`;
+    }
+
+    if (selected) {
+      return `${baseClasses} bg-emerald-600 text-white ring-2 ring-yellow-400`;
+    }
+
+    // Handle availability statuses
+    if (status === 'busy') {
+      return `${baseClasses} bg-red-500 text-white hover:bg-red-600`;
+    } else if (status === 'halfday') {
+      return `${baseClasses} bg-yellow-500 text-white hover:bg-yellow-600`;
+    } else if (status === 'unavailable') {
+      return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
+    } else {
+      // No status or null means available (green) - this is the default
+      return `${baseClasses} ${isToday ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300' : 'bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30'} cursor-pointer`;
+    }
   };
 
   const days = getDaysInMonth(currentMonth);
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/40 rounded-xl p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <button
-          onClick={() => navigateMonth(-1)}
-          className="p-2 rounded-full"
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigateMonth(-1);
+          }}
+          className="p-2 rounded-lg bg-gray-800/50 hover:bg-gray-700 text-white transition-colors cursor-pointer"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft className="h-5 w-5" />
         </button>
-        <h3 className="font-semibold text-gray-900">
+        <h3 className="text-base sm:text-lg font-semibold text-white">
           {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
         </h3>
         <button
-          onClick={() => navigateMonth(1)}
-          className="p-2 rounded-full"
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigateMonth(1);
+          }}
+          className="p-2 rounded-lg bg-gray-800/50 hover:bg-gray-700 text-white transition-colors cursor-pointer"
         >
-          <ArrowLeft size={16} className="rotate-180" />
+          <ArrowLeft className="h-5 w-5 rotate-180" />
         </button>
       </div>
 
+      {/* Legend */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2 bg-gray-800/30 rounded-lg border border-gray-700/40">
+        <div className="flex items-center gap-2 text-xs">
+          <div className="w-3 h-3 bg-green-500/20 border border-green-500/30 rounded"></div>
+          <span className="text-gray-300">Available</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <div className="w-3 h-3 bg-red-500 rounded"></div>
+          <span className="text-gray-300">Busy</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+          <span className="text-gray-300">Half Day</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <div className="w-3 h-3 bg-gray-600 rounded"></div>
+          <span className="text-gray-300">Unavailable</span>
+        </div>
+      </div>
+
+      {/* Day Headers */}
       <div className="grid grid-cols-7 gap-1 mb-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+          <div key={day} className="text-center text-xs font-medium text-gray-400 py-2">
             {day}
           </div>
         ))}
       </div>
 
+      {/* Calendar Days */}
       <div className="grid grid-cols-7 gap-1">
-        {days.map(day => {
-          const available = isDateAvailable(day);
-          const selected = isDateSelected(day);
-          const isToday = day.toDateString() === new Date().toDateString();
+        {days.map((date, index) => {
+          if (!date) {
+            return <div key={`empty-${index}`} className="h-8 sm:h-10"></div>;
+          }
+
+          const dateKey = getDateKey(date);
+          const status = getAvailabilityStatus(date);
+          const isPast = isDatePast(date);
+          const isAvailable = isDateAvailable(date);
 
           return (
             <button
-              key={day.toString()}
-              onClick={() => handleDateClick(day)}
-              disabled={!available}
-              className={`
-                h-8 text-sm rounded-lg
-                ${selected
-                  ? 'bg-emerald-600 text-white font-medium'
-                  : available
-                    ? isToday
-                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                      : 'bg-gray-50 text-gray-700'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              key={dateKey || `date-${index}`}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isPast && isAvailable) {
+                  handleDateClick(date);
                 }
-              `}
+              }}
+              disabled={!isAvailable || isPast}
+              className={getDateClassName(date)}
+              title={(() => {
+                if (isPast) return 'Past date';
+                if (status === 'busy') return 'Busy - Not available';
+                if (status === 'halfday') return 'Half day available';
+                if (status === 'unavailable') return 'Unavailable';
+                return 'Available - Click to select';
+              })()}
             >
-              {day.getDate()}
+              {date.getDate()}
             </button>
           );
         })}
       </div>
 
       {selectedDates.length > 0 && (
-        <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-          <h4 className="font-medium text-emerald-800 mb-2">Selected Dates:</h4>
+        <div className="mt-4 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+          <h4 className="font-medium text-emerald-300 mb-2 text-sm">Selected Dates:</h4>
           <div className="flex flex-wrap gap-2">
             {selectedDates.map((date, index) => (
               <span
@@ -353,7 +468,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
             description: guideData.description || guideData.bio || 'Experienced tour guide',
             featured: guideData.featured || false,
             availability: guideData.availability !== false,
-            availableDates: guideData.availableDates || [],
+            // Ensure availability is an object, not array
+            availabilityCalendar: (guideData.availability && typeof guideData.availability === 'object' && !Array.isArray(guideData.availability))
+              ? guideData.availability
+              : {}, // Object: { "YYYY-MM-DD": "busy"|"halfday"|"unavailable" }
+            availableDates: guideData.availableDates || [], // Keep for backward compatibility
             isCurrentUser: currentUser && currentUser.uid === guideId
           };
 
@@ -1272,6 +1391,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                             selectedDates={selectedDates}
                             onDateSelect={handleDateSelect}
                             availableDates={guide.availableDates}
+                            availabilityCalendar={guide.availabilityCalendar}
                           />
                         </div>
                       </div>

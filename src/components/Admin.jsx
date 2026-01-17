@@ -8,6 +8,7 @@ import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Cal
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
 import { updateBookingStatus, GlobalNotificationBell } from '../App';
+import AvailabilityCalendar from './AvailabilityCalendar';
 
 const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) => {
   const navigate = useNavigate();
@@ -23,10 +24,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   const [profilePreview, setProfilePreview] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'documents'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'documents', 'availability'
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [uploadedCertifications, setUploadedCertifications] = useState([]);
+  const [availabilityCalendar, setAvailabilityCalendar] = useState({}); // Object: { "YYYY-MM-DD": "busy"|"halfday"|"unavailable" }
 
   // Form state - will be populated from userData
   const [formData, setFormData] = useState({
@@ -168,6 +170,13 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
       if (userDoc.exists()) {
         const data = userDoc.data();
         setUserData(data);
+
+        // Load availability calendar
+        if (data.availability && typeof data.availability === 'object' && !Array.isArray(data.availability)) {
+          setAvailabilityCalendar(data.availability);
+        } else {
+          setAvailabilityCalendar({});
+        }
 
         // Check if user is a service provider (jeep driver or guide)
         if (data.serviceType === 'Jeep Driver' || data.serviceType === 'Tour Guide') {
@@ -619,6 +628,16 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 }`}
             >
               Documents
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('availability')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'availability'
+                ? 'bg-emerald-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+            >
+              Availability
             </button>
           </div>
 
@@ -1460,6 +1479,75 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Availability Tab */}
+      {activeTab === 'availability' && (
+        <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
+          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-emerald-400" />
+            Manage Your Availability
+          </h2>
+          <p className="text-gray-400 text-sm mb-6">
+            Mark your busy dates, half days, and unavailable dates. Tourists will see this information when booking.
+          </p>
+
+          <AvailabilityCalendar
+            availability={availabilityCalendar}
+            onChange={(updatedAvailability) => {
+              setAvailabilityCalendar(updatedAvailability);
+            }}
+            readOnly={false}
+          />
+
+          <div className="mt-6 flex gap-4">
+            <button
+              type="button"
+              onClick={async () => {
+                if (!currentUser) return;
+                
+                setSaving(true);
+                setMessage({ type: '', text: '' });
+
+                try {
+                  const userDocRef = doc(db, 'serviceProviders', currentUser.uid);
+                  await updateDoc(userDocRef, {
+                    availability: availabilityCalendar,
+                    updatedAt: serverTimestamp()
+                  });
+
+                  setMessage({ type: 'success', text: 'Availability calendar updated successfully!' });
+                  
+                  // Refresh user data
+                  await fetchUserData(currentUser.uid);
+                  
+                  setTimeout(() => {
+                    setMessage({ type: '', text: '' });
+                  }, 5000);
+                } catch (error) {
+                  console.error('Error updating availability:', error);
+                  setMessage({ type: 'error', text: 'Failed to update availability. Please try again.' });
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Save Availability
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}
