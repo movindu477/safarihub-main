@@ -928,7 +928,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                     <Clock className="h-6 w-6 text-yellow-600 flex-shrink-0" />
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900">
-                        Other Drivers
+                        Uncertified Jeep Drivers
                       </h2>
                       <p className="text-sm text-gray-600 mt-1">
                         Drivers pending certification review

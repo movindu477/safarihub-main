@@ -6,7 +6,10 @@ import {
   getDoc,
   collection,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where,
+  getDocs
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../App";
@@ -1052,6 +1055,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
+  const [hasAcceptedBooking, setHasAcceptedBooking] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
   const driverId = jeepId || searchParams.get('driverId'); // Use jeepId from URL params, fallback to query params
@@ -2131,7 +2135,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         <div className="w-full lg:flex-1 lg:overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6 lg:gap-8 px-4 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-5 md:py-6">
           {/* Sidebar */}
           <div className="lg:col-span-1 flex flex-col min-h-0">
-            <div className="bg-gradient-to-b from-white to-gray-50 border-2 border-gray-300 rounded-lg p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col lg:h-full shadow-xl">
+            <div className="bg-gradient-to-b from-white to-gray-50 border-2 border-gray-300 rounded-lg p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col lg:h-full shadow-xl lg:overflow-y-auto">
               {/* Profile Header */}
               <div className="text-center mb-2 sm:mb-3 md:mb-4">
                 <img
@@ -2245,7 +2249,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       <span className="sm:hidden">Book</span>
                     </button>
                   )}
-                  {currentUser && (
+                  {currentUser && hasAcceptedBooking && (
                     <button
                       onClick={() => {
                         setActiveTab('chat');

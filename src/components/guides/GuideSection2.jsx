@@ -870,7 +870,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
 
                           {/* Current User Badge */}
                           {guide.isCurrentUser && (
-                            <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
+                            <div className="absolute bottom-3 left-3 bg-green-600 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
                               Your Profile
                             </div>
                           )}
@@ -986,8 +986,8 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
                         onClick={() => handleProfileClick(guide)}
                       >
                         {/* Profile Image Section */}
-                        <div className="h-64 relative overflow-hidden bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
-                          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-purple-300 shadow-xl relative">
+                        <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-500 shadow-xl relative">
                             <ProfileImage guide={guide} />
                           </div>
                           
@@ -1000,7 +1000,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
 
                           {/* Current User Badge */}
                           {guide.isCurrentUser && (
-                            <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
+                            <div className="absolute bottom-3 left-3 bg-green-600 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
                               Your Profile
                             </div>
                           )}
