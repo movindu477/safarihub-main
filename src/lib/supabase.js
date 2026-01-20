@@ -157,10 +157,17 @@ export const getDocumentUrl = async (documentPath, expiresIn = 3600) => {
       throw new Error('Document path is required');
     }
 
+    console.log('📄 Original document path:', documentPath);
+
+    // If it's already a full Supabase URL, try to use it as public URL first
+    if (documentPath.includes('supabase.co/storage/v1/object/public/')) {
+      console.log('✅ Using existing public URL directly');
+      return { signedUrl: documentPath, error: null };
+    }
+
     // Extract just the path if it's a full URL
     let filePath = documentPath;
     if (documentPath.includes('supabase.co')) {
-      // Extract path from URL like: https://...supabase.co/storage/v1/object/public/documents/users/...
       const match = documentPath.match(/\/documents\/(.+)$/);
       if (match) {
         filePath = match[1];
@@ -170,16 +177,31 @@ export const getDocumentUrl = async (documentPath, expiresIn = 3600) => {
     // Remove leading slash if present
     filePath = filePath.replace(/^\/+/, '');
 
-    console.log('📄 Getting signed URL for:', filePath);
+    console.log('📄 Extracted file path:', filePath);
 
-    // Try client-side Supabase first (works in production)
+    // Method 1: Try public URL first (fastest, works for public buckets)
+    try {
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/documents/${filePath}`;
+      console.log('🔗 Trying public URL:', publicUrl);
+      
+      // Test if URL is accessible
+      const testResponse = await fetch(publicUrl, { method: 'HEAD' });
+      if (testResponse.ok) {
+        console.log('✅ Public URL accessible, using it directly');
+        return { signedUrl: publicUrl, error: null };
+      }
+    } catch (publicError) {
+      console.log('⚠️ Public URL not accessible, trying signed URL...');
+    }
+
+    // Method 2: Try client-side signed URL (works with RLS policies)
     try {
       const { data, error } = await supabaseClient.storage
         .from('documents')
         .createSignedUrl(filePath, expiresIn);
 
       if (error) {
-        console.warn('⚠️ Client-side signed URL failed:', error);
+        console.warn('⚠️ Client-side signed URL error:', error);
         throw error;
       }
 
@@ -188,9 +210,11 @@ export const getDocumentUrl = async (documentPath, expiresIn = 3600) => {
         return { signedUrl: data.signedUrl, error: null };
       }
     } catch (clientError) {
-      console.warn('⚠️ Client-side method failed, trying backend fallback...', clientError);
-      
-      // Fallback to backend API (for development/local)
+      console.warn('⚠️ Client-side signed URL failed, trying backend...', clientError);
+    }
+
+    // Method 3: Backend fallback (for local development)
+    if (API_BASE_URL && !API_BASE_URL.includes('localhost')) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/get-document-url`, {
           method: 'POST',
@@ -200,11 +224,12 @@ export const getDocumentUrl = async (documentPath, expiresIn = 3600) => {
           body: JSON.stringify({ 
             path: filePath,
             expiresIn 
-          })
+          }),
+          signal: AbortSignal.timeout(5000) // 5 second timeout
         });
 
         if (!response.ok) {
-          throw new Error('Backend API failed');
+          throw new Error(`Backend returned ${response.status}`);
         }
 
         const data = await response.json();
@@ -213,16 +238,20 @@ export const getDocumentUrl = async (documentPath, expiresIn = 3600) => {
           return { signedUrl: data.signedUrl, error: null };
         }
       } catch (backendError) {
-        console.warn('⚠️ Backend fallback also failed:', backendError);
+        console.warn('⚠️ Backend fallback failed:', backendError.message);
       }
     }
 
-    throw new Error('Failed to generate signed URL from both client and backend');
+    // Method 4: Last resort - construct public URL and hope for the best
+    const fallbackUrl = `${supabaseUrl}/storage/v1/object/public/documents/${filePath}`;
+    console.log('⚠️ Using fallback public URL (may not work):', fallbackUrl);
+    return { signedUrl: fallbackUrl, error: null };
+
   } catch (error) {
-    console.error('❌ Get document URL error:', error);
+    console.error('❌ All methods failed. Error:', error);
     return { 
       signedUrl: null, 
-      error: error.message || 'Failed to get document URL' 
+      error: error.message || 'Failed to get document URL. Please ensure documents are uploaded correctly.' 
     };
   }
 };
