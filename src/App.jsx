@@ -4257,12 +4257,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Full Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 25,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 25,000)</span>
-                          )}
                         </label>
                         <input
                           type="text"
@@ -4277,7 +4271,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                           }}
                           required
                           className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 25,000' : 'Maximum: 25,000'}
+                          placeholder="Enter full day price (e.g., 20,000)"
                         />
                       </div>
 
