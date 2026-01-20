@@ -3982,7 +3982,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               return null;
             })()}
 
-<<<<<<< HEAD
         {/* Certification Status Selection (for both Jeep Drivers and Tour Guides) */}
         {(isJeepDriver || isTourGuide) && (
           <div className="space-y-2 mb-4">
@@ -4303,37 +4302,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-white font-medium text-xs">
                   Vehicle Type(s) <span className="text-gray-400 text-xs">(Select all that apply)</span>
-=======
-            {/* Certification Status Selection (for both Jeep Drivers and Tour Guides) */}
-            {(isJeepDriver || isTourGuide) && (
-              <div className="space-y-2 mb-4">
-                <label className="block text-white font-medium text-xs">
-                  Certification Status *
->>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handlers.setCertificationStatus('non-certified')}
-                    className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'non-certified'
-                      ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
-                      : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                      }`}
-                  >
-                    Non-Certified Service Provider
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlers.setCertificationStatus('certified')}
-                    className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'certified'
-                      ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
-                      : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                      }`}
-                  >
-                    Certified Service Provider
-                  </button>
-                </div>
-<<<<<<< HEAD
                 {formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
                   <p className="text-xs text-gray-300 mt-1">
                     Selected: {formData.vehicleTypes.join(', ')}
@@ -4464,17 +4432,9 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 {/* Special packages text - shown after all pricing */}
                 <p className="text-xs text-blue-300 italic mt-2">
                   Add your special packages to your profile from your Service Provider Dashboard
-=======
-                <p className="text-xs text-gray-400 mt-1">
-                  {formData.certificationStatus === 'certified'
-                    ? '✓ Certified providers can charge premium rates and must upload certifications'
-                    : '✓ Non-certified providers have maximum price limits'}
->>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
                 </p>
               </div>
             )}
-
-<<<<<<< HEAD
             {/* Tour Guide Specific Fields */}
             {isTourGuide && (
               <>
@@ -4531,7 +4491,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                           required
                           className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
                           placeholder="Enter half day price (e.g., 12,000)"
-=======
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -4651,7 +4610,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                         <div
                           className="fixed inset-0 z-10"
                           onClick={() => setShowCountryDropdown(false)}
->>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
                         />
                         <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto min-w-[200px]">
                           {countryCodes.map((country) => (
@@ -5381,7 +5339,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                   />
                 </div>
 
-<<<<<<< HEAD
                 {/* Languages Spoken */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
@@ -5472,8 +5429,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                     </p>
                   </div>
                 )}
-=======
->>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
               </>
             )}
 
@@ -5495,7 +5450,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                     className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
                   />
                 </div>
-<<<<<<< HEAD
 
                 {/* Languages Spoken (Multi-select) */}
                 <div className="space-y-1">
@@ -5588,10 +5542,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                   </div>
                 )}
               </>
-=======
-                <p className="text-xs text-gray-400">Max file size: 2MB</p>
-              </div>
->>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
             )}
 
             {/* Close the main conditional wrapper */}

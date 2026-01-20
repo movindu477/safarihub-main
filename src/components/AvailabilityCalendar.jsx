@@ -318,7 +318,6 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
             const hasStatus = status && status !== 'available';
             const label = getDateLabel(status);
 
-<<<<<<< HEAD
           return (
             <button
               key={dateKey}
@@ -349,45 +348,24 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
                   <span className="text-[8px] sm:text-[9px] mt-0.5 font-normal opacity-90">
                     {label}
                   </span>
-=======
-            return (
-              <button
-                key={dateKey}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleDateClick(date, e);
-                }}
-                disabled={readOnly || isPast}
-                className={getDateClassName(date)}
-                title={isPast ? 'Past date' : (label || 'Click to set availability')}
-              >
-                <div className="flex flex-col items-center justify-center">
-                  <span>{date.getDate()}</span>
-                  {label && (
-                    <span className="text-[8px] sm:text-[9px] mt-0.5 font-normal opacity-90">
-                      {label}
-                    </span>
-                  )}
-                </div>
-                {hasStatus && !readOnly && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      clearDate(dateKey, e);
-                    }}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10"
-                    title="Clear"
-                  >
-                    <X className="w-2 h-2 text-white" />
-                  </button>
->>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
                 )}
-              </button>
-            );
+              </div>
+              {hasStatus && !readOnly && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearDate(dateKey, e);
+                  }}
+                  className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10"
+                  title="Clear"
+                >
+                  <X className="w-2 h-2 text-white" />
+                </button>
+              )}
+            </button>
+          );
           })}
         </div>
 

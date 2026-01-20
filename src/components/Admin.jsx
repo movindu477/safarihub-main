@@ -1082,18 +1082,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                 <div>
                                   <label className="block text-xs font-medium text-gray-300 mb-1">
                                     Full Day Price (LKR) *
-<<<<<<< HEAD
-=======
-                                    {formData.certificationStatus === 'certified' ? (
-                                      userData?.certificationApproved ? (
-                                        <span className="text-yellow-400 ml-1">(Min: 25,000)</span>
-                                      ) : (
-                                        <span className="text-emerald-400 ml-1">(Max: 25,000 - Pending Approval)</span>
-                                      )
-                                    ) : (
-                                      <span className="text-emerald-400 ml-1">(Max: 25,000)</span>
-                                    )}
->>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
                                   </label>
                                   <input
                                     type="text"
@@ -2267,7 +2255,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   )}
                 </div>
               </div>
-<<<<<<< HEAD
               {isEditingCalendar ? (
                 <div className="bg-emerald-900/20 border border-emerald-700 rounded-lg p-3 mb-6">
                   <p className="text-emerald-300 text-sm font-medium">
@@ -2281,13 +2268,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   </p>
                 </div>
               )}
-=======
-              <p className="text-gray-400 text-sm mb-6">
-                {isEditingCalendar
-                  ? 'Click on dates to set availability. All dates are unselected by default until you mark them.'
-                  : 'View your availability calendar. Click "Edit Calendar" to make changes.'}
-              </p>
->>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
               <AvailabilityCalendar
                 availability={isEditingCalendar ? tempAvailabilityCalendar : availabilityCalendar}
                 onChange={(newAvailability) => {
