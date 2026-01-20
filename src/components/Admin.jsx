@@ -1779,8 +1779,13 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     <button
                                       onClick={async () => {
                                         try {
-                                          const url = await getDocumentUrl(uploadedDoc.supabasePath || uploadedDoc.fileUrl);
-                                          window.open(url, '_blank');
+                                          const { signedUrl, error } = await getDocumentUrl(uploadedDoc.supabasePath || uploadedDoc.fileUrl);
+                                          if (error) {
+                                            console.error('Error getting document URL:', error);
+                                            setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                            return;
+                                          }
+                                          window.open(signedUrl, '_blank', 'noopener,noreferrer');
                                         } catch (error) {
                                           console.error('Error opening document:', error);
                                         }
