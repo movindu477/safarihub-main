@@ -101,17 +101,17 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
     const rect = event.target.getBoundingClientRect();
     const container = event.target.closest('.bg-gray-900\\/50');
     const containerRect = container ? container.getBoundingClientRect() : rect;
-    
+
     const viewportWidth = window.innerWidth;
-    
+
     // Popup dimensions (approximate)
     const popupWidth = viewportWidth < 640 ? 170 : 200;
     const popupHeight = viewportWidth < 640 ? 180 : 200;
-    
+
     // Calculate position relative to the container (for absolute positioning)
     let left = rect.left - containerRect.left + rect.width + 10; // 10px offset from date
     let top = rect.top - containerRect.top;
-    
+
     // For mobile, center the popup horizontally
     if (viewportWidth < 640) {
       left = (containerRect.width - popupWidth) / 2;
@@ -126,7 +126,7 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
         left = 10;
       }
     }
-    
+
     // Ensure popup stays within container bounds vertically
     if (top + popupHeight > containerRect.height - 10) {
       top = Math.max(10, containerRect.height - popupHeight - 10);
@@ -135,7 +135,7 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
     if (top < 10) {
       top = 10;
     }
-    
+
     setPopupPosition({ top, left });
     setPopupDate(date);
     setShowPopup(true);
@@ -144,7 +144,7 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
 
   const handleStatusSelect = useCallback((status) => {
     if (!popupDate) return;
-    
+
     // If "Half Day" is clicked, show sub-menu instead of setting status
     if (status === 'halfday') {
       setShowHalfDayMenu(true);
@@ -152,7 +152,7 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
     }
 
     const dateKey = getDateKey(popupDate);
-    
+
     setDateAvailability(prev => {
       const newState = { ...prev };
       if (!status || status === 'available') {
@@ -236,8 +236,8 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
   };
 
   const days = getDaysInMonth(currentMonth);
-  const monthNames = ["January", "February", "March", "April", "May", "June", 
-                      "July", "August", "September", "October", "November", "December"];
+  const monthNames = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
 
   // Count availability types
   const availabilityCounts = {
@@ -273,9 +273,8 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
               navigateMonth(-1);
             }}
             disabled={readOnly}
-            className={`p-2 rounded-lg bg-gray-800/50 text-white transition-colors ${
-              readOnly ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-700 cursor-pointer'
-            }`}
+            className={`p-2 rounded-lg bg-gray-800/50 text-white transition-colors ${readOnly ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-700 cursor-pointer'
+              }`}
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -290,9 +289,8 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
               navigateMonth(1);
             }}
             disabled={readOnly}
-            className={`p-2 rounded-lg bg-gray-800/50 text-white transition-colors ${
-              readOnly ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-700 cursor-pointer'
-            }`}
+            className={`p-2 rounded-lg bg-gray-800/50 text-white transition-colors ${readOnly ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-700 cursor-pointer'
+              }`}
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -309,55 +307,55 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
 
         {/* Calendar Days */}
         <div className="grid grid-cols-7 gap-1">
-        {days.map((date, index) => {
-          if (!date) {
-            return <div key={`empty-${index}`} className="h-8 sm:h-10"></div>;
-          }
+          {days.map((date, index) => {
+            if (!date) {
+              return <div key={`empty-${index}`} className="h-8 sm:h-10"></div>;
+            }
 
-          const dateKey = getDateKey(date);
-          const status = getAvailabilityStatus(date);
-          const isPast = isPastDate(date);
-          const hasStatus = status && status !== 'available';
-          const label = getDateLabel(status);
+            const dateKey = getDateKey(date);
+            const status = getAvailabilityStatus(date);
+            const isPast = isPastDate(date);
+            const hasStatus = status && status !== 'available';
+            const label = getDateLabel(status);
 
-          return (
-            <button
-              key={dateKey}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDateClick(date, e);
-              }}
-              disabled={readOnly || isPast}
-              className={getDateClassName(date)}
-              title={isPast ? 'Past date' : (label || 'Click to set availability')}
-            >
-              <div className="flex flex-col items-center justify-center">
-                <span>{date.getDate()}</span>
-                {label && (
-                  <span className="text-[8px] sm:text-[9px] mt-0.5 font-normal opacity-90">
-                    {label}
-                  </span>
+            return (
+              <button
+                key={dateKey}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDateClick(date, e);
+                }}
+                disabled={readOnly || isPast}
+                className={getDateClassName(date)}
+                title={isPast ? 'Past date' : (label || 'Click to set availability')}
+              >
+                <div className="flex flex-col items-center justify-center">
+                  <span>{date.getDate()}</span>
+                  {label && (
+                    <span className="text-[8px] sm:text-[9px] mt-0.5 font-normal opacity-90">
+                      {label}
+                    </span>
+                  )}
+                </div>
+                {hasStatus && !readOnly && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      clearDate(dateKey, e);
+                    }}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10"
+                    title="Clear"
+                  >
+                    <X className="w-2 h-2 text-white" />
+                  </button>
                 )}
-              </div>
-              {hasStatus && !readOnly && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    clearDate(dateKey, e);
-                  }}
-                  className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10"
-                  title="Clear"
-                >
-                  <X className="w-2 h-2 text-white" />
-                </button>
-              )}
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
         </div>
 
         {/* Summary */}
@@ -378,8 +376,8 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
       {showPopup && popupDate && !readOnly && (
         <>
           {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-40" 
+          <div
+            className="fixed inset-0 z-40"
             onClick={() => {
               setShowPopup(false);
               setShowHalfDayMenu(false);
@@ -387,81 +385,35 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
             }}
           />
           {/* Popup Box - uses absolute positioning to scroll with content */}
-          <div 
+          <div
             className="absolute z-50 bg-gray-800 border-2 border-gray-600 rounded-xl shadow-2xl p-3 sm:p-4 w-[170px] sm:w-[200px] animate-fadeIn"
-            style={{ 
-              top: `${popupPosition.top}px`, 
+            style={{
+              top: `${popupPosition.top}px`,
               left: `${popupPosition.left}px`
             }}
           >
             <div className="text-xs sm:text-sm text-gray-300 mb-2 sm:mb-3 font-medium text-center border-b border-gray-600 pb-2">
               {popupDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </div>
-            
-            {!showHalfDayMenu ? (
-              // Main Menu
-              <div className="space-y-1.5 sm:space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect(null)}
-                  className="w-full px-2 sm:px-3 py-2 bg-transparent border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700/30 active:bg-gray-700/50 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
-                >
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 border border-gray-500 rounded flex-shrink-0"></div>
-                  <span>Clear / Available</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('fullday')}
-                  className="w-full px-2 sm:px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 active:bg-red-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
-                >
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-600 rounded flex-shrink-0"></div>
-                  <span>Full Day</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('halfday')}
-                  className="w-full px-2 sm:px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:bg-yellow-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
-                >
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-600 rounded flex-shrink-0"></div>
-                  <span>Half Day →</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('unavailable')}
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
-                >
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-700 rounded flex-shrink-0"></div>
-                  <span>Unavailable</span>
-                </button>
-              </div>
-            ) : (
-              // Half Day Sub-Menu
-              <div className="space-y-1.5 sm:space-y-2">
-                <button
-                  type="button"
-                  onClick={handleBackToMainMenu}
-                  className="w-full px-2 sm:px-3 py-1.5 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation mb-2"
-                >
-                  <span>← Back</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('halfday-morning')}
-                  className="w-full px-2 sm:px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:bg-yellow-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
-                >
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-600 rounded flex-shrink-0"></div>
-                  <span>Morning Half</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('halfday-evening')}
-                  className="w-full px-2 sm:px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 active:bg-yellow-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
-                >
-                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-700 rounded flex-shrink-0"></div>
-                  <span>Evening Half</span>
-                </button>
-              </div>
-            )}
+
+            <div className="space-y-1.5 sm:space-y-2">
+              <button
+                type="button"
+                onClick={() => handleStatusSelect(null)}
+                className="w-full px-2 sm:px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+              >
+                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 border border-white rounded shrink-0"></div>
+                <span>Available</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStatusSelect('unavailable')}
+                className="w-full px-2 sm:px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+              >
+                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-700 rounded shrink-0"></div>
+                <span>Unavailable</span>
+              </button>
+            </div>
           </div>
         </>
       )}

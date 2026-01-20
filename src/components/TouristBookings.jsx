@@ -11,10 +11,10 @@ import { createNotification } from '../App';
 const formatDate = (date) => {
   if (!date) return 'N/A';
   const dateObj = date instanceof Date ? date : new Date(date);
-  return dateObj.toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  return dateObj.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
 };
 
@@ -22,7 +22,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
   const navigate = useNavigate();
   const auth = getAuth();
   const db = getFirestore();
-  
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bookingFilter, setBookingFilter] = useState('all'); // 'all', 'pending', 'accepted', 'completed', 'declined', 'reviewed'
@@ -58,7 +58,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
       bookingsData.sort((a, b) => {
         if (a.status === 'pending' && b.status !== 'pending') return -1;
         if (a.status !== 'pending' && b.status === 'pending') return 1;
-        
+
         const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
         const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
         return dateB - dateA;
@@ -77,7 +77,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
   // Handle review submission
   const handleReviewSubmit = async () => {
     if (!selectedBooking || !user) return;
-    
+
     if (reviewData.rating < 1 || reviewData.rating > 5) {
       alert('Please select a rating between 1 and 5 stars');
       return;
@@ -127,6 +127,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
   const statusColors = {
     pending: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
     accepted: 'bg-green-900/50 text-green-300 border-green-700',
+    confirmed: 'bg-emerald-900/50 text-emerald-300 border-emerald-700',
     declined: 'bg-red-900/50 text-red-300 border-red-700',
     completed: 'bg-blue-900/50 text-blue-300 border-blue-700',
     reviewed: 'bg-purple-900/50 text-purple-300 border-purple-700',
@@ -134,14 +135,22 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
   };
 
   // Filter bookings based on selected filter
-  const filteredBookings = bookingFilter === 'all' 
-    ? bookings 
-    : bookings.filter(booking => booking.status === bookingFilter);
+  const filteredBookings = bookings.filter(booking => {
+    if (bookingFilter === 'all') return true;
+    if (bookingFilter === 'pending') return booking.status === 'pending';
+    if (bookingFilter === 'accepted') {
+      return booking.status === 'accepted' && booking.paymentStatus !== 'paid';
+    }
+    if (bookingFilter === 'confirmed') {
+      return (booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus === 'paid';
+    }
+    return booking.status === bookingFilter;
+  });
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <Navbar user={user} onLogout={onLogout} onLogin={onShowAuth} onRegister={onShowAuth} />
-      
+
       <div className="flex-1 pt-20 pb-10 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -160,61 +169,64 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
           <div className="mb-6 flex flex-wrap gap-2">
             <button
               onClick={() => setBookingFilter('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                bookingFilter === 'all'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${bookingFilter === 'all'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
             >
               All ({bookings.length})
             </button>
             <button
               onClick={() => setBookingFilter('pending')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                bookingFilter === 'pending'
-                  ? 'bg-yellow-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${bookingFilter === 'pending'
+                ? 'bg-yellow-600 text-white'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
             >
               Pending ({bookings.filter(b => b.status === 'pending').length})
             </button>
             <button
               onClick={() => setBookingFilter('accepted')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                bookingFilter === 'accepted'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${bookingFilter === 'accepted'
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
             >
-              Accepted ({bookings.filter(b => b.status === 'accepted').length})
+              Accepted ({bookings.filter(b => b.status === 'accepted' && b.paymentStatus !== 'paid').length})
+            </button>
+            <button
+              onClick={() => setBookingFilter('confirmed')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${bookingFilter === 'confirmed'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+            >
+              Confirmed ({bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && b.paymentStatus === 'paid').length})
             </button>
             <button
               onClick={() => setBookingFilter('completed')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                bookingFilter === 'completed'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${bookingFilter === 'completed'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
             >
               Completed ({bookings.filter(b => b.status === 'completed').length})
             </button>
             <button
               onClick={() => setBookingFilter('reviewed')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                bookingFilter === 'reviewed'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${bookingFilter === 'reviewed'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
             >
               Reviewed ({bookings.filter(b => b.status === 'reviewed').length})
             </button>
             <button
               onClick={() => setBookingFilter('declined')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                bookingFilter === 'declined'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${bookingFilter === 'declined'
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
             >
               Declined ({bookings.filter(b => b.status === 'declined').length})
             </button>
@@ -263,7 +275,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                       const dates = booking.datesWithTypes.map(d => new Date(d.date));
                       return new Date(Math.max(...dates));
                     } else if (booking.selectedDates) {
-                      const dates = Array.isArray(booking.selectedDates) 
+                      const dates = Array.isArray(booking.selectedDates)
                         ? booking.selectedDates.map(d => new Date(d))
                         : [new Date(booking.selectedDates)];
                       return new Date(Math.max(...dates));
@@ -273,14 +285,14 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
 
                   const latestDate = getLatestBookingDate();
                   let hasBookingPassed = false;
-                  
+
                   if (latestDate) {
                     const latestDateMidnight = new Date(latestDate);
                     latestDateMidnight.setHours(0, 0, 0, 0);
-                    
+
                     const nowMidnight = new Date();
                     nowMidnight.setHours(0, 0, 0, 0);
-                    
+
                     hasBookingPassed = nowMidnight > latestDateMidnight;
                   }
 
@@ -299,10 +311,11 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                             <h3 className="text-lg font-semibold text-white">
                               {booking.providerName || booking.serviceType || 'Service Provider'}
                             </h3>
-                            <span className={`px-2 py-1 rounded text-xs font-medium border ${
-                              statusColors[booking.status] || statusColors.pending
-                            }`}>
-                              {booking.status?.toUpperCase() || 'PENDING'}
+                            <span className={`px-2 py-1 rounded text-xs font-medium border ${booking.paymentStatus === 'paid'
+                              ? statusColors.confirmed
+                              : statusColors[booking.status] || statusColors.pending
+                              }`}>
+                              {booking.paymentStatus === 'paid' ? 'CONFIRMED' : (booking.status?.toUpperCase() || 'PENDING')}
                             </span>
                           </div>
                           <div className="space-y-1 text-sm text-gray-300">
@@ -317,18 +330,17 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                                     const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
                                     const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
                                     const isFullDay = type === 'full' || type === 'full-day';
-                                    const dayPrice = isFullDay 
-                                      ? booking.priceFullDay || booking.pricePerDay 
+                                    const dayPrice = isFullDay
+                                      ? booking.priceFullDay || booking.pricePerDay
                                       : booking.priceHalfDay || (booking.pricePerDay * 0.6);
                                     if (!date) return null;
                                     return (
                                       <div key={index} className="flex items-center justify-between text-xs">
-                                        <span className="text-gray-300">{formatDate(date)}</span>
+                                        <span className="text-gray-300">{date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                         <div className="flex items-center gap-2">
-                                          <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
-                                          {dayPrice && (
-                                            <span className="text-gray-300 font-medium">LKR {dayPrice.toLocaleString()}</span>
-                                          )}
+                                          <span className={`font-medium ${typeColor}`}>
+                                            {typeLabel} {dayPrice ? `- LKR ${dayPrice.toLocaleString()}` : ''}
+                                          </span>
                                         </div>
                                       </div>
                                     );
@@ -357,9 +369,21 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                           </div>
                         </div>
 
-                        {/* Action Button */}
-                        {booking.status === 'completed' && hasBookingPassed && (
-                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                        {/* Action Buttons */}
+                        <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                          {/* Pay Now Button */}
+                          {booking.status === 'accepted' && booking.paymentStatus !== 'paid' && (
+                            <button
+                              onClick={() => navigate(`/payment/${booking.id}`)}
+                              className="flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all transform hover:scale-105 shadow-lg text-sm font-bold"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              PAY NOW
+                            </button>
+                          )}
+
+                          {/* Review Button */}
+                          {booking.status === 'completed' && hasBookingPassed && (
                             <button
                               onClick={() => {
                                 setSelectedBooking(booking);
@@ -370,8 +394,8 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                               <Star className="h-4 w-4" />
                               Leave a Review
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -419,11 +443,10 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                     className="transition-transform hover:scale-110"
                   >
                     <Star
-                      className={`h-8 w-8 ${
-                        star <= reviewData.rating
-                          ? 'fill-yellow-400 text-yellow-400'
-                          : 'text-gray-600'
-                      }`}
+                      className={`h-8 w-8 ${star <= reviewData.rating
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : 'text-gray-600'
+                        }`}
                     />
                   </button>
                 ))}

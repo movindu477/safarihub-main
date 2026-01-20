@@ -159,7 +159,11 @@ const BookingPanel = ({ user }) => {
     if (selectedStatus === 'all') return true;
     if (selectedStatus === 'pending') return booking.status === 'pending';
     if (selectedStatus === 'accepted') {
-      // Show confirmed bookings (accepted/confirmed with paid status)
+      // Show accepted bookings that are NOT yet paid
+      return booking.status === 'accepted' && booking.paymentStatus !== 'paid';
+    }
+    if (selectedStatus === 'confirmed') {
+      // Show confirmed bookings (accepted or confirmed) that ARE paid
       return (booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus === 'paid';
     }
     if (selectedStatus === 'declined') return booking.status === 'declined';
@@ -168,7 +172,7 @@ const BookingPanel = ({ user }) => {
 
   // Group bookings by status
   const pendingBookings = bookings.filter(b => b.status === 'pending');
-  const acceptedBookings = bookings.filter(b => b.status === 'accepted' || b.status === 'confirmed');
+  const acceptedBookings = bookings.filter(b => b.status === 'accepted' && b.paymentStatus !== 'paid');
   const confirmedBookings = bookings.filter(b =>
     (b.status === 'accepted' || b.status === 'confirmed') && b.paymentStatus === 'paid'
   );
@@ -176,6 +180,7 @@ const BookingPanel = ({ user }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
+      case 'confirmed':
       case 'accepted':
         return 'bg-green-100 text-green-800 border-green-300';
       case 'declined':
@@ -189,6 +194,7 @@ const BookingPanel = ({ user }) => {
 
   const getStatusIcon = (status) => {
     switch (status) {
+      case 'confirmed':
       case 'accepted':
         return <CheckCircle className="h-4 w-4" />;
       case 'declined':
@@ -308,6 +314,15 @@ const BookingPanel = ({ user }) => {
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
             >
+              Accepted ({acceptedBookings.length})
+            </button>
+            <button
+              onClick={() => setSelectedStatus('confirmed')}
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'confirmed'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+            >
               Confirmed ({confirmedBookings.length})
             </button>
             <button
@@ -389,7 +404,7 @@ const BookingPanel = ({ user }) => {
                     // Calculate the correct total based on half-day/full-day + add-ons
                     const actualPricePerDay = booking.pricePerDay || 0;
                     let serviceCharge = 0;
-                    
+
                     if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
                       booking.datesWithTypes.forEach(dateObj => {
                         serviceCharge += dateObj.type === 'half-day' ? actualPricePerDay * 0.5 : actualPricePerDay;
@@ -397,25 +412,42 @@ const BookingPanel = ({ user }) => {
                     } else {
                       serviceCharge = actualPricePerDay * (booking.numberOfDays || 1);
                     }
-                    
+
                     let addOns = 0;
                     if (booking.needsBinoculars) addOns += 500;
                     if (booking.needsChildSeat) addOns += 1000;
                     if (booking.needsWater) addOns += 300;
-                    
+
                     const correctTotal = serviceCharge + addOns;
-                    
+
                     return (
-                      <div className="flex items-center gap-2 mb-2 text-xs">
-                        <DollarSign className="h-3 w-3 text-green-500" />
-                        <span className="font-semibold text-green-400">
-                          LKR {correctTotal.toLocaleString()}
-                        </span>
-                        {(booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus !== 'paid' && (
-                          <span className="ml-auto text-red-400 text-xs font-medium">Payment Pending</span>
-                        )}
-                        {booking.paymentStatus === 'paid' && (
-                          <span className="ml-auto text-green-400 text-xs font-medium">✓ Paid</span>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 text-xs">
+                          <DollarSign className="h-3 w-3 text-green-500" />
+                          <span className="font-semibold text-green-400">
+                            LKR {correctTotal.toLocaleString()}
+                          </span>
+                          {booking.status === 'accepted' && booking.paymentStatus !== 'paid' && (
+                            <span className="ml-auto text-red-400 text-xs font-medium">Payment Pending</span>
+                          )}
+                          {booking.paymentStatus === 'paid' && (
+                            <span className="ml-auto text-green-400 text-xs font-medium">✓ Paid</span>
+                          )}
+                        </div>
+
+                        {/* Pay Now Button for Accepted bookings */}
+                        {userRole === 'tourist' && booking.status === 'accepted' && booking.paymentStatus !== 'paid' && (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              navigate(`/payment/${booking.id}`);
+                            }}
+                            className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition-all transform hover:scale-[1.02] shadow-md flex items-center justify-center gap-1.5 mt-1"
+                          >
+                            <DollarSign className="h-3.5 w-3.5" />
+                            PAY NOW
+                          </button>
                         )}
                       </div>
                     );
@@ -490,7 +522,7 @@ const BookingPanel = ({ user }) => {
                 </h4>
                 <div className="space-y-0.5 text-xs">
                   <p className="font-medium text-gray-900">
-                    {userRole === 'provider' 
+                    {userRole === 'provider'
                       ? (selectedBooking.customerName || selectedBooking.fullName || 'N/A')
                       : (selectedBooking.driverName || selectedBooking.guideName || 'Service Provider')}
                   </p>
@@ -593,12 +625,12 @@ const BookingPanel = ({ user }) => {
               {selectedBooking.totalPrice && (() => {
                 // Get the actual price per day from booking (driver's/guide's rate)
                 const actualPricePerDay = selectedBooking.pricePerDay || 0;
-                
+
                 // Calculate base service charge based on full-day and half-day bookings
                 let baseServiceCharge = 0;
                 let fullDayCount = 0;
                 let halfDayCount = 0;
-                
+
                 // Check if we have datesWithTypes (which includes half-day/full-day info)
                 if (selectedBooking.datesWithTypes && selectedBooking.datesWithTypes.length > 0) {
                   selectedBooking.datesWithTypes.forEach(dateObj => {
@@ -615,16 +647,16 @@ const BookingPanel = ({ user }) => {
                   fullDayCount = selectedBooking.numberOfDays || 1;
                   baseServiceCharge = actualPricePerDay * fullDayCount;
                 }
-                
+
                 // Calculate add-ons total
                 let addOnsTotal = 0;
                 if (selectedBooking.needsBinoculars) addOnsTotal += 500;
                 if (selectedBooking.needsChildSeat) addOnsTotal += 1000;
                 if (selectedBooking.needsWater) addOnsTotal += 300;
-                
+
                 // Calculate actual total (base + add-ons)
                 const calculatedTotal = baseServiceCharge + addOnsTotal;
-                
+
                 return (
                   <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2 border-2 border-green-300">
                     <h4 className="font-semibold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs">

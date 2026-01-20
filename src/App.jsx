@@ -797,6 +797,79 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
       ...(status === 'completed' && { completedAt: serverTimestamp() })
     });
 
+    // Update provider availability if booking is accepted
+    if (status === 'accepted') {
+      try {
+        const providerRef = doc(db, 'serviceProviders', providerId);
+        const providerDoc = await getDoc(providerRef);
+        const currentAvailability = providerDoc.exists() ? (providerDoc.data().availability || {}) : {};
+        const updates = {};
+
+        // Extract dates with types from booking data
+        if (bookingData.datesWithTypes && Array.isArray(bookingData.datesWithTypes)) {
+          bookingData.datesWithTypes.forEach(d => {
+            const date = d.date ? (d.date.toDate ? d.date.toDate() : new Date(d.date)) : null;
+            if (date) {
+              // Format as YYYY-MM-DD
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const day = String(date.getDate()).padStart(2, '0');
+              const dateKey = `${year}-${month}-${day}`;
+
+              const bookingType = d.type || 'full-day';
+              const safariTypeLabel = d.safariType || ''; // 'Morning Safari' or 'Evening Safari'
+              const currentStatus = currentAvailability[dateKey];
+
+              if (bookingType === 'full-day' || bookingType === 'full') {
+                updates[`availability.${dateKey}`] = 'busy';
+              } else if (bookingType === 'half-day' || bookingType === 'half') {
+                const isMorning = safariTypeLabel.toLowerCase().includes('morning');
+                const isEvening = safariTypeLabel.toLowerCase().includes('evening');
+
+                if (isMorning) {
+                  // If evening was already booked, the day is now fully busy
+                  if (currentStatus === 'halfday-evening') {
+                    updates[`availability.${dateKey}`] = 'busy';
+                  } else {
+                    updates[`availability.${dateKey}`] = 'halfday-morning';
+                  }
+                } else if (isEvening) {
+                  // If morning was already booked, the day is now fully busy
+                  if (currentStatus === 'halfday-morning') {
+                    updates[`availability.${dateKey}`] = 'busy';
+                  } else {
+                    updates[`availability.${dateKey}`] = 'halfday-evening';
+                  }
+                } else {
+                  // Fallback: if safari type not specified, just mark as busy to be safe
+                  updates[`availability.${dateKey}`] = 'busy';
+                }
+              }
+            }
+          });
+        } else if (bookingData.selectedDates && Array.isArray(bookingData.selectedDates)) {
+          // Fallback legacy support
+          bookingData.selectedDates.forEach(d => {
+            const date = d ? (d.toDate ? d.toDate() : new Date(d)) : null;
+            if (date) {
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const day = String(date.getDate()).padStart(2, '0');
+              const dateKey = `${year}-${month}-${day}`;
+              updates[`availability.${dateKey}`] = 'busy';
+            }
+          });
+        }
+
+        if (Object.keys(updates).length > 0) {
+          console.log(`📅 Updating availability for provider ${providerId}:`, updates);
+          await updateDoc(providerRef, updates);
+        }
+      } catch (err) {
+        console.error("Error updating provider availability:", err);
+      }
+    }
+
     // Create notification for customer based on status
     let statusMessage = '';
     let notificationTitle = '';
@@ -863,7 +936,7 @@ export const sendBookingReminders = async () => {
     );
 
     const snapshot = await getDocs(bookingsQuery);
-    
+
     for (const docSnapshot of snapshot.docs) {
       const booking = docSnapshot.data();
       const bookingId = docSnapshot.id;
@@ -877,7 +950,7 @@ export const sendBookingReminders = async () => {
         const dates = booking.datesWithTypes.map(d => new Date(d.date));
         earliestDate = new Date(Math.min(...dates));
       } else if (booking.selectedDates) {
-        const dates = Array.isArray(booking.selectedDates) 
+        const dates = Array.isArray(booking.selectedDates)
           ? booking.selectedDates.map(d => new Date(d))
           : [new Date(booking.selectedDates)];
         earliestDate = new Date(Math.min(...dates));
@@ -1198,7 +1271,7 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
 
     // Determine if user is a service provider or customer
     const isServiceProvider = user.serviceType === 'Jeep Driver' || user.serviceType === 'Tour Guide' || user.serviceType === 'Renting';
-    
+
     let bookingQuery;
     if (isServiceProvider) {
       // For service providers: query by driverId or guideId
@@ -1236,14 +1309,14 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
           datesWithTypes: booking.datesWithTypes,
           selectedDates: booking.selectedDates
         });
-        
+
         // Get earliest booking date
         let earliestDate = null;
         if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
           const dates = booking.datesWithTypes.map(d => new Date(d.date));
           earliestDate = new Date(Math.min(...dates));
         } else if (booking.selectedDates) {
-          const dates = Array.isArray(booking.selectedDates) 
+          const dates = Array.isArray(booking.selectedDates)
             ? booking.selectedDates.map(d => new Date(d))
             : [new Date(booking.selectedDates)];
           earliestDate = new Date(Math.min(...dates));
@@ -1353,10 +1426,10 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
                 </div>
                 <span className="text-[9px] text-gray-400 mt-0.5 font-medium">DAYS</span>
               </div>
-              
+
               {/* Separator */}
               <span className="text-emerald-400 text-lg font-bold mb-3">:</span>
-              
+
               {/* Hours */}
               <div className="flex flex-col items-center">
                 <div className="bg-black/60 rounded px-2 py-1 min-w-[32px] border border-emerald-500/30">
@@ -1366,10 +1439,10 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
                 </div>
                 <span className="text-[9px] text-gray-400 mt-0.5 font-medium">HRS</span>
               </div>
-              
+
               {/* Separator */}
               <span className="text-emerald-400 text-lg font-bold mb-3">:</span>
-              
+
               {/* Minutes */}
               <div className="flex flex-col items-center">
                 <div className="bg-black/60 rounded px-2 py-1 min-w-[32px] border border-emerald-500/30">
@@ -1592,9 +1665,8 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
 
       {/* Home Content with All Sections */}
       <div className="pt--1 space-y-1">
-        {/* Upcoming Trip Banner - Shows for both clients and service providers */}
-        {user && <UpcomingTripBanner user={user} />}
-        
+
+
         <Section1>
           {/* Booking Panel - Only show for tourists, not for service providers */}
           {/* BookingSection component handles its own visibility based on user role */}
@@ -1885,7 +1957,7 @@ function App() {
     setReturnToPath(currentPath);
     sessionStorage.setItem('returnToPath', currentPath); // Save to sessionStorage for persistence
     setAuthInitialScreen(initialScreen); // Store the initial screen
-    
+
     // Navigate to the auth route instead of using modal
     const authRoute = initialScreen === 'register' ? '/register' : '/login';
     window.location.href = authRoute;
@@ -1957,345 +2029,345 @@ function App() {
       <Router>
         <ScrollToTop />
 
-      {/* Scroll to Top Button - Always visible on all pages regardless of login status */}
-      <ScrollToTopButton />
+        {/* Scroll to Top Button - Always visible on all pages regardless of login status */}
+        <ScrollToTopButton />
 
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <HomePage
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        
-        {/* Authentication Routes - Dynamic routes MUST come before static ones */}
-        <Route
-          path="/login"
-          element={
-            <AuthenticationWrapper 
-              onAuthSuccess={handleAuthSuccess} 
-              returnToPath={returnToPath} 
-              initialScreen="login" 
-              onBackToHome={() => {
-                const backPath = returnToPath || '/';
-                sessionStorage.removeItem('returnToPath');
-                sessionStorage.removeItem('showAuth');
-                sessionStorage.removeItem('authInitialScreen');
-                sessionStorage.removeItem('authRole');
-                sessionStorage.removeItem('authScreen');
-                sessionStorage.removeItem('authServiceType');
-                window.location.href = backPath;
-              }} 
-            />
-          }
-        />
-        {/* Dynamic Service Type Registration Routes - MORE SPECIFIC, comes first */}
-        <Route
-          path="/register/:serviceType"
-          element={
-            <AuthenticationWrapper 
-              onAuthSuccess={handleAuthSuccess} 
-              returnToPath={returnToPath} 
-              initialScreen="register" 
-              onBackToHome={() => {
-                const backPath = returnToPath || '/';
-                sessionStorage.removeItem('returnToPath');
-                sessionStorage.removeItem('showAuth');
-                sessionStorage.removeItem('authInitialScreen');
-                sessionStorage.removeItem('authRole');
-                sessionStorage.removeItem('authScreen');
-                sessionStorage.removeItem('authServiceType');
-                window.location.href = backPath;
-              }} 
-            />
-          }
-        />
-        {/* Static register route - comes after dynamic */}
-        <Route
-          path="/register"
-          element={
-            <AuthenticationWrapper 
-              onAuthSuccess={handleAuthSuccess} 
-              returnToPath={returnToPath} 
-              initialScreen="register" 
-              onBackToHome={() => {
-                const backPath = returnToPath || '/';
-                sessionStorage.removeItem('returnToPath');
-                sessionStorage.removeItem('showAuth');
-                sessionStorage.removeItem('authInitialScreen');
-                sessionStorage.removeItem('authRole');
-                sessionStorage.removeItem('authScreen');
-                sessionStorage.removeItem('authServiceType');
-                window.location.href = backPath;
-              }} 
-            />
-          }
-        />
-        
-        <Route
-          path="/driver"
-          element={
-            <JeepDriversPage
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        <Route
-          path="/jeep"
-          element={
-            <JeepDriversPage
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        <Route
-          path="/jeep-profile/:jeepId"
-          element={
-            <JeepProfile
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        {/* Destination Routes - Specific routes first */}
-        <Route
-          path="/destination/:destinationId"
-          element={
-            <DestinationDetails
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        <Route
-          path="/destination"
-          element={
-            <DestinationApp
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        {/* Guide Route */}
-        <Route
-          path="/guide"
-          element={
-            <GuideApp
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        <Route
-          path="/guide-profile/:guideId"
-          element={
-            <GuideProfile
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        {/* Renting Routes */}
-        <Route
-          path="/rent"
-          element={
-            <RentingMain
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        <Route
-          path="/renting"
-          element={
-            <RentingMain
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        <Route
-          path="/renting-profile/:providerId"
-          element={
-            <RentingProfile
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        {/* Payment Route */}
-        <Route
-          path="/payment/:bookingId"
-          element={
-            <Payment
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-            />
-          }
-        />
-        {/* About Us Route */}
-        <Route
-          path="/about"
-          element={
-            <AboutUs
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <Admin
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              onMarkAsRead={handleMarkAsRead}
-            />
-          }
-        />
-        <Route
-          path="/admin-panel"
-          element={
-            <ProtectedRoute requireAdmin={true}>
-              <AdminPanel />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin-certifications"
-          element={
-            <ProtectedRoute requireAdmin={true}>
-              <AdminCertificationPanel adminUser={user} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProfileDashboard
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-            />
-          }
-        />
-        <Route
-          path="/favorites"
-          element={
-            <Favorites
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-            />
-          }
-        />
-        <Route
-          path="/payment-wallet"
-          element={
-            <Elements stripe={stripePromise}>
-              <PaymentWallet
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <HomePage
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+
+          {/* Authentication Routes - Dynamic routes MUST come before static ones */}
+          <Route
+            path="/login"
+            element={
+              <AuthenticationWrapper
+                onAuthSuccess={handleAuthSuccess}
+                returnToPath={returnToPath}
+                initialScreen="login"
+                onBackToHome={() => {
+                  const backPath = returnToPath || '/';
+                  sessionStorage.removeItem('returnToPath');
+                  sessionStorage.removeItem('showAuth');
+                  sessionStorage.removeItem('authInitialScreen');
+                  sessionStorage.removeItem('authRole');
+                  sessionStorage.removeItem('authScreen');
+                  sessionStorage.removeItem('authServiceType');
+                  window.location.href = backPath;
+                }}
+              />
+            }
+          />
+          {/* Dynamic Service Type Registration Routes - MORE SPECIFIC, comes first */}
+          <Route
+            path="/register/:serviceType"
+            element={
+              <AuthenticationWrapper
+                onAuthSuccess={handleAuthSuccess}
+                returnToPath={returnToPath}
+                initialScreen="register"
+                onBackToHome={() => {
+                  const backPath = returnToPath || '/';
+                  sessionStorage.removeItem('returnToPath');
+                  sessionStorage.removeItem('showAuth');
+                  sessionStorage.removeItem('authInitialScreen');
+                  sessionStorage.removeItem('authRole');
+                  sessionStorage.removeItem('authScreen');
+                  sessionStorage.removeItem('authServiceType');
+                  window.location.href = backPath;
+                }}
+              />
+            }
+          />
+          {/* Static register route - comes after dynamic */}
+          <Route
+            path="/register"
+            element={
+              <AuthenticationWrapper
+                onAuthSuccess={handleAuthSuccess}
+                returnToPath={returnToPath}
+                initialScreen="register"
+                onBackToHome={() => {
+                  const backPath = returnToPath || '/';
+                  sessionStorage.removeItem('returnToPath');
+                  sessionStorage.removeItem('showAuth');
+                  sessionStorage.removeItem('authInitialScreen');
+                  sessionStorage.removeItem('authRole');
+                  sessionStorage.removeItem('authScreen');
+                  sessionStorage.removeItem('authServiceType');
+                  window.location.href = backPath;
+                }}
+              />
+            }
+          />
+
+          <Route
+            path="/driver"
+            element={
+              <JeepDriversPage
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          <Route
+            path="/jeep"
+            element={
+              <JeepDriversPage
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          <Route
+            path="/jeep-profile/:jeepId"
+            element={
+              <JeepProfile
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          {/* Destination Routes - Specific routes first */}
+          <Route
+            path="/destination/:destinationId"
+            element={
+              <DestinationDetails
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          <Route
+            path="/destination"
+            element={
+              <DestinationApp
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          {/* Guide Route */}
+          <Route
+            path="/guide"
+            element={
+              <GuideApp
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          <Route
+            path="/guide-profile/:guideId"
+            element={
+              <GuideProfile
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          {/* Renting Routes */}
+          <Route
+            path="/rent"
+            element={
+              <RentingMain
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          <Route
+            path="/renting"
+            element={
+              <RentingMain
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          <Route
+            path="/renting-profile/:providerId"
+            element={
+              <RentingProfile
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          {/* Payment Route */}
+          <Route
+            path="/payment/:bookingId"
+            element={
+              <Payment
                 user={user}
                 onLogout={handleLogout}
                 onShowAuth={handleShowAuth}
               />
-            </Elements>
-          }
-        />
-        <Route
-          path="/booking-history"
-          element={
-            <BookingHistory
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-            />
-          }
-        />
-        <Route
-          path="/my-bookings"
-          element={
-            <TouristBookings
-              user={user}
-              onLogout={handleLogout}
-              onShowAuth={handleShowAuth}
-            />
-          }
-        />
-        <Route
-          path="/my-packages"
-          element={
-            <MyPackages
-              user={user}
-            />
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+            }
+          />
+          {/* About Us Route */}
+          <Route
+            path="/about"
+            element={
+              <AboutUs
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <Admin
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onMarkAsRead={handleMarkAsRead}
+              />
+            }
+          />
+          <Route
+            path="/admin-panel"
+            element={
+              <ProtectedRoute requireAdmin={true}>
+                <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin-certifications"
+            element={
+              <ProtectedRoute requireAdmin={true}>
+                <AdminCertificationPanel adminUser={user} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProfileDashboard
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+              />
+            }
+          />
+          <Route
+            path="/favorites"
+            element={
+              <Favorites
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+              />
+            }
+          />
+          <Route
+            path="/payment-wallet"
+            element={
+              <Elements stripe={stripePromise}>
+                <PaymentWallet
+                  user={user}
+                  onLogout={handleLogout}
+                  onShowAuth={handleShowAuth}
+                />
+              </Elements>
+            }
+          />
+          <Route
+            path="/booking-history"
+            element={
+              <BookingHistory
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+              />
+            }
+          />
+          <Route
+            path="/my-bookings"
+            element={
+              <TouristBookings
+                user={user}
+                onLogout={handleLogout}
+                onShowAuth={handleShowAuth}
+              />
+            }
+          />
+          <Route
+            path="/my-packages"
+            element={
+              <MyPackages
+                user={user}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
 
-      {/* Global Notification Bell with Countdown - Visible on ALL pages */}
-      <GlobalNotificationBell
-        user={user}
-        notifications={notifications}
-        onNotificationClick={handleNotificationClick}
-        onMarkAsRead={handleMarkAsRead}
-      />
+        {/* Global Notification Bell with Countdown - Visible on ALL pages */}
+        <GlobalNotificationBell
+          user={user}
+          notifications={notifications}
+          onNotificationClick={handleNotificationClick}
+          onMarkAsRead={handleMarkAsRead}
+        />
 
       </Router>
     </AuthProvider>
@@ -2308,7 +2380,7 @@ const formatPhoneNumber = (phone) => {
 
   // Remove all non-digit characters except +
   let cleaned = phone.replace(/[^\d+]/g, '');
-  
+
   // Remove + if present for processing
   if (cleaned.startsWith('+')) {
     cleaned = cleaned.substring(1);
@@ -2366,13 +2438,13 @@ const isValidPhone = (phone, countryCode) => {
   const country = countryCodes.find(c => c.code === countryCode);
   if (!country) return false;
   const digits = phone.replace(/\D/g, '');
-  
+
   // Special validation for Sri Lanka (+94) - must be 9 digits, no leading 0
   if (countryCode === '+94') {
     // Must be exactly 9 digits, starting from 7 (or other valid digits, but not 0)
     return digits.length === 9 && !digits.startsWith('0');
   }
-  
+
   // For other countries, use standard pattern validation
   return country.pattern.test(digits);
 };
@@ -2381,9 +2453,9 @@ const isValidPhone = (phone, countryCode) => {
 function AuthenticationWrapper({ onAuthSuccess, returnToPath, initialScreen = "login", onBackToHome }) {
   const { serviceType: urlServiceType } = useParams();
   const navigate = useNavigate();
-  
+
   return (
-    <Authentication 
+    <Authentication
       onAuthSuccess={onAuthSuccess}
       returnToPath={returnToPath}
       initialScreen={initialScreen}
@@ -2399,10 +2471,10 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   // CRITICAL: When URL has serviceType, ALWAYS set role and screen immediately
   const initialRole = urlServiceType ? 'provider' : (sessionStorage.getItem('authRole') || null);
   const initialScreenValue = urlServiceType ? 'register' : (sessionStorage.getItem('authScreen') || initialScreen);
-  
+
   const [screen, setScreen] = useState(initialScreenValue);
   const [role, setRole] = useState(initialRole);
-  
+
   // Immediately sync to sessionStorage if URL has serviceType
   useEffect(() => {
     if (urlServiceType) {
@@ -2485,7 +2557,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     if (serviceType) {
       sessionStorage.setItem('authServiceType', serviceType);
       console.log('💾 Service type saved:', serviceType);
-      
+
       // Update URL when service type changes
       if (navigate && screen === 'register' && role === 'provider') {
         const serviceTypeSlug = {
@@ -2493,7 +2565,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
           'Tour Guide': 'tour-guide',
           'Renting Store': 'renting-store'
         }[serviceType];
-        
+
         if (serviceTypeSlug) {
           const currentPath = window.location.pathname;
           const expectedPath = `/register/${serviceTypeSlug}`;
@@ -2515,25 +2587,25 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     console.log('   - screen:', screen);
     console.log('   - role:', role);
     console.log('   - Will show:', !role ? 'UserTypeSelection' : 'RegistrationForm');
-    
+
     // If URL has serviceType but role/screen aren't set properly, fix it immediately
     if (urlServiceType && serviceType) {
       let needsUpdate = false;
-      
+
       if (!role || role !== 'provider') {
         console.log('⚠️ Fixing role to provider due to URL serviceType');
         setRole('provider');
         sessionStorage.setItem('authRole', 'provider');
         needsUpdate = true;
       }
-      
+
       if (screen !== 'register') {
         console.log('⚠️ Fixing screen to register due to URL serviceType');
         setScreen('register');
         sessionStorage.setItem('authScreen', 'register');
         needsUpdate = true;
       }
-      
+
       if (needsUpdate) {
         console.log('✅ State synchronized with URL');
       }
@@ -2575,7 +2647,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     const selectedCountry = getSelectedCountry();
     // Only allow digits (no letters or special characters)
     let cleaned = value.replace(/\D/g, '');
-    
+
     // For Sri Lanka (+94), remove leading 0 and limit to 9 digits
     if (phoneCountryCode === '+94') {
       // Remove leading 0 if present
@@ -2725,7 +2797,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         setMsg("❌ Certified providers must select at least one certification");
         return;
       }
-      
+
       // Check if at least one certification has a file uploaded
       const hasUploadedCert = certifications.some(cert => certificationFiles[cert]);
       if (!hasUploadedCert) {
@@ -2905,7 +2977,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
           contactPhone: formattedPhone,
         };
 
-          // Service type specific data
+        // Service type specific data
         if (serviceType === "Tour Guide") {
           // Convert single destination to array format for Firestore compatibility
           const destinationsArray = destinations ? [destinations] : [];
@@ -3586,7 +3658,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         </div>
       );
     }
-    
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl">
@@ -3634,13 +3706,13 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             const hasUrlServiceType = Boolean(urlServiceType);
             const hasServiceType = Boolean(serviceType);
             const shouldShowForm = hasRole || hasUrlServiceType || hasServiceType;
-            
+
             console.log('🎯 RENDER DECISION:');
             console.log('   - role:', role, '→', hasRole);
             console.log('   - urlServiceType:', urlServiceType, '→', hasUrlServiceType);
             console.log('   - serviceType:', serviceType, '→', hasServiceType);
             console.log('   - DECISION:', shouldShowForm ? '✅ SHOW FORM' : '❌ SHOW SELECTION');
-            
+
             return null;
           })()}
           {(role || urlServiceType || serviceType) ? (
@@ -3746,7 +3818,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   useEffect(() => {
     if (!isTourist && serviceType && serviceType !== previousServiceType && previousServiceType) {
       console.log('🔄 Service type changed from', previousServiceType, 'to', serviceType, '- Clearing form');
-      
+
       // Clear ALL fields - both common and service-specific
       // Common fields
       if (handlers.setFullName) handlers.setFullName('');
@@ -3757,7 +3829,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
       if (handlers.setPhone) handlers.setPhone('');
       if (handlers.setAddress) handlers.setAddress('');
       if (handlers.setPhoneCountryCode) handlers.setPhoneCountryCode('+94');
-      
+
       // Service-specific fields
       if (handlers.setVehicleTypes) handlers.setVehicleTypes([]);
       if (handlers.setPriceFullDayStandard) handlers.setPriceFullDayStandard('');
@@ -3910,9 +3982,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               value={formData.serviceType}
               onChange={(e) => handlers.setServiceType(e.target.value)}
               required
-              className={`w-full px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg focus:outline-none focus:border-yellow-400 text-sm font-medium ${
-                formData.serviceType ? 'text-white' : 'text-gray-400'
-              }`}
+              className={`w-full px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg focus:outline-none focus:border-yellow-400 text-sm font-medium ${formData.serviceType ? 'text-white' : 'text-gray-400'
+                }`}
             >
               <option value="" disabled hidden>Select Service Type</option>
               {serviceTypes.map(type => (
@@ -3930,1003 +4001,996 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
         {/* Show form fields only after service type is selected (for providers) or always for tourists */}
         {(isTourist || formData.serviceType) && (
           <>
-        {(() => {
-          console.log('📋 Form fields rendering - isTourist:', isTourist, 'serviceType:', formData.serviceType);
-          return null;
-        })()}
+            {(() => {
+              console.log('📋 Form fields rendering - isTourist:', isTourist, 'serviceType:', formData.serviceType);
+              return null;
+            })()}
 
-        {/* Certification Status Selection (for both Jeep Drivers and Tour Guides) */}
-        {(isJeepDriver || isTourGuide) && (
-          <div className="space-y-2 mb-4">
-            <label className="block text-white font-medium text-xs">
-              Certification Status *
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handlers.setCertificationStatus('non-certified')}
-                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${
-                  formData.certificationStatus === 'non-certified'
-                    ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
-                    : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                }`}
-              >
-                Non-Certified Service Provider
-              </button>
-              <button
-                type="button"
-                onClick={() => handlers.setCertificationStatus('certified')}
-                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${
-                  formData.certificationStatus === 'certified'
-                    ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
-                    : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                }`}
-              >
-                Certified Service Provider
-              </button>
-            </div>
-            <p className="text-xs text-gray-400 mt-1">
-              {formData.certificationStatus === 'certified' 
-                ? '✓ Certified providers can charge premium rates and must upload certifications'
-                : '✓ Non-certified providers have maximum price limits'}
-            </p>
-          </div>
-        )}
-
-        {/* Basic Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <User className="h-3 w-3 text-yellow-400" />
-              Full Name *
-            </label>
-            <input
-              type="text"
-              value={formData.fullName}
-              onChange={(e) => {
-                // Only allow letters and spaces
-                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                handlers.setFullName(value);
-              }}
-              required
-              pattern="[A-Za-z\s]+"
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder="Enter your full name"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <Mail className="h-3 w-3 text-yellow-400" />
-              Email Address *
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => handlers.setEmail(e.target.value)}
-              required
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder="Enter your email"
-            />
-          </div>
-        </div>
-
-        {/* Password Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <Lock className="h-3 w-3 text-yellow-400" />
-              Password *
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={formData.password}
-                onChange={(e) => handlers.setPassword(e.target.value)}
-                required
-                minLength="6"
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs pr-8"
-                placeholder="Create password (min. 6 characters)"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-yellow-400"
-              >
-                {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <Lock className="h-3 w-3 text-yellow-400" />
-              Confirm Password *
-            </label>
-            <div className="relative">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                value={formData.confirm}
-                onChange={(e) => handlers.setConfirm(e.target.value)}
-                required
-                minLength="6"
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs pr-8"
-                placeholder="Confirm password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-yellow-400"
-              >
-                {showConfirmPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Contact Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {/* Phone Number */}
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <Phone className="h-3 w-3 text-yellow-400" />
-              Phone Number {!isTourist && <span className="text-red-400">*</span>}
-            </label>
-            <div className="flex gap-2">
-              {/* Country Code Dropdown */}
-              <div className="relative flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowCountryDropdown(!showCountryDropdown);
-                  }}
-                  className="flex items-center gap-1.5 px-2 py-2 text-xs border border-white/10 rounded-lg bg-white/5 hover:bg-white/10 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 min-w-[90px] text-white"
-                >
-                  <span className="text-sm">{countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.flag || '🇱🇰'}</span>
-                  <span className="text-xs font-medium">{formData.phoneCountryCode || '+94'}</span>
-                  <ChevronDown className="h-3 w-3 text-gray-400" />
-                </button>
-                {showCountryDropdown && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-10" 
-                      onClick={() => setShowCountryDropdown(false)}
-                    />
-                    <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto min-w-[200px]">
-                      {countryCodes.map((country) => (
-                        <button
-                          key={country.code}
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (handlers && handlers.setPhoneCountryCode) {
-                              handlers.setPhoneCountryCode(country.code);
-                              if (handlers.setPhone) {
-                                handlers.setPhone(''); // Clear phone when country changes
-                              }
-                            }
-                            setShowCountryDropdown(false);
-                          }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${
-                            (formData.phoneCountryCode || '+94') === country.code ? 'bg-yellow-500/20' : ''
-                          }`}
-                        >
-                          <span className="text-sm">{country.flag}</span>
-                          <span className="flex-1 text-left">{country.country}</span>
-                          <span className="text-gray-300 font-medium">{country.code}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              {/* Phone Number Input */}
-              <div className="flex-1">
-                <input
-                  type="tel"
-                  value={formData.phone || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (handlers && handlers.setPhone) {
-                      handlers.setPhone(value);
-                    }
-                  }}
-                  required={!isTourist}
-                  maxLength={countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.maxLength || 10}
-                  className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-white placeholder-gray-400 focus:outline-none text-xs ${
-                    formData.phone && isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
-                      ? 'border-green-400 focus:border-green-400'
-                      : formData.phone
-                      ? 'border-red-400 focus:border-red-400'
-                      : 'border-white/10 focus:border-yellow-400'
-                  }`}
-                  placeholder={formData.phoneCountryCode === '+94' ? '743090367' : 'Enter phone number'}
-                />
-              </div>
-            </div>
-            {formData.phone && (
-              <p className={`text-xs mt-1 ${
-                isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
-                  ? 'text-green-400'
-                  : 'text-red-400'
-              }`}>
-                {isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
-                  ? `✓ Valid ${countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.country || 'phone'} number`
-                  : `Invalid format`}
-              </p>
-            )}
-          </div>
-
-          {/* Address Field */}
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <MapPin className="h-3 w-3 text-yellow-400" />
-              Address {!isTourist && <span className="text-red-400">*</span>}
-            </label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => handlers.setAddress(e.target.value)}
-              required={!isTourist}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder={isTourist ? "Your address" : "Service location address"}
-            />
-          </div>
-        </div>
-
-        {/* Country field for tourists */}
-        {isTourist && (
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <MapPin className="h-3 w-3 text-yellow-400" />
-              Country *
-            </label>
-            <input
-              type="text"
-              value={formData.country}
-              onChange={(e) => handlers.setCountry(e.target.value)}
-              required
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder="Your country"
-            />
-          </div>
-        )}
-
-        {/* Tourist Specific Fields */}
-        {isTourist && (
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-white font-medium text-xs">
-              <Globe className="h-3 w-3 text-yellow-400" />
-              Preferred Language
-            </label>
-            <select
-              value={formData.language?.startsWith('other:') ? 'other' : formData.language}
-              onChange={(e) => {
-                if (e.target.value === 'other') {
-                  handlers.setLanguage('other:');
-                } else {
-                  handlers.setLanguage(e.target.value);
-                }
-              }}
-              className="w-full px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs cursor-pointer"
-              style={{
-                backgroundColor: '#111827',
-                color: '#ffffff'
-              }}
-            >
-              <option value="english" style={{ backgroundColor: '#111827', color: '#ffffff' }}>English</option>
-              <option value="sinhala" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Sinhala</option>
-              <option value="tamil" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Tamil</option>
-              <option value="hindi" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Hindi</option>
-              <option value="french" style={{ backgroundColor: '#111827', color: '#ffffff' }}>French</option>
-              <option value="german" style={{ backgroundColor: '#111827', color: '#ffffff' }}>German</option>
-              <option value="spanish" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Spanish</option>
-              <option value="chinese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Chinese</option>
-              <option value="japanese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Japanese</option>
-              <option value="korean" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Korean</option>
-              <option value="arabic" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Arabic</option>
-              <option value="portuguese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Portuguese</option>
-              <option value="italian" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Italian</option>
-              <option value="russian" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Russian</option>
-              <option value="other" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Other</option>
-            </select>
-            {(formData.language === 'other' || formData.language?.startsWith('other:')) && (
-              <div className="mt-2">
-                <input
-                  type="text"
-                  value={formData.language?.startsWith('other:') ? formData.language.replace('other:', '') : ''}
-                  onChange={(e) => {
-                    handlers.setLanguage(`other:${e.target.value}`);
-                  }}
-                  placeholder="Please specify your language"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Service Provider Specific Fields */}
-        {!isTourist && formData.serviceType && (
-          <>
-            {/* Vehicle Type Selection (Multiple Choice for Jeep Driver) */}
-            {formData.serviceType === "Jeep Driver" && (
-              <div className="space-y-1">
-                <label className="flex items-center gap-2 text-white font-medium text-xs">
-                  Vehicle Type(s) <span className="text-gray-400 text-xs">(Select all that apply)</span>
+            {/* Certification Status Selection (for both Jeep Drivers and Tour Guides) */}
+            {(isJeepDriver || isTourGuide) && (
+              <div className="space-y-2 mb-4">
+                <label className="block text-white font-medium text-xs">
+                  Certification Status *
                 </label>
-                <div className="border border-white/10 rounded-lg p-3 bg-white/5 space-y-2">
-                  {vehicleTypes.map(type => (
-                    <div key={type} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`vehicle-${type}`}
-                        checked={formData.vehicleTypes?.includes(type) || false}
-                        onChange={(e) => handleMultiSelectChange('vehicleTypes', type)}
-                        className="mr-2 h-3.5 w-3.5 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded cursor-pointer"
-                      />
-                      <label htmlFor={`vehicle-${type}`} className="text-white text-xs cursor-pointer">
-                        {type}
-                      </label>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handlers.setCertificationStatus('non-certified')}
+                    className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'non-certified'
+                      ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                      : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                      }`}
+                  >
+                    Non-Certified Service Provider
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlers.setCertificationStatus('certified')}
+                    className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'certified'
+                      ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
+                      : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                      }`}
+                  >
+                    Certified Service Provider
+                  </button>
                 </div>
-                {formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
-                  <p className="text-xs text-gray-300 mt-1">
-                    Selected: {formData.vehicleTypes.join(', ')}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Price Fields (for Jeep Drivers) - Show based on vehicle type selection */}
-            {formData.serviceType === "Jeep Driver" && formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-white font-semibold text-sm">
-                  Pricing Information
-                  {formData.certificationStatus === 'certified' && (
-                    <span className="text-yellow-400 text-xs ml-2">(Certified - Premium Rates)</span>
-                  )}
-                  {formData.certificationStatus === 'non-certified' && (
-                    <span className="text-emerald-400 text-xs ml-2">(Non-Certified - Standard Rates)</span>
-                  )}
-                </h4>
-                
-                {/* Standard Safari Jeep Prices */}
-                {formData.vehicleTypes.includes("Standard Safari Jeep") && (
-                  <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">
-                    <p className="text-green-400 font-medium text-xs mb-2">Standard Safari Jeep Pricing</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-white font-medium text-xs">
-                          Full Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 25,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 25,000)</span>
-                          )}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.priceFullDayStandard}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Prevent starting with 0
-                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
-                              return;
-                            }
-                            handlers.setPriceFullDayStandard(value);
-                          }}
-                          required
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 25,000' : 'Maximum: 25,000'}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-white font-medium text-xs">
-                          Half Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 12,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 12,000)</span>
-                          )}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.priceHalfDayStandard}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Prevent starting with 0
-                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
-                              return;
-                            }
-                            handlers.setPriceHalfDayStandard(value);
-                          }}
-                          required
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 12,000' : 'Maximum: 12,000'}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Luxury Safari Jeep Prices */}
-                {formData.vehicleTypes.includes("Luxury Safari Jeep") && (
-                  <div className="border border-purple-500/30 rounded-lg p-3 bg-purple-500/5">
-                    <p className="text-purple-400 font-medium text-xs mb-2">Luxury Safari Jeep Pricing</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-white font-medium text-xs">
-                          Full Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 35,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 35,000)</span>
-                          )}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.priceFullDayLuxury}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Prevent starting with 0
-                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
-                              return;
-                            }
-                            handlers.setPriceFullDayLuxury(value);
-                          }}
-                          required
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 35,000' : 'Maximum: 35,000'}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-white font-medium text-xs">
-                          Half Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 18,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 18,000)</span>
-                          )}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.priceHalfDayLuxury}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Prevent starting with 0
-                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
-                              return;
-                            }
-                            handlers.setPriceHalfDayLuxury(value);
-                          }}
-                          required
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 18,000' : 'Maximum: 18,000'}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Special packages text - shown after all pricing */}
-                <p className="text-xs text-blue-300 italic mt-2">
-                  Add your special packages to your profile from your Service Provider Dashboard
+                <p className="text-xs text-gray-400 mt-1">
+                  {formData.certificationStatus === 'certified'
+                    ? '✓ Certified providers can charge premium rates and must upload certifications'
+                    : '✓ Non-certified providers have maximum price limits'}
                 </p>
               </div>
             )}
 
-            {/* Tour Guide Specific Fields */}
-            {isTourGuide && (
-              <>
-                {/* Tour Guide Pricing Information */}
-                <div className="space-y-3">
-                  <h4 className="text-white font-semibold text-sm">
-                    Tour Guide Price
-                    {formData.certificationStatus === 'certified' && (
-                      <span className="text-yellow-400 text-xs ml-2">(Certified - Premium Rates)</span>
-                    )}
-                    {formData.certificationStatus === 'non-certified' && (
-                      <span className="text-emerald-400 text-xs ml-2">(Non-Certified - Standard Rates)</span>
-                    )}
-                  </h4>
-                  
-                  <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-white font-medium text-xs">
-                          Full Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 25,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 25,000)</span>
-                          )}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.priceFullDayStandard}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Prevent starting with 0
-                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
-                              return;
-                            }
-                            handlers.setPriceFullDayStandard(value);
-                          }}
-                          required
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 25,000' : 'Maximum: 25,000'}
-                        />
-                      </div>
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <User className="h-3 w-3 text-yellow-400" />
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.fullName}
+                  onChange={(e) => {
+                    // Only allow letters and spaces
+                    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                    handlers.setFullName(value);
+                  }}
+                  required
+                  pattern="[A-Za-z\s]+"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                  placeholder="Enter your full name"
+                />
+              </div>
 
-                      <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-white font-medium text-xs">
-                          Half Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 15,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 15,000)</span>
-                          )}
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.priceHalfDayStandard}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Prevent starting with 0
-                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
-                              return;
-                            }
-                            handlers.setPriceHalfDayStandard(value);
-                          }}
-                          required
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 15,000' : 'Maximum: 15,000'}
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <Mail className="h-3 w-3 text-yellow-400" />
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handlers.setEmail(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                  placeholder="Enter your email"
+                />
+              </div>
+            </div>
+
+            {/* Password Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <Lock className="h-3 w-3 text-yellow-400" />
+                  Password *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(e) => handlers.setPassword(e.target.value)}
+                    required
+                    minLength="6"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs pr-8"
+                    placeholder="Create password (min. 6 characters)"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-yellow-400"
+                  >
+                    {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <Lock className="h-3 w-3 text-yellow-400" />
+                  Confirm Password *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={formData.confirm}
+                    onChange={(e) => handlers.setConfirm(e.target.value)}
+                    required
+                    minLength="6"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs pr-8"
+                    placeholder="Confirm password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-yellow-400"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Phone Number */}
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <Phone className="h-3 w-3 text-yellow-400" />
+                  Phone Number {!isTourist && <span className="text-red-400">*</span>}
+                </label>
+                <div className="flex gap-2">
+                  {/* Country Code Dropdown */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowCountryDropdown(!showCountryDropdown);
+                      }}
+                      className="flex items-center gap-1.5 px-2 py-2 text-xs border border-white/10 rounded-lg bg-white/5 hover:bg-white/10 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 min-w-[90px] text-white"
+                    >
+                      <span className="text-sm">{countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.flag || '🇱🇰'}</span>
+                      <span className="text-xs font-medium">{formData.phoneCountryCode || '+94'}</span>
+                      <ChevronDown className="h-3 w-3 text-gray-400" />
+                    </button>
+                    {showCountryDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setShowCountryDropdown(false)}
                         />
-                      </div>
+                        <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto min-w-[200px]">
+                          {countryCodes.map((country) => (
+                            <button
+                              key={country.code}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (handlers && handlers.setPhoneCountryCode) {
+                                  handlers.setPhoneCountryCode(country.code);
+                                  if (handlers.setPhone) {
+                                    handlers.setPhone(''); // Clear phone when country changes
+                                  }
+                                }
+                                setShowCountryDropdown(false);
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${(formData.phoneCountryCode || '+94') === country.code ? 'bg-yellow-500/20' : ''
+                                }`}
+                            >
+                              <span className="text-sm">{country.flag}</span>
+                              <span className="flex-1 text-left">{country.country}</span>
+                              <span className="text-gray-300 font-medium">{country.code}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {/* Phone Number Input */}
+                  <div className="flex-1">
+                    <input
+                      type="tel"
+                      value={formData.phone || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (handlers && handlers.setPhone) {
+                          handlers.setPhone(value);
+                        }
+                      }}
+                      required={!isTourist}
+                      maxLength={countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.maxLength || 10}
+                      className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-white placeholder-gray-400 focus:outline-none text-xs ${formData.phone && isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
+                        ? 'border-green-400 focus:border-green-400'
+                        : formData.phone
+                          ? 'border-red-400 focus:border-red-400'
+                          : 'border-white/10 focus:border-yellow-400'
+                        }`}
+                      placeholder={formData.phoneCountryCode === '+94' ? '743090367' : 'Enter phone number'}
+                    />
+                  </div>
+                </div>
+                {formData.phone && (
+                  <p className={`text-xs mt-1 ${isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
+                    ? 'text-green-400'
+                    : 'text-red-400'
+                    }`}>
+                    {isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
+                      ? `✓ Valid ${countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.country || 'phone'} number`
+                      : `Invalid format`}
+                  </p>
+                )}
+              </div>
+
+              {/* Address Field */}
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <MapPin className="h-3 w-3 text-yellow-400" />
+                  Address {!isTourist && <span className="text-red-400">*</span>}
+                </label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => handlers.setAddress(e.target.value)}
+                  required={!isTourist}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                  placeholder={isTourist ? "Your address" : "Service location address"}
+                />
+              </div>
+            </div>
+
+            {/* Country field for tourists */}
+            {isTourist && (
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <MapPin className="h-3 w-3 text-yellow-400" />
+                  Country *
+                </label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => handlers.setCountry(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                  placeholder="Your country"
+                />
+              </div>
+            )}
+
+            {/* Tourist Specific Fields */}
+            {isTourist && (
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <Globe className="h-3 w-3 text-yellow-400" />
+                  Preferred Language
+                </label>
+                <select
+                  value={formData.language?.startsWith('other:') ? 'other' : formData.language}
+                  onChange={(e) => {
+                    if (e.target.value === 'other') {
+                      handlers.setLanguage('other:');
+                    } else {
+                      handlers.setLanguage(e.target.value);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs cursor-pointer"
+                  style={{
+                    backgroundColor: '#111827',
+                    color: '#ffffff'
+                  }}
+                >
+                  <option value="english" style={{ backgroundColor: '#111827', color: '#ffffff' }}>English</option>
+                  <option value="sinhala" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Sinhala</option>
+                  <option value="tamil" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Tamil</option>
+                  <option value="hindi" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Hindi</option>
+                  <option value="french" style={{ backgroundColor: '#111827', color: '#ffffff' }}>French</option>
+                  <option value="german" style={{ backgroundColor: '#111827', color: '#ffffff' }}>German</option>
+                  <option value="spanish" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Spanish</option>
+                  <option value="chinese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Chinese</option>
+                  <option value="japanese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Japanese</option>
+                  <option value="korean" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Korean</option>
+                  <option value="arabic" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Arabic</option>
+                  <option value="portuguese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Portuguese</option>
+                  <option value="italian" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Italian</option>
+                  <option value="russian" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Russian</option>
+                  <option value="other" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Other</option>
+                </select>
+                {(formData.language === 'other' || formData.language?.startsWith('other:')) && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      value={formData.language?.startsWith('other:') ? formData.language.replace('other:', '') : ''}
+                      onChange={(e) => {
+                        handlers.setLanguage(`other:${e.target.value}`);
+                      }}
+                      placeholder="Please specify your language"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Service Provider Specific Fields */}
+            {!isTourist && formData.serviceType && (
+              <>
+                {/* Vehicle Type Selection (Multiple Choice for Jeep Driver) */}
+                {formData.serviceType === "Jeep Driver" && (
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      Vehicle Type(s) <span className="text-gray-400 text-xs">(Select all that apply)</span>
+                    </label>
+                    <div className="border border-white/10 rounded-lg p-3 bg-white/5 space-y-2">
+                      {vehicleTypes.map(type => (
+                        <div key={type} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`vehicle-${type}`}
+                            checked={formData.vehicleTypes?.includes(type) || false}
+                            onChange={(e) => handleMultiSelectChange('vehicleTypes', type)}
+                            className="mr-2 h-3.5 w-3.5 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded cursor-pointer"
+                          />
+                          <label htmlFor={`vehicle-${type}`} className="text-white text-xs cursor-pointer">
+                            {type}
+                          </label>
+                        </div>
+                      ))}
                     </div>
-                    <p className="text-xs text-blue-300 mt-2 italic">
+                    {formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
+                      <p className="text-xs text-gray-300 mt-1">
+                        Selected: {formData.vehicleTypes.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Price Fields (for Jeep Drivers) - Show based on vehicle type selection */}
+                {formData.serviceType === "Jeep Driver" && formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-white font-semibold text-sm">
+                      Pricing Information
+                      {formData.certificationStatus === 'certified' && (
+                        <span className="text-yellow-400 text-xs ml-2">(Certified - Premium Rates)</span>
+                      )}
+                      {formData.certificationStatus === 'non-certified' && (
+                        <span className="text-emerald-400 text-xs ml-2">(Non-Certified - Standard Rates)</span>
+                      )}
+                    </h4>
+
+                    {/* Standard Safari Jeep Prices */}
+                    {formData.vehicleTypes.includes("Standard Safari Jeep") && (
+                      <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">
+                        <p className="text-green-400 font-medium text-xs mb-2">Standard Safari Jeep Pricing</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="flex items-center gap-2 text-white font-medium text-xs">
+                              Full Day Price (LKR) *
+                              {formData.certificationStatus === 'non-certified' && (
+                                <span className="text-emerald-400 text-[10px]">(Max: 25,000)</span>
+                              )}
+                              {formData.certificationStatus === 'certified' && (
+                                <span className="text-yellow-400 text-[10px]">(Min: 25,000)</span>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.priceFullDayStandard}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Prevent starting with 0
+                                if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                  return;
+                                }
+                                handlers.setPriceFullDayStandard(value);
+                              }}
+                              required
+                              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                              placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 25,000' : 'Maximum: 25,000'}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="flex items-center gap-2 text-white font-medium text-xs">
+                              Half Day Price (LKR) *
+                              {formData.certificationStatus === 'non-certified' && (
+                                <span className="text-emerald-400 text-[10px]">(Max: 12,000)</span>
+                              )}
+                              {formData.certificationStatus === 'certified' && (
+                                <span className="text-yellow-400 text-[10px]">(Min: 12,000)</span>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.priceHalfDayStandard}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Prevent starting with 0
+                                if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                  return;
+                                }
+                                handlers.setPriceHalfDayStandard(value);
+                              }}
+                              required
+                              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                              placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 12,000' : 'Maximum: 12,000'}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Luxury Safari Jeep Prices */}
+                    {formData.vehicleTypes.includes("Luxury Safari Jeep") && (
+                      <div className="border border-purple-500/30 rounded-lg p-3 bg-purple-500/5">
+                        <p className="text-purple-400 font-medium text-xs mb-2">Luxury Safari Jeep Pricing</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="flex items-center gap-2 text-white font-medium text-xs">
+                              Full Day Price (LKR) *
+                              {formData.certificationStatus === 'non-certified' && (
+                                <span className="text-emerald-400 text-[10px]">(Max: 35,000)</span>
+                              )}
+                              {formData.certificationStatus === 'certified' && (
+                                <span className="text-yellow-400 text-[10px]">(Min: 35,000)</span>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.priceFullDayLuxury}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Prevent starting with 0
+                                if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                  return;
+                                }
+                                handlers.setPriceFullDayLuxury(value);
+                              }}
+                              required
+                              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                              placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 35,000' : 'Maximum: 35,000'}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="flex items-center gap-2 text-white font-medium text-xs">
+                              Half Day Price (LKR) *
+                              {formData.certificationStatus === 'non-certified' && (
+                                <span className="text-emerald-400 text-[10px]">(Max: 18,000)</span>
+                              )}
+                              {formData.certificationStatus === 'certified' && (
+                                <span className="text-yellow-400 text-[10px]">(Min: 18,000)</span>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.priceHalfDayLuxury}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Prevent starting with 0
+                                if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                  return;
+                                }
+                                handlers.setPriceHalfDayLuxury(value);
+                              }}
+                              required
+                              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                              placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 18,000' : 'Maximum: 18,000'}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Special packages text - shown after all pricing */}
+                    <p className="text-xs text-blue-300 italic mt-2">
                       Add your special packages to your profile from your Service Provider Dashboard
                     </p>
                   </div>
-                </div>
+                )}
 
-                {/* Destination (Custom dropdown for Tour Guide) */}
-                <div className="space-y-1 relative">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Destination *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formData.destinations || ""}
-                      onChange={(e) => {
-                        handlers.setDestinations(e.target.value);
-                        setShowDestinationDropdown(true);
-                      }}
-                      onFocus={() => setShowDestinationDropdown(true)}
-                      required
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                      placeholder="Type to search destinations..."
-                      autoComplete="off"
-                    />
-                    <ChevronDown 
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 cursor-pointer"
-                      onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
-                    />
-                    {showDestinationDropdown && (
-                      <>
-                        <div 
-                          className="fixed inset-0 z-10" 
-                          onClick={() => setShowDestinationDropdown(false)}
-                        />
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-                          {destinations
-                            .filter(dest => 
-                              dest.toLowerCase().includes((formData.destinations || '').toLowerCase())
-                            )
-                            .map((destination) => (
-                              <button
-                                key={destination}
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handlers.setDestinations(destination);
-                                  setShowDestinationDropdown(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${
-                                  (formData.destinations || '') === destination ? 'bg-yellow-500/20' : ''
-                                }`}
-                              >
-                                {destination}
-                              </button>
-                            ))}
+                {/* Tour Guide Specific Fields */}
+                {isTourGuide && (
+                  <>
+                    {/* Tour Guide Pricing Information */}
+                    <div className="space-y-3">
+                      <h4 className="text-white font-semibold text-sm">
+                        Tour Guide Price
+                        {formData.certificationStatus === 'certified' && (
+                          <span className="text-yellow-400 text-xs ml-2">(Certified - Premium Rates)</span>
+                        )}
+                        {formData.certificationStatus === 'non-certified' && (
+                          <span className="text-emerald-400 text-xs ml-2">(Non-Certified - Standard Rates)</span>
+                        )}
+                      </h4>
+
+                      <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="flex items-center gap-2 text-white font-medium text-xs">
+                              Full Day Price (LKR) *
+                              {formData.certificationStatus === 'non-certified' && (
+                                <span className="text-emerald-400 text-[10px]">(Max: 25,000)</span>
+                              )}
+                              {formData.certificationStatus === 'certified' && (
+                                <span className="text-yellow-400 text-[10px]">(Min: 25,000)</span>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.priceFullDayStandard}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Prevent starting with 0
+                                if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                  return;
+                                }
+                                handlers.setPriceFullDayStandard(value);
+                              }}
+                              required
+                              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                              placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 25,000' : 'Maximum: 25,000'}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="flex items-center gap-2 text-white font-medium text-xs">
+                              Half Day Price (LKR) *
+                              {formData.certificationStatus === 'non-certified' && (
+                                <span className="text-emerald-400 text-[10px]">(Max: 15,000)</span>
+                              )}
+                              {formData.certificationStatus === 'certified' && (
+                                <span className="text-yellow-400 text-[10px]">(Min: 15,000)</span>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.priceHalfDayStandard}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Prevent starting with 0
+                                if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                  return;
+                                }
+                                handlers.setPriceHalfDayStandard(value);
+                              }}
+                              required
+                              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                              placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 15,000' : 'Maximum: 15,000'}
+                            />
+                          </div>
                         </div>
-                      </>
-                    )}
-                  </div>
-                  <p className="text-gray-400 text-[10px] mt-1">
-                    Select the primary destination where you operate
-                  </p>
-                </div>
+                        <p className="text-xs text-blue-300 mt-2 italic">
+                          Add your special packages to your profile from your Service Provider Dashboard
+                        </p>
+                      </div>
+                    </div>
 
-                {/* Years of Experience (Full Width) */}
+                    {/* Destination (Custom dropdown for Tour Guide) */}
+                    <div className="space-y-1 relative">
+                      <label className="flex items-center gap-2 text-white font-medium text-xs">
+                        Destination *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={formData.destinations || ""}
+                          onChange={(e) => {
+                            handlers.setDestinations(e.target.value);
+                            setShowDestinationDropdown(true);
+                          }}
+                          onFocus={() => setShowDestinationDropdown(true)}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                          placeholder="Type to search destinations..."
+                          autoComplete="off"
+                        />
+                        <ChevronDown
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 cursor-pointer"
+                          onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
+                        />
+                        {showDestinationDropdown && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setShowDestinationDropdown(false)}
+                            />
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                              {destinations
+                                .filter(dest =>
+                                  dest.toLowerCase().includes((formData.destinations || '').toLowerCase())
+                                )
+                                .map((destination) => (
+                                  <button
+                                    key={destination}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handlers.setDestinations(destination);
+                                      setShowDestinationDropdown(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${(formData.destinations || '') === destination ? 'bg-yellow-500/20' : ''
+                                      }`}
+                                  >
+                                    {destination}
+                                  </button>
+                                ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-gray-400 text-[10px] mt-1">
+                        Select the primary destination where you operate
+                      </p>
+                    </div>
+
+                    {/* Years of Experience (Full Width) */}
+                    <div className="space-y-1">
+                      <label className="flex items-center gap-2 text-white font-medium text-xs">
+                        Years of Experience *
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.experience}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Prevent 0 and ensure minimum is 1
+                          if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
+                            handlers.setExperience(value);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Prevent typing 0 as first digit
+                          if (e.key === '0' && e.target.value === '') {
+                            e.preventDefault();
+                          }
+                        }}
+                        required
+                        min="1"
+                        max="50"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                        placeholder="Enter years of experience"
+                      />
+                    </div>
+
+                    {/* Languages Spoken */}
+                    <div className="space-y-1">
+                      <label className="flex items-center gap-2 text-white font-medium text-xs">
+                        Languages Spoken
+                      </label>
+                      <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                        {languages.map(language => (
+                          <div key={language} className="flex items-center mb-1">
+                            <input
+                              type="checkbox"
+                              id={`guide-lang-${language}`}
+                              checked={formData.languages?.includes(language) || false}
+                              onChange={(e) => handleMultiSelectChange('languages', language)}
+                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                            />
+                            <label htmlFor={`guide-lang-${language}`} className="text-white text-xs">
+                              {language}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Areas of Expertise (Multi-select) */}
+                    <div className="space-y-1">
+                      <label className="flex items-center gap-2 text-white font-medium text-xs">
+                        Areas of Expertise
+                      </label>
+                      <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                        {areasOfExpertise.map(area => (
+                          <div key={area} className="flex items-center mb-1">
+                            <input
+                              type="checkbox"
+                              id={`area-${area}`}
+                              checked={formData.areasOfExpertise?.includes(area) || false}
+                              onChange={(e) => handleMultiSelectChange('areasOfExpertise', area)}
+                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                            />
+                            <label htmlFor={`area-${area}`} className="text-white text-xs">
+                              {area}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Certifications (Multi-select) - Only shown for certified providers */}
+                    {formData.certificationStatus === 'certified' && (
+                      <div className="space-y-1 border-2 border-yellow-500/40 rounded-lg p-3 bg-yellow-500/5">
+                        <label className="flex items-center gap-2 text-yellow-400 font-semibold text-xs">
+                          Certifications *
+                          <span className="text-yellow-300/70 text-[10px] font-normal">(Upload at least one certification)</span>
+                        </label>
+                        <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5 space-y-2">
+                          {certifications.map(cert => (
+                            <div key={cert} className="space-y-1">
+                              <div className="flex items-center mb-1">
+                                <input
+                                  type="checkbox"
+                                  id={`guide-cert-${cert}`}
+                                  checked={formData.certifications?.includes(cert) || false}
+                                  onChange={(e) => handleMultiSelectChange('certifications', cert)}
+                                  className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                                />
+                                <label htmlFor={`guide-cert-${cert}`} className="text-white text-xs">
+                                  {cert}
+                                </label>
+                              </div>
+                              {formData.certifications?.includes(cert) && (
+                                <div className="ml-5 mt-1">
+                                  <input
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,image/*"
+                                    onChange={(e) => onCertificationFileSelect(cert, e)}
+                                    required
+                                    className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
+                                  />
+                                  {certificationFiles[cert] && (
+                                    <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-yellow-300/70 mt-2">
+                          ⚠️ At least one certification with uploaded document is required for certified providers
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Jeep Driver Specific Fields */}
+                {!isTourGuide && (
+                  <>
+                    {/* Destination (Custom dropdown for Jeep Driver) */}
+                    <div className="space-y-1 relative">
+                      <label className="flex items-center gap-2 text-white font-medium text-xs">
+                        Destination *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={formData.destinations || ""}
+                          onChange={(e) => {
+                            handlers.setDestinations(e.target.value);
+                            setShowDestinationDropdown(true);
+                          }}
+                          onFocus={() => setShowDestinationDropdown(true)}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                          placeholder="Type to search destinations..."
+                          autoComplete="off"
+                        />
+                        <ChevronDown
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 cursor-pointer"
+                          onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
+                        />
+                        {showDestinationDropdown && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setShowDestinationDropdown(false)}
+                            />
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                              {destinations
+                                .filter(dest =>
+                                  dest.toLowerCase().includes((formData.destinations || '').toLowerCase())
+                                )
+                                .map((destination) => (
+                                  <button
+                                    key={destination}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handlers.setDestinations(destination);
+                                      setShowDestinationDropdown(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${(formData.destinations || '') === destination ? 'bg-yellow-500/20' : ''
+                                      }`}
+                                  >
+                                    {destination}
+                                  </button>
+                                ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-gray-400 text-[10px] mt-1">
+                        Select the primary destination where you operate
+                      </p>
+                    </div>
+
+                    {/* Years of Experience (Full Width) */}
+                    <div className="space-y-1">
+                      <label className="flex items-center gap-2 text-white font-medium text-xs">
+                        Years of Experience *
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.experience}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Prevent 0 and ensure minimum is 1
+                          if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
+                            handlers.setExperience(value);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Prevent typing 0 as first digit
+                          if (e.key === '0' && e.target.value === '') {
+                            e.preventDefault();
+                          }
+                        }}
+                        required
+                        min="1"
+                        max="50"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                        placeholder="Enter years of experience"
+                      />
+                    </div>
+
+                    {/* Languages Spoken (Multi-select) */}
+                    <div className="space-y-1">
+                      <label className="flex items-center gap-2 text-white font-medium text-xs">
+                        Languages Spoken
+                      </label>
+                      <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                        {languages.map(language => (
+                          <div key={language} className="flex items-center mb-1">
+                            <input
+                              type="checkbox"
+                              id={`lang-${language}`}
+                              checked={formData.languages?.includes(language) || false}
+                              onChange={(e) => handleMultiSelectChange('languages', language)}
+                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                            />
+                            <label htmlFor={`lang-${language}`} className="text-white text-xs">
+                              {language}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Special Skills (Multi-select) */}
+                    <div className="space-y-1">
+                      <label className="flex items-center gap-2 text-white font-medium text-xs">
+                        Special Skills
+                      </label>
+                      <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                        {specialSkills.map(skill => (
+                          <div key={skill} className="flex items-center mb-1">
+                            <input
+                              type="checkbox"
+                              id={`skill-${skill}`}
+                              checked={formData.specialSkills?.includes(skill) || false}
+                              onChange={(e) => handleMultiSelectChange('specialSkills', skill)}
+                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                            />
+                            <label htmlFor={`skill-${skill}`} className="text-white text-xs">
+                              {skill}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Certifications (Multi-select) - Only shown for certified providers */}
+                    {formData.certificationStatus === 'certified' && (
+                      <div className="space-y-1 border-2 border-yellow-500/40 rounded-lg p-3 bg-yellow-500/5">
+                        <label className="flex items-center gap-2 text-yellow-400 font-semibold text-xs">
+                          Certifications *
+                          <span className="text-yellow-300/70 text-[10px] font-normal">(Upload at least one certification)</span>
+                        </label>
+                        <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5 space-y-2">
+                          {certifications.map(cert => (
+                            <div key={cert} className="space-y-1">
+                              <div className="flex items-center mb-1">
+                                <input
+                                  type="checkbox"
+                                  id={`cert-${cert}`}
+                                  checked={formData.certifications?.includes(cert) || false}
+                                  onChange={(e) => handleMultiSelectChange('certifications', cert)}
+                                  className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                                />
+                                <label htmlFor={`cert-${cert}`} className="text-white text-xs">
+                                  {cert}
+                                </label>
+                              </div>
+                              {formData.certifications?.includes(cert) && (
+                                <div className="ml-5 mt-1">
+                                  <input
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,image/*"
+                                    onChange={(e) => onCertificationFileSelect(cert, e)}
+                                    required
+                                    className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
+                                  />
+                                  {certificationFiles[cert] && (
+                                    <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-yellow-300/70 mt-2">
+                          ⚠️ At least one certification with uploaded document is required for certified providers
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Service Provider Bio */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Years of Experience *
+                    Service Provider Bio
                   </label>
-                  <input
-                    type="number"
-                    value={formData.experience}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Prevent 0 and ensure minimum is 1
-                      if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
-                        handlers.setExperience(value);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      // Prevent typing 0 as first digit
-                      if (e.key === '0' && e.target.value === '') {
-                        e.preventDefault();
-                      }
-                    }}
-                    required
-                    min="1"
-                    max="50"
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => handlers.setDescription(e.target.value)}
+                    rows="2"
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                    placeholder="Enter years of experience"
+                    placeholder="Describe your services, expertise, and what makes you unique..."
                   />
                 </div>
 
-                {/* Languages Spoken */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Languages Spoken
-                  </label>
-                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                    {languages.map(language => (
-                      <div key={language} className="flex items-center mb-1">
-                        <input
-                          type="checkbox"
-                          id={`guide-lang-${language}`}
-                          checked={formData.languages?.includes(language) || false}
-                          onChange={(e) => handleMultiSelectChange('languages', language)}
-                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`guide-lang-${language}`} className="text-white text-xs">
-                          {language}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Areas of Expertise (Multi-select) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Areas of Expertise
-                  </label>
-                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                    {areasOfExpertise.map(area => (
-                      <div key={area} className="flex items-center mb-1">
-                        <input
-                          type="checkbox"
-                          id={`area-${area}`}
-                          checked={formData.areasOfExpertise?.includes(area) || false}
-                          onChange={(e) => handleMultiSelectChange('areasOfExpertise', area)}
-                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`area-${area}`} className="text-white text-xs">
-                          {area}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Certifications (Multi-select) - Only shown for certified providers */}
-                {formData.certificationStatus === 'certified' && (
-                  <div className="space-y-1 border-2 border-yellow-500/40 rounded-lg p-3 bg-yellow-500/5">
-                    <label className="flex items-center gap-2 text-yellow-400 font-semibold text-xs">
-                      Certifications *
-                      <span className="text-yellow-300/70 text-[10px] font-normal">(Upload at least one certification)</span>
-                    </label>
-                    <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5 space-y-2">
-                      {certifications.map(cert => (
-                        <div key={cert} className="space-y-1">
-                          <div className="flex items-center mb-1">
-                            <input
-                              type="checkbox"
-                              id={`guide-cert-${cert}`}
-                              checked={formData.certifications?.includes(cert) || false}
-                              onChange={(e) => handleMultiSelectChange('certifications', cert)}
-                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                            />
-                            <label htmlFor={`guide-cert-${cert}`} className="text-white text-xs">
-                              {cert}
-                            </label>
-                          </div>
-                          {formData.certifications?.includes(cert) && (
-                            <div className="ml-5 mt-1">
-                              <input
-                                type="file"
-                                accept=".pdf,.doc,.docx,image/*"
-                                onChange={(e) => onCertificationFileSelect(cert, e)}
-                                required
-                                className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
-                              />
-                              {certificationFiles[cert] && (
-                                <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-yellow-300/70 mt-2">
-                      ⚠️ At least one certification with uploaded document is required for certified providers
-                    </p>
-                  </div>
-                )}
               </>
             )}
 
-            {/* Jeep Driver Specific Fields */}
-            {!isTourGuide && (
-              <>
-                {/* Destination (Custom dropdown for Jeep Driver) */}
-                <div className="space-y-1 relative">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Destination *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formData.destinations || ""}
-                      onChange={(e) => {
-                        handlers.setDestinations(e.target.value);
-                        setShowDestinationDropdown(true);
-                      }}
-                      onFocus={() => setShowDestinationDropdown(true)}
-                      required
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                      placeholder="Type to search destinations..."
-                      autoComplete="off"
-                    />
-                    <ChevronDown 
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 cursor-pointer"
-                      onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
-                    />
-                    {showDestinationDropdown && (
-                      <>
-                        <div 
-                          className="fixed inset-0 z-10" 
-                          onClick={() => setShowDestinationDropdown(false)}
-                        />
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-                          {destinations
-                            .filter(dest => 
-                              dest.toLowerCase().includes((formData.destinations || '').toLowerCase())
-                            )
-                            .map((destination) => (
-                              <button
-                                key={destination}
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handlers.setDestinations(destination);
-                                  setShowDestinationDropdown(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${
-                                  (formData.destinations || '') === destination ? 'bg-yellow-500/20' : ''
-                                }`}
-                              >
-                                {destination}
-                              </button>
-                            ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <p className="text-gray-400 text-[10px] mt-1">
-                    Select the primary destination where you operate
-                  </p>
-                </div>
-
-                {/* Years of Experience (Full Width) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Years of Experience *
-                  </label>
+            {/* Profile Picture */}
+            {(isTourist || formData.serviceType) && (
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-white font-medium text-xs">
+                  <Camera className="h-3 w-3 text-yellow-400" />
+                  Profile Picture (Optional)
+                </label>
+                <div className="flex items-center gap-2">
+                  {profilePreview && (
+                    <img src={profilePreview} alt="Profile preview" className="w-8 h-8 rounded-full object-cover border border-yellow-400" />
+                  )}
                   <input
-                    type="number"
-                    value={formData.experience}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Prevent 0 and ensure minimum is 1
-                      if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
-                        handlers.setExperience(value);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      // Prevent typing 0 as first digit
-                      if (e.key === '0' && e.target.value === '') {
-                        e.preventDefault();
-                      }
-                    }}
-                    required
-                    min="1"
-                    max="50"
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                    placeholder="Enter years of experience"
+                    type="file"
+                    onChange={onProfileImageSelect}
+                    accept="image/*"
+                    className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
                   />
                 </div>
-
-                {/* Languages Spoken (Multi-select) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Languages Spoken
-                  </label>
-                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                    {languages.map(language => (
-                      <div key={language} className="flex items-center mb-1">
-                        <input
-                          type="checkbox"
-                          id={`lang-${language}`}
-                          checked={formData.languages?.includes(language) || false}
-                          onChange={(e) => handleMultiSelectChange('languages', language)}
-                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`lang-${language}`} className="text-white text-xs">
-                          {language}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Special Skills (Multi-select) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Special Skills
-                  </label>
-                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                    {specialSkills.map(skill => (
-                      <div key={skill} className="flex items-center mb-1">
-                        <input
-                          type="checkbox"
-                          id={`skill-${skill}`}
-                          checked={formData.specialSkills?.includes(skill) || false}
-                          onChange={(e) => handleMultiSelectChange('specialSkills', skill)}
-                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`skill-${skill}`} className="text-white text-xs">
-                          {skill}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Certifications (Multi-select) - Only shown for certified providers */}
-                {formData.certificationStatus === 'certified' && (
-                  <div className="space-y-1 border-2 border-yellow-500/40 rounded-lg p-3 bg-yellow-500/5">
-                    <label className="flex items-center gap-2 text-yellow-400 font-semibold text-xs">
-                      Certifications *
-                      <span className="text-yellow-300/70 text-[10px] font-normal">(Upload at least one certification)</span>
-                    </label>
-                    <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5 space-y-2">
-                      {certifications.map(cert => (
-                        <div key={cert} className="space-y-1">
-                          <div className="flex items-center mb-1">
-                            <input
-                              type="checkbox"
-                              id={`cert-${cert}`}
-                              checked={formData.certifications?.includes(cert) || false}
-                              onChange={(e) => handleMultiSelectChange('certifications', cert)}
-                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                            />
-                            <label htmlFor={`cert-${cert}`} className="text-white text-xs">
-                              {cert}
-                            </label>
-                          </div>
-                          {formData.certifications?.includes(cert) && (
-                            <div className="ml-5 mt-1">
-                              <input
-                                type="file"
-                                accept=".pdf,.doc,.docx,image/*"
-                                onChange={(e) => onCertificationFileSelect(cert, e)}
-                                required
-                                className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
-                              />
-                              {certificationFiles[cert] && (
-                                <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-yellow-300/70 mt-2">
-                      ⚠️ At least one certification with uploaded document is required for certified providers
-                    </p>
-                  </div>
-                )}
-              </>
+                <p className="text-xs text-gray-400">Max file size: 2MB</p>
+              </div>
             )}
 
-            {/* Service Provider Bio */}
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                Service Provider Bio
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => handlers.setDescription(e.target.value)}
-                rows="2"
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                placeholder="Describe your services, expertise, and what makes you unique..."
-              />
-            </div>
-
+            {/* Close the main conditional wrapper */}
           </>
-        )}
-
-        {/* Profile Picture */}
-        {(isTourist || formData.serviceType) && (
-        <div className="space-y-1">
-          <label className="flex items-center gap-2 text-white font-medium text-xs">
-            <Camera className="h-3 w-3 text-yellow-400" />
-            Profile Picture (Optional)
-          </label>
-          <div className="flex items-center gap-2">
-            {profilePreview && (
-              <img src={profilePreview} alt="Profile preview" className="w-8 h-8 rounded-full object-cover border border-yellow-400" />
-            )}
-            <input
-              type="file"
-              onChange={onProfileImageSelect}
-              accept="image/*"
-              className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
-            />
-          </div>
-          <p className="text-xs text-gray-400">Max file size: 2MB</p>
-        </div>
-        )}
-        
-        {/* Close the main conditional wrapper */}
-        </>
         )}
 
         {/* Submit Button */}
         {(isTourist || formData.serviceType) && (
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            {busy ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Creating Account...
-              </div>
-            ) : (
-              isTourist ? "Create Tourist Account" : "Register as Provider"
-            )}
-          </button>
-        </div>
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              {busy ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Creating Account...
+                </div>
+              ) : (
+                isTourist ? "Create Tourist Account" : "Register as Provider"
+              )}
+            </button>
+          </div>
         )}
       </form>
 

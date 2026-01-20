@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { CheckCircle, XCircle, Loader, Shield } from 'lucide-react';
+import { CheckCircle, XCircle, Loader, Shield, AlertCircle } from 'lucide-react';
 
 export default function CheckoutForm({ booking, onPaymentSuccess, userId, userEmail }) {
   const stripe = useStripe();
@@ -102,13 +102,13 @@ export default function CheckoutForm({ booking, onPaymentSuccess, userId, userEm
             console.log('💳 Attempting to save payment method to wallet...');
             console.log('User ID:', userId);
             console.log('Payment Method ID:', result.paymentIntent.payment_method);
-            
+
             try {
               let apiUrl = import.meta.env.VITE_API_URL || '/api';
               if (!apiUrl.endsWith('/api')) {
                 apiUrl = apiUrl + '/api';
               }
-              
+
               const saveResponse = await fetch(`${apiUrl}/payment-methods`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -199,12 +199,24 @@ export default function CheckoutForm({ booking, onPaymentSuccess, userId, userEm
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {!stripe && !loading && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 animate-fadeIn">
+          <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-sm font-bold mb-1">Stripe Not Initialized</h3>
+            <p className="text-xs leading-relaxed">
+              The payment field failed to load. This usually means the Stripe Public Key is missing from your environment variables.
+              Please check if <code className="bg-amber-100 px-1 rounded">VITE_STRIPE_PUBLIC_KEY</code> is set in your <code className="bg-amber-100 px-1 rounded">.env</code> file.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="bg-white rounded-lg p-6 border border-gray-200">
         <label className="block text-sm font-semibold text-gray-700 mb-3">
           Card Details
         </label>
-        <div className="p-4 border border-gray-300 rounded-lg bg-gray-50">
-              <CardElement options={cardElementOptions} />
+        <div className="p-4 border border-gray-300 rounded-lg bg-gray-50 focus-within:ring-2 focus-within:ring-green-500 focus-within:border-green-500 transition-all">
+          <CardElement options={cardElementOptions} />
         </div>
       </div>
 
