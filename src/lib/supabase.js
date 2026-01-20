@@ -1,6 +1,15 @@
 // Backend API base URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// Supabase client for direct access (client-side)
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client with public anon key (safe for client-side)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://nlzsojxtzmmbkyakdfvl.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5senNvanh0em1tYmt5YWtkZnZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NDgxMzAsImV4cCI6MjA1MTIyNDEzMH0.aTWt36pAQCUZxYYFTQ6_MqW3jlA7n0QBqOMKYb28rMw';
+
+const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+
 /**
  * Test Backend API Connection
  * This tests if the backend is properly configured with Supabase
@@ -135,41 +144,85 @@ export const deleteDocument = async (fileUrl, userId = null) => {
  * @param {number} expiresIn - Expiration time in seconds (default: 300 = 5 minutes)
  * @returns {Promise<{signedUrl: string, error: any}>}
  */
-export const getDocumentUrl = async (documentPath, expiresIn = 300) => {
+/**
+ * Get Document URL using client-side Supabase (works in production without backend)
+ * @param {string} documentPath - Relative file path (e.g., 'users/userId/documents/file.pdf')
+ * @param {number} expiresIn - Expiration time in seconds (default: 3600 = 1 hour)
+ * @returns {Promise<{signedUrl: string, error: any}>}
+ */
+export const getDocumentUrl = async (documentPath, expiresIn = 3600) => {
   try {
-    // Validate path is not a URL
+    // Validate path
     if (!documentPath) {
       throw new Error('Document path is required');
     }
 
-    if (documentPath.startsWith('http://') || documentPath.startsWith('https://')) {
-      throw new Error('Path must be relative (e.g., users/userId/documents/file.pdf), not a full URL');
+    // Extract just the path if it's a full URL
+    let filePath = documentPath;
+    if (documentPath.includes('supabase.co')) {
+      // Extract path from URL like: https://...supabase.co/storage/v1/object/public/documents/users/...
+      const match = documentPath.match(/\/documents\/(.+)$/);
+      if (match) {
+        filePath = match[1];
+      }
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/get-document-url`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        path: documentPath, // ✅ Only send relative path
-        expiresIn 
-      })
-    });
+    // Remove leading slash if present
+    filePath = filePath.replace(/^\/+/, '');
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Failed to get document URL' }));
-      throw new Error(errorData.error || 'Failed to get document URL');
+    console.log('📄 Getting signed URL for:', filePath);
+
+    // Try client-side Supabase first (works in production)
+    try {
+      const { data, error } = await supabaseClient.storage
+        .from('documents')
+        .createSignedUrl(filePath, expiresIn);
+
+      if (error) {
+        console.warn('⚠️ Client-side signed URL failed:', error);
+        throw error;
+      }
+
+      if (data?.signedUrl) {
+        console.log('✅ Client-side signed URL generated successfully');
+        return { signedUrl: data.signedUrl, error: null };
+      }
+    } catch (clientError) {
+      console.warn('⚠️ Client-side method failed, trying backend fallback...', clientError);
+      
+      // Fallback to backend API (for development/local)
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/get-document-url`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            path: filePath,
+            expiresIn 
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Backend API failed');
+        }
+
+        const data = await response.json();
+        if (data?.signedUrl) {
+          console.log('✅ Backend signed URL generated successfully');
+          return { signedUrl: data.signedUrl, error: null };
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Backend fallback also failed:', backendError);
+      }
     }
 
-    const data = await response.json();
-    return { signedUrl: data.signedUrl, error: null };
+    throw new Error('Failed to generate signed URL from both client and backend');
   } catch (error) {
     console.error('❌ Get document URL error:', error);
-    // Return more detailed error for better debugging
-    const errorMessage = error.message.includes('fetch') 
-      ? 'Backend server is not accessible. Please ensure the server is running or configure VITE_API_URL environment variable.'
-      : error.message;
-    return { signedUrl: null, error: errorMessage };
+    return { 
+      signedUrl: null, 
+      error: error.message || 'Failed to get document URL' 
+    };
   }
 };
