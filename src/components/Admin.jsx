@@ -1563,27 +1563,36 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                         <p className="text-xs text-gray-400 ml-6">{cert.size}</p>
                                       )}
                                     </div>
-                                    {hasValidPath && (
-                                      <button
-                                        onClick={async () => {
-                                          try {
-                                            const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
-                                            if (error) {
-                                              console.error('Error getting document URL:', error);
-                                              setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
-                                              return;
-                                            }
-                                            window.open(signedUrl, '_blank', 'noopener,noreferrer');
-                                          } catch (error) {
-                                            console.error('Error opening document:', error);
+                                    <button
+                                      onClick={async () => {
+                                        if (!hasValidPath) {
+                                          console.error('No document path available:', cert);
+                                          setMessage({ type: 'error', text: 'Document path not found. Please re-upload the document.' });
+                                          return;
+                                        }
+                                        try {
+                                          const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                          if (error) {
+                                            console.error('Error getting document URL:', error);
                                             setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                            return;
                                           }
-                                        }}
-                                        className="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
-                                      >
-                                        View
-                                      </button>
-                                    )}
+                                          window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                                        } catch (error) {
+                                          console.error('Error opening document:', error);
+                                          setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                        }
+                                      }}
+                                      disabled={!hasValidPath}
+                                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                                        hasValidPath 
+                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                      }`}
+                                      title={hasValidPath ? 'View document' : 'Document path not available'}
+                                    >
+                                      View
+                                    </button>
                                   </div>
                                 );
                               })}
@@ -1618,28 +1627,37 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    {hasValidPath && (
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          try {
-                                            const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
-                                            if (error) {
-                                              console.error('Error getting document URL:', error);
-                                              setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
-                                              return;
-                                            }
-                                            window.open(signedUrl, '_blank', 'noopener,noreferrer');
-                                          } catch (error) {
-                                            console.error('Error opening document:', error);
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!hasValidPath) {
+                                          console.error('No document path available:', cert);
+                                          setMessage({ type: 'error', text: 'Document path not found. Please re-upload the document.' });
+                                          return;
+                                        }
+                                        try {
+                                          const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                          if (error) {
+                                            console.error('Error getting document URL:', error);
                                             setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                            return;
                                           }
-                                        }}
-                                        className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
-                                      >
-                                        View
-                                      </button>
-                                    )}
+                                          window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                                        } catch (error) {
+                                          console.error('Error opening document:', error);
+                                          setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                        }
+                                      }}
+                                      disabled={!hasValidPath}
+                                      className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                                        hasValidPath 
+                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                      }`}
+                                      title={hasValidPath ? 'View document' : 'Document path not available'}
+                                    >
+                                      View
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => {
