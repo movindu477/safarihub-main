@@ -1274,20 +1274,20 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
 
     let bookingQuery;
     if (isServiceProvider) {
-      // For service providers: query by driverId or guideId
+      // For service providers: query by driverId or guideId - look for confirmed/paid bookings
       const isGuide = user.serviceType === 'Tour Guide';
       const providerField = isGuide ? 'guideId' : 'driverId';
       bookingQuery = query(
         collection(db, 'bookings'),
         where(providerField, '==', user.uid),
-        where('status', '==', 'accepted')
+        where('paymentStatus', '==', 'paid')
       );
     } else {
-      // For customers: query by customerId
+      // For customers: query by customerId - look for confirmed/paid bookings
       bookingQuery = query(
         collection(db, 'bookings'),
         where('customerId', '==', user.uid),
-        where('status', '==', 'accepted')
+        where('paymentStatus', '==', 'paid')
       );
     }
 
@@ -1404,12 +1404,23 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
     }
   };
 
+  console.log('🔔 GlobalNotificationBell render:', {
+    hasUser: !!user,
+    userId: user?.uid,
+    upcomingTrip: upcomingTrip ? {
+      tripDate: upcomingTrip.tripDate,
+      destination: upcomingTrip.destination
+    } : null,
+    countdown: countdown,
+    notificationCount: notifications.length
+  });
+
   if (!user) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 notification-container">
-      <div className="flex items-center gap-3">
-        {/* Digital Clock Countdown (appears to the left of bell when there's an upcoming trip) */}
+      <div className="flex flex-col items-end gap-3">
+        {/* Digital Clock Countdown (appears above My Bookings when there's an upcoming trip) */}
         {upcomingTrip && (
           <div className="bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-2xl border-2 border-emerald-400/50 px-3 py-2">
             <div className="flex items-center gap-2 mb-1">
@@ -1455,6 +1466,15 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
             </div>
           </div>
         )}
+
+        {/* My Bookings Button */}
+        <button
+          onClick={() => window.location.href = '/my-bookings'}
+          className="bg-gray-900/95 backdrop-blur-sm hover:bg-gray-800/95 text-white px-4 py-3 rounded-lg shadow-2xl border-2 border-gray-700/50 transition-all duration-300 hover:scale-105 flex items-center gap-3 cursor-pointer"
+        >
+          <Calendar className="h-5 w-5 text-emerald-400" />
+          <span className="font-semibold text-sm">My Bookings</span>
+        </button>
 
         {/* Notification Bell */}
         <div className="relative">
@@ -4256,60 +4276,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
                   placeholder="Your country"
                 />
-              </div>
-            )}
-
-            {/* Tourist Specific Fields */}
-            {isTourist && (
-              <div className="space-y-1">
-                <label className="flex items-center gap-2 text-white font-medium text-xs">
-                  <Globe className="h-3 w-3 text-yellow-400" />
-                  Preferred Language
-                </label>
-                <select
-                  value={formData.language?.startsWith('other:') ? 'other' : formData.language}
-                  onChange={(e) => {
-                    if (e.target.value === 'other') {
-                      handlers.setLanguage('other:');
-                    } else {
-                      handlers.setLanguage(e.target.value);
-                    }
-                  }}
-                  className="w-full px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs cursor-pointer"
-                  style={{
-                    backgroundColor: '#111827',
-                    color: '#ffffff'
-                  }}
-                >
-                  <option value="english" style={{ backgroundColor: '#111827', color: '#ffffff' }}>English</option>
-                  <option value="sinhala" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Sinhala</option>
-                  <option value="tamil" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Tamil</option>
-                  <option value="hindi" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Hindi</option>
-                  <option value="french" style={{ backgroundColor: '#111827', color: '#ffffff' }}>French</option>
-                  <option value="german" style={{ backgroundColor: '#111827', color: '#ffffff' }}>German</option>
-                  <option value="spanish" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Spanish</option>
-                  <option value="chinese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Chinese</option>
-                  <option value="japanese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Japanese</option>
-                  <option value="korean" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Korean</option>
-                  <option value="arabic" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Arabic</option>
-                  <option value="portuguese" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Portuguese</option>
-                  <option value="italian" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Italian</option>
-                  <option value="russian" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Russian</option>
-                  <option value="other" style={{ backgroundColor: '#111827', color: '#ffffff' }}>Other</option>
-                </select>
-                {(formData.language === 'other' || formData.language?.startsWith('other:')) && (
-                  <div className="mt-2">
-                    <input
-                      type="text"
-                      value={formData.language?.startsWith('other:') ? formData.language.replace('other:', '') : ''}
-                      onChange={(e) => {
-                        handlers.setLanguage(`other:${e.target.value}`);
-                      }}
-                      placeholder="Please specify your language"
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                    />
-                  </div>
-                )}
               </div>
             )}
 
