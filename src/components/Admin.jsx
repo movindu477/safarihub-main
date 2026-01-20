@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 // Supabase Storage imports (replacing Firebase Storage)
-import { uploadProfileImage, uploadDocument, deleteDocument, getDocumentUrl } from '../lib/supabase';
+import { uploadProfileImage, uploadDocument, deleteDocument, getDocumentUrl, uploadDocumentClientSide, deleteDocumentClientSide } from '../lib/supabase';
 import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
@@ -1496,13 +1496,70 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         id="certification-upload-input"
                         type="file"
                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            // Handle document upload
-                            console.log('Document selected:', file.name);
-                            // TODO: Implement upload to Supabase and save to Firestore
-                            setMessage({ type: 'info', text: 'Document upload functionality will be implemented soon.' });
+                          if (!file) return;
+
+                          try {
+                            setMessage({ type: 'info', text: 'Uploading document...' });
+                            setSaving(true);
+
+                            console.log('📤 Uploading document:', file.name);
+
+                            // Upload to Supabase using client-side method
+                            const { url, path, error } = await uploadDocumentClientSide(file, currentUser.uid, file.name);
+
+                            if (error) {
+                              console.error('Upload failed:', error);
+                              setMessage({ type: 'error', text: `Upload failed: ${error}` });
+                              setSaving(false);
+                              return;
+                            }
+
+                            console.log('✅ Upload successful:', { url, path });
+
+                            // Create document metadata
+                            const newDocument = {
+                              certificationName: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+                              fileName: file.name,
+                              fileUrl: url,
+                              supabasePath: path,
+                              fileSize: file.size,
+                              fileType: file.type,
+                              uploadedAt: new Date(),
+                              documentId: `${currentUser.uid}_${Date.now()}`,
+                              uploadStatus: 'uploaded'
+                            };
+
+                            // Determine collection based on service type
+                            const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
+                            const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                            const userCertDocRef = doc(db, collectionName, currentUser.uid);
+
+                            // Get existing documents
+                            const existingDoc = await getDoc(userCertDocRef);
+                            const existingDocuments = existingDoc.exists() ? (existingDoc.data().documents || []) : [];
+
+                            // Add new document to array
+                            const updatedDocuments = [...existingDocuments, newDocument];
+
+                            // Save to Firestore
+                            await setDoc(userCertDocRef, {
+                              providerId: currentUser.uid,
+                              documents: updatedDocuments,
+                              updatedAt: serverTimestamp()
+                            }, { merge: true });
+
+                            console.log('✅ Document saved to Firestore');
+                            setMessage({ type: 'success', text: 'Document uploaded successfully!' });
+                            setSaving(false);
+
+                            // Reset file input
+                            e.target.value = '';
+                          } catch (error) {
+                            console.error('❌ Upload error:', error);
+                            setMessage({ type: 'error', text: `Upload failed: ${error.message}` });
+                            setSaving(false);
                           }
                         }}
                         className="hidden"
@@ -1660,11 +1717,51 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        // Handle document deletion
-                                        console.log('Delete document:', cert.name);
-                                        // TODO: Implement delete from Supabase and Firestore
-                                        setMessage({ type: 'info', text: 'Document deletion functionality will be implemented soon.' });
+                                      onClick={async () => {
+                                        if (!confirm(`Are you sure you want to delete "${cert.certificationName || cert.fileName}"?`)) {
+                                          return;
+                                        }
+
+                                        try {
+                                          setSaving(true);
+                                          setMessage({ type: 'info', text: 'Deleting document...' });
+
+                                          console.log('🗑️ Deleting document:', cert);
+
+                                          // Delete from Supabase Storage if path exists
+                                          if (cert.supabasePath || cert.fileUrl) {
+                                            const { success, error } = await deleteDocumentClientSide(cert.supabasePath || cert.fileUrl);
+                                            if (error) {
+                                              console.warn('⚠️ Supabase delete warning:', error);
+                                              // Continue with Firestore deletion even if Storage delete fails
+                                            }
+                                          }
+
+                                          // Remove from Firestore
+                                          const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
+                                          const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                                          const userCertDocRef = doc(db, collectionName, currentUser.uid);
+
+                                          const existingDoc = await getDoc(userCertDocRef);
+                                          if (existingDoc.exists()) {
+                                            const existingDocuments = existingDoc.data().documents || [];
+                                            const updatedDocuments = existingDocuments.filter(d => d.documentId !== cert.documentId);
+
+                                            await setDoc(userCertDocRef, {
+                                              providerId: currentUser.uid,
+                                              documents: updatedDocuments,
+                                              updatedAt: serverTimestamp()
+                                            }, { merge: true });
+                                          }
+
+                                          console.log('✅ Document deleted');
+                                          setMessage({ type: 'success', text: 'Document deleted successfully!' });
+                                          setSaving(false);
+                                        } catch (error) {
+                                          console.error('❌ Delete error:', error);
+                                          setMessage({ type: 'error', text: `Delete failed: ${error.message}` });
+                                          setSaving(false);
+                                        }
                                       }}
                                       className="text-red-400 hover:text-red-300 transition-colors p-1.5"
                                       title="Delete document"

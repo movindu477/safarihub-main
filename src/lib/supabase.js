@@ -11,6 +11,100 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIU
 const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
+ * Upload Document using client-side Supabase (works in production)
+ * @param {File} file - Document file to upload
+ * @param {string} userId - User ID
+ * @param {string} fileName - Optional custom file name
+ * @returns {Promise<{url: string, path: string, error: any}>}
+ */
+export const uploadDocumentClientSide = async (file, userId, fileName = null) => {
+  try {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    // Generate file path
+    const timestamp = Date.now();
+    const sanitizedName = (fileName || file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `users/${userId}/documents/${timestamp}_${sanitizedName}`;
+
+    console.log('📤 Uploading document to Supabase:', filePath);
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabaseClient.storage
+      .from('documents')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('❌ Upload error:', error);
+      throw error;
+    }
+
+    console.log('✅ Upload successful:', data);
+
+    // Get public URL
+    const { data: urlData } = supabaseClient.storage
+      .from('documents')
+      .getPublicUrl(filePath);
+
+    return {
+      url: urlData.publicUrl,
+      path: filePath,
+      error: null
+    };
+  } catch (error) {
+    console.error('❌ Upload failed:', error);
+    return {
+      url: null,
+      path: null,
+      error: error.message || 'Upload failed'
+    };
+  }
+};
+
+/**
+ * Delete Document using client-side Supabase
+ * @param {string} filePath - File path to delete
+ * @returns {Promise<{success: boolean, error: any}>}
+ */
+export const deleteDocumentClientSide = async (filePath) => {
+  try {
+    if (!filePath) {
+      throw new Error('No file path provided');
+    }
+
+    // Extract just the path if it's a full URL
+    let pathToDelete = filePath;
+    if (filePath.includes('supabase.co')) {
+      const match = filePath.match(/\/documents\/(.+)$/);
+      if (match) {
+        pathToDelete = match[1];
+      }
+    }
+
+    console.log('🗑️ Deleting document from Supabase:', pathToDelete);
+
+    const { data, error } = await supabaseClient.storage
+      .from('documents')
+      .remove([pathToDelete]);
+
+    if (error) {
+      console.error('❌ Delete error:', error);
+      throw error;
+    }
+
+    console.log('✅ Delete successful');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('❌ Delete failed:', error);
+    return { success: false, error: error.message || 'Delete failed' };
+  }
+};
+
+/**
  * Test Backend API Connection
  * This tests if the backend is properly configured with Supabase
  */
