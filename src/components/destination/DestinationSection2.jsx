@@ -103,7 +103,8 @@ export default function Destination2() {
     "Wildlife Sanctuaries": "sanctuaries",
     "Famous Beaches": "beaches",
     "Forest Reserves": "forest-reserves",
-    "Camping Sites": "camping-sites"
+    "Camping Sites": "camping-sites",
+    "Wetlands": "wetlands"
   };
 
   const [filters, setFilters] = useState({
@@ -126,7 +127,8 @@ export default function Destination2() {
       "Wildlife Sanctuaries",
       "Famous Beaches",
       "Forest Reserves",
-      "Camping Sites"
+      "Camping Sites",
+      "Wetlands"
     ],
     province: [
       "Central Province",
@@ -499,9 +501,9 @@ export default function Destination2() {
           {showFilters && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Location / Region Filter - Only 5 categories */}
+                {/* Location Filter */}
                 <FilterSection
-                  title="Location / Region"
+                  title="Location"
                   icon={MapPin}
                   options={filterOptions.location}
                   filterKey="location"

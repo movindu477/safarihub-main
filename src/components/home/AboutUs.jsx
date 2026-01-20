@@ -12,19 +12,102 @@ import {
   Zap,
   Star
 } from 'lucide-react';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import ChatList from '../ChatList';
 import aboutback1 from '../../assets/aboutback1.avif';
+import destinations from '../../data/destinations';
 
 const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
+  const db = getFirestore();
   const [showChatList, setShowChatList] = useState(false);
+  
+  // Dynamic stats state
+  const [stats, setStats] = useState([
+    { number: "...", label: "Service Providers" },
+    { number: "...", label: "Happy Customers" },
+    { number: "...", label: "Destinations" },
+    { number: "...", label: "Average Rating" }
+  ]);
 
   // Scroll to top when page loads
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [location.pathname]);
+
+  // Fetch dynamic stats from database
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // Fetch Service Providers count
+        const providersSnapshot = await getDocs(collection(db, 'serviceProviders'));
+        const providersCount = providersSnapshot.size;
+
+        // Fetch Happy Customers (tourists) count
+        const touristsSnapshot = await getDocs(collection(db, 'tourists'));
+        const customersCount = touristsSnapshot.size;
+
+        // Count Destinations from destinations data
+        const destinationsCount = Object.keys(destinations).length;
+
+        // Fetch Average Rating from reviews
+        const reviewsSnapshot = await getDocs(collection(db, 'reviews'));
+        let totalRating = 0;
+        let reviewCount = 0;
+        
+        reviewsSnapshot.forEach((doc) => {
+          const review = doc.data();
+          if (review.rating) {
+            totalRating += Number(review.rating);
+            reviewCount++;
+          }
+        });
+
+        const averageRating = reviewCount > 0 
+          ? (totalRating / reviewCount).toFixed(1) 
+          : "5.0";
+
+        // Format numbers with + suffix for large numbers
+        const formatNumber = (num) => {
+          if (num >= 10000) return `${Math.floor(num / 1000)}K+`;
+          if (num >= 1000) return `${(num / 1000).toFixed(1)}K+`;
+          if (num >= 100) return `${Math.floor(num / 100) * 100}+`;
+          if (num >= 50) return `${Math.floor(num / 10) * 10}+`;
+          return `${num}+`;
+        };
+
+        // Update stats with real data
+        setStats([
+          { number: formatNumber(providersCount), label: "Service Providers" },
+          { number: formatNumber(customersCount), label: "Happy Customers" },
+          { number: `${destinationsCount}+`, label: "Destinations" },
+          { number: `${averageRating}/5`, label: "Average Rating" }
+        ]);
+
+        console.log('📊 Stats fetched:', {
+          providers: providersCount,
+          customers: customersCount,
+          destinations: destinationsCount,
+          avgRating: averageRating,
+          totalReviews: reviewCount
+        });
+
+      } catch (error) {
+        console.error('❌ Error fetching stats:', error);
+        // Keep loading state on error
+        setStats([
+          { number: "500+", label: "Service Providers" },
+          { number: "10K+", label: "Happy Customers" },
+          { number: "50+", label: "Destinations" },
+          { number: "4.8/5", label: "Average Rating" }
+        ]);
+      }
+    };
+
+    fetchStats();
+  }, [db]);
 
   const features = [
     {
@@ -72,12 +155,6 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
     }
   ];
 
-  const stats = [
-    { number: "500+", label: "Service Providers" },
-    { number: "10K+", label: "Happy Customers" },
-    { number: "50+", label: "Destinations" },
-    { number: "4.8/5", label: "Average Rating" }
-  ];
 
   return (
     <div className="min-h-screen bg-white">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -41,6 +41,7 @@ import Section4 from "./components/home/Section4";
 import Section5 from "./components/home/Section5";
 import Section6 from "./components/home/Section6";
 import Footer from "./components/home/Footer";
+import UpcomingTripBanner from "./components/UpcomingTripBanner";
 import JeepDriversPage from "./components/jeepdrivers/JeepMain";
 import JeepProfile from "./components/jeepdrivers/JeepProfile";
 import NotificationPanel from "./components/NotificationPanel";
@@ -55,14 +56,17 @@ import GuideProfile from "./components/guides/GuideProfile";
 
 // Import Renting App
 import RentingMain from "./components/renting/RentingMain";
+import RentingProfile from "./components/renting/RentingProfile";
 import Payment from "./components/Payment";
 import AboutUs from "./components/home/AboutUs";
 import Admin from "./components/Admin";
 import AdminPanel from "./components/AdminPanel";
+import AdminCertificationPanel from "./components/AdminCertificationPanel";
 import ProfileDashboard from "./components/ProfileDashboard";
 import Favorites from "./components/Favorites";
 import PaymentWallet from "./components/PaymentWallet";
 import BookingHistory from "./components/BookingHistory";
+import TouristBookings from "./components/TouristBookings";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -788,24 +792,37 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
     await updateDoc(doc(db, 'bookings', bookingId), {
       status: status,
       updatedAt: serverTimestamp(),
-      statusUpdatedAt: serverTimestamp()
+      statusUpdatedAt: serverTimestamp(),
+      ...(status === 'completed' && { completedAt: serverTimestamp() })
     });
 
-    // Create notification for customer
-    const statusMessage = status === 'accepted'
-      ? `Your booking with ${providerName} has been accepted!`
-      : `Your booking with ${providerName} has been declined.`;
+    // Create notification for customer based on status
+    let statusMessage = '';
+    let notificationTitle = '';
 
-    await createNotification({
-      type: 'booking',
-      title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      message: statusMessage,
-      recipientId: customerId,
-      senderId: providerId,
-      senderName: providerName,
-      relatedId: bookingId,
-      bookingId: bookingId
-    });
+    if (status === 'accepted') {
+      statusMessage = `Your booking with ${providerName} has been accepted!`;
+      notificationTitle = 'Booking Accepted';
+    } else if (status === 'declined') {
+      statusMessage = `Your booking with ${providerName} has been declined.`;
+      notificationTitle = 'Booking Declined';
+    } else if (status === 'completed') {
+      statusMessage = `Your trip with ${providerName} is completed! Please take a moment to review your experience.`;
+      notificationTitle = 'Trip Completed - Review Your Experience';
+    }
+
+    if (statusMessage) {
+      await createNotification({
+        type: status === 'completed' ? 'review' : 'booking',
+        title: notificationTitle,
+        message: statusMessage,
+        recipientId: customerId,
+        senderId: providerId,
+        senderName: providerName,
+        relatedId: bookingId,
+        bookingId: bookingId
+      });
+    }
 
     console.log(`✅ Booking ${bookingId} status updated to ${status} (${serviceType})`);
   } catch (error) {
@@ -827,6 +844,89 @@ export const getBookingById = async (bookingId) => {
   } catch (error) {
     console.error('Error getting booking:', error);
     return null;
+  }
+};
+
+// Send reminder notifications 3 days before booking
+export const sendBookingReminders = async () => {
+  try {
+    const now = new Date();
+    const threeDaysFromNow = new Date(now.getTime() + (3 * 24 * 60 * 60 * 1000));
+    const threeDaysStart = new Date(threeDaysFromNow.setHours(0, 0, 0, 0));
+    const threeDaysEnd = new Date(threeDaysFromNow.setHours(23, 59, 59, 999));
+
+    // Query accepted bookings
+    const bookingsQuery = query(
+      collection(db, 'bookings'),
+      where('status', '==', 'accepted')
+    );
+
+    const snapshot = await getDocs(bookingsQuery);
+    
+    for (const docSnapshot of snapshot.docs) {
+      const booking = docSnapshot.data();
+      const bookingId = docSnapshot.id;
+
+      // Check if reminder already sent
+      if (booking.reminderSent) continue;
+
+      // Get earliest booking date
+      let earliestDate = null;
+      if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
+        const dates = booking.datesWithTypes.map(d => new Date(d.date));
+        earliestDate = new Date(Math.min(...dates));
+      } else if (booking.selectedDates) {
+        const dates = Array.isArray(booking.selectedDates) 
+          ? booking.selectedDates.map(d => new Date(d))
+          : [new Date(booking.selectedDates)];
+        earliestDate = new Date(Math.min(...dates));
+      }
+
+      // If earliest date is exactly 3 days from now, send reminders
+      if (earliestDate && earliestDate >= threeDaysStart && earliestDate <= threeDaysEnd) {
+        const isGuideBooking = !!booking.guideId;
+        const providerId = isGuideBooking ? booking.guideId : booking.driverId;
+        const providerName = isGuideBooking ? booking.guideName : booking.driverName;
+        const customerId = booking.customerId;
+        const customerName = booking.customerName;
+
+        const dateStr = earliestDate.toLocaleDateString();
+
+        // Send notification to customer
+        await createNotification({
+          type: 'reminder',
+          title: 'Upcoming Trip Reminder',
+          message: `Your trip with ${providerName} is coming up in 3 days (${dateStr}). Get ready for an amazing experience!`,
+          recipientId: customerId,
+          senderId: providerId,
+          senderName: providerName,
+          relatedId: bookingId,
+          bookingId: bookingId
+        });
+
+        // Send notification to provider
+        await createNotification({
+          type: 'reminder',
+          title: 'Upcoming Trip Reminder',
+          message: `You have an upcoming trip with ${customerName} in 3 days (${dateStr}). Please prepare accordingly.`,
+          recipientId: providerId,
+          senderId: customerId,
+          senderName: customerName,
+          relatedId: bookingId,
+          bookingId: bookingId
+        });
+
+        // Mark reminder as sent
+        await updateDoc(doc(db, 'bookings', bookingId), {
+          reminderSent: true,
+          reminderSentAt: serverTimestamp()
+        });
+
+        console.log(`✅ Reminders sent for booking ${bookingId}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error sending booking reminders:', error);
   }
 };
 
@@ -1085,9 +1185,118 @@ export const ScrollToTopButton = () => {
   );
 };
 
-// Global Notification Bell Component (Available on all pages)
+// Global Notification Bell Component (Available on all pages) with Countdown
 export const GlobalNotificationBell = ({ user, notifications, onNotificationClick, onMarkAsRead }) => {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [upcomingTrip, setUpcomingTrip] = useState(null);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0 });
+
+  // Fetch upcoming trip for countdown badge
+  useEffect(() => {
+    if (!user || !user.uid) return;
+
+    // Determine if user is a service provider or customer
+    const isServiceProvider = user.serviceType === 'Jeep Driver' || user.serviceType === 'Tour Guide' || user.serviceType === 'Renting';
+    
+    let bookingQuery;
+    if (isServiceProvider) {
+      // For service providers: query by driverId or guideId
+      const isGuide = user.serviceType === 'Tour Guide';
+      const providerField = isGuide ? 'guideId' : 'driverId';
+      bookingQuery = query(
+        collection(db, 'bookings'),
+        where(providerField, '==', user.uid),
+        where('status', '==', 'accepted')
+      );
+    } else {
+      // For customers: query by customerId
+      bookingQuery = query(
+        collection(db, 'bookings'),
+        where('customerId', '==', user.uid),
+        where('status', '==', 'accepted')
+      );
+    }
+
+    const unsubscribe = onSnapshot(bookingQuery, (snapshot) => {
+      console.log('🔍 Countdown: Checking for upcoming trips...', {
+        totalBookings: snapshot.docs.length,
+        userId: user.uid
+      });
+
+      const now = new Date();
+      let nearestTrip = null;
+      let nearestDate = null;
+
+      snapshot.docs.forEach(doc => {
+        const booking = { id: doc.id, ...doc.data() };
+        console.log('📅 Countdown: Found booking:', {
+          id: doc.id,
+          status: booking.status,
+          datesWithTypes: booking.datesWithTypes,
+          selectedDates: booking.selectedDates
+        });
+        
+        // Get earliest booking date
+        let earliestDate = null;
+        if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
+          const dates = booking.datesWithTypes.map(d => new Date(d.date));
+          earliestDate = new Date(Math.min(...dates));
+        } else if (booking.selectedDates) {
+          const dates = Array.isArray(booking.selectedDates) 
+            ? booking.selectedDates.map(d => new Date(d))
+            : [new Date(booking.selectedDates)];
+          earliestDate = new Date(Math.min(...dates));
+        }
+
+        console.log('📆 Countdown: Parsed date:', {
+          earliestDate,
+          isInFuture: earliestDate ? earliestDate > now : false
+        });
+
+        // Only consider future trips
+        if (earliestDate && earliestDate > now) {
+          if (!nearestDate || earliestDate < nearestDate) {
+            nearestDate = earliestDate;
+            nearestTrip = { ...booking, tripDate: earliestDate };
+          }
+        }
+      });
+
+      console.log('✅ Countdown: Nearest trip found:', nearestTrip ? {
+        tripDate: nearestTrip.tripDate,
+        destination: nearestTrip.destination
+      } : 'No upcoming trips');
+
+      setUpcomingTrip(nearestTrip);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Update countdown every minute
+  useEffect(() => {
+    if (!upcomingTrip || !upcomingTrip.tripDate) return;
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const difference = upcomingTrip.tripDate - now;
+
+      if (difference > 0) {
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+
+        setCountdown({ days, hours, minutes });
+      } else {
+        setCountdown({ days: 0, hours: 0, minutes: 0 });
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [upcomingTrip]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1125,30 +1334,80 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
 
   return (
     <div className="fixed bottom-6 right-6 z-50 notification-container">
-      <div className="relative">
-        {showNotifications && (
-          <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
-            <NotificationPanel
-              notifications={notifications}
-              onClose={() => setShowNotifications(false)}
-              onNotificationClick={handleNotificationItemClick}
-              onMarkAsRead={onMarkAsRead}
-              currentUser={user}
-            />
+      <div className="flex items-center gap-3">
+        {/* Digital Clock Countdown (appears to the left of bell when there's an upcoming trip) */}
+        {upcomingTrip && (
+          <div className="bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-2xl border-2 border-emerald-400/50 px-3 py-2">
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar className="h-3 w-3 text-emerald-400" />
+              <span className="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">Trip Countdown</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Days */}
+              <div className="flex flex-col items-center">
+                <div className="bg-black/60 rounded px-2 py-1 min-w-[32px] border border-emerald-500/30">
+                  <span className="text-emerald-400 font-mono text-lg font-bold leading-none">
+                    {String(countdown.days).padStart(2, '0')}
+                  </span>
+                </div>
+                <span className="text-[9px] text-gray-400 mt-0.5 font-medium">DAYS</span>
+              </div>
+              
+              {/* Separator */}
+              <span className="text-emerald-400 text-lg font-bold mb-3">:</span>
+              
+              {/* Hours */}
+              <div className="flex flex-col items-center">
+                <div className="bg-black/60 rounded px-2 py-1 min-w-[32px] border border-emerald-500/30">
+                  <span className="text-emerald-400 font-mono text-lg font-bold leading-none">
+                    {String(countdown.hours).padStart(2, '0')}
+                  </span>
+                </div>
+                <span className="text-[9px] text-gray-400 mt-0.5 font-medium">HRS</span>
+              </div>
+              
+              {/* Separator */}
+              <span className="text-emerald-400 text-lg font-bold mb-3">:</span>
+              
+              {/* Minutes */}
+              <div className="flex flex-col items-center">
+                <div className="bg-black/60 rounded px-2 py-1 min-w-[32px] border border-emerald-500/30">
+                  <span className="text-emerald-400 font-mono text-lg font-bold leading-none">
+                    {String(countdown.minutes).padStart(2, '0')}
+                  </span>
+                </div>
+                <span className="text-[9px] text-gray-400 mt-0.5 font-medium">MIN</span>
+              </div>
+            </div>
           </div>
         )}
 
-        <button
-          onClick={handleBellClick}
-          className="relative bg-green-400 p-2 sm:p-3 md:p-4 rounded-full shadow-lg border-2 border-green-300 hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-500 cursor-pointer"
-        >
-          <Bell className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
-          {notifications.filter(n => !n.read).length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] sm:text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center animate-pulse font-bold">
-              {notifications.filter(n => !n.read).length > 9 ? '9+' : notifications.filter(n => !n.read).length}
-            </span>
+        {/* Notification Bell */}
+        <div className="relative">
+          {showNotifications && (
+            <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
+              <NotificationPanel
+                notifications={notifications}
+                onClose={() => setShowNotifications(false)}
+                onNotificationClick={handleNotificationItemClick}
+                onMarkAsRead={onMarkAsRead}
+                currentUser={user}
+              />
+            </div>
           )}
-        </button>
+
+          <button
+            onClick={handleBellClick}
+            className="relative bg-green-400 p-2 sm:p-3 md:p-4 rounded-full shadow-lg border-2 border-green-300 hover:shadow-xl transition-all duration-300 hover:scale-110 hover:bg-green-500 cursor-pointer"
+          >
+            <Bell className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white" />
+            {notifications.filter(n => !n.read).length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] sm:text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center animate-pulse font-bold">
+                {notifications.filter(n => !n.read).length > 9 ? '9+' : notifications.filter(n => !n.read).length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1309,13 +1568,6 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
         />
       )}
 
-      <GlobalNotificationBell
-        user={user}
-        notifications={notifications}
-        onNotificationClick={handleNotificationClick}
-        onMarkAsRead={onMarkAsRead}
-      />
-
       {/* Scroll to Top Button - Always visible regardless of login status */}
       <ScrollToTopButton />
 
@@ -1339,6 +1591,9 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
 
       {/* Home Content with All Sections */}
       <div className="pt--1 space-y-1">
+        {/* Upcoming Trip Banner - Shows for both clients and service providers */}
+        {user && <UpcomingTripBanner user={user} />}
+        
         <Section1>
           {/* Booking Panel - Only show for tourists, not for service providers */}
           {/* BookingSection component handles its own visibility based on user role */}
@@ -1358,11 +1613,20 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
 // Main App Component
 function App() {
   const [user, setUser] = useState(null);
-  const [showAuth, setShowAuth] = useState(false);
+  const [showAuth, setShowAuth] = useState(() => {
+    // Restore showAuth state from sessionStorage on page load
+    const saved = sessionStorage.getItem('showAuth');
+    return saved === 'true';
+  });
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [welcomeUserName, setWelcomeUserName] = useState('');
+
+  // Persist showAuth state to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('showAuth', showAuth.toString());
+  }, [showAuth]);
 
   // TEMPORARY TEST: Verify Stripe Public Key is loaded
   useEffect(() => {
@@ -1480,6 +1744,20 @@ function App() {
     }
   }, [user]);
 
+  // Send booking reminders 3 days before trip date
+  useEffect(() => {
+    // Run reminder check immediately on mount
+    sendBookingReminders();
+
+    // Then run every 6 hours
+    const interval = setInterval(() => {
+      console.log('🔔 Checking for booking reminders...');
+      sendBookingReminders();
+    }, 6 * 60 * 60 * 1000); // 6 hours
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLogout = async () => {
     try {
       console.log('🔄 Starting logout...');
@@ -1502,6 +1780,13 @@ function App() {
       setUser(null);
       setNotifications([]);
 
+      // Clear auth session storage
+      sessionStorage.removeItem('showAuth');
+      sessionStorage.removeItem('authInitialScreen');
+      sessionStorage.removeItem('authRole');
+      sessionStorage.removeItem('authScreen');
+      sessionStorage.removeItem('authServiceType');
+
       await signOut(auth);
 
       // Force navigation
@@ -1514,15 +1799,40 @@ function App() {
       console.error('Logout error:', error);
       // Still reset state
       setUser(null);
+      // Clear auth session storage on error too
+      sessionStorage.removeItem('showAuth');
+      sessionStorage.removeItem('authInitialScreen');
+      sessionStorage.removeItem('authRole');
+      sessionStorage.removeItem('authScreen');
+      sessionStorage.removeItem('authServiceType');
       window.location.href = '/';
     }
   };
 
-  const [returnToPath, setReturnToPath] = useState(null);
-  const [authInitialScreen, setAuthInitialScreen] = useState('login');
+  const [returnToPath, setReturnToPath] = useState(() => {
+    // Restore returnToPath from sessionStorage on page load
+    const saved = sessionStorage.getItem('returnToPath');
+    return saved || null;
+  });
+  const [authInitialScreen, setAuthInitialScreen] = useState(() => {
+    // Restore authInitialScreen from sessionStorage on page load
+    const saved = sessionStorage.getItem('authInitialScreen');
+    return saved || 'login';
+  });
+
+  // Persist authInitialScreen to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('authInitialScreen', authInitialScreen);
+  }, [authInitialScreen]);
 
   const handleAuthSuccess = async (returnPath) => {
-    setShowAuth(false);
+    // Clear session storage after successful auth
+    sessionStorage.removeItem('showAuth');
+    sessionStorage.removeItem('authInitialScreen');
+    sessionStorage.removeItem('authRole');
+    sessionStorage.removeItem('authScreen');
+    sessionStorage.removeItem('authServiceType');
+    sessionStorage.removeItem('returnToPath');
 
     const currentUser = auth.currentUser;
     if (currentUser) {
@@ -1572,8 +1882,12 @@ function App() {
     // Save current location before showing auth
     const currentPath = window.location.pathname;
     setReturnToPath(currentPath);
+    sessionStorage.setItem('returnToPath', currentPath); // Save to sessionStorage for persistence
     setAuthInitialScreen(initialScreen); // Store the initial screen
-    setShowAuth(true);
+    
+    // Navigate to the auth route instead of using modal
+    const authRoute = initialScreen === 'register' ? '/register' : '/login';
+    window.location.href = authRoute;
   };
 
   const handleNotificationClick = async (notification) => {
@@ -1609,11 +1923,6 @@ function App() {
   const handleMarkAsRead = async (notificationId) => {
     await markNotificationAsRead(notificationId);
   };
-
-  if (showAuth) {
-    return <Authentication onAuthSuccess={handleAuthSuccess} returnToPath={returnToPath} initialScreen={authInitialScreen} onBackToHome={() => setShowAuth(false)} />;
-  }
-
 
   // Scroll to top component - handles route changes and back/forward button
   const ScrollToTop = () => {
@@ -1664,6 +1973,71 @@ function App() {
             />
           }
         />
+        
+        {/* Authentication Routes - Dynamic routes MUST come before static ones */}
+        <Route
+          path="/login"
+          element={
+            <AuthenticationWrapper 
+              onAuthSuccess={handleAuthSuccess} 
+              returnToPath={returnToPath} 
+              initialScreen="login" 
+              onBackToHome={() => {
+                const backPath = returnToPath || '/';
+                sessionStorage.removeItem('returnToPath');
+                sessionStorage.removeItem('showAuth');
+                sessionStorage.removeItem('authInitialScreen');
+                sessionStorage.removeItem('authRole');
+                sessionStorage.removeItem('authScreen');
+                sessionStorage.removeItem('authServiceType');
+                window.location.href = backPath;
+              }} 
+            />
+          }
+        />
+        {/* Dynamic Service Type Registration Routes - MORE SPECIFIC, comes first */}
+        <Route
+          path="/register/:serviceType"
+          element={
+            <AuthenticationWrapper 
+              onAuthSuccess={handleAuthSuccess} 
+              returnToPath={returnToPath} 
+              initialScreen="register" 
+              onBackToHome={() => {
+                const backPath = returnToPath || '/';
+                sessionStorage.removeItem('returnToPath');
+                sessionStorage.removeItem('showAuth');
+                sessionStorage.removeItem('authInitialScreen');
+                sessionStorage.removeItem('authRole');
+                sessionStorage.removeItem('authScreen');
+                sessionStorage.removeItem('authServiceType');
+                window.location.href = backPath;
+              }} 
+            />
+          }
+        />
+        {/* Static register route - comes after dynamic */}
+        <Route
+          path="/register"
+          element={
+            <AuthenticationWrapper 
+              onAuthSuccess={handleAuthSuccess} 
+              returnToPath={returnToPath} 
+              initialScreen="register" 
+              onBackToHome={() => {
+                const backPath = returnToPath || '/';
+                sessionStorage.removeItem('returnToPath');
+                sessionStorage.removeItem('showAuth');
+                sessionStorage.removeItem('authInitialScreen');
+                sessionStorage.removeItem('authRole');
+                sessionStorage.removeItem('authScreen');
+                sessionStorage.removeItem('authServiceType');
+                window.location.href = backPath;
+              }} 
+            />
+          }
+        />
+        
         <Route
           path="/driver"
           element={
@@ -1757,11 +2131,37 @@ function App() {
             />
           }
         />
-        {/* Renting Route */}
+        {/* Renting Routes */}
         <Route
           path="/rent"
           element={
             <RentingMain
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          }
+        />
+        <Route
+          path="/renting"
+          element={
+            <RentingMain
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          }
+        />
+        <Route
+          path="/renting-profile/:providerId"
+          element={
+            <RentingProfile
               user={user}
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
@@ -1818,6 +2218,14 @@ function App() {
           }
         />
         <Route
+          path="/admin-certifications"
+          element={
+            <ProtectedRoute requireAdmin={true}>
+              <AdminCertificationPanel adminUser={user} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/profile"
           element={
             <ProfileDashboard
@@ -1859,8 +2267,27 @@ function App() {
             />
           }
         />
+        <Route
+          path="/my-bookings"
+          element={
+            <TouristBookings
+              user={user}
+              onLogout={handleLogout}
+              onShowAuth={handleShowAuth}
+            />
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {/* Global Notification Bell with Countdown - Visible on ALL pages */}
+      <GlobalNotificationBell
+        user={user}
+        notifications={notifications}
+        onNotificationClick={handleNotificationClick}
+        onMarkAsRead={handleMarkAsRead}
+      />
+
       </Router>
     </AuthProvider>
   );
@@ -1882,31 +2309,22 @@ const formatPhoneNumber = (phone) => {
   if (cleaned.startsWith('94')) {
     // Already has country code
     const number = cleaned.substring(2);
-    if (number.length === 9) {
-      return `+94 ${number}`;
-    }
-    return `+94 ${number}`;
+    // Remove leading 0 if present
+    const finalNumber = number.startsWith('0') ? number.substring(1) : number;
+    return `+94 ${finalNumber}`;
   }
 
   if (cleaned.startsWith('0')) {
     // Remove leading 0 and add country code
     const number = cleaned.substring(1);
-    if (number.length === 9) {
-      return `+94 ${number}`;
-    }
     return `+94 ${number}`;
   }
 
-  // Just the number, add country code
-  if (cleaned.length === 9) {
-    return `+94 ${cleaned}`;
-  }
-
-  // Partial number, still format with country code
+  // Just the number (9 digits), add country code
   return `+94 ${cleaned}`;
 };
 
-// Phone number validation - Format: +94 743090367 (deprecated - use isValidPhone with country code)
+// Phone number validation - Format: +94 743090367 (9 digits, no leading 0) (deprecated - use isValidPhone with country code)
 const isValidSriLankanPhone = (phone) => {
   if (!phone) return false;
   const formatted = phone.replace(/\s/g, '');
@@ -1916,7 +2334,7 @@ const isValidSriLankanPhone = (phone) => {
 
 // Country codes with phone number formats (shared across components)
 const countryCodes = [
-  { code: '+94', country: 'Sri Lanka', flag: '🇱🇰', maxLength: 10, pattern: /^0\d{9}$/ },
+  { code: '+94', country: 'Sri Lanka', flag: '🇱🇰', maxLength: 9, pattern: /^[7-9]\d{8}$/ },
   { code: '+1', country: 'United States', flag: '🇺🇸', maxLength: 10, pattern: /^\d{10}$/ },
   { code: '+44', country: 'United Kingdom', flag: '🇬🇧', maxLength: 10, pattern: /^\d{10,11}$/ },
   { code: '+91', country: 'India', flag: '🇮🇳', maxLength: 10, pattern: /^\d{10}$/ },
@@ -1939,18 +2357,75 @@ const isValidPhone = (phone, countryCode) => {
   const country = countryCodes.find(c => c.code === countryCode);
   if (!country) return false;
   const digits = phone.replace(/\D/g, '');
+  
+  // Special validation for Sri Lanka (+94) - must be 9 digits, no leading 0
+  if (countryCode === '+94') {
+    // Must be exactly 9 digits, starting from 7 (or other valid digits, but not 0)
+    return digits.length === 9 && !digits.startsWith('0');
+  }
+  
+  // For other countries, use standard pattern validation
   return country.pattern.test(digits);
 };
 
+// Authentication Wrapper Component - Handles URL params
+function AuthenticationWrapper({ onAuthSuccess, returnToPath, initialScreen = "login", onBackToHome }) {
+  const { serviceType: urlServiceType } = useParams();
+  const navigate = useNavigate();
+  
+  return (
+    <Authentication 
+      onAuthSuccess={onAuthSuccess}
+      returnToPath={returnToPath}
+      initialScreen={initialScreen}
+      onBackToHome={onBackToHome}
+      urlServiceType={urlServiceType}
+      navigate={navigate}
+    />
+  );
+}
+
 // Authentication Component
-function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", onBackToHome }) {
-  const [screen, setScreen] = useState(initialScreen);
-  const [role, setRole] = useState(null);
+function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", onBackToHome, urlServiceType, navigate }) {
+  // CRITICAL: When URL has serviceType, ALWAYS set role and screen immediately
+  const initialRole = urlServiceType ? 'provider' : (sessionStorage.getItem('authRole') || null);
+  const initialScreenValue = urlServiceType ? 'register' : (sessionStorage.getItem('authScreen') || initialScreen);
+  
+  const [screen, setScreen] = useState(initialScreenValue);
+  const [role, setRole] = useState(initialRole);
+  
+  // Immediately sync to sessionStorage if URL has serviceType
+  useEffect(() => {
+    if (urlServiceType) {
+      console.log('🔒 URL serviceType detected, forcing states');
+      if (role !== 'provider') {
+        setRole('provider');
+        sessionStorage.setItem('authRole', 'provider');
+      }
+      if (screen !== 'register') {
+        setScreen('register');
+        sessionStorage.setItem('authScreen', 'register');
+      }
+    }
+  }, [urlServiceType]); // Run whenever urlServiceType changes
   const [msg, setMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successUserName, setSuccessUserName] = useState('');
+
+  // Persist screen and role to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('authScreen', screen);
+  }, [screen]);
+
+  useEffect(() => {
+    if (role) {
+      sessionStorage.setItem('authRole', role);
+    } else {
+      sessionStorage.removeItem('authRole');
+    }
+  }, [role]);
 
   // Common Fields
   const [email, setEmail] = useState("");
@@ -1959,6 +2434,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   const [confirm, setConfirm] = useState("");
   const [country, setCountry] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [language, setLanguage] = useState("");
   const [profileFile, setProfileFile] = useState(null);
   const [profilePreview, setProfilePreview] = useState(null);
@@ -1967,14 +2443,105 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   const [locationBase, setLocationBase] = useState("");
   const [experience, setExperience] = useState("");
   const [languagesSpoken, setLanguagesSpoken] = useState("");
-  const [serviceType, setServiceType] = useState("Jeep Driver");
-  const [vehicleType, setVehicleType] = useState("");
+  const [serviceType, setServiceType] = useState(() => {
+    // Priority: URL param > sessionStorage > empty
+    if (urlServiceType) {
+      // Convert URL slug back to proper service type name
+      const serviceTypeMap = {
+        'jeep-driver': 'Jeep Driver',
+        'jeep': 'Jeep Driver',
+        'tour-guide': 'Tour Guide',
+        'guide': 'Tour Guide',
+        'renting-store': 'Renting Store',
+        'renting': 'Renting Store'
+      };
+      const mappedType = serviceTypeMap[urlServiceType.toLowerCase()];
+      if (mappedType) {
+        console.log('✅ Service type from URL:', mappedType);
+        sessionStorage.setItem('authServiceType', mappedType);
+        return mappedType;
+      }
+    }
+    // Restore serviceType from sessionStorage on page load
+    const saved = sessionStorage.getItem('authServiceType');
+    if (saved) {
+      console.log('✅ Service type restored from session:', saved);
+    }
+    return saved || "";
+  });
+  const [vehicleTypes, setVehicleTypes] = useState([]); // Changed to array for multiple selection
+
+  // Persist serviceType to sessionStorage and update URL
+  useEffect(() => {
+    if (serviceType) {
+      sessionStorage.setItem('authServiceType', serviceType);
+      console.log('💾 Service type saved:', serviceType);
+      
+      // Update URL when service type changes
+      if (navigate && screen === 'register' && role === 'provider') {
+        const serviceTypeSlug = {
+          'Jeep Driver': 'jeep-driver',
+          'Tour Guide': 'tour-guide',
+          'Renting Store': 'renting-store'
+        }[serviceType];
+        
+        if (serviceTypeSlug) {
+          const currentPath = window.location.pathname;
+          const expectedPath = `/register/${serviceTypeSlug}`;
+          if (currentPath !== expectedPath) {
+            navigate(expectedPath, { replace: true });
+          }
+        }
+      }
+    } else {
+      sessionStorage.removeItem('authServiceType');
+    }
+  }, [serviceType, navigate, screen, role]);
+
+  // Debug and sync: Ensure everything is properly set when component mounts
+  useEffect(() => {
+    console.log('🔍 Authentication component mounted');
+    console.log('   - urlServiceType:', urlServiceType);
+    console.log('   - serviceType:', serviceType);
+    console.log('   - screen:', screen);
+    console.log('   - role:', role);
+    console.log('   - Will show:', !role ? 'UserTypeSelection' : 'RegistrationForm');
+    
+    // If URL has serviceType but role/screen aren't set properly, fix it immediately
+    if (urlServiceType && serviceType) {
+      let needsUpdate = false;
+      
+      if (!role || role !== 'provider') {
+        console.log('⚠️ Fixing role to provider due to URL serviceType');
+        setRole('provider');
+        sessionStorage.setItem('authRole', 'provider');
+        needsUpdate = true;
+      }
+      
+      if (screen !== 'register') {
+        console.log('⚠️ Fixing screen to register due to URL serviceType');
+        setScreen('register');
+        sessionStorage.setItem('authScreen', 'register');
+        needsUpdate = true;
+      }
+      
+      if (needsUpdate) {
+        console.log('✅ State synchronized with URL');
+      }
+    }
+  }, []);
   const [pricePerDay, setPricePerDay] = useState("");
+  // Separate prices for different vehicle types
+  const [priceFullDayStandard, setPriceFullDayStandard] = useState("");
+  const [priceHalfDayStandard, setPriceHalfDayStandard] = useState("");
+  const [priceFullDayLuxury, setPriceFullDayLuxury] = useState("");
+  const [priceHalfDayLuxury, setPriceHalfDayLuxury] = useState("");
   const [destinations, setDestinations] = useState("");
   const [languages, setLanguages] = useState([]);
   const [specialSkills, setSpecialSkills] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [certificationFiles, setCertificationFiles] = useState({}); // Map of cert name to File
+  const [certificationStatus, setCertificationStatus] = useState("non-certified"); // 'certified' or 'non-certified'
   const [description, setDescription] = useState("");
   const [availableDates, setAvailableDates] = useState({}); // Object: { "YYYY-MM-DD": "busy"|"halfday"|"unavailable" }
 
@@ -1994,13 +2561,27 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     return countryCodes.find(c => c.code === phoneCountryCode) || countryCodes[0];
   };
 
-  // Handle phone number input - only digits, limit by country
+  // Handle phone number input - only digits, remove leading 0 for Sri Lanka
   const handlePhoneChange = (value) => {
     const selectedCountry = getSelectedCountry();
-    // Only allow digits, limit to maxLength
+    // Only allow digits (no letters or special characters)
     let cleaned = value.replace(/\D/g, '');
-    if (cleaned.length > selectedCountry.maxLength) {
-      cleaned = cleaned.substring(0, selectedCountry.maxLength);
+    
+    // For Sri Lanka (+94), remove leading 0 and limit to 9 digits
+    if (phoneCountryCode === '+94') {
+      // Remove leading 0 if present
+      if (cleaned.startsWith('0')) {
+        cleaned = cleaned.substring(1);
+      }
+      // Limit to 9 digits (starting from 7 or other valid digits)
+      if (cleaned.length > 9) {
+        cleaned = cleaned.substring(0, 9);
+      }
+    } else {
+      // For other countries, use standard max length
+      if (cleaned.length > selectedCountry.maxLength) {
+        cleaned = cleaned.substring(0, selectedCountry.maxLength);
+      }
     }
     setPhone(cleaned);
   };
@@ -2013,6 +2594,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     setConfirm("");
     setCountry("");
     setPhone("");
+    setAddress("");
     setPhoneCountryCode("+94");
     setLanguage("");
     setProfileFile(null);
@@ -2020,14 +2602,19 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     setLocationBase("");
     setExperience("");
     setLanguagesSpoken("");
-    setServiceType("Jeep Driver");
-    setVehicleType("");
+    setServiceType("");
+    setVehicleTypes([]);
     setPricePerDay("");
+    setPriceFullDayStandard("");
+    setPriceHalfDayStandard("");
+    setPriceFullDayLuxury("");
+    setPriceHalfDayLuxury("");
     setDestinations("");
     setLanguages([]);
     setSpecialSkills([]);
     setCertifications([]);
     setCertificationFiles({});
+    setCertificationStatus("non-certified");
     setDescription("");
     setAvailableDates({});
     setSpecialQualifications([]);
@@ -2094,7 +2681,8 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     console.log("🔄 Starting registration process...");
     console.log("Role:", role);
     console.log("Form data:", {
-      email, fullName, phone, serviceType, vehicleType, experience, pricePerDay,
+      email, fullName, phone, address, serviceType, vehicleTypes, experience,
+      priceFullDayStandard, priceHalfDayStandard, priceFullDayLuxury, priceHalfDayLuxury,
       destinations, languages, specialSkills, certifications, specialQualifications,
       areasOfExpertise, verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
     });
@@ -2122,6 +2710,99 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       return;
     }
 
+    // Certification validation for certified providers
+    if (role === 'provider' && certificationStatus === 'certified') {
+      if (!certifications || certifications.length === 0) {
+        setMsg("❌ Certified providers must select at least one certification");
+        return;
+      }
+      
+      // Check if at least one certification has a file uploaded
+      const hasUploadedCert = certifications.some(cert => certificationFiles[cert]);
+      if (!hasUploadedCert) {
+        setMsg("❌ Please upload at least one certification document");
+        return;
+      }
+    }
+
+    // Price validation for service providers
+    if (role === 'provider') {
+      const parsePrice = (price) => {
+        if (!price) return 0;
+        const cleanPrice = String(price).replace(/,/g, '');
+        return parseInt(cleanPrice) || 0;
+      };
+
+      const fullDayStd = parsePrice(priceFullDayStandard);
+      const halfDayStd = parsePrice(priceHalfDayStandard);
+      const fullDayLux = parsePrice(priceFullDayLuxury);
+      const halfDayLux = parsePrice(priceHalfDayLuxury);
+
+      // All prices must be at least 1 LKR (minimum validation)
+      if (fullDayStd < 1) {
+        setMsg("❌ Full Day Standard price must be at least 1 LKR");
+        return;
+      }
+      if (halfDayStd < 1) {
+        setMsg("❌ Half Day Standard price must be at least 1 LKR");
+        return;
+      }
+      if (fullDayLux < 1 && formData.vehicleTypes.includes("Luxury Safari Jeep")) {
+        setMsg("❌ Full Day Luxury price must be at least 1 LKR");
+        return;
+      }
+      if (halfDayLux < 1 && formData.vehicleTypes.includes("Luxury Safari Jeep")) {
+        setMsg("❌ Half Day Luxury price must be at least 1 LKR");
+        return;
+      }
+
+      if (certificationStatus === 'non-certified') {
+        // Non-certified providers have maximum price limits
+        if (fullDayStd > 25000) {
+          setMsg("❌ Non-certified Full Day Standard price cannot exceed 25,000 LKR");
+          return;
+        }
+        if (halfDayStd > 12000 && serviceType === 'Jeep Driver') {
+          setMsg("❌ Non-certified Half Day Standard price cannot exceed 12,000 LKR");
+          return;
+        }
+        if (halfDayStd > 15000 && serviceType === 'Tour Guide') {
+          setMsg("❌ Non-certified Half Day Tour Guide price cannot exceed 15,000 LKR");
+          return;
+        }
+        if (fullDayLux > 35000) {
+          setMsg("❌ Non-certified Full Day Luxury price cannot exceed 35,000 LKR");
+          return;
+        }
+        if (halfDayLux > 18000) {
+          setMsg("❌ Non-certified Half Day Luxury price cannot exceed 18,000 LKR");
+          return;
+        }
+      } else if (certificationStatus === 'certified') {
+        // Certified providers have minimum price requirements
+        if (fullDayStd > 0 && fullDayStd < 25000) {
+          setMsg("❌ Certified Full Day Standard price must be at least 25,000 LKR");
+          return;
+        }
+        if (halfDayStd > 0 && halfDayStd < 12000 && serviceType === 'Jeep Driver') {
+          setMsg("❌ Certified Half Day Standard price must be at least 12,000 LKR");
+          return;
+        }
+        if (halfDayStd > 0 && halfDayStd < 15000 && serviceType === 'Tour Guide') {
+          setMsg("❌ Certified Half Day Tour Guide price must be at least 15,000 LKR");
+          return;
+        }
+        if (fullDayLux > 0 && fullDayLux < 35000) {
+          setMsg("❌ Certified Full Day Luxury price must be at least 35,000 LKR");
+          return;
+        }
+        if (halfDayLux > 0 && halfDayLux < 18000) {
+          setMsg("❌ Certified Half Day Luxury price must be at least 18,000 LKR");
+          return;
+        }
+      }
+    }
+
     setBusy(true);
     setMsg("⏳ Creating your account...");
 
@@ -2140,6 +2821,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         email,
         fullName: fullName.trim(),
         phone: formattedPhone,
+        address: address?.trim() || "",
         profilePicture: "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -2166,14 +2848,38 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       } else {
         collectionName = "serviceProviders";
 
+        // Helper function to parse price with commas (e.g., "25,000" -> 25000)
+        const parsePrice = (price) => {
+          if (!price) return 0;
+          // Remove commas and parse as integer
+          const cleanPrice = String(price).replace(/,/g, '');
+          return parseInt(cleanPrice) || 0;
+        };
+
         // Base provider data
         userData = {
           ...userData,
           location: locationBase?.trim() || "",
           experienceYears: experience ? parseInt(experience) : 0,
           serviceType: serviceType || "Jeep Driver",
-          vehicleType: vehicleType || "",
-          pricePerDay: pricePerDay ? parseInt(pricePerDay) : 0,
+          certificationStatus: certificationStatus || "non-certified", // 'certified' or 'non-certified'
+          // Certification approval fields (only for certified providers)
+          certificationApproved: false, // Admin must approve
+          certificationRejected: false,
+          certificationApprovedBy: null,
+          certificationApprovedAt: null,
+          certificationApprovedByName: null,
+          certificationRejectedBy: null,
+          certificationRejectedAt: null,
+          certificationRejectedByName: null,
+          certificationRejectionReason: null,
+          vehicleTypes: vehicleTypes || [], // Array of selected vehicle types
+          pricePerDay: pricePerDay ? parsePrice(pricePerDay) : 0,
+          // Separate prices for different vehicle types
+          priceFullDayStandard: priceFullDayStandard ? parsePrice(priceFullDayStandard) : 0,
+          priceHalfDayStandard: priceHalfDayStandard ? parsePrice(priceHalfDayStandard) : 0,
+          priceFullDayLuxury: priceFullDayLuxury ? parsePrice(priceFullDayLuxury) : 0,
+          priceHalfDayLuxury: priceHalfDayLuxury ? parsePrice(priceHalfDayLuxury) : 0,
           rating: 0,
           totalRatings: 0,
           availability: true,
@@ -2624,7 +3330,15 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       setTimeout(() => {
         signOut(auth);
         setScreen("login");
+        setRole(null); // Reset role after successful registration
         resetForm();
+        // Clear session storage after successful registration
+        sessionStorage.removeItem('authRole');
+        sessionStorage.removeItem('authScreen');
+        sessionStorage.removeItem('authServiceType');
+        sessionStorage.setItem('authScreen', 'login');
+        // Stay on the same auth page after registration
+        // No redirect happens - user can click login after seeing success message
       }, 2000);
 
     } catch (error) {
@@ -2843,51 +3557,95 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     );
 
   // Register Page
-  if (screen === "register")
+  if (screen === "register") {
+    // CRITICAL: If URL has serviceType but role isn't set yet, wait for state to sync
+    if (urlServiceType && !role) {
+      console.log('⏳ Waiting for role to sync with URL serviceType...');
+      // Return a minimal loader while state syncs
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
+          <div className="text-white">Loading...</div>
+        </div>
+      );
+    }
+    
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
-        <div className="relative w-full max-w-2xl">
-          {/* Back Button */}
+        <div className="w-full max-w-2xl">
+          {/* Back Button - Now scrolls with content */}
           {onBackToHome && (
             <button
               onClick={() => {
                 if (role) {
                   setRole(null);
+                  setServiceType('');
                   resetForm();
+                  // Clear role and service type from session storage when going back to selection
+                  sessionStorage.removeItem('authRole');
+                  sessionStorage.removeItem('authServiceType');
+                  sessionStorage.setItem('authScreen', 'register');
+                  // Navigate back to /register without service type
+                  if (navigate) {
+                    navigate('/register', { replace: true });
+                  }
                 } else {
+                  // Clear all auth session storage when going back to home
+                  sessionStorage.removeItem('showAuth');
+                  sessionStorage.removeItem('authInitialScreen');
+                  sessionStorage.removeItem('authRole');
+                  sessionStorage.removeItem('authScreen');
+                  sessionStorage.removeItem('authServiceType');
                   onBackToHome();
                 }
               }}
-              className="absolute top-4 left-4 text-yellow-400 hover:text-yellow-300 font-semibold flex items-center gap-2 text-sm transition-colors z-10"
+              className="mb-3 text-yellow-400 hover:text-yellow-300 font-semibold flex items-center gap-2 text-sm transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
               Back to {role ? 'Selection' : 'Home'}
             </button>
           )}
 
-          {!role ? (
-            <UserTypeSelection onSelect={setRole} logo={logo} onBackToHome={onBackToHome} />
-          ) : (
+          {/* CRITICAL: Show RegistrationForm if ANY of these are true:
+              1. role is set (user selected provider/tourist)
+              2. urlServiceType exists (URL like /register/jeep-driver)
+              3. serviceType is set (state has service type)
+          */}
+          {(() => {
+            // Check if we should show the form or the selection
+            const hasRole = Boolean(role);
+            const hasUrlServiceType = Boolean(urlServiceType);
+            const hasServiceType = Boolean(serviceType);
+            const shouldShowForm = hasRole || hasUrlServiceType || hasServiceType;
+            
+            console.log('🎯 RENDER DECISION:');
+            console.log('   - role:', role, '→', hasRole);
+            console.log('   - urlServiceType:', urlServiceType, '→', hasUrlServiceType);
+            console.log('   - serviceType:', serviceType, '→', hasServiceType);
+            console.log('   - DECISION:', shouldShowForm ? '✅ SHOW FORM' : '❌ SHOW SELECTION');
+            
+            return null;
+          })()}
+          {(role || urlServiceType || serviceType) ? (
             <RegistrationForm
-              role={role}
+              role={role || 'provider'}
               serviceType={serviceType}
               formData={{
-                email, fullName, password, confirm, country, phone, phoneCountryCode, language,
+                email, fullName, password, confirm, country, phone, address, phoneCountryCode, language,
                 locationBase, experience, languagesSpoken, serviceType,
-                vehicleType, pricePerDay,
+                vehicleTypes, pricePerDay, priceFullDayStandard, priceHalfDayStandard, priceFullDayLuxury, priceHalfDayLuxury,
                 destinations: typeof destinations === 'string' ? destinations : (destinations && destinations.length > 0 ? destinations[0] : ""), // Convert array to string for single select
                 languages,
-                specialSkills, certifications, description,
+                specialSkills, certifications, certificationStatus, certificationFiles, description,
                 availableDates, specialQualifications, areasOfExpertise,
                 verificationDocuments, hourlyRate, dailyRate, specialPackageRates, currencyPreference
               }}
               handlers={{
-                setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone: handlePhoneChange, setLanguage,
+                setEmail, setFullName, setPassword, setConfirm, setCountry, setPhone: handlePhoneChange, setAddress, setLanguage,
                 setLocationBase, setExperience, setLanguagesSpoken, setServiceType,
-                setVehicleType, setPricePerDay, setDestinations, setLanguages,
-                setSpecialSkills, setCertifications, setDescription,
+                setVehicleTypes, setPricePerDay, setPriceFullDayStandard, setPriceHalfDayStandard, setPriceFullDayLuxury, setPriceHalfDayLuxury, setDestinations, setLanguages,
+                setSpecialSkills, setCertifications, setCertificationStatus, setCertificationFiles, setDescription,
                 setAvailableDates, setSpecialQualifications, setAreasOfExpertise,
-                setVerificationDocuments, setHourlyRate, setDailyRate, setSpecialPackageRates, setCurrencyPreference
+                setVerificationDocuments, setHourlyRate, setDailyRate, setSpecialPackageRates, setCurrencyPreference, setPhoneCountryCode
               }}
               profilePreview={profilePreview}
               onProfileImageSelect={handleProfileImageSelect}
@@ -2899,10 +3657,13 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
               busy={busy}
               msg={msg}
             />
+          ) : (
+            <UserTypeSelection onSelect={setRole} logo={logo} onBackToHome={onBackToHome} />
           )}
         </div>
       </div>
     );
+  }
 
   return null;
 }
@@ -2956,21 +3717,65 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
+  const [previousServiceType, setPreviousServiceType] = useState(serviceType);
 
   const isTourist = role === 'tourist';
+  const isJeepDriver = serviceType === "Jeep Driver";
   const isTourGuide = serviceType === "Tour Guide";
+
+  // Reset ALL form fields when service type changes
+  useEffect(() => {
+    if (!isTourist && serviceType && serviceType !== previousServiceType && previousServiceType) {
+      console.log('🔄 Service type changed from', previousServiceType, 'to', serviceType, '- Clearing form');
+      
+      // Clear ALL fields - both common and service-specific
+      // Common fields
+      if (handlers.setFullName) handlers.setFullName('');
+      if (handlers.setEmail) handlers.setEmail('');
+      if (handlers.setPassword) handlers.setPassword('');
+      if (handlers.setConfirm) handlers.setConfirm('');
+      if (handlers.setCountry) handlers.setCountry('');
+      if (handlers.setPhone) handlers.setPhone('');
+      if (handlers.setAddress) handlers.setAddress('');
+      if (handlers.setPhoneCountryCode) handlers.setPhoneCountryCode('+94');
+      
+      // Service-specific fields
+      if (handlers.setVehicleTypes) handlers.setVehicleTypes([]);
+      if (handlers.setPriceFullDayStandard) handlers.setPriceFullDayStandard('');
+      if (handlers.setPriceHalfDayStandard) handlers.setPriceHalfDayStandard('');
+      if (handlers.setPriceFullDayLuxury) handlers.setPriceFullDayLuxury('');
+      if (handlers.setPriceHalfDayLuxury) handlers.setPriceHalfDayLuxury('');
+      if (handlers.setDestinations) handlers.setDestinations('');
+      if (handlers.setLanguages) handlers.setLanguages([]);
+      if (handlers.setSpecialSkills) handlers.setSpecialSkills([]);
+      if (handlers.setCertifications) handlers.setCertifications([]);
+      if (handlers.setCertificationStatus) handlers.setCertificationStatus('non-certified');
+      if (handlers.setSpecialQualifications) handlers.setSpecialQualifications([]);
+      if (handlers.setAreasOfExpertise) handlers.setAreasOfExpertise([]);
+      if (handlers.setVerificationDocuments) handlers.setVerificationDocuments([]);
+      if (handlers.setDescription) handlers.setDescription('');
+      if (handlers.setHourlyRate) handlers.setHourlyRate('');
+      if (handlers.setDailyRate) handlers.setDailyRate('');
+      if (handlers.setExperience) handlers.setExperience('');
+      if (handlers.setLocationBase) handlers.setLocationBase('');
+      if (handlers.setLanguagesSpoken) handlers.setLanguagesSpoken('');
+      if (handlers.setPricePerDay) handlers.setPricePerDay('');
+      if (handlers.setSpecialPackageRates) handlers.setSpecialPackageRates('');
+      if (handlers.setCurrencyPreference) handlers.setCurrencyPreference('LKR');
+    }
+    setPreviousServiceType(serviceType);
+  }, [serviceType, previousServiceType, isTourist, handlers]);
 
   const serviceTypes = [
     "Jeep Driver",
     "Tour Guide",
-    "Renting"
+    "Renting Store"
   ];
 
   const vehicleTypes = [
     "Standard Safari Jeep",
-    "Luxury Safari Jeep",
-    "Open Roof Jeep",
-    "4x4 Modified Jeep"
+    "Luxury Safari Jeep"
   ];
 
   const destinations = [
@@ -2996,19 +3801,17 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   ];
 
   const specialSkills = [
-    "Wildlife photography knowledge",
-    "Birdwatching expertise",
-    "Family-friendly tours",
-    "Private tours",
-    "Full-day safari",
-    "Half-day safari"
+    "Bird identification knowledge",
+    "Tusker identification knowledge",
+    "Leopard identification knowledge",
+    "Reptile identification knowledge",
+    "Flora identification knowledge",
+    "First aid knowledge"
   ];
 
   const certifications = [
-    "Wildlife Department Certified",
-    "Tourism Board Licensed",
-    "First Aid Certified",
-    "Eco Tourism Certified"
+    "Wildlife Department of Sri Lanka certification",
+    "Tourist Board of Sri Lanka certification"
   ];
 
   // Tour Guide specific options
@@ -3023,15 +3826,14 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
   const areasOfExpertise = [
     "National Parks",
-    "Beaches & Coastal Areas",
+    "Campsites",
+    "Wetlands",
+    "Beaches",
     "Forest Reserves",
-    "Camping Sites",
-    "Wildlife Sanctuaries",
+    "Mountain Regions",
     "Cultural Heritage Sites",
-    "Adventure Tourism",
-    "Bird Watching Areas",
     "Historical Sites",
-    "Mountain Regions"
+    "Knowledgeable about animal behavior"
   ];
 
   const verificationDocuments = [
@@ -3068,7 +3870,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl max-h-[80vh] overflow-y-auto">
+    <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl max-h-[80vh] overflow-y-auto relative">
       <div className="text-center mb-4">
         <h2 className="text-xl font-bold text-white">
           {isTourist ? 'Tourist Registration' : 'Service Provider Registration'}
@@ -3079,6 +3881,80 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
       </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
+        {/* Service Type Selection (For Service Providers - Show First) */}
+        {!isTourist && (
+          <div className="space-y-1 mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+            <label className="flex items-center gap-2 text-white font-medium text-sm">
+              <User className="h-4 w-4 text-yellow-400" />
+              Service Type *
+            </label>
+            <select
+              value={formData.serviceType}
+              onChange={(e) => handlers.setServiceType(e.target.value)}
+              required
+              className={`w-full px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg focus:outline-none focus:border-yellow-400 text-sm font-medium ${
+                formData.serviceType ? 'text-white' : 'text-gray-400'
+              }`}
+            >
+              <option value="" disabled hidden>Select Service Type</option>
+              {serviceTypes.map(type => (
+                <option key={type} value={type} className="text-white">{type}</option>
+              ))}
+            </select>
+            {!formData.serviceType && (
+              <p className="text-xs text-yellow-300 mt-1">
+                Please select your service type to continue with registration
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Show form fields only after service type is selected (for providers) or always for tourists */}
+        {(isTourist || formData.serviceType) && (
+          <>
+        {(() => {
+          console.log('📋 Form fields rendering - isTourist:', isTourist, 'serviceType:', formData.serviceType);
+          return null;
+        })()}
+
+        {/* Certification Status Selection (for both Jeep Drivers and Tour Guides) */}
+        {(isJeepDriver || isTourGuide) && (
+          <div className="space-y-2 mb-4">
+            <label className="block text-white font-medium text-xs">
+              Certification Status *
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handlers.setCertificationStatus('non-certified')}
+                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${
+                  formData.certificationStatus === 'non-certified'
+                    ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                    : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                }`}
+              >
+                Non-Certified Service Provider
+              </button>
+              <button
+                type="button"
+                onClick={() => handlers.setCertificationStatus('certified')}
+                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${
+                  formData.certificationStatus === 'certified'
+                    ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
+                    : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                }`}
+              >
+                Certified Service Provider
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {formData.certificationStatus === 'certified' 
+                ? '✓ Certified providers can charge premium rates and must upload certifications'
+                : '✓ Non-certified providers have maximum price limits'}
+            </p>
+          </div>
+        )}
+
         {/* Basic Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -3089,8 +3965,13 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             <input
               type="text"
               value={formData.fullName}
-              onChange={(e) => handlers.setFullName(e.target.value)}
+              onChange={(e) => {
+                // Only allow letters and spaces
+                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                handlers.setFullName(value);
+              }}
               required
+              pattern="[A-Za-z\s]+"
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
               placeholder="Enter your full name"
             />
@@ -3167,6 +4048,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
         {/* Contact Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Phone Number */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <Phone className="h-3 w-3 text-yellow-400" />
@@ -3241,7 +4123,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       ? 'border-red-400 focus:border-red-400'
                       : 'border-white/10 focus:border-yellow-400'
                   }`}
-                  placeholder={formData.phoneCountryCode === '+94' ? '0743090367' : 'Enter phone number'}
+                  placeholder={formData.phoneCountryCode === '+94' ? '743090367' : 'Enter phone number'}
                 />
               </div>
             </div>
@@ -3258,21 +4140,40 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             )}
           </div>
 
+          {/* Address Field */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <MapPin className="h-3 w-3 text-yellow-400" />
-              {isTourist ? 'Country' : 'Base Location'} *
+              Address {!isTourist && <span className="text-red-400">*</span>}
             </label>
             <input
               type="text"
-              value={isTourist ? formData.country : formData.locationBase}
-              onChange={(e) => isTourist ? handlers.setCountry(e.target.value) : handlers.setLocationBase(e.target.value)}
-              required
+              value={formData.address}
+              onChange={(e) => handlers.setAddress(e.target.value)}
+              required={!isTourist}
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder={isTourist ? 'Your country' : 'Your base city/location'}
+              placeholder={isTourist ? "Your address" : "Service location address"}
             />
           </div>
         </div>
+
+        {/* Country field for tourists */}
+        {isTourist && (
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-white font-medium text-xs">
+              <MapPin className="h-3 w-3 text-yellow-400" />
+              Country *
+            </label>
+            <input
+              type="text"
+              value={formData.country}
+              onChange={(e) => handlers.setCountry(e.target.value)}
+              required
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+              placeholder="Your country"
+            />
+          </div>
+        )}
 
         {/* Tourist Specific Fields */}
         {isTourist && (
@@ -3329,104 +4230,364 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
         )}
 
         {/* Service Provider Specific Fields */}
-        {!isTourist && (
+        {!isTourist && formData.serviceType && (
           <>
-            {/* Service Type and Vehicle Type */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Vehicle Type Selection (Multiple Choice for Jeep Driver) */}
+            {formData.serviceType === "Jeep Driver" && (
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-white font-medium text-xs">
-                  <User className="h-3 w-3 text-yellow-400" />
-                  Service Type *
+                  Vehicle Type(s) <span className="text-gray-400 text-xs">(Select all that apply)</span>
                 </label>
-                <select
-                  value={formData.serviceType}
-                  onChange={(e) => handlers.setServiceType(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-                >
-                  <option value="">Select Service Type</option>
-                  {serviceTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                <div className="border border-white/10 rounded-lg p-3 bg-white/5 space-y-2">
+                  {vehicleTypes.map(type => (
+                    <div key={type} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`vehicle-${type}`}
+                        checked={formData.vehicleTypes?.includes(type) || false}
+                        onChange={(e) => handleMultiSelectChange('vehicleTypes', type)}
+                        className="mr-2 h-3.5 w-3.5 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded cursor-pointer"
+                      />
+                      <label htmlFor={`vehicle-${type}`} className="text-white text-xs cursor-pointer">
+                        {type}
+                      </label>
+                    </div>
                   ))}
-                </select>
-              </div>
-
-              {/* Vehicle Type (only show for Jeep Driver) */}
-              {formData.serviceType === "Jeep Driver" && (
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Vehicle Type
-                  </label>
-                  <select
-                    value={formData.vehicleType}
-                    onChange={(e) => handlers.setVehicleType(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-                  >
-                    <option value="">Select Vehicle Type</option>
-                    {vehicleTypes.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
                 </div>
-              )}
-            </div>
-
-            {/* Experience and Price */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="flex items-center gap-2 text-white font-medium text-xs">
-                  Experience (Years) *
-                </label>
-                <input
-                  type="number"
-                  value={formData.experience}
-                  onChange={(e) => handlers.setExperience(e.target.value)}
-                  required
-                  min="0"
-                  max="50"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                  placeholder="Years of experience"
-                />
+                {formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
+                  <p className="text-xs text-gray-300 mt-1">
+                    Selected: {formData.vehicleTypes.join(', ')}
+                  </p>
+                )}
               </div>
+            )}
 
-              {/* Price per Day (for Jeep Drivers) */}
-              {formData.serviceType === "Jeep Driver" && (
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Price per Day (LKR)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.pricePerDay}
-                    onChange={(e) => handlers.setPricePerDay(e.target.value)}
-                    min="0"
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                    placeholder="e.g., 12000"
-                  />
-                </div>
-              )}
-            </div>
+            {/* Price Fields (for Jeep Drivers) - Show based on vehicle type selection */}
+            {formData.serviceType === "Jeep Driver" && formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-white font-semibold text-sm">
+                  Pricing Information
+                  {formData.certificationStatus === 'certified' && (
+                    <span className="text-yellow-400 text-xs ml-2">(Certified - Premium Rates)</span>
+                  )}
+                  {formData.certificationStatus === 'non-certified' && (
+                    <span className="text-emerald-400 text-xs ml-2">(Non-Certified - Standard Rates)</span>
+                  )}
+                </h4>
+                
+                {/* Standard Safari Jeep Prices */}
+                {formData.vehicleTypes.includes("Standard Safari Jeep") && (
+                  <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">
+                    <p className="text-green-400 font-medium text-xs mb-2">Standard Safari Jeep Pricing</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-white font-medium text-xs">
+                          Full Day Price (LKR) *
+                          {formData.certificationStatus === 'non-certified' && (
+                            <span className="text-emerald-400 text-[10px]">(Max: 25,000)</span>
+                          )}
+                          {formData.certificationStatus === 'certified' && (
+                            <span className="text-yellow-400 text-[10px]">(Min: 25,000)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.priceFullDayStandard}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Prevent starting with 0
+                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                              return;
+                            }
+                            handlers.setPriceFullDayStandard(value);
+                          }}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 25,000' : 'Maximum: 25,000'}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-white font-medium text-xs">
+                          Half Day Price (LKR) *
+                          {formData.certificationStatus === 'non-certified' && (
+                            <span className="text-emerald-400 text-[10px]">(Max: 12,000)</span>
+                          )}
+                          {formData.certificationStatus === 'certified' && (
+                            <span className="text-yellow-400 text-[10px]">(Min: 12,000)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.priceHalfDayStandard}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Prevent starting with 0
+                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                              return;
+                            }
+                            handlers.setPriceHalfDayStandard(value);
+                          }}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 12,000' : 'Maximum: 12,000'}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Luxury Safari Jeep Prices */}
+                {formData.vehicleTypes.includes("Luxury Safari Jeep") && (
+                  <div className="border border-purple-500/30 rounded-lg p-3 bg-purple-500/5">
+                    <p className="text-purple-400 font-medium text-xs mb-2">Luxury Safari Jeep Pricing</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-white font-medium text-xs">
+                          Full Day Price (LKR) *
+                          {formData.certificationStatus === 'non-certified' && (
+                            <span className="text-emerald-400 text-[10px]">(Max: 35,000)</span>
+                          )}
+                          {formData.certificationStatus === 'certified' && (
+                            <span className="text-yellow-400 text-[10px]">(Min: 35,000)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.priceFullDayLuxury}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Prevent starting with 0
+                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                              return;
+                            }
+                            handlers.setPriceFullDayLuxury(value);
+                          }}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 35,000' : 'Maximum: 35,000'}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-white font-medium text-xs">
+                          Half Day Price (LKR) *
+                          {formData.certificationStatus === 'non-certified' && (
+                            <span className="text-emerald-400 text-[10px]">(Max: 18,000)</span>
+                          )}
+                          {formData.certificationStatus === 'certified' && (
+                            <span className="text-yellow-400 text-[10px]">(Min: 18,000)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.priceHalfDayLuxury}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Prevent starting with 0
+                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                              return;
+                            }
+                            handlers.setPriceHalfDayLuxury(value);
+                          }}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 18,000' : 'Maximum: 18,000'}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Special packages text - shown after all pricing */}
+                <p className="text-xs text-blue-300 italic mt-2">
+                  Add your special packages to your profile from your Service Provider Dashboard
+                </p>
+              </div>
+            )}
 
             {/* Tour Guide Specific Fields */}
             {isTourGuide && (
               <>
-                {/* Special Qualifications (Multi-select) */}
+                {/* Tour Guide Pricing Information */}
+                <div className="space-y-3">
+                  <h4 className="text-white font-semibold text-sm">
+                    Tour Guide Price
+                    {formData.certificationStatus === 'certified' && (
+                      <span className="text-yellow-400 text-xs ml-2">(Certified - Premium Rates)</span>
+                    )}
+                    {formData.certificationStatus === 'non-certified' && (
+                      <span className="text-emerald-400 text-xs ml-2">(Non-Certified - Standard Rates)</span>
+                    )}
+                  </h4>
+                  
+                  <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-white font-medium text-xs">
+                          Full Day Price (LKR) *
+                          {formData.certificationStatus === 'non-certified' && (
+                            <span className="text-emerald-400 text-[10px]">(Max: 25,000)</span>
+                          )}
+                          {formData.certificationStatus === 'certified' && (
+                            <span className="text-yellow-400 text-[10px]">(Min: 25,000)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.priceFullDayStandard}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Prevent starting with 0
+                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                              return;
+                            }
+                            handlers.setPriceFullDayStandard(value);
+                          }}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 25,000' : 'Maximum: 25,000'}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-white font-medium text-xs">
+                          Half Day Price (LKR) *
+                          {formData.certificationStatus === 'non-certified' && (
+                            <span className="text-emerald-400 text-[10px]">(Max: 15,000)</span>
+                          )}
+                          {formData.certificationStatus === 'certified' && (
+                            <span className="text-yellow-400 text-[10px]">(Min: 15,000)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.priceHalfDayStandard}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Prevent starting with 0
+                            if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                              return;
+                            }
+                            handlers.setPriceHalfDayStandard(value);
+                          }}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 15,000' : 'Maximum: 15,000'}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-300 mt-2 italic">
+                      Add your special packages to your profile from your Service Provider Dashboard
+                    </p>
+                  </div>
+                </div>
+
+                {/* Destination (Custom dropdown for Tour Guide) */}
+                <div className="space-y-1 relative">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    Destination *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.destinations || ""}
+                      onChange={(e) => {
+                        handlers.setDestinations(e.target.value);
+                        setShowDestinationDropdown(true);
+                      }}
+                      onFocus={() => setShowDestinationDropdown(true)}
+                      required
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                      placeholder="Type to search destinations..."
+                      autoComplete="off"
+                    />
+                    <ChevronDown 
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 cursor-pointer"
+                      onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
+                    />
+                    {showDestinationDropdown && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setShowDestinationDropdown(false)}
+                        />
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                          {destinations
+                            .filter(dest => 
+                              dest.toLowerCase().includes((formData.destinations || '').toLowerCase())
+                            )
+                            .map((destination) => (
+                              <button
+                                key={destination}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handlers.setDestinations(destination);
+                                  setShowDestinationDropdown(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${
+                                  (formData.destinations || '') === destination ? 'bg-yellow-500/20' : ''
+                                }`}
+                              >
+                                {destination}
+                              </button>
+                            ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-gray-400 text-[10px] mt-1">
+                    Select the primary destination where you operate
+                  </p>
+                </div>
+
+                {/* Years of Experience (Full Width) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Special Qualifications
+                    Years of Experience *
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.experience}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Prevent 0 and ensure minimum is 1
+                      if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
+                        handlers.setExperience(value);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      // Prevent typing 0 as first digit
+                      if (e.key === '0' && e.target.value === '') {
+                        e.preventDefault();
+                      }
+                    }}
+                    required
+                    min="1"
+                    max="50"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                    placeholder="Enter years of experience"
+                  />
+                </div>
+
+                {/* Languages Spoken */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    Languages Spoken
                   </label>
                   <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                    {specialQualifications.map(qualification => (
-                      <div key={qualification} className="flex items-center mb-1">
+                    {languages.map(language => (
+                      <div key={language} className="flex items-center mb-1">
                         <input
                           type="checkbox"
-                          id={`qual-${qualification}`}
-                          checked={formData.specialQualifications?.includes(qualification) || false}
-                          onChange={(e) => handleMultiSelectChange('specialQualifications', qualification)}
+                          id={`guide-lang-${language}`}
+                          checked={formData.languages?.includes(language) || false}
+                          onChange={(e) => handleMultiSelectChange('languages', language)}
                           className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
                         />
-                        <label htmlFor={`qual-${qualification}`} className="text-white text-xs">
-                          {qualification}
+                        <label htmlFor={`guide-lang-${language}`} className="text-white text-xs">
+                          {language}
                         </label>
                       </div>
                     ))}
@@ -3456,182 +4617,142 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                   </div>
                 </div>
 
-                {/* Languages Spoken (Multi-select) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Languages Spoken <span className="text-gray-400 text-xs">(Select all that apply)</span>
-                  </label>
-                  <div className="max-h-32 overflow-y-auto border border-white/10 rounded-lg p-2.5 bg-white/5">
-                    {languages.map(language => (
-                      <div key={language} className="flex items-center mb-1.5">
-                        <input
-                          type="checkbox"
-                          id={`guide-lang-${language}`}
-                          checked={formData.languages?.includes(language) || false}
-                          onChange={(e) => handleMultiSelectChange('languages', language)}
-                          className="mr-2 h-3.5 w-3.5 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded cursor-pointer"
-                        />
-                        <label htmlFor={`guide-lang-${language}`} className="text-white text-xs cursor-pointer">
-                          {language}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                  {formData.languages && formData.languages.length > 0 && (
-                    <p className="text-xs text-gray-300 mt-1">
-                      Selected: {formData.languages.length} language{formData.languages.length !== 1 ? 's' : ''}
-                    </p>
-                  )}
-                </div>
-
-                {/* Verification Documents (Multi-select) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Verification Documents
-                  </label>
-                  <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5 space-y-2">
-                    {verificationDocuments.map(doc => (
-                      <div key={doc} className="space-y-1">
-                        <div className="flex items-center mb-1">
-                          <input
-                            type="checkbox"
-                            id={`verif-${doc}`}
-                            checked={formData.verificationDocuments?.includes(doc) || false}
-                            onChange={(e) => handleMultiSelectChange('verificationDocuments', doc)}
-                            className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                          />
-                          <label htmlFor={`verif-${doc}`} className="text-white text-xs">
-                            {doc}
-                          </label>
-                        </div>
-                        {formData.verificationDocuments?.includes(doc) && (
-                          <div className="ml-5 mt-1">
+                {/* Certifications (Multi-select) - Only shown for certified providers */}
+                {formData.certificationStatus === 'certified' && (
+                  <div className="space-y-1 border-2 border-yellow-500/40 rounded-lg p-3 bg-yellow-500/5">
+                    <label className="flex items-center gap-2 text-yellow-400 font-semibold text-xs">
+                      Certifications *
+                      <span className="text-yellow-300/70 text-[10px] font-normal">(Upload at least one certification)</span>
+                    </label>
+                    <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5 space-y-2">
+                      {certifications.map(cert => (
+                        <div key={cert} className="space-y-1">
+                          <div className="flex items-center mb-1">
                             <input
-                              type="file"
-                              accept=".pdf,.doc,.docx,image/*"
-                              onChange={(e) => onVerificationDocumentFileSelect(doc, e)}
-                              className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
+                              type="checkbox"
+                              id={`guide-cert-${cert}`}
+                              checked={formData.certifications?.includes(cert) || false}
+                              onChange={(e) => handleMultiSelectChange('certifications', cert)}
+                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
                             />
-                            {verificationDocumentFiles[doc] && (
-                              <p className="text-xs text-green-400 mt-1">✓ {verificationDocumentFiles[doc].name}</p>
-                            )}
+                            <label htmlFor={`guide-cert-${cert}`} className="text-white text-xs">
+                              {cert}
+                            </label>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Pricing Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="flex items-center gap-2 text-white font-medium text-xs">
-                      Hourly Rate
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.hourlyRate}
-                      onChange={(e) => handlers.setHourlyRate(e.target.value)}
-                      min="0"
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                      placeholder="e.g., 2000"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="flex items-center gap-2 text-white font-medium text-xs">
-                      Daily Rate
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.dailyRate}
-                      onChange={(e) => handlers.setDailyRate(e.target.value)}
-                      min="0"
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                      placeholder="e.g., 15000"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="flex items-center gap-2 text-white font-medium text-xs">
-                      Special Package Rates
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.specialPackageRates}
-                      onChange={(e) => handlers.setSpecialPackageRates(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                      placeholder="e.g., 3-day package: 40,000 LKR"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="flex items-center gap-2 text-white font-medium text-xs">
-                      Currency Preference
-                    </label>
-                    <select
-                      value={formData.currencyPreference}
-                      onChange={(e) => handlers.setCurrencyPreference(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-                    >
-                      {currencyOptions.map(currency => (
-                        <option key={currency} value={currency.split(' - ')[0]}>{currency}</option>
+                          {formData.certifications?.includes(cert) && (
+                            <div className="ml-5 mt-1">
+                              <input
+                                type="file"
+                                accept=".pdf,.doc,.docx,image/*"
+                                onChange={(e) => onCertificationFileSelect(cert, e)}
+                                required
+                                className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
+                              />
+                              {certificationFiles[cert] && (
+                                <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </select>
+                    </div>
+                    <p className="text-xs text-yellow-300/70 mt-2">
+                      ⚠️ At least one certification with uploaded document is required for certified providers
+                    </p>
                   </div>
-                </div>
-
-                {/* Destination (Single-select for Tour Guide - same as Jeep Driver) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    National Park / Destination *
-                  </label>
-                  <select
-                    value={formData.destinations || ""}
-                    onChange={(e) => handlers.setDestinations(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-                  >
-                    <option value="">Select Your National Park</option>
-                    {destinations.map(destination => (
-                      <option key={destination} value={destination} className="bg-gray-800">
-                        {destination}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-gray-400 text-[10px] mt-1">
-                    Select the primary destination you operate in
-                  </p>
-                </div>
+                )}
               </>
             )}
 
             {/* Jeep Driver Specific Fields */}
             {!isTourGuide && (
               <>
-                {/* Destination (Single-select for Jeep Driver - one park only) */}
+                {/* Destination (Custom dropdown for Jeep Driver) */}
+                <div className="space-y-1 relative">
+                  <label className="flex items-center gap-2 text-white font-medium text-xs">
+                    Destination *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.destinations || ""}
+                      onChange={(e) => {
+                        handlers.setDestinations(e.target.value);
+                        setShowDestinationDropdown(true);
+                      }}
+                      onFocus={() => setShowDestinationDropdown(true)}
+                      required
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                      placeholder="Type to search destinations..."
+                      autoComplete="off"
+                    />
+                    <ChevronDown 
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 cursor-pointer"
+                      onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
+                    />
+                    {showDestinationDropdown && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setShowDestinationDropdown(false)}
+                        />
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                          {destinations
+                            .filter(dest => 
+                              dest.toLowerCase().includes((formData.destinations || '').toLowerCase())
+                            )
+                            .map((destination) => (
+                              <button
+                                key={destination}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handlers.setDestinations(destination);
+                                  setShowDestinationDropdown(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${
+                                  (formData.destinations || '') === destination ? 'bg-yellow-500/20' : ''
+                                }`}
+                              >
+                                {destination}
+                              </button>
+                            ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-gray-400 text-[10px] mt-1">
+                    Select the primary destination where you operate
+                  </p>
+                </div>
+
+                {/* Years of Experience (Full Width) */}
                 <div className="space-y-1">
                   <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    National Park / Destination *
+                    Years of Experience *
                   </label>
-                  <select
-                    value={formData.destinations || ""}
-                    onChange={(e) => handlers.setDestinations(e.target.value)}
+                  <input
+                    type="number"
+                    value={formData.experience}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Prevent 0 and ensure minimum is 1
+                      if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
+                        handlers.setExperience(value);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      // Prevent typing 0 as first digit
+                      if (e.key === '0' && e.target.value === '') {
+                        e.preventDefault();
+                      }
+                    }}
                     required
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-                  >
-                    <option value="">Select Your National Park</option>
-                    {destinations.map(destination => (
-                      <option key={destination} value={destination} className="bg-gray-800">
-                        {destination}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-gray-400 text-[10px] mt-1">
-                    Jeep drivers operate at one park location
-                  </p>
+                    min="1"
+                    max="50"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                    placeholder="Enter years of experience"
+                  />
                 </div>
 
                 {/* Languages Spoken (Multi-select) */}
@@ -3680,86 +4801,72 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                   </div>
                 </div>
 
-                {/* Certifications (Multi-select) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Certifications
-                  </label>
-                  <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5 space-y-2">
-                    {certifications.map(cert => (
-                      <div key={cert} className="space-y-1">
-                        <div className="flex items-center mb-1">
-                          <input
-                            type="checkbox"
-                            id={`cert-${cert}`}
-                            checked={formData.certifications?.includes(cert) || false}
-                            onChange={(e) => handleMultiSelectChange('certifications', cert)}
-                            className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                          />
-                          <label htmlFor={`cert-${cert}`} className="text-white text-xs">
-                            {cert}
-                          </label>
-                        </div>
-                        {formData.certifications?.includes(cert) && (
-                          <div className="ml-5 mt-1">
+                {/* Certifications (Multi-select) - Only shown for certified providers */}
+                {formData.certificationStatus === 'certified' && (
+                  <div className="space-y-1 border-2 border-yellow-500/40 rounded-lg p-3 bg-yellow-500/5">
+                    <label className="flex items-center gap-2 text-yellow-400 font-semibold text-xs">
+                      Certifications *
+                      <span className="text-yellow-300/70 text-[10px] font-normal">(Upload at least one certification)</span>
+                    </label>
+                    <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5 space-y-2">
+                      {certifications.map(cert => (
+                        <div key={cert} className="space-y-1">
+                          <div className="flex items-center mb-1">
                             <input
-                              type="file"
-                              accept=".pdf,.doc,.docx,image/*"
-                              onChange={(e) => onCertificationFileSelect(cert, e)}
-                              className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
+                              type="checkbox"
+                              id={`cert-${cert}`}
+                              checked={formData.certifications?.includes(cert) || false}
+                              onChange={(e) => handleMultiSelectChange('certifications', cert)}
+                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
                             />
-                            {certificationFiles[cert] && (
-                              <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
-                            )}
+                            <label htmlFor={`cert-${cert}`} className="text-white text-xs">
+                              {cert}
+                            </label>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {formData.certifications?.includes(cert) && (
+                            <div className="ml-5 mt-1">
+                              <input
+                                type="file"
+                                accept=".pdf,.doc,.docx,image/*"
+                                onChange={(e) => onCertificationFileSelect(cert, e)}
+                                required
+                                className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
+                              />
+                              {certificationFiles[cert] && (
+                                <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-yellow-300/70 mt-2">
+                      ⚠️ At least one certification with uploaded document is required for certified providers
+                    </p>
                   </div>
-                </div>
+                )}
               </>
             )}
 
-            {/* Description */}
+            {/* Service Provider Bio */}
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-white font-medium text-xs">
-                {isTourGuide ? 'Service Description' : 'Service Description'}
+                Service Provider Bio
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => handlers.setDescription(e.target.value)}
                 rows="2"
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                placeholder={isTourGuide ? "Describe your guiding services, expertise, and what makes you unique..." : "Describe your services, expertise, and what makes you unique..."}
+                placeholder="Describe your services, expertise, and what makes you unique..."
               />
             </div>
 
-            {/* Availability Calendar */}
-            <div className="space-y-2 mt-4" onClick={(e) => e.stopPropagation()}>
-              <label className="flex items-center gap-2 text-white font-medium text-xs">
-                <Calendar className="h-3 w-3 text-yellow-400" />
-                Mark Your Availability (Optional)
-              </label>
-              <p className="text-xs text-gray-400">
-                Click on dates to mark as Busy, Half Day, or Unavailable. This helps tourists see when you're available for bookings.
-              </p>
-              <div onClick={(e) => e.stopPropagation()}>
-                <AvailabilityCalendar
-                  availability={formData.availableDates || {}}
-                  onChange={(availability) => {
-                    console.log('📅 Availability changed:', availability);
-                    if (handlers && handlers.setAvailableDates) {
-                      handlers.setAvailableDates(availability);
-                    }
-                  }}
-                  readOnly={false}
-                />
-              </div>
-            </div>
           </>
         )}
 
         {/* Profile Picture */}
+        {(isTourist || formData.serviceType) && (
         <div className="space-y-1">
           <label className="flex items-center gap-2 text-white font-medium text-xs">
             <Camera className="h-3 w-3 text-yellow-400" />
@@ -3778,8 +4885,14 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
           </div>
           <p className="text-xs text-gray-400">Max file size: 2MB</p>
         </div>
+        )}
+        
+        {/* Close the main conditional wrapper */}
+        </>
+        )}
 
         {/* Submit Button */}
+        {(isTourist || formData.serviceType) && (
         <div className="pt-2">
           <button
             type="submit"
@@ -3796,6 +4909,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             )}
           </button>
         </div>
+        )}
       </form>
 
       {msg && (

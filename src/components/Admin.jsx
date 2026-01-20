@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 // Supabase Storage imports (replacing Firebase Storage)
@@ -10,8 +10,21 @@ import Footer from './home/Footer';
 import { updateBookingStatus, GlobalNotificationBell } from '../App';
 import AvailabilityCalendar from './AvailabilityCalendar';
 
+// Helper function to format dates with month as text
+const formatDate = (date) => {
+  if (!date) return 'N/A';
+  const dateObj = date instanceof Date ? date : new Date(date);
+  return dateObj.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+};
+
 const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationClick, onMarkAsRead }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const auth = getAuth();
   const db = getFirestore();
   // Firebase Storage removed - using Supabase Storage instead
@@ -24,11 +37,15 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   const [profilePreview, setProfilePreview] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'documents', 'availability'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'availability'
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [uploadedCertifications, setUploadedCertifications] = useState([]);
   const [availabilityCalendar, setAvailabilityCalendar] = useState({}); // Object: { "YYYY-MM-DD": "busy"|"halfday"|"unavailable" }
+  const [isEditing, setIsEditing] = useState(false); // For profile edit mode
+  const [isEditingCalendar, setIsEditingCalendar] = useState(false); // For calendar edit mode
+  const [tempAvailabilityCalendar, setTempAvailabilityCalendar] = useState({}); // Temp calendar state for editing
+  const [bookingFilter, setBookingFilter] = useState('all'); // 'all', 'pending', 'accepted', 'completed', 'declined'
 
   // Form state - will be populated from userData
   const [formData, setFormData] = useState({
@@ -39,14 +56,21 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
     experience: '',
     description: '',
     // Jeep Driver fields
-    vehicleType: '',
+    vehicleType: '', // Legacy single vehicle type
+    vehicleTypes: [], // New: Array for multiple vehicle types
     pricePerDay: '',
+    priceFullDay: '', // Legacy
+    priceHalfDay: '', // Legacy
+    // Separate prices for each vehicle type
+    priceFullDayStandard: '',
+    priceHalfDayStandard: '',
+    priceFullDayLuxury: '',
+    priceHalfDayLuxury: '',
     destinations: '',
     languages: [],
     specialSkills: [],
     certifications: [],
     // Guide fields
-    destinations: '',
     specialQualifications: [],
     areasOfExpertise: [],
     verificationDocuments: [],
@@ -59,9 +83,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   // Options for dropdowns/checkboxes
   const vehicleTypes = [
     "Standard Safari Jeep",
-    "Luxury Safari Jeep",
-    "Open Roof Jeep",
-    "4x4 Modified Jeep"
+    "Luxury Safari Jeep"
   ];
 
   const destinations = [
@@ -86,19 +108,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   ];
 
   const specialSkills = [
-    "Wildlife photography knowledge",
-    "Birdwatching expertise",
-    "Family-friendly tours",
-    "Private tours",
-    "Full-day safari",
-    "Half-day safari"
+    "Bird identification knowledge",
+    "Tusker identification knowledge",
+    "Leopard identification knowledge",
+    "Reptile identification knowledge",
+    "Flora identification knowledge",
+    "First aid knowledge"
   ];
 
   const certifications = [
-    "Wildlife Department Certified",
-    "Tourism Board Licensed",
-    "First Aid Certified",
-    "Eco Tourism Certified"
+    "Wildlife Department of Sri Lanka certification",
+    "Tourist Board of Sri Lanka certification"
   ];
 
   // Guide specific options
@@ -160,6 +180,14 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
     return () => unsubscribe();
   }, [auth, navigate]);
 
+  // Handle URL tab parameter (e.g., /admin?tab=bookings)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['profile', 'bookings', 'availability'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
   const fetchUserData = async (uid) => {
     try {
       setLoading(true);
@@ -187,16 +215,24 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             phone: data.phone || data.contactPhone || '',
             location: data.location || data.baseLocation || '',
             experience: data.experienceYears || data.experience || '',
+            certificationStatus: data.certificationStatus || 'non-certified',
             description: data.description || data.bio || '',
             // Jeep Driver fields
-            vehicleType: data.vehicleType || '',
+            vehicleType: data.vehicleType || '', // Legacy single vehicle
+            vehicleTypes: Array.isArray(data.vehicleTypes) ? data.vehicleTypes : (data.vehicleType ? [data.vehicleType] : []), // New: Multiple vehicle types
             pricePerDay: data.pricePerDay || data.price || data.dailyRate || '',
+            priceFullDay: data.priceFullDay || '', // Legacy
+            priceHalfDay: data.priceHalfDay || '', // Legacy
+            // Separate prices for each vehicle type
+            priceFullDayStandard: data.priceFullDayStandard || '',
+            priceHalfDayStandard: data.priceHalfDayStandard || '',
+            priceFullDayLuxury: data.priceFullDayLuxury || '',
+            priceHalfDayLuxury: data.priceHalfDayLuxury || '',
             destinations: Array.isArray(data.destinations) ? data.destinations[0] || '' : data.destinations || '',
             languages: Array.isArray(data.languages) ? data.languages : (data.languagesSpoken ? [data.languagesSpoken] : []),
             specialSkills: Array.isArray(data.specialSkills) ? data.specialSkills : [],
             certifications: Array.isArray(data.certifications) ? data.certifications : [],
             // Guide fields
-            destinations: Array.isArray(data.destinations) ? data.destinations[0] || '' : data.destinations || '',
             specialQualifications: Array.isArray(data.specialQualifications) ? data.specialQualifications : [],
             areasOfExpertise: Array.isArray(data.areasOfExpertise) ? data.areasOfExpertise : [],
             verificationDocuments: Array.isArray(data.verificationDocuments) ? data.verificationDocuments : [],
@@ -247,7 +283,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           id: doc.id,
           ...doc.data()
         })).sort((a, b) => {
-          // Sort by date (newest first)
+          // Prioritize pending bookings first
+          if (a.status === 'pending' && b.status !== 'pending') return -1;
+          if (a.status !== 'pending' && b.status === 'pending') return 1;
+          
+          // Then sort by date (newest first)
           const dateA = a.createdAt?.toDate?.() || a.createdAt || new Date(0);
           const dateB = b.createdAt?.toDate?.() || b.createdAt || new Date(0);
           return dateB - dateA;
@@ -471,10 +511,24 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
 
       // Service type specific fields
       if (serviceType === 'Jeep Driver') {
+        // Parse prices (handle comma-separated strings)
+        const parsePrice = (priceStr) => {
+          if (!priceStr) return 0;
+          return parseInt(priceStr.toString().replace(/,/g, '')) || 0;
+        };
+
         updateData = {
           ...updateData,
-          vehicleType: formData.vehicleType || '',
+          vehicleType: formData.vehicleType || '', // Legacy single vehicle
+          vehicleTypes: formData.vehicleTypes || [], // New: Multiple vehicle types array
           pricePerDay: formData.pricePerDay ? parseInt(formData.pricePerDay) : 0,
+          priceFullDay: formData.priceFullDay ? parseInt(formData.priceFullDay) : 0,
+          priceHalfDay: formData.priceHalfDay ? parseInt(formData.priceHalfDay) : 0,
+          // Separate prices for each vehicle type
+          priceFullDayStandard: parsePrice(formData.priceFullDayStandard),
+          priceHalfDayStandard: parsePrice(formData.priceHalfDayStandard),
+          priceFullDayLuxury: parsePrice(formData.priceFullDayLuxury),
+          priceHalfDayLuxury: parsePrice(formData.priceHalfDayLuxury),
           destinations: formData.destinations ? [formData.destinations] : [],
           languages: formData.languages || [],
           specialSkills: formData.specialSkills || [],
@@ -517,6 +571,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
       await updateDoc(userDocRef, updateData);
 
       setMessage({ type: 'success', text: 'Your profile has been updated successfully!' });
+      setIsEditing(false); // Exit edit mode after successful save
 
       // Refresh user data
       await fetchUserData(uid);
@@ -621,16 +676,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('documents')}
-              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'documents'
-                ? 'bg-emerald-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                }`}
-            >
-              Documents
-            </button>
-            <button
-              type="button"
               onClick={() => setActiveTab('availability')}
               className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'availability'
                 ? 'bg-emerald-600 text-white'
@@ -644,6 +689,74 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           {/* Profile Tab */}
           {activeTab === 'profile' && (
             <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
+              {/* Header with Edit/Save Buttons */}
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-white">Profile Information</h2>
+                <div className="flex gap-2">
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditing(false);
+                          // Reload user data to discard changes
+                          if (userData) {
+                            setFormData({
+                              fullName: userData.fullName || '',
+                              email: userData.email || '',
+                              phone: userData.phone || '',
+                              location: userData.location || '',
+                              experience: userData.experience || '',
+                              description: userData.description || '',
+                              vehicleType: userData.vehicleType || '',
+                              vehicleTypes: Array.isArray(userData.vehicleTypes) ? userData.vehicleTypes : (userData.vehicleType ? [userData.vehicleType] : []),
+                              pricePerDay: userData.pricePerDay || '',
+                              priceFullDay: userData.priceFullDay || '',
+                              priceHalfDay: userData.priceHalfDay || '',
+                              priceFullDayStandard: userData.priceFullDayStandard || '',
+                              priceHalfDayStandard: userData.priceHalfDayStandard || '',
+                              priceFullDayLuxury: userData.priceFullDayLuxury || '',
+                              priceHalfDayLuxury: userData.priceHalfDayLuxury || '',
+                              destinations: userData.destinations || '',
+                              languages: userData.languages || [],
+                              specialSkills: userData.specialSkills || [],
+                              certifications: userData.certifications || [],
+                              specialQualifications: userData.specialQualifications || [],
+                              areasOfExpertise: userData.areasOfExpertise || [],
+                              verificationDocuments: userData.verificationDocuments || [],
+                              hourlyRate: userData.hourlyRate || '',
+                              dailyRate: userData.dailyRate || '',
+                              specialPackageRates: userData.specialPackageRates || '',
+                              currencyPreference: userData.currencyPreference || 'LKR',
+                            });
+                            setProfileFile(null);
+                            setProfilePreview(null);
+                          }
+                        }}
+                        className="px-4 py-2 text-sm border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Save className="h-4 w-4" />
+                        Save Changes
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+                    >
+                      Edit Profile
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Main Two Boxes - Side by Side */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
                 {/* Left Box - Basic Information */}
@@ -654,31 +767,88 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   </h2>
 
                   <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1">
-                        Full Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.fullName}
-                        onChange={(e) => handleInputChange('fullName', e.target.value)}
-                        required
-                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
+                    {/* Profile Picture and Full Name Row */}
+                    <div className="flex gap-4 items-start">
+                      {/* Profile Picture - Left */}
+                      <div className="flex-shrink-0">
+                        <label className="block text-xs font-medium text-gray-300 mb-2 flex items-center gap-1">
+                          <Upload className="h-3 w-3" />
+                          Profile Picture
+                        </label>
+                        {isEditing ? (
+                          <div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleProfileImageSelect}
+                              className="hidden"
+                              id="profile-picture-upload"
+                            />
+                            <label
+                              htmlFor="profile-picture-upload"
+                              className="cursor-pointer block"
+                            >
+                              {profilePreview || userData?.profilePicture ? (
+                                <img
+                                  src={profilePreview || userData.profilePicture}
+                                  alt="Profile"
+                                  className="h-24 w-24 rounded-full object-cover border-2 border-emerald-500 hover:border-emerald-400 transition-colors"
+                                />
+                              ) : (
+                                <div className="h-24 w-24 rounded-full bg-gray-900/50 border-2 border-gray-600 hover:border-emerald-500 transition-colors flex items-center justify-center">
+                                  <User className="h-12 w-12 text-gray-500" />
+                                </div>
+                              )}
+                            </label>
+                            <p className="text-xs text-gray-500 mt-1 text-center">Click to change</p>
+                          </div>
+                        ) : (
+                          <div>
+                            {(userData?.profilePicture || profilePreview) ? (
+                              <img
+                                src={profilePreview || userData.profilePicture}
+                                alt="Profile"
+                                className="h-24 w-24 rounded-full object-cover border-2 border-emerald-500 shadow-lg"
+                              />
+                            ) : (
+                              <div className="h-24 w-24 rounded-full bg-gray-900/50 border-2 border-gray-600 flex items-center justify-center">
+                                <User className="h-12 w-12 text-gray-500" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Full Name - Right */}
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                          Full Name *
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.fullName}
+                            onChange={(e) => handleInputChange('fullName', e.target.value)}
+                            required
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          />
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.fullName || 'Not provided'}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
+                    {/* Email and Phone */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-300 mb-1">
                           Email *
                         </label>
-                        <input
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => handleInputChange('email', e.target.value)}
-                          required
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        />
+                        <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-400">
+                          {formData.email || 'Not provided'}
+                        </div>
                       </div>
 
                       <div>
@@ -686,31 +856,44 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           <Phone className="h-3 w-3" />
                           Phone *
                         </label>
-                        <input
-                          type="tel"
-                          value={formData.phone}
-                          onChange={(e) => handleInputChange('phone', e.target.value)}
-                          required
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="+94701234567"
-                        />
+                        {isEditing ? (
+                          <input
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) => handleInputChange('phone', e.target.value)}
+                            required
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="+94701234567"
+                          />
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.phone || 'Not provided'}
+                          </div>
+                        )}
                       </div>
                     </div>
 
+                    {/* Location and Experience */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
                           Location *
                         </label>
-                        <input
-                          type="text"
-                          value={formData.location}
-                          onChange={(e) => handleInputChange('location', e.target.value)}
-                          required
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="Base location"
-                        />
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.location}
+                            onChange={(e) => handleInputChange('location', e.target.value)}
+                            required
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="Base location"
+                          />
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.location || 'Not provided'}
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -718,48 +901,83 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           <Calendar className="h-3 w-3" />
                           Experience *
                         </label>
-                        <input
-                          type="number"
-                          value={formData.experience}
-                          onChange={(e) => handleInputChange('experience', e.target.value)}
-                          required
-                          min="0"
-                          max="50"
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        />
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={formData.experience}
+                            onChange={(e) => handleInputChange('experience', e.target.value)}
+                            required
+                            min="0"
+                            max="50"
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          />
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.experience ? `${formData.experience} years` : 'Not provided'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Certification Status - VIEW ONLY (Admin-controlled approval status) */}
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                          <Award className="h-3 w-3" />
+                          Certification Status
+                        </label>
+                        {/* Always View-Only - Shows admin approval status */}
+                        <div>
+                          {formData.certificationStatus === 'certified' ? (
+                            <div className="space-y-2">
+                              {userData?.certificationApproved ? (
+                                <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-green-500/20 border-2 border-green-500/50 text-green-300 flex items-center gap-2">
+                                  <CheckCircle className="h-4 w-4" />
+                                  ✓ Certified Provider (Admin Approved)
+                                </div>
+                              ) : userData?.certificationRejected ? (
+                                <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-red-500/20 border-2 border-red-500/50 text-red-300 flex items-center gap-2">
+                                  <AlertCircle className="h-4 w-4" />
+                                  ✗ Certification Request Rejected
+                                </div>
+                              ) : (
+                                <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-300 flex items-center gap-2 animate-pulse">
+                                  <AlertCircle className="h-4 w-4" />
+                                  ⏳ Pending Admin Approval
+                                </div>
+                              )}
+                              <p className="text-xs text-gray-400">
+                                {userData?.certificationApproved 
+                                  ? `Approved by ${userData.certificationApprovedByName || 'Admin'} on ${userData.certificationApprovedAt?.toDate?.().toLocaleDateString() || 'N/A'}`
+                                  : userData?.certificationRejected
+                                  ? `Rejected: ${userData.certificationRejectionReason || 'Please contact admin for more details'}`
+                                  : 'Your certification request is being reviewed by an admin. You will be notified once approved.'}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="w-full px-3 py-1.5 text-sm rounded-lg font-medium bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
+                              Non-Certified Provider
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
+                    {/* Service Provider Bio */}
                     <div>
                       <label className="block text-xs font-medium text-gray-300 mb-1">
-                        Description
+                        Service Provider Bio
                       </label>
-                      <textarea
-                        value={formData.description}
-                        onChange={(e) => handleInputChange('description', e.target.value)}
-                        rows="2"
-                        className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                        placeholder="Tell us about yourself..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                        <Upload className="h-3 w-3" />
-                        Profile Picture
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleProfileImageSelect}
-                        className="w-full px-3 py-1.5 text-xs bg-gray-900 border border-gray-600 rounded-lg text-white file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                      {profilePreview && (
-                        <img
-                          src={profilePreview}
-                          alt="Preview"
-                          className="mt-2 h-12 w-12 rounded-full object-cover border-2 border-emerald-500"
+                      {isEditing ? (
+                        <textarea
+                          value={formData.description}
+                          onChange={(e) => handleInputChange('description', e.target.value)}
+                          rows="2"
+                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+                          placeholder="Tell us about yourself..."
                         />
+                      ) : (
+                        <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200 whitespace-pre-wrap">
+                          {formData.description || 'No description provided'}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -770,58 +988,333 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                       <Car className="h-4 w-4 text-emerald-400" />
-                      Jeep Driver Details
+                      Service Rates
                     </h2>
 
                     <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-1">
-                            Vehicle Type
-                          </label>
-                          <select
-                            value={formData.vehicleType}
-                            onChange={(e) => handleInputChange('vehicleType', e.target.value)}
-                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          >
-                            <option value="">Select Type</option>
-                            {vehicleTypes.map(type => (
-                              <option key={type} value={type}>{type}</option>
-                            ))}
-                          </select>
-                        </div>
-
+                      {/* Certification Status Toggle - EDIT MODE ONLY */}
+                      {isEditing && (
                         <div>
                           <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
-                            Price/Day (LKR)
+                            <Award className="h-3 w-3" />
+                            Certification Status
                           </label>
-                          <input
-                            type="number"
-                            value={formData.pricePerDay}
-                            onChange={(e) => handleInputChange('pricePerDay', e.target.value)}
-                            min="0"
-                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            placeholder="12000"
-                          />
+                          <div className="space-y-2">
+                            {/* Editable Toggle */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <button
+                                type="button"
+                                onClick={() => handleInputChange('certificationStatus', 'non-certified')}
+                                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${
+                                  formData.certificationStatus === 'non-certified'
+                                    ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                                    : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                                }`}
+                              >
+                                Non-Certified Service Provider
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleInputChange('certificationStatus', 'certified')}
+                                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${
+                                  formData.certificationStatus === 'certified'
+                                    ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
+                                    : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                                }`}
+                              >
+                                Certified Service Provider
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-400">
+                              {formData.certificationStatus === 'certified'
+                                ? '⚠️ Selecting certified status requires admin approval before premium pricing applies'
+                                : '✓ Non-certified providers have maximum price limits'}
+                            </p>
+                          </div>
                         </div>
+                      )}
+
+                      {/* Vehicle Type(s) */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                          Vehicle Type(s) {isEditing && <span className="text-gray-400 text-xs">(Select all that apply)</span>}
+                        </label>
+                        {isEditing ? (
+                          <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 space-y-2">
+                            {vehicleTypes.map(type => (
+                              <div key={type} className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id={`vehicle-edit-${type}`}
+                                  checked={formData.vehicleTypes?.includes(type) || false}
+                                  onChange={() => handleMultiSelectChange('vehicleTypes', type)}
+                                  className="mr-2 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800 cursor-pointer"
+                                />
+                                <label htmlFor={`vehicle-edit-${type}`} className="text-sm text-gray-300 cursor-pointer">
+                                  {type}
+                                </label>
+                              </div>
+                            ))}
+                            {formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
+                              <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-600">
+                                Selected: {formData.vehicleTypes.join(', ')}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.vehicleTypes && formData.vehicleTypes.length > 0
+                              ? formData.vehicleTypes.join(', ')
+                              : (formData.vehicleType || 'Not specified')
+                            }
+                          </div>
+                        )}
                       </div>
 
+                      {/* Pricing based on selected vehicle types */}
+                      {isEditing && formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
+                        <div className="space-y-3">
+                          <h4 className="text-white font-semibold text-sm">Pricing Information</h4>
+                          
+                          {/* Standard Safari Jeep Prices */}
+                          {formData.vehicleTypes.includes("Standard Safari Jeep") && (
+                            <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">
+                              <p className="text-green-400 font-medium text-xs mb-2">Standard Safari Jeep Pricing</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                                    Full Day Price (LKR) * 
+                                    {formData.certificationStatus === 'certified' ? (
+                                      userData?.certificationApproved ? (
+                                        <span className="text-yellow-400 ml-1">(Min: 25,000)</span>
+                                      ) : (
+                                        <span className="text-emerald-400 ml-1">(Max: 25,000 - Pending Approval)</span>
+                                      )
+                                    ) : (
+                                      <span className="text-emerald-400 ml-1">(Max: 25,000)</span>
+                                    )}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={formData.priceFullDayStandard}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      // Prevent starting with 0
+                                      if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                        return;
+                                      }
+                                      handleInputChange('priceFullDayStandard', value);
+                                    }}
+                                    required
+                                    className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    placeholder={
+                                      formData.certificationStatus === 'certified' && userData?.certificationApproved
+                                        ? "Minimum: 25,000"
+                                        : "Maximum: 25,000"
+                                    }
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                                    Half Day Price (LKR) *
+                                    {formData.certificationStatus === 'certified' ? (
+                                      userData?.certificationApproved ? (
+                                        <span className="text-yellow-400 ml-1">(Min: 12,000)</span>
+                                      ) : (
+                                        <span className="text-emerald-400 ml-1">(Max: 12,000 - Pending Approval)</span>
+                                      )
+                                    ) : (
+                                      <span className="text-emerald-400 ml-1">(Max: 12,000)</span>
+                                    )}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={formData.priceHalfDayStandard}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      // Prevent starting with 0
+                                      if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                        return;
+                                      }
+                                      handleInputChange('priceHalfDayStandard', value);
+                                    }}
+                                    required
+                                    className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    placeholder={
+                                      formData.certificationStatus === 'certified' && userData?.certificationApproved
+                                        ? "Minimum: 12,000"
+                                        : "Maximum: 12,000"
+                                    }
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Luxury Safari Jeep Prices */}
+                          {formData.vehicleTypes.includes("Luxury Safari Jeep") && (
+                            <div className="border border-yellow-500/30 rounded-lg p-3 bg-yellow-500/5">
+                              <p className="text-yellow-400 font-medium text-xs mb-2">Luxury Safari Jeep Pricing</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                                    Full Day Price (LKR) *
+                                    {formData.certificationStatus === 'certified' ? (
+                                      userData?.certificationApproved ? (
+                                        <span className="text-yellow-400 ml-1">(Min: 35,000)</span>
+                                      ) : (
+                                        <span className="text-emerald-400 ml-1">(Max: 35,000 - Pending Approval)</span>
+                                      )
+                                    ) : (
+                                      <span className="text-emerald-400 ml-1">(Max: 35,000)</span>
+                                    )}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={formData.priceFullDayLuxury}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      // Prevent starting with 0
+                                      if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                        return;
+                                      }
+                                      handleInputChange('priceFullDayLuxury', value);
+                                    }}
+                                    required
+                                    className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    placeholder={
+                                      formData.certificationStatus === 'certified' && userData?.certificationApproved
+                                        ? "Minimum: 35,000"
+                                        : "Maximum: 35,000"
+                                    }
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                                    Half Day Price (LKR) *
+                                    {formData.certificationStatus === 'certified' ? (
+                                      userData?.certificationApproved ? (
+                                        <span className="text-yellow-400 ml-1">(Min: 18,000)</span>
+                                      ) : (
+                                        <span className="text-emerald-400 ml-1">(Max: 18,000 - Pending Approval)</span>
+                                      )
+                                    ) : (
+                                      <span className="text-emerald-400 ml-1">(Max: 18,000)</span>
+                                    )}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={formData.priceHalfDayLuxury}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      // Prevent starting with 0
+                                      if (value === '0' || (value.startsWith('0') && !value.includes(','))) {
+                                        return;
+                                      }
+                                      handleInputChange('priceHalfDayLuxury', value);
+                                    }}
+                                    required
+                                    className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    placeholder={
+                                      formData.certificationStatus === 'certified' && userData?.certificationApproved
+                                        ? "Minimum: 18,000"
+                                        : "Maximum: 18,000"
+                                    }
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* View Mode Prices */}
+                      {!isEditing && (
+                        <div className="space-y-2">
+                          {/* Standard Prices */}
+                          {(formData.priceFullDayStandard || formData.priceHalfDayStandard) && (
+                            <div className="border border-green-500/30 rounded-lg p-2 bg-green-500/5">
+                              <p className="text-green-400 font-medium text-xs mb-1">Standard Safari Jeep</p>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                {formData.priceFullDayStandard && (
+                                  <div>
+                                    <span className="text-gray-400">Full Day:</span>{' '}
+                                    <span className="text-gray-200">LKR {parseInt(formData.priceFullDayStandard).toLocaleString()}</span>
+                                  </div>
+                                )}
+                                {formData.priceHalfDayStandard && (
+                                  <div>
+                                    <span className="text-gray-400">Half Day:</span>{' '}
+                                    <span className="text-gray-200">LKR {parseInt(formData.priceHalfDayStandard).toLocaleString()}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Luxury Prices */}
+                          {(formData.priceFullDayLuxury || formData.priceHalfDayLuxury) && (
+                            <div className="border border-yellow-500/30 rounded-lg p-2 bg-yellow-500/5">
+                              <p className="text-yellow-400 font-medium text-xs mb-1">Luxury Safari Jeep</p>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                {formData.priceFullDayLuxury && (
+                                  <div>
+                                    <span className="text-gray-400">Full Day:</span>{' '}
+                                    <span className="text-gray-200">LKR {parseInt(formData.priceFullDayLuxury).toLocaleString()}</span>
+                                  </div>
+                                )}
+                                {formData.priceHalfDayLuxury && (
+                                  <div>
+                                    <span className="text-gray-400">Half Day:</span>{' '}
+                                    <span className="text-gray-200">LKR {parseInt(formData.priceHalfDayLuxury).toLocaleString()}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Legacy prices fallback */}
+                          {!formData.priceFullDayStandard && !formData.priceHalfDayStandard && !formData.priceFullDayLuxury && !formData.priceHalfDayLuxury && (formData.priceFullDay || formData.priceHalfDay) && (
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-300 mb-1">Full Day Price (LKR)</label>
+                                <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                                  {formData.priceFullDay ? `LKR ${parseInt(formData.priceFullDay).toLocaleString()}` : 'Not set'}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-300 mb-1">Half Day Price (LKR)</label>
+                                <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                                  {formData.priceHalfDay ? `LKR ${parseInt(formData.priceHalfDay).toLocaleString()}` : 'Not set'}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* National Park */}
                       <div>
                         <label className="block text-xs font-medium text-gray-300 mb-1">
                           National Park *
                         </label>
-                        <select
-                          value={formData.destinations}
-                          onChange={(e) => handleInputChange('destinations', e.target.value)}
-                          required
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          <option value="">Select Park</option>
-                          {destinations.map(dest => (
-                            <option key={dest} value={dest}>{dest}</option>
-                          ))}
-                        </select>
+                        {isEditing ? (
+                          <select
+                            value={formData.destinations}
+                            onChange={(e) => handleInputChange('destinations', e.target.value)}
+                            required
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          >
+                            <option value="">Select Park</option>
+                            {destinations.map(dest => (
+                              <option key={dest} value={dest}>{dest}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.destinations || 'Not specified'}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -839,17 +1332,23 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         <label className="block text-xs font-medium text-gray-300 mb-1">
                           National Park / Destination *
                         </label>
-                        <select
-                          value={formData.destinations}
-                          onChange={(e) => handleInputChange('destinations', e.target.value)}
-                          required
-                          className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        >
-                          <option value="">Select Park</option>
-                          {destinations.map(dest => (
-                            <option key={dest} value={dest}>{dest}</option>
-                          ))}
-                        </select>
+                        {isEditing ? (
+                          <select
+                            value={formData.destinations}
+                            onChange={(e) => handleInputChange('destinations', e.target.value)}
+                            required
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          >
+                            <option value="">Select Park</option>
+                            {destinations.map(dest => (
+                              <option key={dest} value={dest}>{dest}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.destinations || 'Not specified'}
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -858,14 +1357,20 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                             <DollarSign className="h-3 w-3" />
                             Hourly Rate
                           </label>
-                          <input
-                            type="number"
-                            value={formData.hourlyRate}
-                            onChange={(e) => handleInputChange('hourlyRate', e.target.value)}
-                            min="0"
-                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            placeholder="2000"
-                          />
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={formData.hourlyRate}
+                              onChange={(e) => handleInputChange('hourlyRate', e.target.value)}
+                              min="0"
+                              className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="2000"
+                            />
+                          ) : (
+                            <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                              {formData.hourlyRate ? `LKR ${parseInt(formData.hourlyRate).toLocaleString()}` : 'Not set'}
+                            </div>
+                          )}
                         </div>
 
                         <div>
@@ -873,14 +1378,20 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                             <DollarSign className="h-3 w-3" />
                             Daily Rate
                           </label>
-                          <input
-                            type="number"
-                            value={formData.dailyRate}
-                            onChange={(e) => handleInputChange('dailyRate', e.target.value)}
-                            min="0"
-                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            placeholder="15000"
-                          />
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={formData.dailyRate}
+                              onChange={(e) => handleInputChange('dailyRate', e.target.value)}
+                              min="0"
+                              className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="15000"
+                            />
+                          ) : (
+                            <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                              {formData.dailyRate ? `LKR ${parseInt(formData.dailyRate).toLocaleString()}` : 'Not set'}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -889,30 +1400,42 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           <label className="block text-xs font-medium text-gray-300 mb-1">
                             Package Rates
                           </label>
-                          <input
-                            type="text"
-                            value={formData.specialPackageRates}
-                            onChange={(e) => handleInputChange('specialPackageRates', e.target.value)}
-                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            placeholder="3-day: 40,000 LKR"
-                          />
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={formData.specialPackageRates}
+                              onChange={(e) => handleInputChange('specialPackageRates', e.target.value)}
+                              className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="3-day: 40,000 LKR"
+                            />
+                          ) : (
+                            <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                              {formData.specialPackageRates || 'Not set'}
+                            </div>
+                          )}
                         </div>
 
                         <div>
                           <label className="block text-xs font-medium text-gray-300 mb-1">
                             Currency
                           </label>
-                          <select
-                            value={formData.currencyPreference}
-                            onChange={(e) => handleInputChange('currencyPreference', e.target.value)}
-                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          >
-                            {currencyOptions.map(currency => (
-                              <option key={currency} value={currency.split(' - ')[0]}>
-                                {currency.split(' - ')[0]}
-                              </option>
-                            ))}
-                          </select>
+                          {isEditing ? (
+                            <select
+                              value={formData.currencyPreference}
+                              onChange={(e) => handleInputChange('currencyPreference', e.target.value)}
+                              className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            >
+                              {currencyOptions.map(currency => (
+                                <option key={currency} value={currency.split(' - ')[0]}>
+                                  {currency.split(' - ')[0]}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                              {formData.currencyPreference || 'LKR'}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -929,64 +1452,254 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       <Languages className="h-4 w-4 text-emerald-400" />
                       Languages
                     </label>
-                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
-                      {languages.map(language => (
-                        <div key={language} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`lang-${language}`}
-                            checked={formData.languages.includes(language)}
-                            onChange={() => handleMultiSelectChange('languages', language)}
-                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                          />
-                          <label htmlFor={`lang-${language}`} className="text-xs text-gray-300">
-                            {language}
-                          </label>
+                    <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 max-h-40 overflow-y-auto">
+                      {isEditing ? (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {languages.map(language => (
+                            <div key={language} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`lang-${language}`}
+                                checked={formData.languages.includes(language)}
+                                onChange={() => handleMultiSelectChange('languages', language)}
+                                className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                              />
+                              <label htmlFor={`lang-${language}`} className="text-xs text-gray-300">
+                                {language}
+                              </label>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-1.5">
+                          {formData.languages && formData.languages.length > 0 ? (
+                            formData.languages.map((language, index) => (
+                              <div key={index} className="text-sm text-gray-300">
+                                • {language}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-xs text-gray-500 italic">No languages selected</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Special Skills Box */}
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <label className="block text-sm font-semibold text-white mb-3">Special Skills</label>
-                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
-                      {specialSkills.map(skill => (
-                        <div key={skill} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`skill-${skill}`}
-                            checked={formData.specialSkills.includes(skill)}
-                            onChange={() => handleMultiSelectChange('specialSkills', skill)}
-                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                          />
-                          <label htmlFor={`skill-${skill}`} className="text-xs text-gray-300">
-                            {skill}
-                          </label>
+                    <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 max-h-40 overflow-y-auto">
+                      {isEditing ? (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {specialSkills.map(skill => (
+                            <div key={skill} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`skill-${skill}`}
+                                checked={formData.specialSkills.includes(skill)}
+                                onChange={() => handleMultiSelectChange('specialSkills', skill)}
+                                className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                              />
+                              <label htmlFor={`skill-${skill}`} className="text-xs text-gray-300">
+                                {skill}
+                              </label>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-1.5">
+                          {formData.specialSkills && formData.specialSkills.length > 0 ? (
+                            formData.specialSkills.map((skill, index) => (
+                              <div key={index} className="text-sm text-gray-300">
+                                • {skill}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-xs text-gray-500 italic">No special skills selected</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Certifications Box */}
+                  {/* Jeep Driver Certifications */}
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                    <label className="block text-sm font-semibold text-white mb-3">Certifications</label>
-                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-40 overflow-y-auto">
-                      {certifications.map(cert => (
-                        <div key={cert} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`cert-${cert}`}
-                            checked={formData.certifications.includes(cert)}
-                            onChange={() => handleMultiSelectChange('certifications', cert)}
-                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                          />
-                          <label htmlFor={`cert-${cert}`} className="text-xs text-gray-300">
-                            {cert}
-                          </label>
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-semibold text-white flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-emerald-400" />
+                        Jeep Driver Certifications
+                      </label>
+                      {isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Trigger file input click
+                            document.getElementById('certification-upload-input')?.click();
+                          }}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-xs font-medium"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          Add Document
+                        </button>
+                      )}
+                      <input
+                        id="certification-upload-input"
+                        type="file"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            // Handle document upload
+                            console.log('Document selected:', file.name);
+                            // TODO: Implement upload to Supabase and save to Firestore
+                            setMessage({ type: 'info', text: 'Document upload functionality will be implemented soon.' });
+                          }
+                        }}
+                        className="hidden"
+                      />
                     </div>
+                    
+                    {/* View Mode - Display Documents from Registration */}
+                    {!isEditing && (
+                      <>
+                        {/* Documents from Registration Info */}
+                        <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3 mb-3">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="text-xs font-semibold text-blue-300 mb-1">Documents from Registration</h4>
+                              <p className="text-xs text-blue-200">
+                                The documents shown below were uploaded during your registration. 
+                                Click "Edit Profile" to add or modify documents.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Uploaded Documents List */}
+                        <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-xs font-semibold text-white flex items-center gap-1">
+                              <FileText className="h-3 w-3 text-emerald-400" />
+                              Uploaded Documents
+                              {uploadedCertifications.length > 0 && (
+                                <span className="text-xs text-gray-400 font-normal">
+                                  ({uploadedCertifications.length})
+                                </span>
+                              )}
+                            </h4>
+                          </div>
+
+                          {uploadedCertifications.length === 0 ? (
+                            <div className="text-center py-6">
+                              <p className="text-gray-400 text-xs mb-1">No documents uploaded yet</p>
+                              <p className="text-gray-500 text-xs">
+                                Documents uploaded during registration will appear here automatically
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                              {uploadedCertifications.map((cert) => {
+                                const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
+                                const hasError = cert.uploadStatus === 'failed' || (!hasValidPath && cert.uploadStatus !== 'uploaded');
+                                return (
+                                  <div key={cert.id} className={`bg-gray-900/50 rounded-lg p-2 border ${hasError ? 'border-red-600' : 'border-gray-600'} flex items-center justify-between`}>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <FileText className="h-4 w-4 text-emerald-400" />
+                                        <span className="text-sm text-white font-medium">{cert.name || cert.certificationName || 'Document'}</span>
+                                      </div>
+                                      {cert.size && (
+                                        <p className="text-xs text-gray-400 ml-6">{cert.size}</p>
+                                      )}
+                                    </div>
+                                    {hasValidPath && (
+                                      <button
+                                        onClick={async () => {
+                                          try {
+                                            const url = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                            window.open(url, '_blank');
+                                          } catch (error) {
+                                            console.error('Error opening document:', error);
+                                          }
+                                        }}
+                                        className="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
+                                      >
+                                        View
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Edit Mode - Add/Manage Documents */}
+                    {isEditing && (
+                      <>
+                        {uploadedCertifications.length === 0 ? (
+                          <div className="text-center py-8">
+                            <FileText className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+                            <p className="text-gray-400 text-sm">No documents uploaded yet</p>
+                            <p className="text-gray-500 text-xs mt-1">Click "Add Document" to upload your certifications</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {uploadedCertifications.map((cert, index) => {
+                              const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
+                              return (
+                                <div key={cert.id || index} className="bg-gray-900/50 rounded-lg p-3 border border-gray-600 flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <FileText className="h-5 w-5 text-emerald-400" />
+                                    <div>
+                                      <p className="text-white font-medium text-sm">{cert.name || cert.certificationName || 'Document'}</p>
+                                      {cert.size && (
+                                        <p className="text-gray-400 text-xs">{cert.size}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {hasValidPath && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          try {
+                                            const url = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                            window.open(url, '_blank');
+                                          } catch (error) {
+                                            console.error('Error opening document:', error);
+                                          }
+                                        }}
+                                        className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
+                                      >
+                                        View
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        // Handle document deletion
+                                        console.log('Delete document:', cert.name);
+                                        // TODO: Implement delete from Supabase and Firestore
+                                        setMessage({ type: 'info', text: 'Document deletion functionality will be implemented soon.' });
+                                      }}
+                                      className="text-red-400 hover:text-red-300 transition-colors p-1.5"
+                                      title="Delete document"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -996,42 +1709,74 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   {/* Qualifications Box */}
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <label className="block text-sm font-semibold text-white mb-3">Qualifications</label>
-                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-48 overflow-y-auto">
-                      {specialQualifications.map(qual => (
-                        <div key={qual} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`qual-${qual}`}
-                            checked={formData.specialQualifications.includes(qual)}
-                            onChange={() => handleMultiSelectChange('specialQualifications', qual)}
-                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                          />
-                          <label htmlFor={`qual-${qual}`} className="text-xs text-gray-300">
-                            {qual}
-                          </label>
+                    <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 max-h-48 overflow-y-auto">
+                      {isEditing ? (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {specialQualifications.map(qual => (
+                            <div key={qual} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`qual-${qual}`}
+                                checked={formData.specialQualifications.includes(qual)}
+                                onChange={() => handleMultiSelectChange('specialQualifications', qual)}
+                                className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                              />
+                              <label htmlFor={`qual-${qual}`} className="text-xs text-gray-300">
+                                {qual}
+                              </label>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-1.5">
+                          {formData.specialQualifications && formData.specialQualifications.length > 0 ? (
+                            formData.specialQualifications.map((qual, index) => (
+                              <div key={index} className="text-sm text-gray-300">
+                                • {qual}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-xs text-gray-500 italic">No qualifications selected</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Areas of Expertise Box */}
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <label className="block text-sm font-semibold text-white mb-3">Areas of Expertise</label>
-                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-48 overflow-y-auto">
-                      {areasOfExpertise.map(area => (
-                        <div key={area} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`area-${area}`}
-                            checked={formData.areasOfExpertise.includes(area)}
-                            onChange={() => handleMultiSelectChange('areasOfExpertise', area)}
-                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                          />
-                          <label htmlFor={`area-${area}`} className="text-xs text-gray-300">
-                            {area}
-                          </label>
+                    <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 max-h-48 overflow-y-auto">
+                      {isEditing ? (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {areasOfExpertise.map(area => (
+                            <div key={area} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`area-${area}`}
+                                checked={formData.areasOfExpertise.includes(area)}
+                                onChange={() => handleMultiSelectChange('areasOfExpertise', area)}
+                                className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                              />
+                              <label htmlFor={`area-${area}`} className="text-xs text-gray-300">
+                                {area}
+                              </label>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-1.5">
+                          {formData.areasOfExpertise && formData.areasOfExpertise.length > 0 ? (
+                            formData.areasOfExpertise.map((area, index) => (
+                              <div key={index} className="text-sm text-gray-300">
+                                • {area}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-xs text-gray-500 italic">No areas selected</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1041,21 +1786,61 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       <FileText className="h-4 w-4 text-emerald-400" />
                       Verification Docs
                     </label>
-                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-32 overflow-y-auto">
-                      {verificationDocuments.map(doc => (
-                        <div key={doc} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`verif-${doc}`}
-                            checked={formData.verificationDocuments.includes(doc)}
-                            onChange={() => handleMultiSelectChange('verificationDocuments', doc)}
-                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                          />
-                          <label htmlFor={`verif-${doc}`} className="text-xs text-gray-300">
-                            {doc}
-                          </label>
+                    <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 max-h-32 overflow-y-auto">
+                      {isEditing ? (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {verificationDocuments.map(doc => (
+                            <div key={doc} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`verif-${doc}`}
+                                checked={formData.verificationDocuments.includes(doc)}
+                                onChange={() => handleMultiSelectChange('verificationDocuments', doc)}
+                                className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                              />
+                              <label htmlFor={`verif-${doc}`} className="text-xs text-gray-300">
+                                {doc}
+                              </label>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-1.5">
+                          {formData.verificationDocuments && formData.verificationDocuments.length > 0 ? (
+                            formData.verificationDocuments.map((doc, index) => {
+                              const uploadedDoc = uploadedCertifications.find(cert => 
+                                cert.name === doc || cert.certificationName === doc
+                              );
+                              const hasDocument = uploadedDoc && (uploadedDoc.supabasePath || uploadedDoc.fileUrl);
+                              return (
+                                <div key={index} className="text-sm">
+                                  {hasDocument ? (
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          const url = await getDocumentUrl(uploadedDoc.supabasePath || uploadedDoc.fileUrl);
+                                          window.open(url, '_blank');
+                                        } catch (error) {
+                                          console.error('Error opening document:', error);
+                                        }
+                                      }}
+                                      className="text-emerald-400 hover:text-emerald-300 underline decoration-dotted hover:decoration-solid transition-all text-left"
+                                    >
+                                      • {doc}
+                                    </button>
+                                  ) : (
+                                    <div className="text-gray-300">
+                                      • {doc}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-xs text-gray-500 italic">No documents selected</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1065,21 +1850,37 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       <Languages className="h-4 w-4 text-emerald-400" />
                       Languages
                     </label>
-                    <div className="grid grid-cols-1 gap-1.5 border border-gray-600 rounded-lg p-2 bg-gray-900/50 max-h-32 overflow-y-auto">
-                      {languages.map(language => (
-                        <div key={language} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`lang-guide-${language}`}
-                            checked={formData.languages.includes(language)}
-                            onChange={() => handleMultiSelectChange('languages', language)}
-                            className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                          />
-                          <label htmlFor={`lang-guide-${language}`} className="text-xs text-gray-300">
-                            {language}
-                          </label>
+                    <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 max-h-32 overflow-y-auto">
+                      {isEditing ? (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {languages.map(language => (
+                            <div key={language} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`lang-guide-${language}`}
+                                checked={formData.languages.includes(language)}
+                                onChange={() => handleMultiSelectChange('languages', language)}
+                                className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
+                              />
+                              <label htmlFor={`lang-guide-${language}`} className="text-xs text-gray-300">
+                                {language}
+                              </label>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-1.5">
+                          {formData.languages && formData.languages.length > 0 ? (
+                            formData.languages.map((language, index) => (
+                              <div key={index} className="text-sm text-gray-300">
+                                • {language}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-xs text-gray-500 italic">No languages selected</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1119,10 +1920,66 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           {/* Bookings Tab */}
           {activeTab === 'bookings' && (
             <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
-              <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-emerald-400" />
-                My Bookings
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-emerald-400" />
+                  My Bookings
+                </h2>
+
+                {/* Filter Buttons */}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setBookingFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      bookingFilter === 'all'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    All ({bookings.length})
+                  </button>
+                  <button
+                    onClick={() => setBookingFilter('pending')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      bookingFilter === 'pending'
+                        ? 'bg-yellow-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Pending ({bookings.filter(b => b.status === 'pending').length})
+                  </button>
+                  <button
+                    onClick={() => setBookingFilter('accepted')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      bookingFilter === 'accepted'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Accepted ({bookings.filter(b => b.status === 'accepted').length})
+                  </button>
+                  <button
+                    onClick={() => setBookingFilter('completed')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      bookingFilter === 'completed'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Completed ({bookings.filter(b => b.status === 'completed').length})
+                  </button>
+                  <button
+                    onClick={() => setBookingFilter('declined')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      bookingFilter === 'declined'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Declined ({bookings.filter(b => b.status === 'declined').length})
+                  </button>
+                </div>
+              </div>
 
               {bookingsLoading ? (
                 <div className="flex items-center justify-center py-12">
@@ -1136,11 +1993,39 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-4" />
                   <p className="text-gray-400">No bookings yet</p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {bookings.map((booking) => {
-                    const bookingDate = booking.createdAt?.toDate?.() || booking.createdAt || new Date();
-                    const formattedDate = bookingDate instanceof Date ? bookingDate.toLocaleDateString() : new Date(bookingDate).toLocaleDateString();
+              ) : (() => {
+                const filteredBookings = bookings.filter(booking => bookingFilter === 'all' || booking.status === bookingFilter);
+                
+                if (filteredBookings.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                      <p className="text-gray-400">No {bookingFilter !== 'all' ? bookingFilter : ''} bookings found</p>
+                      {bookingFilter !== 'all' && (
+                        <button
+                          onClick={() => setBookingFilter('all')}
+                          className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition-colors"
+                        >
+                          View All Bookings
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-4">
+                    {filteredBookings.map((booking) => {
+                      const bookingDate = booking.createdAt?.toDate?.() || booking.createdAt || new Date();
+                      const formattedDate = formatDate(bookingDate);
+                    
+                    // Calculate hours pending
+                    const now = new Date();
+                    const createdAt = booking.createdAt?.toDate?.() || new Date(booking.createdAt);
+                    const hoursPending = Math.floor((now - createdAt) / (1000 * 60 * 60));
+                    const isPendingOver16Hours = booking.status === 'pending' && hoursPending >= 16;
+                    const isPendingOver24Hours = booking.status === 'pending' && hoursPending >= 24;
+                    
                     const statusColors = {
                       pending: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
                       accepted: 'bg-green-900/50 text-green-300 border-green-700',
@@ -1156,11 +2041,38 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           setSelectedBooking(booking);
                           setShowBookingDetails(true);
                         }}
-                        className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 cursor-pointer transition-colors hover:bg-gray-700"
+                        className={`rounded-lg p-4 border cursor-pointer transition-colors hover:bg-gray-700 ${
+                          isPendingOver24Hours 
+                            ? 'bg-red-900/30 border-red-500/50 ring-2 ring-red-500/50' 
+                            : isPendingOver16Hours 
+                              ? 'bg-orange-900/30 border-orange-500/50 ring-2 ring-orange-500/50' 
+                              : 'bg-gray-700/50 border-gray-600'
+                        }`}
                       >
+                        {/* Urgent Alert Banner */}
+                        {isPendingOver16Hours && (
+                          <div className={`mb-3 px-3 py-2 rounded-lg border-2 ${
+                            isPendingOver24Hours 
+                              ? 'bg-red-900/50 border-red-500 text-red-200' 
+                              : 'bg-orange-900/50 border-orange-500 text-orange-200'
+                          }`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <AlertCircle className="h-4 w-4" />
+                              <span className="font-bold text-sm">
+                                {isPendingOver24Hours ? '⚠️ URGENT: 24+ Hours No Response' : '⏰ WARNING: 16+ Hours Pending'}
+                              </span>
+                            </div>
+                            <p className="text-xs">
+                              {isPendingOver24Hours 
+                                ? `This booking has been pending for ${hoursPending} hours. Customer is waiting!` 
+                                : `This booking has been pending for ${hoursPending} hours. Please respond soon.`}
+                            </p>
+                          </div>
+                        )}
+
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center gap-3 mb-2 flex-wrap">
                               <h3 className="text-lg font-semibold text-white">
                                 {booking.customerName || 'Customer'}
                               </h3>
@@ -1168,6 +2080,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                 }`}>
                                 {booking.status?.toUpperCase() || 'PENDING'}
                               </span>
+                              {booking.status === 'pending' && (
+                                <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300 border border-gray-600">
+                                  {hoursPending}h pending
+                                </span>
+                              )}
                             </div>
                             <div className="space-y-1 text-sm text-gray-300">
                               <p><span className="font-medium">Email:</span> {booking.customerEmail || 'N/A'}</p>
@@ -1180,11 +2097,21 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                       const type = item.type || 'full-day';
                                       const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
                                       const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
+                                      // Calculate price for this day
+                                      const isFullDay = type === 'full' || type === 'full-day';
+                                      const dayPrice = isFullDay 
+                                        ? booking.priceFullDay || booking.pricePerDay 
+                                        : booking.priceHalfDay || (booking.pricePerDay * 0.6);
                                       if (!date) return null;
                                       return (
                                         <div key={index} className="flex items-center justify-between text-xs">
-                                          <span className="text-gray-300">{date.toLocaleDateString()}</span>
-                                          <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                                          <span className="text-gray-300">{formatDate(date)}</span>
+                                          <div className="flex items-center gap-2">
+                                            <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                                            {dayPrice && (
+                                              <span className="text-gray-300 font-medium">LKR {dayPrice.toLocaleString()}</span>
+                                            )}
+                                          </div>
                                         </div>
                                       );
                                     })}
@@ -1193,8 +2120,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               ) : booking.selectedDates ? (
                                 <p><span className="font-medium">Dates:</span> {
                                   Array.isArray(booking.selectedDates)
-                                    ? booking.selectedDates.map(d => new Date(d).toLocaleDateString()).join(', ')
-                                    : new Date(booking.selectedDates).toLocaleDateString()
+                                    ? booking.selectedDates.map(d => formatDate(new Date(d))).join(', ')
+                                    : formatDate(new Date(booking.selectedDates))
                                 }</p>
                               ) : booking.datesString ? (
                                 <p><span className="font-medium">Dates:</span> {booking.datesString}</p>
@@ -1203,40 +2130,175 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                 <p><span className="font-medium">Destination:</span> {booking.destination}</p>
                               )}
                               {booking.totalPrice && (
-                                <p><span className="font-medium">Total Price:</span> LKR {booking.totalPrice.toLocaleString()}</p>
+                                <p className="border-t border-gray-700 pt-2 mt-2">
+                                  <span className="font-medium">Total Price:</span>{' '}
+                                  <span className="font-bold text-base">LKR {booking.totalPrice.toLocaleString()}</span>
+                                </p>
                               )}
                               <p><span className="font-medium">Booked on:</span> {formattedDate}</p>
                             </div>
                           </div>
-                          {booking.status === 'pending' && (
-                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => handleBookingStatusUpdate(booking.id, 'accepted')}
-                                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
-                              >
-                                <Check className="h-4 w-4" />
-                                Accept
-                              </button>
-                              <button
-                                onClick={() => handleBookingStatusUpdate(booking.id, 'declined')}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
-                              >
-                                <X className="h-4 w-4" />
-                                Decline
-                              </button>
-                            </div>
-                          )}
+                          {(() => {
+                            // Check if booking date has passed (for completed button)
+                            const getLatestBookingDate = () => {
+                              if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
+                                const dates = booking.datesWithTypes.map(d => new Date(d.date));
+                                return new Date(Math.max(...dates));
+                              } else if (booking.selectedDates) {
+                                const dates = Array.isArray(booking.selectedDates) 
+                                  ? booking.selectedDates.map(d => new Date(d))
+                                  : [new Date(booking.selectedDates)];
+                                return new Date(Math.max(...dates));
+                              }
+                              return null;
+                            };
+
+                            const latestDate = getLatestBookingDate();
+                            let hasBookingPassed = false;
+                            
+                            if (latestDate) {
+                              // Normalize both dates to midnight (start of day) for proper date-only comparison
+                              const latestDateMidnight = new Date(latestDate);
+                              latestDateMidnight.setHours(0, 0, 0, 0);
+                              
+                              const nowMidnight = new Date();
+                              nowMidnight.setHours(0, 0, 0, 0);
+                              
+                              // Booking is considered "passed" if today is after the latest booking date
+                              hasBookingPassed = nowMidnight > latestDateMidnight;
+                            }
+
+                            // Show different buttons based on status
+                            if (booking.status === 'pending') {
+                              return (
+                                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => handleBookingStatusUpdate(booking.id, 'accepted')}
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                    Accept
+                                  </button>
+                                  <button
+                                    onClick={() => handleBookingStatusUpdate(booking.id, 'declined')}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                  >
+                                    <X className="h-4 w-4" />
+                                    Decline
+                                  </button>
+                                </div>
+                              );
+                            } else if (booking.status === 'accepted' && hasBookingPassed) {
+                              return (
+                                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => handleBookingStatusUpdate(booking.id, 'completed')}
+                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                    Mark as Completed
+                                  </button>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              )}
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Availability Tab */}
+          {activeTab === 'availability' && (
+            <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700 relative overflow-visible">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-emerald-400" />
+                  <h2 className="text-xl font-semibold text-white">Manage Your Availability</h2>
+                </div>
+                {/* Edit / Save Calendar Buttons */}
+                <div className="flex gap-2">
+                  {isEditingCalendar ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Revert to original availability
+                          setTempAvailabilityCalendar(availabilityCalendar);
+                          setIsEditingCalendar(false);
+                        }}
+                        className="px-4 py-2 text-sm border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            // Save to database
+                            if (currentUser && userData) {
+                              await updateDoc(doc(db, 'serviceProviders', currentUser.uid), {
+                                availability: tempAvailabilityCalendar,
+                                updatedAt: serverTimestamp()
+                              });
+                              setAvailabilityCalendar(tempAvailabilityCalendar);
+                              setIsEditingCalendar(false);
+                              setMessage({ type: 'success', text: 'Availability calendar updated successfully!' });
+                              
+                              // Clear message after 3 seconds
+                              setTimeout(() => {
+                                setMessage({ type: '', text: '' });
+                              }, 3000);
+                            }
+                          } catch (error) {
+                            console.error('Error updating availability:', error);
+                            setMessage({ type: 'error', text: 'Failed to update calendar. Please try again.' });
+                          }
+                        }}
+                        className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Save className="h-4 w-4" />
+                        Save Calendar
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempAvailabilityCalendar(availabilityCalendar);
+                        setIsEditingCalendar(true);
+                      }}
+                      className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+                    >
+                      Edit Calendar
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-gray-400 text-sm mb-6">
+                {isEditingCalendar 
+                  ? 'Click on dates to set availability. All dates are unselected by default until you mark them.'
+                  : 'View your availability calendar. Click "Edit Calendar" to make changes.'}
+              </p>
+              <AvailabilityCalendar
+                availability={isEditingCalendar ? tempAvailabilityCalendar : availabilityCalendar}
+                onChange={(newAvailability) => {
+                  if (isEditingCalendar) {
+                    setTempAvailabilityCalendar(newAvailability);
+                  }
+                }}
+                readOnly={!isEditingCalendar}
+              />
             </div>
           )}
 
         </div>
-      </div >
+      </div>
 
       {/* Global Notification Bell */}
       {currentUser && (
@@ -1334,11 +2396,21 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           const type = item.type || 'full-day';
                           const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
                           const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
+                          // Calculate price for this day
+                          const isFullDay = type === 'full' || type === 'full-day';
+                          const dayPrice = isFullDay 
+                            ? selectedBooking.priceFullDay || selectedBooking.pricePerDay 
+                            : selectedBooking.priceHalfDay || (selectedBooking.pricePerDay * 0.6);
                           if (!date) return null;
                           return (
                             <div key={index} className="flex items-center justify-between text-sm">
-                              <span className="text-white">{date.toLocaleDateString()}</span>
-                              <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                              <span className="text-white">{formatDate(date)}</span>
+                              <div className="flex items-center gap-2">
+                                <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                                {dayPrice && (
+                                  <span className="text-white font-medium">LKR {dayPrice.toLocaleString()}</span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -1349,8 +2421,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       <span className="text-gray-400 font-medium">Dates:</span>
                       <p className="text-white">
                         {Array.isArray(selectedBooking.selectedDates)
-                          ? selectedBooking.selectedDates.map(d => new Date(d).toLocaleDateString()).join(', ')
-                          : new Date(selectedBooking.selectedDates).toLocaleDateString()}
+                          ? selectedBooking.selectedDates.map(d => formatDate(new Date(d))).join(', ')
+                          : formatDate(new Date(selectedBooking.selectedDates))}
                       </p>
                     </div>
                   ) : selectedBooking.datesString ? (
@@ -1387,9 +2459,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                     <div>
                       <span className="text-gray-400 font-medium">Booked on:</span>
                       <p className="text-white">
-                        {selectedBooking.createdAt?.toDate ?
-                          selectedBooking.createdAt.toDate().toLocaleDateString() :
-                          new Date(selectedBooking.createdAt).toLocaleDateString()}
+                        {formatDate(selectedBooking.createdAt?.toDate?.() || selectedBooking.createdAt)}
                       </p>
                     </div>
                   )}
@@ -1479,245 +2549,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Availability Tab */}
-      {activeTab === 'availability' && (
-        <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
-          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-emerald-400" />
-            Manage Your Availability
-          </h2>
-          <p className="text-gray-400 text-sm mb-6">
-            Mark your busy dates, half days, and unavailable dates. Tourists will see this information when booking.
-          </p>
-
-          <AvailabilityCalendar
-            availability={availabilityCalendar}
-            onChange={(updatedAvailability) => {
-              setAvailabilityCalendar(updatedAvailability);
-            }}
-            readOnly={false}
-          />
-
-          <div className="mt-6 flex gap-4">
-            <button
-              type="button"
-              onClick={async () => {
-                if (!currentUser) return;
-                
-                setSaving(true);
-                setMessage({ type: '', text: '' });
-
-                try {
-                  const userDocRef = doc(db, 'serviceProviders', currentUser.uid);
-                  await updateDoc(userDocRef, {
-                    availability: availabilityCalendar,
-                    updatedAt: serverTimestamp()
-                  });
-
-                  setMessage({ type: 'success', text: 'Availability calendar updated successfully!' });
-                  
-                  // Refresh user data
-                  await fetchUserData(currentUser.uid);
-                  
-                  setTimeout(() => {
-                    setMessage({ type: '', text: '' });
-                  }, 5000);
-                } catch (error) {
-                  console.error('Error updating availability:', error);
-                  setMessage({ type: 'error', text: 'Failed to update availability. Please try again.' });
-                } finally {
-                  setSaving(false);
-                }
-              }}
-              disabled={saving}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  Save Availability
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Documents Tab */}
-      {activeTab === 'documents' && (
-        <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
-          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-emerald-400" />
-            {isJeepDriver ? 'Jeep Driver Certifications' : 'Guide Certifications'}
-          </h2>
-
-          {/* Documents uploaded during registration */}
-          <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 mb-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-semibold text-blue-300 mb-1">Documents from Registration</h3>
-                <p className="text-xs text-blue-200">
-                  The documents shown below were uploaded during your registration. 
-                  To add or modify documents, please contact support.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Existing Documents List */}
-          <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <FileText className="h-4 w-4 text-emerald-400" />
-                Uploaded Documents
-                {uploadedCertifications.length > 0 && (
-                  <span className="text-sm text-gray-400 font-normal">
-                    ({uploadedCertifications.length})
-                  </span>
-                )}
-              </h3>
-              <button
-                onClick={async () => {
-                  // Manually refresh documents
-                  if (!currentUser || !userData) return;
-                  try {
-                    const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
-                    const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
-                    const userCertDocRef = doc(db, collectionName, currentUser.uid);
-                    const docSnapshot = await getDoc(userCertDocRef);
-                    
-                    if (docSnapshot.exists()) {
-                      const data = docSnapshot.data();
-                      const documents = data.documents || [];
-                      console.log('🔄 Manually refreshed documents:', documents.length);
-                      // The real-time listener will update the state automatically
-                    } else {
-                      console.log('⚠️ No documents found when refreshing');
-                    }
-                  } catch (error) {
-                    console.error('❌ Error refreshing documents:', error);
-                  }
-                }}
-                className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
-                title="Refresh documents list"
-              >
-                🔄 Refresh
-              </button>
-            </div>
-
-            {uploadedCertifications.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-400 text-sm mb-2">No documents uploaded yet</p>
-                <p className="text-gray-500 text-xs">
-                  Documents uploaded during registration will appear here automatically
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {uploadedCertifications.map((cert) => {
-                  // Use status to determine error state
-                  // Status can be: 'uploaded' | 'failed' | null (legacy/unknown)
-                  // Show error only if status is explicitly 'failed'
-                  // If status is 'uploaded' or null but has valid path, show as valid
-                  const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
-                  const hasError = cert.uploadStatus === 'failed' || (!hasValidPath && cert.uploadStatus !== 'uploaded');
-                  return (
-                    <div key={cert.id} className={`bg-gray-900/50 rounded-lg p-3 border ${hasError ? 'border-red-600' : 'border-gray-600'} flex items-center justify-between`}>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <FileText className={`h-4 w-4 ${hasError ? 'text-red-400' : 'text-emerald-400'}`} />
-                          <span className="text-white font-medium text-sm">{cert.certificationName || cert.fileName}</span>
-                          {hasError && (
-                            <span className="px-2 py-0.5 bg-red-600 text-white text-xs rounded">Upload Failed</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-400 space-y-0.5">
-                          <p>Size: {(cert.fileSize / 1024).toFixed(1)} KB</p>
-                          <p>Type: {cert.fileType || 'Unknown'}</p>
-                          {cert.uploadedAt && (
-                            <p>Uploaded: {
-                              cert.uploadedAt.toDate 
-                                ? cert.uploadedAt.toDate().toLocaleDateString() 
-                                : cert.uploadedAt instanceof Date
-                                  ? cert.uploadedAt.toLocaleDateString()
-                                  : typeof cert.uploadedAt === 'number'
-                                    ? new Date(cert.uploadedAt).toLocaleDateString()
-                                    : 'Unknown'
-                            }</p>
-                          )}
-                          {hasError && cert.uploadError && (
-                            <p className="text-red-400">Error: {cert.uploadError}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {hasError ? (
-                          <span className="px-3 py-1.5 bg-gray-600 text-gray-300 rounded text-xs font-medium cursor-not-allowed flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            Upload Failed
-                          </span>
-                        ) : (
-                          <button
-                            onClick={async () => {
-                              try {
-                                // ✅ ONLY use supabasePath (relative path)
-                                // ❌ NEVER use fileUrl (could be full URL)
-                                // supabasePath format: users/userId/documents/filename.pdf
-                                const documentPath = cert.supabasePath;
-                                
-                                if (!documentPath) {
-                                  alert('Document path not found. Please re-upload the document.');
-                                  return;
-                                }
-
-                                // Validate it's not a URL (safety check)
-                                if (documentPath.startsWith('http://') || documentPath.startsWith('https://')) {
-                                  console.error('❌ Invalid path format (URL detected):', documentPath);
-                                  alert('Document path is invalid. Please re-upload the document.');
-                                  return;
-                                }
-
-                                console.log('📄 Requesting signed URL for path:', documentPath);
-
-                                // Generate signed URL using ONLY the relative path
-                                const { signedUrl, error } = await getDocumentUrl(documentPath, 300);
-                                
-                                if (error || !signedUrl) {
-                                  console.error('❌ Error getting signed URL:', error);
-                                  alert(`Failed to open document: ${error?.message || 'Unknown error'}`);
-                                  return;
-                                }
-
-                                console.log('✅ Signed URL generated, opening document');
-                                // Open signed URL in new window
-                                window.open(signedUrl, '_blank', 'noopener,noreferrer');
-                              } catch (error) {
-                                console.error('❌ Error viewing document:', error);
-                                alert(`Failed to open document: ${error.message || 'Unknown error'}`);
-                              }
-                            }}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
-                          >
-                            <FileText className="h-3 w-3" />
-                            View
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       )}

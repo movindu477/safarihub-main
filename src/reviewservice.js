@@ -23,9 +23,9 @@ const db = getFirestore();
 // Enhanced Firebase review functions with better error handling
 export const addReview = async (reviewData) => {
   try {
-    // Support both driverId and guideId
-    const providerId = reviewData.driverId || reviewData.guideId;
-    const providerType = reviewData.providerType || (reviewData.driverId ? 'driver' : 'guide');
+    // Support driverId, guideId, and providerId (for renting)
+    const providerId = reviewData.providerId || reviewData.driverId || reviewData.guideId;
+    const providerType = reviewData.providerType || (reviewData.providerId ? 'renting' : reviewData.driverId ? 'driver' : 'guide');
     
     console.log('🚀 Starting review submission with data:', {
       providerId,
@@ -56,9 +56,10 @@ export const addReview = async (reviewData) => {
 
     // Check for existing reviews to prevent duplicates
     console.log('🔍 Checking for existing reviews...');
+    const fieldName = providerType === 'driver' ? 'driverId' : providerType === 'renting' ? 'providerId' : 'guideId';
     const existingReviewQuery = query(
       collection(db, 'reviews'),
-      where(providerType === 'driver' ? 'driverId' : 'guideId', '==', providerId),
+      where(fieldName, '==', providerId),
       where('userId', '==', reviewData.userId)
     );
     
@@ -70,9 +71,10 @@ export const addReview = async (reviewData) => {
       const existingDoc = existingSnapshot.docs[0];
       console.log('🔄 Updating existing review:', existingDoc.id);
       
+      const updateFieldName = providerType === 'driver' ? 'driverId' : providerType === 'renting' ? 'providerId' : 'guideId';
       await updateDoc(doc(db, 'reviews', existingDoc.id), {
         ...reviewData,
-        [providerType === 'driver' ? 'driverId' : 'guideId']: providerId,
+        [updateFieldName]: providerId,
         providerType,
         lastUpdated: serverTimestamp()
       });
@@ -82,8 +84,9 @@ export const addReview = async (reviewData) => {
 
     // Create new review with validated data
     console.log('➕ Creating new review...');
+    const createFieldName = providerType === 'driver' ? 'driverId' : providerType === 'renting' ? 'providerId' : 'guideId';
     const reviewDataWithTimestamp = {
-      [providerType === 'driver' ? 'driverId' : 'guideId']: providerId,
+      [createFieldName]: providerId,
       providerType,
       userId: reviewData.userId,
       userName: reviewData.userName || 'Anonymous User',
@@ -128,6 +131,10 @@ export const updateDriverRating = async (driverId) => {
   return updateProviderRating(driverId, 'driver');
 };
 
+export const updateRentalProviderRating = async (providerId) => {
+  return updateProviderRating(providerId, 'renting');
+};
+
 export const updateProviderRating = async (providerId, providerType = 'driver') => {
   try {
     if (!providerId) {
@@ -137,7 +144,7 @@ export const updateProviderRating = async (providerId, providerType = 'driver') 
 
     console.log(`⭐ Updating ${providerType} rating for:`, providerId);
     
-    const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
+    const fieldName = providerType === 'driver' ? 'driverId' : providerType === 'renting' ? 'providerId' : 'guideId';
     const reviewsQuery = query(
       collection(db, 'reviews'),
       where(fieldName, '==', providerId)
@@ -230,7 +237,7 @@ export const getProviderReviews = (providerId, callback, providerType = 'driver'
 
   console.log(`🔍 Setting up reviews listener for ${providerType}:`, providerId);
 
-  const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
+  const fieldName = providerType === 'driver' ? 'driverId' : providerType === 'renting' ? 'providerId' : 'guideId';
   // Keep Firestore query simple (no composite index needed) and sort on the client
   const reviewsQuery = query(
     collection(db, 'reviews'),
@@ -299,7 +306,7 @@ export const getUserReviewForProvider = async (providerId, userId, providerType 
 
     console.log(`🔍 Checking user review for ${providerType}:`, providerId, 'user:', userId);
     
-    const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
+    const fieldName = providerType === 'driver' ? 'driverId' : providerType === 'renting' ? 'providerId' : 'guideId';
     const reviewsQuery = query(
       collection(db, 'reviews'),
       where(fieldName, '==', providerId),
@@ -450,7 +457,7 @@ export const getProviderReviewStats = async (providerId, providerType = 'driver'
       };
     }
 
-    const fieldName = providerType === 'driver' ? 'driverId' : 'guideId';
+    const fieldName = providerType === 'driver' ? 'driverId' : providerType === 'renting' ? 'providerId' : 'guideId';
     const reviewsQuery = query(
       collection(db, 'reviews'),
       where(fieldName, '==', providerId)

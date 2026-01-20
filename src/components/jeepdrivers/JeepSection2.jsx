@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, doc, onSnapshot, query, where, orderBy, limit, getDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../../firebase';
-import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Star, MapPin, Clock, Users, Shield } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { MessageCircle, Star, MapPin, Clock, Users, Shield, X } from 'lucide-react';
 
 const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) => {
   const [jeeps, setJeeps] = useState([]);
@@ -12,8 +12,22 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
   const [error, setError] = useState(null);
   const [favoriteMessage, setFavoriteMessage] = useState(null);
   const [userFavorites, setUserFavorites] = useState([]); // Track user's favorites
+  const [rebookingSuggestion, setRebookingSuggestion] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const auth = getAuth();
+  
+  // Check for rebooking flow
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const isRebooking = params.get('rebook') === 'true';
+    if (isRebooking) {
+      const rebookingDetails = sessionStorage.getItem('rebookingDetails');
+      if (rebookingDetails) {
+        setRebookingSuggestion(JSON.parse(rebookingDetails));
+      }
+    }
+  }, [location]);
 
   // Scroll to driver card and restore scroll position when returning from profile page
   useEffect(() => {
@@ -136,11 +150,8 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       'Night safari tours'
     ],
     certifications: [
-      'Wildlife Department Certified',
-      'Tourism Board Licensed',
-      'First Aid Certified',
-      'Eco Tourism Certified',
-      'Defensive Driving Certified'
+      'Certified',
+      'Uncertified'
     ]
   };
 
@@ -177,8 +188,10 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             rating: typeof providerData.rating === 'number' ? providerData.rating : 
                    typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
             totalReviews: providerData.totalReviews || 0,
-            pricePerDay: providerData.pricePerDay || providerData.price || providerData.dailyRate || 0,
-            vehicleType: providerData.vehicleType || 'Standard Safari Jeep',
+            priceFullDay: providerData.priceFullDay || providerData.pricePerDay || providerData.price || providerData.dailyRate || 0,
+            priceHalfDay: providerData.priceHalfDay || (providerData.pricePerDay ? providerData.pricePerDay * 0.6 : 0) || 0,
+            vehicleType: Array.isArray(providerData.vehicleType) ? providerData.vehicleType : 
+                        providerData.vehicleType ? [providerData.vehicleType] : ['Standard Safari Jeep'],
             experience: providerData.experienceYears || providerData.experience || 0,
             
             // Arrays with proper fallbacks
@@ -262,19 +275,23 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       );
     }
 
-    // Price range filter
+    // Price range filter - check both full day and half day prices
     if (filters.priceRange) {
       const [minPrice, maxPrice] = filters.priceRange.split('-').map(Number);
       filtered = filtered.filter(jeep => {
-        const price = jeep.pricePerDay || 0;
-        return price >= minPrice && price <= maxPrice;
+        const fullDayPrice = jeep.priceFullDay || 0;
+        const halfDayPrice = jeep.priceHalfDay || 0;
+        return (fullDayPrice >= minPrice && fullDayPrice <= maxPrice) || 
+               (halfDayPrice >= minPrice && halfDayPrice <= maxPrice);
       });
     }
 
-    // Vehicle type filter
+    // Vehicle type filter - support multiple vehicle types
     if (filters.vehicleType) {
       filtered = filtered.filter(jeep => 
-        jeep.vehicleType?.toLowerCase() === filters.vehicleType.toLowerCase()
+        Array.isArray(jeep.vehicleType) 
+          ? jeep.vehicleType.some(type => type.toLowerCase() === filters.vehicleType.toLowerCase())
+          : jeep.vehicleType?.toLowerCase() === filters.vehicleType.toLowerCase()
       );
     }
 
@@ -300,21 +317,37 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       );
     }
 
-    // Certifications filter
+    // Certifications filter - based on certification status
     if (filters.certifications.length > 0) {
-      filtered = filtered.filter(jeep =>
-        filters.certifications.every(cert => 
-          jeep.certifications?.some(jCert => 
-            jCert.toLowerCase().includes(cert.toLowerCase())
-          )
-        )
-      );
+      filtered = filtered.filter(jeep => {
+        if (filters.certifications.includes('Certified')) {
+          return jeep.certificationStatus === 'certified';
+        }
+        if (filters.certifications.includes('Uncertified')) {
+          return jeep.certificationStatus !== 'certified';
+        }
+        return false;
+      });
     }
 
+    // If in rebooking mode, sort by: certified first, then by rating (highest first)
+    if (rebookingSuggestion) {
+      console.log('🔄 Rebooking mode: prioritizing certified drivers with highest ratings');
+      filtered.sort((a, b) => {
+        // First, prioritize certified drivers
+        const aCertified = a.certificationStatus === 'certified' ? 1 : 0;
+        const bCertified = b.certificationStatus === 'certified' ? 1 : 0;
+        if (aCertified !== bCertified) {
+          return bCertified - aCertified; // Certified first
+        }
+        // Then sort by rating (highest first)
+        return (b.rating || 0) - (a.rating || 0);
+      });
+    }
 
     console.log('✅ Filtered results:', filtered.length);
     setFilteredJeeps(filtered);
-  }, [filters, jeeps, selectedDestination]);
+  }, [filters, jeeps, selectedDestination, rebookingSuggestion]);
 
   const handleFilterChange = (filterType, value) => {
     setFilters(prev => ({
@@ -601,6 +634,40 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     <div id="jeep-drivers-section" className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
       <FavoriteMessage />
       <div className="container mx-auto px-4 py-12">
+        {/* Rebooking Suggestion Banner */}
+        {rebookingSuggestion && (
+          <div className="mb-8 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg p-6 border-2 border-blue-500">
+            <div className="flex items-start gap-4">
+              <div className="bg-white/20 rounded-full p-3">
+                <Users className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold mb-2">Finding Alternative Drivers for You</h3>
+                <p className="text-blue-100 mb-3">
+                  We're showing you the highest-rated certified drivers available for <span className="font-semibold text-white">{rebookingSuggestion.nationalPark}</span>
+                  {rebookingSuggestion.numberOfDays && ` for ${rebookingSuggestion.numberOfDays} day${rebookingSuggestion.numberOfDays > 1 ? 's' : ''}`}.
+                </p>
+                <div className="flex items-center gap-2 text-sm">
+                  <Shield className="h-4 w-4 text-green-300" />
+                  <span className="text-blue-100">Certified drivers are shown first, sorted by rating</span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRebookingSuggestion(null);
+                  sessionStorage.removeItem('rebookingDetails');
+                  const params = new URLSearchParams(location.search);
+                  params.delete('rebook');
+                  navigate(`${location.pathname}${params.toString() ? '?' + params.toString() : ''}`, { replace: true });
+                }}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-emerald-900 mb-4">Safari Jeep Drivers</h1>
@@ -866,11 +933,11 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                             </div>
                           </div>
 
-                          {/* Vehicle Type */}
+                          {/* Vehicle Types */}
                           <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Type:</p>
-                            <p className="text-sm text-gray-600 line-clamp-1">
-                              {jeep.vehicleType}
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Types:</p>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {Array.isArray(jeep.vehicleType) ? jeep.vehicleType.join(', ') : jeep.vehicleType}
                             </p>
                           </div>
 
@@ -889,6 +956,25 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                               {jeep.languages?.slice(0, 3).join(', ')}
                               {jeep.languages?.length > 3 && '...'}
                             </p>
+                          </div>
+
+                          {/* Price */}
+                          <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-gray-700 mb-2">Pricing:</p>
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">Full Day:</span>
+                                <span className="text-sm font-bold text-green-600">
+                                  LKR {jeep.priceFullDay ? new Intl.NumberFormat('en-LK').format(jeep.priceFullDay) : 'Contact'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">Half Day:</span>
+                                <span className="text-sm font-bold text-green-600">
+                                  LKR {jeep.priceHalfDay ? new Intl.NumberFormat('en-LK').format(jeep.priceHalfDay) : 'Contact'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Favorite Button */}
@@ -1005,11 +1091,11 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                             </div>
                           </div>
 
-                          {/* Vehicle Type */}
+                          {/* Vehicle Types */}
                           <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Type:</p>
-                            <p className="text-sm text-gray-600 line-clamp-1">
-                              {jeep.vehicleType}
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Types:</p>
+                            <p className="text-sm text-gray-600 line-clamp-2">
+                              {Array.isArray(jeep.vehicleType) ? jeep.vehicleType.join(', ') : jeep.vehicleType}
                             </p>
                           </div>
 
@@ -1028,6 +1114,25 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                               {jeep.languages?.slice(0, 3).join(', ')}
                               {jeep.languages?.length > 3 && '...'}
                             </p>
+                          </div>
+
+                          {/* Price */}
+                          <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-gray-700 mb-2">Pricing:</p>
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">Full Day:</span>
+                                <span className="text-sm font-bold text-green-600">
+                                  LKR {jeep.priceFullDay ? new Intl.NumberFormat('en-LK').format(jeep.priceFullDay) : 'Contact'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">Half Day:</span>
+                                <span className="text-sm font-bold text-green-600">
+                                  LKR {jeep.priceHalfDay ? new Intl.NumberFormat('en-LK').format(jeep.priceHalfDay) : 'Contact'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Favorite Button */}

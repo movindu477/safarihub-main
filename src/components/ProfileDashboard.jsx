@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadProfileImage } from '../lib/supabase';
-import { ChevronLeft, User, Mail, Phone, MapPin, Globe, Camera, Save, Loader2, ChevronDown } from 'lucide-react';
+import { ChevronLeft, User, Mail, Phone, MapPin, Globe, Camera, Save, Loader2, ChevronDown, Edit } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
 import userImage from '../assets/user.png';
@@ -48,6 +48,7 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
   const [profileImageUrl, setProfileImageUrl] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -252,6 +253,7 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
       }, { merge: true });
 
       setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setIsEditing(false);
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -259,6 +261,44 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    // Reset form data to original userData
+    if (userData) {
+      let phoneNumber = userData.phone || '';
+      let countryCode = '+94';
+      let phone = '';
+      
+      if (phoneNumber) {
+        const matchedCountry = countryCodes.find(c => phoneNumber.startsWith(c.code));
+        if (matchedCountry) {
+          countryCode = matchedCountry.code;
+          phone = phoneNumber.substring(matchedCountry.code.length).trim();
+        } else if (phoneNumber.startsWith('+')) {
+          const match = phoneNumber.match(/^(\+\d{1,4})\s*(.+)$/);
+          if (match) {
+            countryCode = match[1];
+            phone = match[2];
+          }
+        } else {
+          phone = phoneNumber;
+        }
+      }
+      
+      setFormData({
+        fullName: userData.fullName || '',
+        email: user.email || '',
+        phone: phone,
+        phoneCountryCode: countryCode,
+        location: userData.location || userData.country || '',
+        preferredLanguage: userData.preferredLanguage || userData.language || ''
+      });
+      setProfileImageUrl(userData.profilePicture || user.photoURL || null);
+      setProfileImage(null);
+    }
+    setMessage({ type: '', text: '' });
   };
 
   if (loading) {
@@ -287,31 +327,44 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
               </button>
               <h1 className="text-lg font-bold text-gray-900">My Profile Dashboard</h1>
             </div>
-            {/* Save Button in Header */}
+            {/* Action Buttons in Header */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate('/')}
-                className="px-4 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || imageUploading}
-                className="px-4 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-3.5 w-3.5" />
-                    Save
-                  </>
-                )}
-              </button>
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleCancel}
+                    disabled={saving || imageUploading}
+                    className="px-4 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || imageUploading}
+                    className="px-4 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-3.5 w-3.5" />
+                        Save Changes
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-4 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 font-medium"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                  Edit Profile
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -355,18 +408,22 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
                       </div>
                     )}
                   </div>
-                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors text-sm">
-                    <Camera className="h-3.5 w-3.5 text-gray-600" />
-                    <span className="text-xs font-medium text-gray-700">Change Photo</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="hidden"
-                      disabled={imageUploading}
-                    />
-                  </label>
-                  <p className="text-xs text-gray-500 mt-2 text-center">Max 5MB</p>
+                  {isEditing && (
+                    <>
+                      <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors text-sm">
+                        <Camera className="h-3.5 w-3.5 text-gray-600" />
+                        <span className="text-xs font-medium text-gray-700">Change Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                          disabled={imageUploading}
+                        />
+                      </label>
+                      <p className="text-xs text-gray-500 mt-2 text-center">Max 5MB</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -383,14 +440,20 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
                       <User className="inline h-3.5 w-3.5 mr-1.5" />
                       Full Name
                     </label>
-                    <input
-                      type="text"
-                      name="fullName"
-                      value={formData.fullName}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="Enter your full name"
-                    />
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={formData.fullName}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Enter your full name"
+                      />
+                    ) : (
+                      <div className="w-full px-3 py-2 text-sm bg-gray-50 rounded-lg text-gray-900 border border-gray-200">
+                        {formData.fullName || 'Not provided'}
+                      </div>
+                    )}
                   </div>
 
                   {/* Email */}
@@ -415,73 +478,81 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
                       <Phone className="inline h-3.5 w-3.5 mr-1.5" />
                       Phone Number
                     </label>
-                    <div className="flex gap-2">
-                      {/* Country Code Dropdown */}
-                      <div className="relative flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-transparent min-w-[100px]"
-                        >
-                          <span className="text-base">{getSelectedCountry().flag}</span>
-                          <span className="text-xs font-medium">{getSelectedCountry().code}</span>
-                          <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
-                        </button>
-                        {showCountryDropdown && (
-                          <>
-                            <div 
-                              className="fixed inset-0 z-10" 
-                              onClick={() => setShowCountryDropdown(false)}
-                            />
-                            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto min-w-[200px]">
-                              {countryCodes.map((country) => (
-                                <button
-                                  key={country.code}
-                                  type="button"
-                                  onClick={() => handleCountryCodeChange(country.code)}
-                                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 transition-colors ${
-                                    formData.phoneCountryCode === country.code ? 'bg-green-50' : ''
-                                  }`}
-                                >
-                                  <span className="text-base">{country.flag}</span>
-                                  <span className="flex-1 text-left">{country.country}</span>
-                                  <span className="text-gray-600 font-medium">{country.code}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
+                    {isEditing ? (
+                      <div className="flex gap-2">
+                        {/* Country Code Dropdown */}
+                        <div className="relative flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-transparent min-w-[100px]"
+                          >
+                            <span className="text-base">{getSelectedCountry().flag}</span>
+                            <span className="text-xs font-medium">{getSelectedCountry().code}</span>
+                            <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                          </button>
+                          {showCountryDropdown && (
+                            <>
+                              <div 
+                                className="fixed inset-0 z-10" 
+                                onClick={() => setShowCountryDropdown(false)}
+                              />
+                              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto min-w-[200px]">
+                                {countryCodes.map((country) => (
+                                  <button
+                                    key={country.code}
+                                    type="button"
+                                    onClick={() => handleCountryCodeChange(country.code)}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 transition-colors ${
+                                      formData.phoneCountryCode === country.code ? 'bg-green-50' : ''
+                                    }`}
+                                  >
+                                    <span className="text-base">{country.flag}</span>
+                                    <span className="flex-1 text-left">{country.country}</span>
+                                    <span className="text-gray-600 font-medium">{country.code}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {/* Phone Number Input */}
+                        <div className="flex-1">
+                          <input
+                            type="tel"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleInputChange}
+                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                              formData.phone && isValidPhone(formData.phone, formData.phoneCountryCode)
+                                ? 'border-green-500 bg-green-50'
+                                : formData.phone
+                                ? 'border-red-300 bg-red-50'
+                                : 'border-gray-300'
+                            }`}
+                            placeholder={getSelectedCountry().code === '+94' ? '0743090367' : 'Enter phone number'}
+                            maxLength={getSelectedCountry().maxLength}
+                          />
+                          {formData.phone && (
+                            <p className={`text-xs mt-1 ${
+                              isValidPhone(formData.phone, formData.phoneCountryCode)
+                                ? 'text-green-600'
+                                : 'text-red-600'
+                            }`}>
+                              {isValidPhone(formData.phone, formData.phoneCountryCode)
+                                ? `✓ Valid ${getSelectedCountry().country} phone number`
+                                : `Invalid format for ${getSelectedCountry().country}`}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      {/* Phone Number Input */}
-                      <div className="flex-1">
-                        <input
-                          type="tel"
-                          name="phone"
-                          value={formData.phone}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                            formData.phone && isValidPhone(formData.phone, formData.phoneCountryCode)
-                              ? 'border-green-500 bg-green-50'
-                              : formData.phone
-                              ? 'border-red-300 bg-red-50'
-                              : 'border-gray-300'
-                          }`}
-                          placeholder={getSelectedCountry().code === '+94' ? '0743090367' : 'Enter phone number'}
-                          maxLength={getSelectedCountry().maxLength}
-                        />
-                        {formData.phone && (
-                          <p className={`text-xs mt-1 ${
-                            isValidPhone(formData.phone, formData.phoneCountryCode)
-                              ? 'text-green-600'
-                              : 'text-red-600'
-                          }`}>
-                            {isValidPhone(formData.phone, formData.phoneCountryCode)
-                              ? `✓ Valid ${getSelectedCountry().country} phone number`
-                              : `Invalid format for ${getSelectedCountry().country}`}
-                          </p>
-                        )}
+                    ) : (
+                      <div className="w-full px-3 py-2 text-sm bg-gray-50 rounded-lg text-gray-900 border border-gray-200">
+                        {formData.phone 
+                          ? `${formData.phoneCountryCode} ${formData.phone}` 
+                          : 'Not provided'}
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Location */}
@@ -490,14 +561,20 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
                       <MapPin className="inline h-3.5 w-3.5 mr-1.5" />
                       Location
                     </label>
-                    <input
-                      type="text"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="Enter location"
-                    />
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="location"
+                        value={formData.location}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Enter location"
+                      />
+                    ) : (
+                      <div className="w-full px-3 py-2 text-sm bg-gray-50 rounded-lg text-gray-900 border border-gray-200">
+                        {formData.location || 'Not provided'}
+                      </div>
+                    )}
                   </div>
 
                   {/* Preferred Language */}
@@ -506,14 +583,20 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
                       <Globe className="inline h-3.5 w-3.5 mr-1.5" />
                       Preferred Language
                     </label>
-                    <input
-                      type="text"
-                      name="preferredLanguage"
-                      value={formData.preferredLanguage}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="Enter preferred language"
-                    />
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="preferredLanguage"
+                        value={formData.preferredLanguage}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Enter preferred language"
+                      />
+                    ) : (
+                      <div className="w-full px-3 py-2 text-sm bg-gray-50 rounded-lg text-gray-900 border border-gray-200">
+                        {formData.preferredLanguage || 'Not provided'}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

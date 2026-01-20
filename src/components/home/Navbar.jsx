@@ -3,7 +3,6 @@ import {
   Menu,
   X,
   User,
-  Settings,
   LogOut,
   Heart,
   Calendar,
@@ -21,12 +20,15 @@ import {
   FileText
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, getDoc, onSnapshot, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // Import images from src/assets
 import logo from "../../assets/logo.png";
 import userImage from "../../assets/user.png";
+
+// Import Chat component for Help & Support
+import Chat from "../Chat";
 
 export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -38,6 +40,8 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
   const [authUser, setAuthUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showProviderSupport, setShowProviderSupport] = useState(false);
+  const [showUserSupport, setShowUserSupport] = useState(false);
 
   const auth = getAuth();
   const db = getFirestore();
@@ -217,6 +221,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     };
   }, [user, authUser, db]);
 
+
   const handleLogout = useCallback(async () => {
     try {
       await signOut(auth);
@@ -327,25 +332,31 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     navigate('/booking-history');
   }, [navigate]);
 
+  const handleUserSupportClick = useCallback(() => {
+    setProfileOpen(false);
+    setShowUserSupport(true);
+  }, []);
+
+  const handleMyBookingsClick = useCallback(() => {
+    setProfileOpen(false);
+    navigate('/my-bookings');
+  }, [navigate]);
+
   // Memoize profile menu items
   const profileMenuItems = useMemo(() => {
     if (isServiceProvider) {
-      return [
-        { icon: Heart, label: "My Favorites", href: "#" },
-        { icon: Settings, label: "Settings", href: "#" },
-        { icon: HelpCircle, label: "Help & Support", href: "#" },
-      ];
+      // Service providers don't see My Favorites, Settings, or Help & Support
+      return [];
     } else {
       return [
         { icon: User, label: "My Profile", href: "/profile", onClick: handleProfileClick },
+        { icon: Calendar, label: "My Bookings", href: "/my-bookings", onClick: handleMyBookingsClick },
         { icon: Heart, label: "My Favorites", href: "/favorites", onClick: handleFavoritesClick },
-        { icon: Calendar, label: "Booking History & Receipts", href: "/booking-history", onClick: handleBookingHistoryClick },
         { icon: CreditCard, label: "Payment Wallet", href: "/payment-wallet", onClick: handlePaymentWalletClick },
-        { icon: Settings, label: "Settings", href: "#" },
-        { icon: HelpCircle, label: "Help & Support", href: "#" },
+        { icon: HelpCircle, label: "Help & Support", href: "#", onClick: handleUserSupportClick },
       ];
     }
-  }, [isServiceProvider, handleProfileClick, handleFavoritesClick, handlePaymentWalletClick, handleBookingHistoryClick]);
+  }, [isServiceProvider, handleProfileClick, handleMyBookingsClick, handleFavoritesClick, handlePaymentWalletClick, handleUserSupportClick]);
 
   // Memoize navigation handlers
   const handleAdminClick = useCallback(() => navigate("/admin"), [navigate]);
@@ -430,10 +441,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
   // Memoize services items to prevent recreation
   const servicesItems = useMemo(() => [
+    { icon: Compass, label: "Find a Destination", onClick: handleDestinationClick, path: "/destination" },
     { icon: Map, label: "Find a Guide", onClick: handleGuideClick, path: "/guide" },
-    { icon: Compass, label: "Explore Destinations", onClick: handleDestinationClick, path: "/destination" },
     { icon: Car, label: "Find a Jeep Driver", onClick: handleJeepDriverClick, path: "/driver" },
-    { icon: ShoppingBag, label: "Rent Equipment", onClick: handleRentClick, path: "/rent" },
+    { icon: ShoppingBag, label: "Find a Renting Store", onClick: handleRentClick, path: "/rent" },
   ], [handleGuideClick, handleDestinationClick, handleJeepDriverClick, handleRentClick]);
 
   const isServicesActive = useMemo(() => 
@@ -789,11 +800,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           />
 
           <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-white shadow-2xl border-l-2 border-gray-700/50 overflow-hidden z-50 animate-slideInRight">
-            {/* Close Button - Top Right */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Close Button - Top Right - Fixed position to stay visible when scrolling */}
+            <div className="fixed top-4 right-4 z-[60]">
               <button
                 onClick={() => setProfileOpen(false)}
-                className="p-2 cursor-pointer"
+                className="p-2 cursor-pointer bg-gray-800/80 rounded-full hover:bg-gray-700/80 transition-colors backdrop-blur-sm"
                 aria-label="Close profile"
               >
                 <X className="h-5 w-5 text-gray-300" />
@@ -919,71 +930,93 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                 </div>
               )}
 
-
-              <div className="grid grid-cols-3 gap-3 px-6 py-5 border-y border-gray-700/30 bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm animate-fadeInUp" style={{ animationDelay: "300ms" }}>
-                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
-                  <div className="text-xl font-bold text-gray-400">12</div>
-                  <div className="text-xs text-gray-300/80 mt-1">Trips</div>
-                </div>
-                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
-                  <div className="text-xl font-bold text-gray-400">8</div>
-                  <div className="text-xs text-gray-300/80 mt-1">Favorites</div>
-                </div>
-                <div className="text-center p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
-                  <div className="text-xl font-bold text-gray-400">2</div>
-                  <div className="text-xs text-gray-300/80 mt-1">Upcoming</div>
-                </div>
-              </div>
-
               {/* Admin Button for Service Providers */}
               {isServiceProvider && (
                 <div className="p-6 pb-4 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp" style={{ animationDelay: "400ms" }}>
+                  {/* My Profile */}
                   <button
                     onClick={() => {
                       setProfileOpen(false);
-                      navigate('/admin');
+                      navigate('/admin?tab=profile');
                     }}
-                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20"
+                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
                     style={{ animationDelay: "500ms" }}
                   >
                     <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
                       <User className="h-5 w-5 text-gray-300" />
                     </div>
                     <span className="font-medium text-gray-200">
-                      My Profile / Admin
+                      My Profile
                     </span>
                   </button>
+
+                  {/* My Bookings */}
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      navigate('/admin?tab=bookings');
+                    }}
+                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                    style={{ animationDelay: "550ms" }}
+                  >
+                    <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                      <Calendar className="h-5 w-5 text-gray-300" />
+                    </div>
+                    <span className="font-medium text-gray-200">
+                      My Bookings
+                    </span>
+                  </button>
+
+                  {/* Help & Support */}
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setShowProviderSupport(true);
+                    }}
+                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                    style={{ animationDelay: "600ms" }}
+                  >
+                    <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                      <HelpCircle className="h-5 w-5 text-gray-300" />
+                    </div>
+                    <span className="font-medium text-gray-200">
+                      Help & Support
+                    </span>
+                  </button>
+
                 </div>
               )}
 
-              <div className={`p-6 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp ${isServiceProvider ? 'pt-4' : ''}`} style={{ animationDelay: "400ms" }}>
-                {profileMenuItems.map((item, index) => {
-                  const IconComponent = item.icon;
-                  return (
-                    <a
-                      key={item.label}
-                      href={item.href}
-                      className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-700/30 animate-fadeInUp hover:bg-gray-800/30 transition-colors"
-                      style={{ animationDelay: `${index * 50 + 500}ms` }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (item.onClick) {
-                          item.onClick();
-                        } else {
-                          setProfileOpen(false);
-                        }
-                      }}
-                    >
-                      <div className="p-2 bg-gray-800/30 rounded-lg border border-gray-700/30">
-                        <IconComponent className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <span className="font-medium text-gray-300">
-                        {item.label}
-                      </span>
-                    </a>
-                  );
-                })}
-              </div>
+              {profileMenuItems.length > 0 && (
+                <div className={`p-6 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp ${isServiceProvider ? 'pt-4' : ''}`} style={{ animationDelay: "400ms" }}>
+                  {profileMenuItems.map((item, index) => {
+                    const IconComponent = item.icon;
+                    return (
+                      <a
+                        key={item.label}
+                        href={item.href}
+                        className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-700/30 animate-fadeInUp hover:bg-gray-800/30 transition-colors relative"
+                        style={{ animationDelay: `${index * 50 + 500}ms` }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (item.onClick) {
+                            item.onClick();
+                          } else {
+                            setProfileOpen(false);
+                          }
+                        }}
+                      >
+                        <div className="p-2 bg-gray-800/30 rounded-lg border border-gray-700/30">
+                          <IconComponent className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <span className="font-medium text-gray-300">
+                          {item.label}
+                        </span>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="px-6 py-5 border-t border-gray-700/30 bg-gradient-to-b from-gray-900 to-black mt-auto animate-fadeInUp" style={{ animationDelay: "600ms" }}>
                 <button
@@ -999,6 +1032,78 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             </div>
           </div>
         </>
+      )}
+
+      {/* Help & Support Chat Modal for Service Providers */}
+      {showProviderSupport && currentUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="relative w-full max-w-4xl h-[90vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <HelpCircle className="h-6 w-6" />
+                <div>
+                  <h3 className="font-semibold text-lg">Help & Support</h3>
+                  <p className="text-xs text-emerald-100">Chat with Admin</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowProviderSupport(false)}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                aria-label="Close support chat"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Chat Component */}
+            <div className="h-[calc(100%-4rem)]">
+              <Chat
+                user={currentUser}
+                otherUserId="admin-support"
+                otherUserName="Admin Support"
+                otherUserPhoto=""
+                onClose={() => setShowProviderSupport(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help & Support Chat Modal for Users/Tourists */}
+      {showUserSupport && currentUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="relative w-full max-w-4xl h-[90vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <HelpCircle className="h-6 w-6" />
+                <div>
+                  <h3 className="font-semibold text-lg">Help & Support</h3>
+                  <p className="text-xs text-emerald-100">Chat with Admin</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowUserSupport(false)}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                aria-label="Close support chat"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Chat Component */}
+            <div className="h-[calc(100%-4rem)]">
+              <Chat
+                user={currentUser}
+                otherUserId="admin-support"
+                otherUserName="Admin Support"
+                otherUserPhoto=""
+                onClose={() => setShowUserSupport(false)}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`

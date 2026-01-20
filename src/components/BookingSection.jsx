@@ -231,8 +231,8 @@ const BookingSection = ({ user }) => {
       const booking = bookings.find(b => b.id === bookingId);
       if (!booking) return;
 
-      const providerId = booking.driverId || booking.guideId;
-      const providerName = booking.driverName || booking.guideName || 'Service Provider';
+      const providerId = booking.driverId || booking.guideId || booking.providerId;
+      const providerName = booking.driverName || booking.guideName || booking.providerName || 'Service Provider';
       const customerId = booking.customerId;
       const customerName = booking.customerName || 'Customer';
 
@@ -368,7 +368,7 @@ const BookingSection = ({ user }) => {
                         <span className="text-sm font-semibold text-gray-900">
                           {userRole === 'provider'
                             ? (booking.customerName || 'Customer')
-                            : (booking.driverName || booking.guideName || 'Service Provider')
+                            : (booking.driverName || booking.guideName || booking.providerName || 'Service Provider')
                           }
                         </span>
                       </div>
@@ -421,7 +421,7 @@ const BookingSection = ({ user }) => {
                               <User className="h-3 w-3 text-green-400" />
                               Service Provider
                             </h4>
-                            <p className="text-xs text-gray-300">{booking.driverName || booking.guideName || 'Service Provider'}</p>
+                            <p className="text-xs text-gray-300">{booking.driverName || booking.guideName || booking.providerName || 'Service Provider'}</p>
                           </div>
 
                           {/* Booking Dates Details */}
@@ -520,6 +520,31 @@ const BookingSection = ({ user }) => {
                               >
                                 <DollarSign className="h-3 w-3" />
                                 Pay Now
+                              </button>
+                            )}
+
+                            {/* Book Another Provider button for declined bookings */}
+                            {userRole === 'tourist' && booking.status === 'declined' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedBookingId(null);
+                                  // Navigate to jeep/guide/renting page with filters for the national park and dates
+                                  const serviceType = booking.driverId ? 'jeep' : booking.guideId ? 'guide' : 'renting';
+                                  const destination = booking.nationalPark;
+                                  // Store booking details for filtering
+                                  sessionStorage.setItem('rebookingDetails', JSON.stringify({
+                                    nationalPark: booking.nationalPark,
+                                    selectedDates: booking.selectedDates || [],
+                                    datesWithTypes: booking.datesWithTypes || [],
+                                    numberOfDays: booking.numberOfDays
+                                  }));
+                                  navigate(`/${serviceType}?destination=${encodeURIComponent(destination)}&rebook=true`);
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all text-xs font-semibold shadow-lg"
+                              >
+                                <User className="h-4 w-4" />
+                                {booking.driverId ? 'Book Another Driver' : booking.guideId ? 'Book Another Guide' : 'Book Another Provider'}
                               </button>
                             )}
                           </div>

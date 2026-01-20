@@ -369,16 +369,41 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                   )}
                 </div>
 
+                {/* Park Hours */}
+                {destination.parkHours && (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
+                      <Clock className="h-4 w-4 text-green-600 mr-2" />
+                      Park Hours
+                    </h4>
+                    <div className="space-y-2 bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Opens:</span>
+                        <span className="text-sm font-semibold text-gray-900">{destination.parkHours.openTime}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Closes:</span>
+                        <span className="text-sm font-semibold text-gray-900">{destination.parkHours.closeTime}</span>
+                      </div>
+                      {destination.parkHours.note && (
+                        <p className="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-100">
+                          {destination.parkHours.note}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* External official / park site link for Yala */}
                 {destination.id === 'yala-national-park' && (
                   <div className="mt-6 pt-4 border-t border-gray-200">
                     <a
-                      href="https://www.yalasrilanka.lk/"
+                      href="https://dwc.lankagate.gov.lk/DWCEpermitApp/homeAction.action"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
                     >
-                      Visit Yala National Park Website
+                      Book Your Ticket Now to Yala National Park
                     </a>
                   </div>
                 )}
@@ -388,7 +413,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
         </div>
       </section>
 
-      {/* Animal Gallery Section */}
+      {/* Animal Gallery Section - NEW DESIGN */}
       {destination.animals && destination.animals.length > 0 && (
         <section className="py-20 md:py-24 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -401,131 +426,134 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               </p>
             </div>
 
-            <div className="space-y-8">
-              {/* Main Animal Display */}
-              <div className="relative rounded-2xl overflow-hidden bg-gray-900" style={{ height: '500px' }}>
+            {/* Main Container - Selected Animal Image and Details */}
+            <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 mb-8">
+              {/* LEFT SIDE - Main Selected Animal Image */}
+              <div className="flex-1 relative rounded-2xl overflow-hidden border-2 border-green-600 shadow-lg">
                 <img
                   src={destination.animals[selectedAnimal].image}
                   alt={destination.animals[selectedAnimal].name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover min-h-[400px] lg:min-h-[600px]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
-                
-                {/* Navigation Buttons */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePreviousAnimal();
-                  }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-gray-900 p-2.5 rounded-full border border-gray-200 shadow-sm transition-all z-20 cursor-pointer"
-                  aria-label="Previous animal"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNextAnimal();
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white text-gray-900 p-2.5 rounded-full border border-gray-200 shadow-sm transition-all z-20 cursor-pointer"
-                  aria-label="Next animal"
-                >
-                  <ChevronRight size={20} />
-                </button>
+              </div>
 
-                {/* Animal Info */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 text-white">
-                  <h3 className="text-2xl md:text-3xl font-semibold mb-2">
-                    {destination.animals[selectedAnimal].name}
-                  </h3>
-                  <p className="text-sm md:text-base text-white/90 max-w-2xl">
-                    {destination.animals[selectedAnimal].description}
-                  </p>
+              {/* RIGHT SIDE - Animal Details Panel */}
+              <div className="flex-1 bg-white rounded-2xl shadow-lg border border-gray-200 p-4 md:p-6 flex flex-col">
+                <div className="space-y-3">
+                  {/* Animal Name */}
+                  <div>
+                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+                      {destination.animals[selectedAnimal].name}
+                    </h3>
+                    <p className="text-sm text-gray-600 leading-snug">
+                      {destination.animals[selectedAnimal].description}
+                    </p>
+                  </div>
 
-                  {/* Population estimate display */}
-                  {destination.animals[selectedAnimal].populationEstimate && (
-                    <div className="mt-3 flex items-baseline gap-2">
-                      <p className="text-xs uppercase tracking-wide text-emerald-200">
-                        Estimated population
-                      </p>
-                      <p className="text-2xl md:text-3xl font-semibold text-white">
-                        {destination.animals[selectedAnimal].populationEstimate}
+                  {/* Scientific and Sinhala Names */}
+                  {(destination.animals[selectedAnimal].scientificName || destination.animals[selectedAnimal].sinhalaName) && (
+                    <div className="grid grid-cols-2 gap-3 py-2 border-y border-gray-200">
+                      {destination.animals[selectedAnimal].scientificName && (
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-0.5">Scientific</p>
+                          <p className="text-xs font-medium text-gray-900 italic">
+                            {destination.animals[selectedAnimal].scientificName}
+                          </p>
+                        </div>
+                      )}
+                      {destination.animals[selectedAnimal].sinhalaName && (
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-0.5">Sinhala</p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {destination.animals[selectedAnimal].sinhalaName}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Habitat */}
+                  {destination.animals[selectedAnimal].habitat && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-1">Habitat</p>
+                      <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">
+                        {destination.animals[selectedAnimal].habitat}
                       </p>
                     </div>
                   )}
 
-                  {/* Qualitative abundance / notes */}
-                  {destination.animals[selectedAnimal].abundance && (
-                    <p className="mt-2 text-xs md:text-sm text-emerald-200 max-w-2xl">
-                      {destination.animals[selectedAnimal].abundance}
-                    </p>
+                  {/* Population Estimate */}
+                  {destination.animals[selectedAnimal].populationEstimate && (
+                    <div className="bg-green-50 rounded-lg p-3">
+                      <p className="text-xs uppercase tracking-wide text-green-700 font-semibold mb-0.5">Population</p>
+                      <p className="text-2xl font-bold text-green-600 mb-1">
+                        {destination.animals[selectedAnimal].populationEstimate}
+                      </p>
+                      {destination.animals[selectedAnimal].abundance && (
+                        <p className="text-xs text-gray-600 leading-snug line-clamp-2">
+                          {destination.animals[selectedAnimal].abundance}
+                        </p>
+                      )}
+                    </div>
                   )}
 
-                  {/* Animal Button */}
-                  <div className="mt-4">
-                    {destination.id === 'yala-national-park' && destination.animals[selectedAnimal].name === 'Sri Lankan Leopard' ? (
+                  {/* Photography Tips */}
+                  {destination.animals[selectedAnimal].photographyTips && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Camera className="h-4 w-4 text-amber-600" />
+                        <p className="text-xs uppercase tracking-wide text-amber-700 font-semibold">
+                          Photo Tips
+                        </p>
+                      </div>
+                      <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">
+                        {destination.animals[selectedAnimal].photographyTips}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Learn More Button */}
+                  {destination.id === 'yala-national-park' && destination.animals[selectedAnimal].name === 'Sri Lankan Leopard' && (
+                    <div>
                       <a
                         href="https://yalaleoparddiary.com/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 bg-white text-gray-900 rounded-lg font-medium text-sm"
+                        className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium text-xs hover:bg-green-700 transition-colors"
                       >
-                        Learn More
+                        Learn More About Sri Lankan Leopards
                       </a>
-                    ) : (
-                      <button
-                        className="inline-flex items-center px-4 py-2 bg-white text-gray-900 rounded-lg font-medium text-sm"
-                        onClick={() => {
-                          // You can add functionality here for other animals
-                          console.log(`Learn more about ${destination.animals[selectedAnimal].name}`);
-                        }}
-                      >
-                        Learn More
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Indicator Dots */}
-                <div className="absolute bottom-6 right-6 flex gap-2">
-                  {destination.animals.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setSelectedAnimal(index)}
-                      className={`rounded-full transition-all ${index === selectedAnimal
-                          ? 'bg-white h-2 w-8' 
-                          : 'bg-white/50 hover:bg-white/75 h-2 w-2'
-                      }`}
-                      aria-label={`Go to ${destination.animals[index].name}`}
-                    />
-                  ))}
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Animal Thumbnails */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-                {destination.animals.map((animal, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedAnimal(index)}
-                    className={`relative h-24 md:h-32 rounded-lg overflow-hidden border-2 transition-all ${index === selectedAnimal
-                        ? 'border-gray-900 ring-2 ring-gray-900 ring-offset-2' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <img
-                      src={animal.image}
-                      alt={animal.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className={`absolute inset-0 transition-colors ${index === selectedAnimal ? 'bg-black/20' : 'bg-black/30 hover:bg-black/20'
-                    }`}></div>
-                    <p className="absolute bottom-1.5 left-1.5 right-1.5 text-white text-xs font-medium text-center bg-black/40 backdrop-blur-sm rounded px-1.5 py-0.5">
-                      {animal.name}
-                    </p>
-                  </button>
-                ))}
-              </div>
+            {/* Animal Thumbnails - Horizontal Line Below */}
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
+              {destination.animals.map((animal, index) => (
+                <button
+                  key={index}
+                  onClick={() => setSelectedAnimal(index)}
+                  className={`relative flex-shrink-0 w-40 h-40 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${
+                    index === selectedAnimal
+                      ? 'border-green-600 ring-2 ring-green-600 ring-offset-2' 
+                      : 'border-gray-300 hover:border-green-500'
+                  }`}
+                >
+                  <img
+                    src={animal.image}
+                    alt={animal.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className={`absolute inset-0 transition-colors ${
+                    index === selectedAnimal ? 'bg-green-600/20' : 'bg-black/30 hover:bg-black/20'
+                  }`}></div>
+                  <p className="absolute bottom-2 left-2 right-2 text-white text-xs font-medium text-center bg-black/60 backdrop-blur-sm rounded px-2 py-1.5">
+                    {animal.name}
+                  </p>
+                </button>
+              ))}
             </div>
           </div>
         </section>
@@ -969,7 +997,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
               {destination.tips.map((tip, index) => (
                 <div key={index} className="bg-white rounded-lg border border-gray-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
                   <div className="bg-green-100 rounded-full p-2 flex-shrink-0">
@@ -979,6 +1007,39 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                 </div>
               ))}
             </div>
+
+            {/* Law Enforcement Section */}
+            {destination.lawEnforcement && destination.lawEnforcement.length > 0 && (
+              <div className="mt-12">
+                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 md:p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="bg-red-600 rounded-full p-3">
+                      <AlertCircle className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900">Park Rules & Law Enforcement</h3>
+                      <p className="text-sm text-gray-600 mt-1">Strictly enforced for safety and conservation</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {destination.lawEnforcement.map((rule, index) => (
+                      <div key={index} className="bg-white rounded-lg border border-red-200 p-4 flex items-start gap-3">
+                        <div className="bg-red-100 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                        </div>
+                        <p className="text-sm text-gray-800 leading-relaxed">{rule}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 p-4 bg-red-100 rounded-lg">
+                    <p className="text-sm text-red-900 font-medium">
+                      Violation of park rules may result in fines, expulsion from the park, or legal action.
+                      These regulations are in place to protect both wildlife and visitors.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}

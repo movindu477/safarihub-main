@@ -57,84 +57,132 @@ Best visited during the dry season (February to June), the park provides excelle
         image: back4ori2,
         description: 'The apex predator of Yala and the park’s most iconic species.',
         populationEstimate: '250–300',
-        abundance: 'One of the highest leopard densities in the world. Block 1 alone hosts ~25–40 individuals.'
+        abundance: 'One of the highest leopard densities in the world. Block 1 alone hosts ~25–40 individuals.',
+        scientificName: 'Panthera pardus kotiya',
+        sinhalaName: 'කොටියා (Kotiyā)',
+        habitat: 'Dry zone forests, scrublands, rocky outcrops, and grasslands. Highly adaptable and territorial.',
+        photographyTips: 'Use a 400-600mm telephoto lens. Early morning (6-9 AM) offers the best lighting. Look for leopards resting on trees or rocky outcrops. Be patient at waterholes during dry season. Keep ISO low (400-800) to reduce noise. Maintain a safe distance and never disturb the animal.'
       },
       {
         name: 'Sri Lankan Elephant',
         image: yala2,
         description: 'Family groups and lone bulls roam freely between scrub jungle and open grasslands.',
         populationEstimate: '250–350',
-        abundance: 'Common, seasonal movement inside the park. Seen frequently near water sources during dry season.'
+        abundance: 'Common, seasonal movement inside the park. Seen frequently near water sources during dry season.',
+        scientificName: 'Elephas maximus maximus',
+        sinhalaName: 'අලියා (Aliyā)',
+        habitat: 'Open grasslands, forest edges, and near water bodies. Move between blocks seasonally in search of water and food.',
+        photographyTips: 'Best photographed near waterholes and open grasslands. Use 200-400mm lens for close-ups and 70-200mm for herd shots. Capture behavior like bathing, dust bathing, and feeding. Golden hour (sunrise/sunset) provides warm tones. Always respect their space—elephants can be unpredictable.'
       },
       {
         name: 'Sri Lankan Sloth Bear',
         image: yala3,
         description: 'A shaggy, nocturnal bear often seen foraging near termite mounds.',
         populationEstimate: '30–50',
-        abundance: 'Rare but established. Mostly nocturnal, sightings are occasional.'
+        abundance: 'Rare but established. Mostly nocturnal, sightings are occasional.',
+        scientificName: 'Melursus ursinus inornatus',
+        sinhalaName: 'වලසා (Walasā)',
+        habitat: 'Dense forest areas, particularly near termite mounds and fruiting trees. Active at dawn and dusk.',
+        photographyTips: 'Challenging subject—requires patience and luck. Best spotted early morning or late evening. Use 300-600mm lens with high shutter speed (1/500s+) as they move quickly. Increase ISO (800-1600) in low light. Capture feeding behavior at termite mounds. Maintain maximum distance for safety.'
       },
       {
         name: 'Wild Water Buffalo',
         image: yala4,
         description: 'Powerful wild buffalo frequently seen wallowing in villus and marshy areas.',
         populationEstimate: '400–600',
-        abundance: 'Common near wetlands. Both wild and feral individuals present.'
+        abundance: 'Common near wetlands. Both wild and feral individuals present.',
+        scientificName: 'Bubalus arnee',
+        sinhalaName: 'වල් මී හරකා (Wal Mee Harakā)',
+        habitat: 'Wetlands, villus (natural lakes), and marshy grasslands. Often seen wallowing in mud to cool down.',
+        photographyTips: 'Photograph at villu edges during early morning or late afternoon. Use 200-400mm lens. Capture wallowing behavior and reflections in water. Shoot at eye level for powerful compositions. Be cautious—bulls can be aggressive during mating season.'
       },
       {
         name: 'Sambar Deer',
         image: yala5,
         description: 'Largest deer species in the park, often found in forested areas.',
         populationEstimate: '800–1,200',
-        abundance: 'Common. Largest deer species in the park.'
+        abundance: 'Common. Largest deer species in the park.',
+        scientificName: 'Rusa unicolor',
+        sinhalaName: 'ගොන් මුවා (Gon Muwā)',
+        habitat: 'Dense forests, forest edges, and near water sources. Often solitary or in small groups.',
+        photographyTips: 'Best photographed in soft morning or evening light. Use 300-500mm lens for portraits. Capture alert poses with ears forward. Focus on the eyes. Males with antlers make impressive subjects during rutting season. Photograph them at waterholes for added interest.'
       },
       {
         name: 'Mugger Crocodile',
         image: yala6,
         description: 'Large freshwater crocodile basking on riverbanks and lake shores.',
         populationEstimate: '150–200',
-        abundance: 'Common. Seen in lakes and reservoirs.'
+        abundance: 'Common. Seen in lakes and reservoirs.',
+        scientificName: 'Crocodylus palustris',
+        sinhalaName: 'කිඹුලා (Kimbulā)',
+        habitat: 'Freshwater lakes, reservoirs, and slow-moving rivers. Often basking on banks or rocks.',
+        photographyTips: 'Photograph basking crocodiles mid-morning when they are most active. Use 400-600mm lens for close-ups from a safe distance. Capture open-mouth thermoregulation behavior. Shoot from low angles to emphasize size and power. Watch for interesting interactions with birds or other wildlife.'
       },
       {
         name: 'Indian Peafowl',
         image: yala7,
         description: 'Sri Lanka’s national bird, famous for its dramatic courtship displays.',
         populationEstimate: '10,000+',
-        abundance: 'Extremely common. National bird of Sri Lanka.'
+        abundance: 'Extremely common. National bird of Sri Lanka.',
+        scientificName: 'Pavo cristatus',
+        sinhalaName: 'මොනරා (Monarā)',
+        habitat: 'Open forests, grasslands, near water sources, and around park bungalows. Very adaptable.',
+        photographyTips: 'Best photographed during mating displays (monsoon season). Use 200-400mm lens. Capture the full fan display from the front. Fast shutter speed (1/1000s+) for flying shots. Photograph males calling at dawn for dramatic images. Reflections in water add impact.'
       },
       {
         name: 'Wild Boar',
         image: yala8,
         description: 'Important prey species found throughout the park.',
         populationEstimate: '2,000–3,000',
-        abundance: 'Common. Important prey species.'
+        abundance: 'Common. Important prey species.',
+        scientificName: 'Sus scrofa',
+        sinhalaName: 'වල් ඌරා (Wal Ūrā)',
+        habitat: 'Forest undergrowth, grasslands, and near water sources. Often seen foraging in groups.',
+        photographyTips: 'Photograph families with piglets for engaging shots. Use 300-400mm lens. Capture foraging behavior. Early morning or late afternoon provides best light. Focus on piglets with distinctive striped patterns. Shoot from vehicle—wild boars can be aggressive if cornered.'
       },
       {
         name: 'Grey / Purple-faced Langur',
         image: yala9,
         description: 'Endemic primate species with distinctive grey and purple facial markings, commonly seen in tree canopies.',
         populationEstimate: '600–1,000',
-        abundance: 'Common in forested areas. Often seen in troops in the tree canopy.'
+        abundance: 'Common in forested areas. Often seen in troops in the tree canopy.',
+        scientificName: 'Semnopithecus vetulus',
+        sinhalaName: 'කළු වඳුරා (Kalu Wandurā)',
+        habitat: 'Tree canopies in dry mixed forests. Live in troops of 5-15 individuals. Territorial and vocal.',
+        photographyTips: 'Photograph in morning or late afternoon when they are most active. Use 300-500mm lens. Capture interactions between troop members, especially mothers with infants. Focus on facial expressions and purple face coloration. Shoot from slightly below to show canopy habitat. Fast shutter speed (1/500s+) for moving subjects.'
       },
       {
         name: 'Fishing Cat',
         image: yala10,
         description: 'A medium-sized wild cat adapted to wetland habitats, known for its exceptional fishing abilities.',
         populationEstimate: '20–40',
-        abundance: 'Rare. Nocturnal and elusive, mostly found near water bodies and wetlands.'
+        abundance: 'Rare. Nocturnal and elusive, mostly found near water bodies and wetlands.',
+        scientificName: 'Prionailurus viverrinus',
+        sinhalaName: 'හඳුන් දිවියා (Handun Diviyā)',
+        habitat: 'Wetlands, marshes, and mangrove areas. Primarily nocturnal and semi-aquatic.',
+        photographyTips: 'Extremely rare sighting—requires immense patience and luck. Best chance at dawn or dusk near wetlands. Use high ISO (1600-3200) and fast lens (f/2.8-f/4). Stabilization is crucial. Use 400-600mm lens. If spotted, avoid sudden movements. Any photo of this species is valuable for conservation.'
       },
       {
         name: 'Painted Stork',
         image: yala11,
         description: 'Among the over 200 bird species, the painted stork is one of the common and beautiful waterbirds attracted to the park\'s lagoons.',
         populationEstimate: 'Common',
-        abundance: 'Frequently seen in lagoons and wetland areas during the dry season.'
+        abundance: 'Frequently seen in lagoons and wetland areas during the dry season.',
+        scientificName: 'Mycteria leucocephala',
+        sinhalaName: 'චිත්‍ර හංසයා (Chithra Hansayā)',
+        habitat: 'Shallow lagoons, wetlands, and marshy areas. Often in flocks, especially during breeding season.',
+        photographyTips: 'Photograph at lagoon edges during golden hour. Use 400-600mm lens. Capture feeding behavior (sweeping bill motion). Flight shots with wings spread show beautiful wing patterns. Shoot reflections for added interest. Group shots during nesting season are spectacular. Use fast shutter (1/1000s+) for flight photography.'
       },
       {
         name: 'Land Monitor',
         image: yala12,
         description: 'These large, slow-moving lizards are often visible near the safari roads.',
         populationEstimate: 'Common',
-        abundance: 'Frequently spotted basking on roads and rocks, especially during warm weather.'
+        abundance: 'Frequently spotted basking on roads and rocks, especially during warm weather.',
+        scientificName: 'Varanus bengalensis',
+        sinhalaName: 'තලගොයා (Thalagoyā)',
+        habitat: 'Open areas, grasslands, forest edges, and along roads. Often seen basking on rocks or crossing paths.',
+        photographyTips: 'Easy to photograph—often stationary while basking. Use 200-400mm lens. Shoot from low angle to emphasize size. Capture tongue flicking behavior. Focus on textured scales and eye detail. Best light in early morning or late afternoon. If they\'re crossing the road, photograph from vehicle without disturbing them.'
       }
     ],
     accommodations: [
@@ -164,6 +212,23 @@ Best visited during the dry season (February to June), the park provides excelle
       'Bring binoculars and a good camera with zoom lens for photography',
       'Carry sufficient water, sunscreen, and insect repellent',
       'Respect wildlife by maintaining a safe distance and following park regulations'
+    ],
+    parkHours: {
+      openTime: '6:00 AM',
+      closeTime: '6:00 PM',
+      note: 'Safari sessions are typically 5-6 hours. Morning session: 6:00 AM - 12:00 PM, Afternoon session: 2:00 PM - 6:00 PM'
+    },
+    lawEnforcement: [
+      'Remain inside your vehicle at all times unless in designated safe zones',
+      'Do not feed or disturb wildlife - feeding animals is strictly prohibited',
+      'Maintain a minimum distance of 25 meters from all wildlife',
+      'No littering - carry all waste out of the park',
+      'Speed limit is 25 km/h throughout the park',
+      'No loud noises, music, or shouting - respect the natural habitat',
+      'Photography is allowed but drones are strictly prohibited',
+      'No walking or trekking is permitted inside the park',
+      'Smoking is prohibited throughout the park premises',
+      'Follow your guide\'s instructions at all times for safety'
     ],
     mapZoom: 12,
     mapEmbedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14185.313161698377!2d81.46158493853646!3d6.463982517866302!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae5d3a62ffb9359%3A0x3bb623d70b5a3314!2sYala%20National%20Park!5e1!3m2!1sen!2slk!4v1765894171601!5m2!1sen!2slk'

@@ -14,11 +14,16 @@ const BookingHistory = ({ user, onLogout, onShowAuth }) => {
 
   useEffect(() => {
     if (!user || !user.uid) {
+      console.log('⚠️ BookingHistory: No user available yet, user:', user);
       setLoading(false);
+      setBookings([]); // Explicitly set to empty array
       return;
     }
 
     console.log('📋 Fetching booking history for user:', user.uid);
+    console.log('🔍 User object:', { uid: user.uid, email: user.email });
+    
+    setLoading(true); // Ensure loading is true when starting fetch
 
     // Query bookings where user is the customer
     const customerQuery = query(
@@ -35,18 +40,27 @@ const BookingHistory = ({ user, onLogout, onShowAuth }) => {
           ...doc.data()
         }));
         
-        console.log('✅ Fetched bookings:', bookingsData.length);
+        console.log('✅ Fetched bookings:', bookingsData.length, 'bookings');
+        if (bookingsData.length > 0) {
+          console.log('📦 First booking:', bookingsData[0]);
+        }
         setBookings(bookingsData);
         setLoading(false);
       },
       (error) => {
         console.error('❌ Error fetching bookings:', error);
+        console.error('❌ Error code:', error.code);
+        console.error('❌ Error message:', error.message);
+        setBookings([]); // Set to empty array on error
         setLoading(false);
       }
     );
 
-    return () => unsubscribe();
-  }, [user]);
+    return () => {
+      console.log('🧹 Cleaning up booking history listener');
+      unsubscribe();
+    };
+  }, [user, db]);
 
   // Filter bookings based on payment status
   const filteredBookings = bookings.filter(booking => {
@@ -228,10 +242,10 @@ Thank you for choosing SafariHub!
   return (
     <>
       <Navbar user={user} onLogout={onLogout} onLogin={onShowAuth} onRegister={onShowAuth} />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-4 sm:py-6 md:py-8 px-3 sm:px-4 lg:px-6 pt-20 sm:pt-24">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-4 sm:py-6 md:py-8 px-3 sm:px-4 lg:px-6 pt-28 sm:pt-32 md:pt-36">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-lg sm:rounded-xl shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
+        <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-5 sm:p-7 md:p-8 mb-6 sm:mb-8 border border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 sm:gap-3">
@@ -242,33 +256,33 @@ Thank you for choosing SafariHub!
             </div>
             
             {/* Filter Buttons */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 sm:gap-3 flex-wrap">
               <button
                 onClick={() => setFilterType('all')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 shadow-sm ${
                   filterType === 'all'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    ? 'bg-green-600 text-white shadow-md scale-105'
+                    : 'bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-green-400'
                 }`}
               >
                 All ({bookings.length})
               </button>
               <button
                 onClick={() => setFilterType('paid')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 shadow-sm ${
                   filterType === 'paid'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    ? 'bg-green-600 text-white shadow-md scale-105'
+                    : 'bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-green-400'
                 }`}
               >
                 Paid ({bookings.filter(b => b.paymentStatus === 'paid').length})
               </button>
               <button
                 onClick={() => setFilterType('pending')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 shadow-sm ${
                   filterType === 'pending'
-                    ? 'bg-yellow-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    ? 'bg-yellow-600 text-white shadow-md scale-105'
+                    : 'bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-yellow-400'
                 }`}
               >
                 Pending ({bookings.filter(b => b.paymentStatus !== 'paid').length})
@@ -284,19 +298,27 @@ Thank you for choosing SafariHub!
             <p className="text-gray-600 text-sm sm:text-base mt-4">Loading your bookings...</p>
           </div>
         ) : filteredBookings.length === 0 ? (
-          <div className="bg-white rounded-lg sm:rounded-xl shadow-md p-8 sm:p-12 text-center">
-            <Calendar className="h-16 w-16 sm:h-20 sm:w-20 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No bookings found</h3>
-            <p className="text-sm sm:text-base text-gray-600">
-              {filterType === 'paid' 
-                ? "You don't have any paid bookings yet."
-                : filterType === 'pending'
-                ? "You don't have any pending bookings."
-                : "You haven't made any bookings yet."}
-            </p>
+          <div className="bg-white rounded-lg sm:rounded-xl shadow-lg border border-gray-200 p-12 sm:p-16 md:p-20 text-center">
+            <div className="max-w-md mx-auto">
+              <Calendar className="h-20 w-20 sm:h-24 sm:w-24 text-gray-300 mx-auto mb-6" />
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">No bookings found</h3>
+              <p className="text-sm sm:text-base text-gray-500 leading-relaxed">
+                {filterType === 'paid' 
+                  ? "You don't have any paid bookings yet."
+                  : filterType === 'pending'
+                  ? "You don't have any pending bookings."
+                  : "You haven't made any bookings yet."}
+              </p>
+              <button
+                onClick={() => navigate('/')}
+                className="mt-6 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-md"
+              >
+                Explore Safari Options
+              </button>
+            </div>
           </div>
         ) : (
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-4 sm:space-y-5 md:space-y-6">
             {filteredBookings.map((booking) => {
               const total = calculateBookingTotal(booking);
               const { fullDays, halfDays } = getDayTypeCounts(booking);
@@ -305,10 +327,10 @@ Thank you for choosing SafariHub!
               return (
                 <div
                   key={booking.id}
-                  className="bg-white rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-shadow overflow-hidden"
+                  className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-green-200"
                 >
                   {/* Booking Card Header */}
-                  <div className="p-3 sm:p-4 md:p-6">
+                  <div className="p-4 sm:p-5 md:p-7">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
@@ -386,10 +408,10 @@ Thank you for choosing SafariHub!
 
                   {/* Expanded Details */}
                   {isExpanded && (
-                    <div className="border-t border-gray-200 bg-gray-50 p-3 sm:p-4 md:p-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="border-t-2 border-gray-100 bg-gradient-to-br from-gray-50 to-gray-100/50 p-4 sm:p-5 md:p-7">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
                         {/* Personal Information */}
-                        <div className="bg-white rounded-lg p-3 sm:p-4 border border-gray-200">
+                        <div className="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                           <h4 className="font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
                             <User className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                             Personal Information
@@ -403,7 +425,7 @@ Thank you for choosing SafariHub!
                         </div>
 
                         {/* Safari Details */}
-                        <div className="bg-white rounded-lg p-3 sm:p-4 border border-gray-200">
+                        <div className="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                           <h4 className="font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
                             <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                             Safari Details
@@ -418,7 +440,7 @@ Thank you for choosing SafariHub!
                         </div>
 
                         {/* Price Breakdown */}
-                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 sm:p-4 border-2 border-green-300 md:col-span-2">
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 sm:p-5 md:p-6 border-2 border-green-300 md:col-span-2 shadow-md">
                           <h4 className="font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
                             <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                             Payment Breakdown

@@ -59,7 +59,7 @@ import ReviewSection from "../ReviewSection";
 import Chat from "../Chat";
 
 // Import rating update function
-import { updateDriverRating } from "../../reviewservice";
+import { updateRentalProviderRating } from "../../reviewservice";
 
 // Import Firebase functions from App
 import {
@@ -353,7 +353,7 @@ const BookingFormModal = ({
   currentStep,
   setCurrentStep,
   onSubmit,
-  driver,
+  provider,
   selectedDates,
   selectedDatesWithType,
   onDateTypeChange
@@ -672,7 +672,7 @@ const BookingFormModal = ({
                     onChange={(e) => updateFormData('nationalPark', e.target.value)}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 appearance-none pr-10 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                       }`}
-                    disabled={!!(driver?.destinations && driver.destinations.length > 0)}
+                    disabled={!!(provider?.destinations && provider.destinations.length > 0)}
                   >
                     <option value={formData.nationalPark}>{formData.nationalPark || 'Select National Park'}</option>
                   </select>
@@ -1058,13 +1058,13 @@ const getParkTicketPrice = (parkName) => {
   return parkTicketPrices[parkName] || 0;
 };
 
-const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
+const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { jeepId } = useParams(); // Get jeepId from URL parameter
+  const { providerId: paramProviderId } = useParams(); // Get providerId from URL parameter
   // const messagesEndRef = useRef(null); // Removed - using Chat component instead
 
-  const [driver, setDriver] = useState(null);
+  const [provider, setProvider] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
@@ -1119,14 +1119,14 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [hasAcceptedBooking, setHasAcceptedBooking] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
-  const driverId = jeepId || searchParams.get('driverId'); // Use jeepId from URL params, fallback to query params
+  const providerId = paramProviderId || searchParams.get('providerId'); // Use providerId from URL params, fallback to query params
   const openChat = searchParams.get('openChat');
 
   // Scroll to top when page loads or navigates (including back button)
   useEffect(() => {
     // Scroll to top on mount and when location changes
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [location.pathname, driverId]);
+  }, [location.pathname, providerId]);
 
   // Also handle popstate (back/forward button)
   useEffect(() => {
@@ -1142,9 +1142,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     };
   }, []);
 
-  // Reset state when driverId changes (navigating to different driver or going back)
+  // Reset state when providerId changes (navigating to different provider or going back)
   useEffect(() => {
-    // Reset component state when driverId changes or is cleared
+    // Reset component state when providerId changes or is cleared
     setError("");
     setActiveTab("overview");
     // setMessage("");
@@ -1154,24 +1154,24 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     setIsChatModalOpen(false);
     setChatConversationId(null);
     setChatOtherUser(null);
-  }, [driverId]);
+  }, [providerId]);
 
   // Old scrollToBottom and messages useEffect removed - using Chat component instead
 
   // Handle opening chat from URL parameter
   useEffect(() => {
-    if (openChat === 'true' && driverId && currentUser && driver) {
+    if (openChat === 'true' && providerId && currentUser && provider) {
       setActiveTab('chat');
       // Open chat modal instead of initializing old conversation
       setChatOtherUser({
-        id: driver.id,
-        name: driver.fullName || 'Driver',
-        photo: driver.profilePicture || driver.imageUrl || '',
-        role: 'driver'
+        id: provider.id,
+        name: provider.fullName || 'provider',
+        photo: provider.profilePicture || provider.imageUrl || '',
+        role: 'provider'
       });
       setIsChatModalOpen(true);
     }
-  }, [openChat, driverId, currentUser, driver]);
+  }, [openChat, providerId, currentUser, provider]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
@@ -1225,10 +1225,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
   // Calculate total price based on selected dates and their types (half-day vs full-day) + add-ons
   const calculateTotalPrice = () => {
-    if (!driver || selectedDates.length === 0) return 0;
+    if (!provider || selectedDates.length === 0) return 0;
     
     // Calculate base price from dates
-    const dailyPrice = driver.pricePerDay || 0;
+    const dailyPrice = provider.pricePerDay || 0;
     let total = 0;
     selectedDates.forEach(date => {
       const dateString = date.toDateString();
@@ -1391,8 +1391,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     console.log('🔵 Current state:', {
       selectedDates: selectedDates.length,
       currentUser: !!currentUser,
-      driver: !!driver,
-      driverId: driver?.id,
+      provider: !!provider,
+      providerId: provider?.id,
       isBooking: isBooking
     });
 
@@ -1409,16 +1409,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       return;
     }
 
-    if (!driver) {
-      console.warn('⚠️ No driver data');
-      alert('Driver information not available.');
+    if (!provider) {
+      console.warn('⚠️ No provider data');
+      alert('provider information not available.');
       return;
     }
 
-    // Verify driver has a valid ID
-    if (!driver.id) {
-      console.error('❌ Driver ID is missing:', driver);
-      alert('Driver information is incomplete. Please try again.');
+    // Verify provider has a valid ID
+    if (!provider.id) {
+      console.error('❌ provider ID is missing:', provider);
+      alert('provider information is incomplete. Please try again.');
       return;
     }
 
@@ -1468,7 +1468,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       selectedDates.forEach(date => {
         const dateString = date.toDateString();
         const dateType = selectedDatesWithType[dateString] || 'full-day';
-        const dailyPrice = driver.pricePerDay || 0;
+        const dailyPrice = provider.pricePerDay || 0;
         totalPrice += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
       });
 
@@ -1488,23 +1488,23 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         };
       });
 
-      // Get driver email from driver data (could be contactEmail, email, or from auth)
-      const driverEmail = driver.contactEmail || driver.email || '';
+      // Get provider email from provider data (could be contactEmail, email, or from auth)
+      const driverEmail = provider.contactEmail || provider.email || '';
 
-      // Validate driver ID before proceeding
-      const driverIdString = String(driver.id || '');
-      if (!driverIdString || driverIdString === 'undefined' || driverIdString === 'null' || driverIdString.trim() === '') {
-        console.error('❌ Invalid driver ID:', driver.id);
-        alert('Invalid driver information. Please refresh the page and try again.');
+      // Validate provider ID before proceeding
+      const providerIdString = String(provider.id || '');
+      if (!providerIdString || providerIdString === 'undefined' || providerIdString === 'null' || providerIdString.trim() === '') {
+        console.error('❌ Invalid provider ID:', provider.id);
+        alert('Invalid provider information. Please refresh the page and try again.');
         return;
       }
 
       // Create booking in Firestore with all form data
       // Ensure all fields match Firestore rules requirements exactly
       const bookingData = {
-        driverId: driverIdString, // Must be a string
-        driverName: driver.fullName || driver.driverName || 'Driver',
-        driverEmail: driverEmail, // Store driver email in booking
+        providerId: providerIdString, // Must be a string
+        driverName: provider.fullName || provider.driverName || 'provider',
+        driverEmail: driverEmail, // Store provider email in booking
         customerId: authUser.uid, // MUST match request.auth.uid
         customerName: bookingFormData.fullName || authUser.displayName || 'Customer',
         customerEmail: bookingFormData.email || authUser.email || '',
@@ -1512,9 +1512,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         datesWithTypes: datesWithTypes, // Array of {date, type}
         datesString: datesString,
         totalPrice: Number(totalPrice.toFixed(2)), // Must be a number
-        pricePerDay: Number(driver.pricePerDay || 0),
+        pricePerDay: Number(provider.pricePerDay || 0),
         numberOfDays: Number(selectedDates.length),
-        serviceType: driver.serviceType || 'Jeep Driver',
+        serviceType: provider.serviceType || 'Jeep provider',
         status: 'pending',
         // Include all booking form data
         ...bookingFormData,
@@ -1528,10 +1528,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         authUserEmail: authUser.email,
         customerId: bookingData.customerId,
         customerIdMatch: authUser.uid === bookingData.customerId,
-        driverId: bookingData.driverId,
-        driverIdType: typeof bookingData.driverId,
-        driverIdIsString: typeof bookingData.driverId === 'string',
-        driverIdLength: String(bookingData.driverId).length,
+        providerId: bookingData.providerId,
+        providerIdType: typeof bookingData.providerId,
+        providerIdIsString: typeof bookingData.providerId === 'string',
+        providerIdLength: String(bookingData.providerId).length,
         selectedDates: bookingData.selectedDates,
         selectedDatesType: Array.isArray(bookingData.selectedDates) ? 'array' : typeof bookingData.selectedDates,
         selectedDatesIsArray: Array.isArray(bookingData.selectedDates),
@@ -1550,15 +1550,15 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         authUserEmail: authUser?.email,
         customerId: bookingData.customerId,
         customerIdMatch: authUser?.uid === bookingData.customerId,
-        driverId: bookingData.driverId,
-        driverIdType: typeof bookingData.driverId,
+        providerId: bookingData.providerId,
+        providerIdType: typeof bookingData.providerId,
         selectedDatesCount: bookingData.selectedDates.length,
         selectedDatesIsArray: Array.isArray(bookingData.selectedDates),
         totalPrice: bookingData.totalPrice,
         totalPriceType: typeof bookingData.totalPrice,
         allFieldsPresent: {
           customerId: !!bookingData.customerId,
-          driverId: !!bookingData.driverId,
+          providerId: !!bookingData.providerId,
           selectedDates: !!bookingData.selectedDates,
           totalPrice: bookingData.totalPrice !== null && bookingData.totalPrice !== undefined
         }
@@ -1567,7 +1567,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       // Double-check data types before sending
       const validatedBookingData = {
         ...bookingData,
-        driverId: String(bookingData.driverId), // Ensure it's a string
+        providerId: String(bookingData.providerId), // Ensure it's a string
         selectedDates: Array.isArray(bookingData.selectedDates) ? bookingData.selectedDates : [],
         totalPrice: Number(bookingData.totalPrice) // Ensure it's a number
       };
@@ -1584,7 +1584,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         console.log('🚀 Attempting to create booking in Firestore...');
         console.log('🚀 Data being sent:', {
           customerId: finalBookingData.customerId,
-          driverId: finalBookingData.driverId,
+          providerId: finalBookingData.providerId,
           selectedDates: finalBookingData.selectedDates,
           selectedDatesLength: finalBookingData.selectedDates.length,
           totalPrice: finalBookingData.totalPrice,
@@ -1607,7 +1607,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           collection: 'bookings',
           documentId: bookingId,
           customerId: finalBookingData.customerId,
-          driverId: finalBookingData.driverId,
+          providerId: finalBookingData.providerId,
           totalPrice: finalBookingData.totalPrice,
           numberOfDays: finalBookingData.numberOfDays
         });
@@ -1619,7 +1619,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           stack: bookingError.stack,
           dataSent: {
             customerId: finalBookingData.customerId,
-            driverId: finalBookingData.driverId,
+            providerId: finalBookingData.providerId,
             selectedDatesLength: finalBookingData.selectedDates.length,
             totalPrice: finalBookingData.totalPrice
           }
@@ -1644,7 +1644,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         // Don't fail the booking if confirmation record fails
       }
 
-      // Create comprehensive notification for driver with all booking details
+      // Create comprehensive notification for provider with all booking details
       // Wrap in try-catch so notification failure doesn't break the booking
       try {
         // Create detailed message with all booking information
@@ -1672,11 +1672,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           type: 'booking',
           title: 'New Booking Request',
           message: notificationMessage,
-          recipientId: driver.id, // Driver's user ID (from serviceProviders collection)
+          recipientId: provider.id, // provider's user ID (from serviceProviders collection)
           senderId: authUser.uid, // Tourist's user ID
           senderName: bookingFormData.fullName || authUser.displayName || 'Customer', // Tourist's name
           senderEmail: bookingFormData.email || authUser.email || '', // Tourist's email
-          driverEmail: driverEmail, // Driver's email stored in booking
+          driverEmail: driverEmail, // provider's email stored in booking
           relatedId: bookingId,
           bookingId: bookingId,
           bookingData: {
@@ -1688,18 +1688,18 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             totalPrice: totalPrice,
             customerName: bookingFormData.fullName || authUser.displayName || 'Customer',
             customerEmail: bookingFormData.email || authUser.email || '',
-            driverId: driver.id,
-            driverName: driver.fullName || driver.driverName || 'Driver',
+            providerId: provider.id,
+            driverName: provider.fullName || provider.driverName || 'provider',
             driverEmail: driverEmail,
-            pricePerDay: driver.pricePerDay || 0,
+            pricePerDay: provider.pricePerDay || 0,
             status: 'pending'
           }
         };
 
         const notificationId = await createNotification(notificationData);
-        console.log('✅ Notification created for driver:', {
+        console.log('✅ Notification created for provider:', {
           notificationId: notificationId,
-          recipientId: driver.id,
+          recipientId: provider.id,
           bookingId: bookingId
         });
       } catch (notificationError) {
@@ -1709,7 +1709,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
       // Show success animation with booking ID
       console.log('✅ Setting success message data:', {
-        driverName: driver.fullName,
+        driverName: provider.fullName,
         dates: datesString,
         totalPrice: totalPrice,
         numberOfDays: selectedDates.length,
@@ -1728,7 +1728,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       });
 
       setSuccessMessageData({
-        driverName: driver.fullName,
+        driverName: provider.fullName,
         dates: datesString,
         datesWithTypes: datesWithTypesAndSafari,
         totalPrice: totalPrice,
@@ -1869,17 +1869,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         email: prev.email || currentUser.email || userTouristData.email || '',
         phone: prev.phone || userTouristData.phone || userTouristData.phoneNumber || '',
         country: prev.country || userTouristData.country || userTouristData.location || '',
-        // Auto-fill national park from driver's first destination
-        nationalPark: prev.nationalPark || (driver?.destinations && driver.destinations.length > 0 ? driver.destinations[0] : ''),
-        // Vehicle type is auto-filled from driver's vehicle type (display only, not editable)
+        // Auto-fill national park from provider's first destination
+        nationalPark: prev.nationalPark || (provider?.destinations && provider.destinations.length > 0 ? provider.destinations[0] : ''),
+        // Equipment Type is auto-filled from provider's Equipment Type (display only, not editable)
       }));
     }
-  }, [showBookingForm, currentUser, userTouristData, driver]);
+  }, [showBookingForm, currentUser, userTouristData, provider]);
 
   useEffect(() => {
     const fetchDriverData = async () => {
-      if (!driverId) {
-        setError("No driver ID provided");
+      if (!providerId) {
+        setError("No provider ID provided");
         setLoading(false);
         return;
       }
@@ -1887,15 +1887,15 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       // Reset state before fetching
       setLoading(true);
       setError("");
-      setDriver(null);
+      setProvider(null);
       setActiveTab("overview");
 
       try {
-        const driverDoc = await getDoc(doc(db, 'serviceProviders', driverId));
+        const driverDoc = await getDoc(doc(db, 'serviceProviders', providerId));
 
         if (driverDoc.exists()) {
           const driverData = driverDoc.data();
-          setDriver({
+          setProvider({
             id: driverDoc.id,
             ...driverData,
             // Ensure availability is an object, not array
@@ -1905,24 +1905,24 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             availableDates: driverData.availableDates || [] // Keep for backward compatibility
           });
         } else {
-          setError("Driver not found");
+          setError("provider not found");
         }
       } catch (err) {
-        console.error("Error fetching driver:", err);
-        setError("Failed to load driver information");
+        console.error("Error fetching provider:", err);
+        setError("Failed to load provider information");
       } finally {
         setLoading(false);
       }
     };
 
-    if (driverId) {
+    if (providerId) {
       fetchDriverData();
     }
-  }, [driverId]);
+  }, [providerId]);
 
   // Old conversation initialization removed - using Chat component instead
   // const initializeConversation = async () => {
-  //   if (!currentUser || !driverId || !driver) return;
+  //   if (!currentUser || !providerId || !provider) return;
   //   try {
   //     const conversationId = await createOrGetConversation(...);
   //     setConversationId(conversationId);
@@ -1933,10 +1933,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   // };
 
   // useEffect(() => {
-  //   if (currentUser && driverId && driver && !loading) {
+  //   if (currentUser && providerId && provider && !loading) {
   //     initializeConversation();
   //   }
-  // }, [currentUser, driverId, driver, loading]);
+  // }, [currentUser, providerId, provider, loading]);
 
   // useEffect(() => {
   //   // Old message loading code removed
@@ -1958,7 +1958,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         if (chatDoc.exists() && currentUser) {
           const chatData = chatDoc.data();
           const otherId = chatData.participantIds?.find(id => id !== currentUser.uid);
-          if (otherId === driverId) {
+          if (otherId === providerId) {
             // Get other user info
             let otherName = chatData.participantNames?.[otherId] || notification.senderName || 'User';
             let photo = '';
@@ -1992,12 +1992,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   };
 
   const handleOpenChatModal = () => {
-    if (driver && currentUser) {
+    if (provider && currentUser) {
       setChatOtherUser({
-        id: driver.id,
-        name: driver.fullName || 'Driver',
-        photo: driver.profilePicture || driver.imageUrl || '',
-        role: 'driver'
+        id: provider.id,
+        name: provider.fullName || 'provider',
+        photo: provider.profilePicture || provider.imageUrl || '',
+        role: 'provider'
       });
       setIsChatModalOpen(true);
     }
@@ -2020,24 +2020,24 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   };
 
   const handleReviewAdded = async () => {
-    // Update driver rating in database
-    if (driverId) {
+    // Update provider rating in database
+    if (providerId) {
       try {
-        await updateDriverRating(driverId);
-        // Refresh driver data to update rating display
-        const driverDoc = await getDoc(doc(db, 'serviceProviders', driverId));
+        await updateRentalProviderRating(providerId);
+        // Refresh provider data to update rating display
+        const driverDoc = await getDoc(doc(db, 'serviceProviders', providerId));
         if (driverDoc.exists()) {
-          setDriver({
+          setProvider({
             id: driverDoc.id,
             ...driverDoc.data()
           });
         }
       } catch (error) {
-        console.error('Error updating driver rating:', error);
-        // Still refresh driver data even if rating update fails
-        const driverDoc = await getDoc(doc(db, 'serviceProviders', driverId));
+        console.error('Error updating provider rating:', error);
+        // Still refresh provider data even if rating update fails
+        const driverDoc = await getDoc(doc(db, 'serviceProviders', providerId));
         if (driverDoc.exists()) {
-          setDriver({
+          setProvider({
             id: driverDoc.id,
             ...driverDoc.data()
           });
@@ -2051,19 +2051,19 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading driver profile...</p>
+          <p className="text-gray-600 font-medium">Loading provider profile...</p>
         </div>
       </div>
     );
   }
 
-  if (error || !driver) {
+  if (error || !provider) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Driver Not Found</h2>
-          <p className="text-gray-600 mb-4">{error || "The driver you're looking for doesn't exist."}</p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">provider Not Found</h2>
+          <p className="text-gray-600 mb-4">{error || "The provider you're looking for doesn't exist."}</p>
           <button
             onClick={() => navigate(-1)}
             className="bg-gradient-to-r from-black to-gray-800 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:from-gray-800 hover:to-gray-700 transition-colors"
@@ -2106,7 +2106,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               {/* Booking Details */}
               <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left space-y-3">
                 <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">Driver:</span>
+                  <span className="text-gray-600 font-medium block">provider:</span>
                   <span className="text-gray-900 font-semibold block">{successMessageData.driverName}</span>
                 </div>
                 <div className="space-y-1">
@@ -2142,12 +2142,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   setShowSuccessMessage(false);
                   setSuccessMessageData(null);
                   // Ensure we're on the correct route
-                  if (driverId) {
-                    navigate(`/jeepprofile?driverId=${driverId}`, { replace: true });
-                  } else if (driver?.id) {
-                    navigate(`/jeepprofile?driverId=${driver.id}`, { replace: true });
+                  if (providerId) {
+                    navigate(`/jeepprofile?providerId=${providerId}`, { replace: true });
+                  } else if (provider?.id) {
+                    navigate(`/jeepprofile?providerId=${provider.id}`, { replace: true });
                   } else {
-                    navigate('/driver', { replace: true });
+                    navigate('/provider', { replace: true });
                   }
                 }}
                 className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold shadow-lg hover:bg-gray-800 transition-colors"
@@ -2182,7 +2182,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         currentStep={currentStep}
         setCurrentStep={setCurrentStep}
         onSubmit={handleBookingFormSubmit}
-        driver={driver}
+        provider={provider}
         selectedDates={selectedDates}
         selectedDatesWithType={selectedDatesWithType}
         onDateTypeChange={handleDateTypeChange}
@@ -2203,7 +2203,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               <button
                 onClick={() => {
                   // Navigate back to jeep listing page
-                  navigate('/driver');
+                  navigate('/provider');
                   // The scroll will be handled by JeepSection2 component
                 }}
                 className="flex items-center text-white mr-3 sm:mr-4 md:mr-6 font-medium hover:text-gray-300 transition-colors touch-manipulation"
@@ -2211,7 +2211,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 <ArrowLeft size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-2.5" />
                 <span className="text-sm sm:text-base md:text-lg">Back</span>
               </button>
-              <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-white">Jeep Driver Profile</h1>
+              <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-white">Jeep provider Profile</h1>
             </div>
           </div>
         </div>
@@ -2225,23 +2225,23 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               {/* Profile Header */}
               <div className="text-center mb-2 sm:mb-3 md:mb-4">
                 <img
-                  src={driver.profilePicture || "/api/placeholder/120/120"}
-                  alt={driver.fullName}
+                  src={provider.profilePicture || "/api/placeholder/120/120"}
+                  alt={provider.fullName}
                   className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full object-cover border-4 border-black shadow-2xl mx-auto mb-2 sm:mb-2.5 md:mb-3"
                 />
-                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-black mb-1">{driver.fullName}</h2>
-                <p className="text-gray-700 font-medium mb-2 sm:mb-2.5 md:mb-3 text-xs sm:text-sm md:text-base">{driver.serviceType}</p>
+                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-black mb-1">{provider.fullName}</h2>
+                <p className="text-gray-700 font-medium mb-2 sm:mb-2.5 md:mb-3 text-xs sm:text-sm md:text-base">{provider.serviceType}</p>
 
                 {/* Rating */}
                 <div className="flex items-center justify-center mt-2 sm:mt-2.5 bg-gray-100 rounded-lg p-2 sm:p-2.5 md:p-3 border border-gray-300">
                   <div className="flex items-center flex-wrap justify-center gap-1.5 sm:gap-2">
-                    {renderStars(driver.rating || 0)}
+                    {renderStars(provider.rating || 0)}
                     <span className="text-xs sm:text-sm font-semibold text-black">
-                      {driver.rating?.toFixed(1) || '0.0'}/5
+                      {provider.rating?.toFixed(1) || '0.0'}/5
                     </span>
-                    {driver.totalReviews > 0 && (
+                    {provider.totalReviews > 0 && (
                       <span className="text-xs text-gray-600">
-                        • {driver.totalReviews} reviews
+                        • {provider.totalReviews} reviews
                       </span>
                     )}
                   </div>
@@ -2250,30 +2250,30 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
               {/* Contact Info */}
               <div className="space-y-2 sm:space-y-2.5 md:space-y-3 mb-2 sm:mb-3 md:mb-4 flex-1">
-                {driver.contactPhone && (
+                {provider.contactPhone && (
                   <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                     <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
                       <Phone size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{driver.contactPhone}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{provider.contactPhone}</span>
                   </div>
                 )}
 
-                {driver.contactEmail && (
+                {provider.contactEmail && (
                   <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                     <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
                       <Mail size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{driver.contactEmail}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{provider.contactEmail}</span>
                   </div>
                 )}
 
-                {driver.location && (
+                {provider.location && (
                   <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                     <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
                       <MapPin size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{driver.location}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{provider.location}</span>
                   </div>
                 )}
               </div>
@@ -2320,7 +2320,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   >
                     <span className="hidden sm:inline">Reviews</span>
                     <span className="sm:hidden">Rev</span>
-                    {driver.totalReviews > 0 && ` (${driver.totalReviews})`}
+                    {provider.totalReviews > 0 && ` (${provider.totalReviews})`}
                   </button>
                   {currentUser && userRole === 'tourist' && (
                     <button
@@ -2339,7 +2339,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     <button
                       onClick={() => {
                         setActiveTab('chat');
-                        if (currentUser && driver) {
+                        if (currentUser && provider) {
                           handleOpenChatModal();
                         }
                       }}
@@ -2368,36 +2368,36 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-black mb-1 text-xs sm:text-sm md:text-base">Experience</h3>
                         <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
-                          {driver.experienceYears || 0} years of experience as a {driver.serviceType}
+                          {provider.experienceYears || 0} years of experience as a {provider.serviceType}
                         </p>
                       </div>
                     </div>
 
                     {/* Description */}
-                    {driver.description && (
+                    {provider.description && (
                       <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <h3 className="font-bold text-black mb-1 text-xs sm:text-sm md:text-base">About</h3>
                         <p className="text-gray-700 leading-relaxed text-xs sm:text-sm line-clamp-2">
-                          {driver.description}
+                          {provider.description}
                         </p>
                       </div>
                     )}
 
-                    {/* Vehicle Type */}
-                    {driver.vehicleType && (
+                    {/* Equipment Type */}
+                    {provider.equipmentType && (
                       <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <h3 className="font-bold text-black mb-1 flex items-center text-xs sm:text-sm md:text-base">
                           <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
                             <Car className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                           </div>
-                          Vehicle Type
+                          Equipment Type
                         </h3>
-                        <p className="text-gray-700 text-sm sm:text-base md:text-lg font-bold mt-1">{driver.vehicleType}</p>
+                        <p className="text-gray-700 text-sm sm:text-base md:text-lg font-bold mt-1">{provider.equipmentType}</p>
                       </div>
                     )}
 
                     {/* Pricing */}
-                    {driver.pricePerDay && (
+                    {provider.pricePerDay && (
                       <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <h3 className="font-bold text-black mb-2 sm:mb-2.5 flex items-center text-xs sm:text-sm md:text-base">
                           <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
@@ -2414,7 +2414,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             </div>
                             <div className="text-right flex-shrink-0">
                               <span className="text-sm sm:text-base md:text-lg font-black text-black">
-                                LKR {driver.pricePerDay.toLocaleString()}
+                                LKR {provider.pricePerDay.toLocaleString()}
                               </span>
                               <span className="text-xs font-semibold text-gray-600 block">/day</span>
                             </div>
@@ -2427,12 +2427,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             </div>
                             <div className="text-right flex-shrink-0">
                               <span className="text-sm sm:text-base md:text-lg font-black text-black">
-                                LKR {Math.round(driver.pricePerDay * 0.6).toLocaleString()}
+                                LKR {Math.round(provider.pricePerDay * 0.6).toLocaleString()}
                               </span>
                               <span className="text-xs font-semibold text-gray-600 block">/half day</span>
                             </div>
                           </div>
-                          {driver.pricePerHour && (
+                          {provider.pricePerHour && (
                             <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
                               <div className="flex-1 min-w-0 pr-2">
                                 <span className="text-black font-bold text-xs sm:text-sm block">Price per hour:</span>
@@ -2440,7 +2440,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                               </div>
                               <div className="text-right flex-shrink-0">
                                 <span className="text-xs sm:text-sm md:text-base font-black text-black">
-                                  LKR {driver.pricePerHour.toLocaleString()}
+                                  LKR {provider.pricePerHour.toLocaleString()}
                                 </span>
                                 <span className="text-xs font-semibold text-gray-600 block">/hour</span>
                               </div>
@@ -2451,7 +2451,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     )}
 
                     {/* Languages */}
-                    {driver.languages && driver.languages.length > 0 && (
+                    {provider.languages && provider.languages.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
                           <Languages className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -2459,7 +2459,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         <div className="flex-1 min-w-0">
                           <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Languages</h3>
                           <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                            {driver.languages.map((lang, index) => (
+                            {provider.languages.map((lang, index) => (
                               <span
                                 key={index}
                                 className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
@@ -2473,7 +2473,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     )}
 
                     {/* Destinations */}
-                    {driver.destinations && driver.destinations.length > 0 && (
+                    {provider.destinations && provider.destinations.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
                           <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -2481,7 +2481,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         <div className="flex-1 min-w-0">
                           <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Destinations Covered</h3>
                           <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                            {driver.destinations.map((destination, index) => (
+                            {provider.destinations.map((destination, index) => (
                               <span
                                 key={index}
                                 className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
@@ -2495,7 +2495,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     )}
 
                     {/* Certifications */}
-                    {driver.certifications && driver.certifications.length > 0 && (
+                    {provider.certifications && provider.certifications.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
                           <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -2503,7 +2503,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         <div className="flex-1 min-w-0">
                           <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Certifications</h3>
                           <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                            {driver.certifications.map((cert, index) => (
+                            {provider.certifications.map((cert, index) => (
                               <span
                                 key={index}
                                 className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
@@ -2517,7 +2517,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     )}
 
                     {/* Special Skills */}
-                    {driver.specialSkills && driver.specialSkills.length > 0 && (
+                    {provider.specialSkills && provider.specialSkills.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
                           <Shield className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -2525,7 +2525,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         <div className="flex-1 min-w-0">
                           <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Special Skills</h3>
                           <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                            {driver.specialSkills.map((skill, index) => (
+                            {provider.specialSkills.map((skill, index) => (
                               <span
                                 key={index}
                                 className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
@@ -2544,7 +2544,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 {activeTab === 'reviews' && (
                   <div className="lg:h-full lg:overflow-y-auto">
                     <ReviewSection
-                      driverId={driverId}
+                      providerId={providerId}
                       currentUser={currentUser}
                       userRole={userRole}
                       onReviewAdded={handleReviewAdded}
@@ -2564,8 +2564,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             selectedDates={selectedDates}
                             onDateSelect={handleDateSelect}
                             selectedDatesWithType={selectedDatesWithType}
-                            availabilityCalendar={driver?.availabilityCalendar}
-                            availableDates={driver?.availableDates}
+                            availabilityCalendar={provider?.availabilityCalendar}
+                            availableDates={provider?.availableDates}
                             onDateTypeChange={handleDateTypeChange}
                           />
                         </div>
@@ -2592,7 +2592,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 {selectedDates.map((date, index) => {
                                   const dateString = date.toDateString();
                                   const dateType = selectedDatesWithType[dateString] || 'full-day';
-                                  const dayPrice = dateType === 'half-day' ? (driver.pricePerDay || 0) * 0.6 : (driver.pricePerDay || 0);
+                                  const dayPrice = dateType === 'half-day' ? (provider.pricePerDay || 0) * 0.6 : (provider.pricePerDay || 0);
                                   return (
                                     <div key={index} className="flex justify-between items-center text-xs">
                                       <span className="text-gray-700 flex-1 min-w-0 pr-2">
@@ -2608,7 +2608,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-700 text-xs sm:text-sm">Price per day:</span>
-                                <span className="font-medium text-black text-xs sm:text-sm">LKR {driver.pricePerDay?.toLocaleString() || '0'}</span>
+                                <span className="font-medium text-black text-xs sm:text-sm">LKR {provider.pricePerDay?.toLocaleString() || '0'}</span>
                               </div>
 
                               <div className="border-t border-gray-300 pt-2">
@@ -2647,11 +2647,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           )}
                         </div>
 
-                        {/* Driver Info */}
+                        {/* provider Info */}
                         <div className="bg-white border border-gray-300 rounded-lg p-2.5 sm:p-3 md:p-4">
-                          <h3 className="font-semibold text-black mb-1.5 sm:mb-2 text-xs sm:text-sm md:text-base">Driver Information</h3>
+                          <h3 className="font-semibold text-black mb-1.5 sm:mb-2 text-xs sm:text-sm md:text-base">provider Information</h3>
                           <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
-                            You'll be booking with {driver.fullName}, an experienced {driver.serviceType} with {driver.experienceYears || 0} years of experience.
+                            You'll be booking with {provider.fullName}, an experienced {provider.serviceType} with {provider.experienceYears || 0} years of experience.
                           </p>
                         </div>
                       </div>
@@ -2666,7 +2666,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       <div className="text-center">
                         <MessageCircle size={48} className="sm:w-16 sm:h-16 md:w-20 md:h-20 mx-auto mb-3 sm:mb-4 text-black" />
                         <h3 className="text-base sm:text-lg md:text-xl font-semibold text-black mb-2">
-                          Chat with {driver.fullName}
+                          Chat with {provider.fullName}
                         </h3>
                         <p className="text-gray-700 text-xs sm:text-sm md:text-base mb-4 sm:mb-6">
                           Click the button below to open the chat window
@@ -2686,7 +2686,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           Login to Message
                         </h3>
                         <p className="text-gray-700 text-xs sm:text-sm mb-4">
-                          Please login to start a conversation with {driver.fullName}
+                          Please login to start a conversation with {provider.fullName}
                         </p>
                         <button
                           onClick={() => {
@@ -2711,4 +2711,4 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   );
 };
 
-export default JeepProfile;
+export default RentingProfile;
