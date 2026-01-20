@@ -2854,19 +2854,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                               onChange={(e) => setSelectedVehicleType(e.target.value)}
                               className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-black focus:outline-none focus:border-emerald-500"
                             >
-                              <option value="">Choose a vehicle type</option>
-                              {driver?.vehicleTypes && driver.vehicleTypes.length > 0 ? (
-                                driver.vehicleTypes.map((type, index) => (
-                                  <option key={index} value={type}>
-                                    {type}
-                                  </option>
-                                ))
-                              ) : (
-                                <>
-                                  <option value="Standard Safari Jeep">Standard Safari Jeep</option>
-                                  <option value="Luxury Safari Jeep">Luxury Safari Jeep</option>
-                                </>
-                              )}
+                              <option value="" disabled hidden>Choose a vehicle type</option>
+                              <option value="Standard Safari Jeep">Standard Safari Jeep</option>
+                              <option value="Luxury Safari Jeep">Luxury Safari Jeep</option>
                             </select>
                             {selectedVehicleType && (
                               <p className="text-xs text-gray-600 mt-1">
