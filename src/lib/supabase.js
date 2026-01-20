@@ -158,7 +158,7 @@ export const getDocumentUrl = async (documentPath, expiresIn = 300) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({ error: 'Failed to get document URL' }));
       throw new Error(errorData.error || 'Failed to get document URL');
     }
 
@@ -166,6 +166,10 @@ export const getDocumentUrl = async (documentPath, expiresIn = 300) => {
     return { signedUrl: data.signedUrl, error: null };
   } catch (error) {
     console.error('❌ Get document URL error:', error);
-    return { signedUrl: null, error };
+    // Return more detailed error for better debugging
+    const errorMessage = error.message.includes('fetch') 
+      ? 'Backend server is not accessible. Please ensure the server is running or configure VITE_API_URL environment variable.'
+      : error.message;
+    return { signedUrl: null, error: errorMessage };
   }
 };

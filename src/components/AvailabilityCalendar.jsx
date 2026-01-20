@@ -407,24 +407,68 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
               {popupDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </div>
 
-            <div className="space-y-1.5 sm:space-y-2">
-              <button
-                type="button"
-                onClick={() => handleStatusSelect(null)}
-                className="w-full px-2 sm:px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
-              >
-                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 border border-white rounded shrink-0"></div>
-                <span>Available</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleStatusSelect('unavailable')}
-                className="w-full px-2 sm:px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
-              >
-                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-700 rounded shrink-0"></div>
-                <span>Unavailable</span>
-              </button>
-            </div>
+            {!showHalfDayMenu ? (
+              <div className="space-y-1.5 sm:space-y-2">
+                <button
+                  type="button"
+                  onClick={() => handleStatusSelect(null)}
+                  className="w-full px-2 sm:px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:bg-emerald-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 border border-white rounded shrink-0"></div>
+                  <span>Available</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStatusSelect('fullday')}
+                  className="w-full px-2 sm:px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 active:bg-red-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-700 rounded shrink-0"></div>
+                  <span>Full Day Busy</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStatusSelect('halfday')}
+                  className="w-full px-2 sm:px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:bg-yellow-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-700 rounded shrink-0"></div>
+                  <span>Half Day Busy</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStatusSelect('unavailable')}
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-700 rounded shrink-0"></div>
+                  <span>Unavailable</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1.5 sm:space-y-2">
+                <button
+                  type="button"
+                  onClick={handleBackToMainMenu}
+                  className="w-full px-2 sm:px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <span>← Back</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStatusSelect('halfday-morning')}
+                  className="w-full px-2 sm:px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:bg-yellow-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-700 rounded shrink-0"></div>
+                  <span>Morning Half</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStatusSelect('halfday-evening')}
+                  className="w-full px-2 sm:px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 active:bg-yellow-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-800 rounded shrink-0"></div>
+                  <span>Evening Half</span>
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
