@@ -17,7 +17,8 @@ import {
   Compass,
   Car,
   ShoppingBag,
-  FileText
+  FileText,
+  Package
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc, onSnapshot, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";

@@ -2774,51 +2774,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         }
       }
 
-      if (certificationStatus === 'non-certified') {
-        // Non-certified providers have maximum price limits
-        if (fullDayStd > 25000) {
-          setMsg("❌ Non-certified Full Day Standard price cannot exceed 25,000 LKR");
-          return;
-        }
-        if (halfDayStd > 12000 && serviceType === 'Jeep Driver') {
-          setMsg("❌ Non-certified Half Day Standard price cannot exceed 12,000 LKR");
-          return;
-        }
-        if (halfDayStd > 15000 && serviceType === 'Tour Guide') {
-          setMsg("❌ Non-certified Half Day Tour Guide price cannot exceed 15,000 LKR");
-          return;
-        }
-        if (fullDayLux > 35000) {
-          setMsg("❌ Non-certified Full Day Luxury price cannot exceed 35,000 LKR");
-          return;
-        }
-        if (halfDayLux > 18000) {
-          setMsg("❌ Non-certified Half Day Luxury price cannot exceed 18,000 LKR");
-          return;
-        }
-      } else if (certificationStatus === 'certified') {
-        // Certified providers have minimum price requirements
-        if (fullDayStd > 0 && fullDayStd < 25000) {
-          setMsg("❌ Certified Full Day Standard price must be at least 25,000 LKR");
-          return;
-        }
-        if (halfDayStd > 0 && halfDayStd < 12000 && serviceType === 'Jeep Driver') {
-          setMsg("❌ Certified Half Day Standard price must be at least 12,000 LKR");
-          return;
-        }
-        if (halfDayStd > 0 && halfDayStd < 15000 && serviceType === 'Tour Guide') {
-          setMsg("❌ Certified Half Day Tour Guide price must be at least 15,000 LKR");
-          return;
-        }
-        if (fullDayLux > 0 && fullDayLux < 35000) {
-          setMsg("❌ Certified Full Day Luxury price must be at least 35,000 LKR");
-          return;
-        }
-        if (halfDayLux > 0 && halfDayLux < 18000) {
-          setMsg("❌ Certified Half Day Luxury price must be at least 18,000 LKR");
-          return;
-        }
-      }
+      // Price validation removed - users can set any price they want
     }
 
     setBusy(true);
@@ -3967,8 +3923,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             </div>
             <p className="text-xs text-gray-400 mt-1">
               {formData.certificationStatus === 'certified' 
-                ? '✓ Certified providers can charge premium rates and must upload certifications'
-                : '✓ Non-certified providers have maximum price limits'}
+                ? 'Certified providers can charge premium rates and must upload certifications'
+                : 'Non-certified providers have standard rate limits'}
             </p>
           </div>
         )}
@@ -4152,7 +4108,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                   : 'text-red-400'
               }`}>
                 {isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
-                  ? `✓ Valid ${countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.country || 'phone'} number`
+                  ? `Valid ${countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.country || 'phone'} number`
                   : `Invalid format`}
               </p>
             )}
@@ -4328,12 +4284,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Half Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 12,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 12,000)</span>
-                          )}
                         </label>
                         <input
                           type="text"
@@ -4348,7 +4298,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                           }}
                           required
                           className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 12,000' : 'Maximum: 12,000'}
+                          placeholder="Enter half day price (e.g., 10,000)"
                         />
                       </div>
                     </div>
@@ -4363,12 +4313,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Full Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 35,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 35,000)</span>
-                          )}
                         </label>
                         <input
                           type="text"
@@ -4383,19 +4327,13 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                           }}
                           required
                           className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 35,000' : 'Maximum: 35,000'}
+                          placeholder="Enter full day price (e.g., 30,000)"
                         />
                       </div>
 
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Half Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 18,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 18,000)</span>
-                          )}
                         </label>
                         <input
                           type="text"
@@ -4410,7 +4348,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                           }}
                           required
                           className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 18,000' : 'Maximum: 18,000'}
+                          placeholder="Enter half day price (e.g., 15,000)"
                         />
                       </div>
                     </div>
@@ -4444,12 +4382,6 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Full Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 25,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 25,000)</span>
-                          )}
                         </label>
                         <input
                           type="text"
@@ -4464,19 +4396,13 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                           }}
                           required
                           className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 25,000' : 'Maximum: 25,000'}
+                          placeholder="Enter full day price (e.g., 20,000)"
                         />
                       </div>
 
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Half Day Price (LKR) *
-                          {formData.certificationStatus === 'non-certified' && (
-                            <span className="text-emerald-400 text-[10px]">(Max: 15,000)</span>
-                          )}
-                          {formData.certificationStatus === 'certified' && (
-                            <span className="text-yellow-400 text-[10px]">(Min: 15,000)</span>
-                          )}
                         </label>
                         <input
                           type="text"
@@ -4491,7 +4417,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                           }}
                           required
                           className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                          placeholder={formData.certificationStatus === 'certified' ? 'Minimum: 15,000' : 'Maximum: 15,000'}
+                          placeholder="Enter half day price (e.g., 12,000)"
                         />
                       </div>
                     </div>
@@ -4667,7 +4593,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                                 className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
                               />
                               {certificationFiles[cert] && (
-                                <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
+                                <p className="text-xs text-green-400 mt-1">{certificationFiles[cert].name}</p>
                               )}
                             </div>
                           )}
@@ -4675,7 +4601,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       ))}
                     </div>
                     <p className="text-xs text-yellow-300/70 mt-2">
-                      ⚠️ At least one certification with uploaded document is required for certified providers
+                      At least one certification with uploaded document is required for certified providers
                     </p>
                   </div>
                 )}
@@ -4851,7 +4777,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                                 className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
                               />
                               {certificationFiles[cert] && (
-                                <p className="text-xs text-green-400 mt-1">✓ {certificationFiles[cert].name}</p>
+                                <p className="text-xs text-green-400 mt-1">{certificationFiles[cert].name}</p>
                               )}
                             </div>
                           )}
@@ -4859,7 +4785,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       ))}
                     </div>
                     <p className="text-xs text-yellow-300/70 mt-2">
-                      ⚠️ At least one certification with uploaded document is required for certified providers
+                      At least one certification with uploaded document is required for certified providers
                     </p>
                   </div>
                 )}

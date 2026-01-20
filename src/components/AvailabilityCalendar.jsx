@@ -327,11 +327,22 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false }) => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                handleDateClick(date, e);
+                if (!readOnly && !isPast) {
+                  handleDateClick(date, e);
+                }
+              }}
+              onTouchEnd={(e) => {
+                // Handle touch events for mobile devices
+                if (!readOnly && !isPast) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDateClick(date, e);
+                }
               }}
               disabled={readOnly || isPast}
               className={getDateClassName(date)}
-              title={isPast ? 'Past date' : (label || 'Click to set availability')}
+              style={{ touchAction: readOnly || isPast ? 'auto' : 'manipulation' }}
+              title={isPast ? 'Past date' : readOnly ? 'Click "Edit Calendar" to make changes' : (label || 'Click to set availability')}
             >
               <div className="flex flex-col items-center justify-center">
                 <span>{date.getDate()}</span>

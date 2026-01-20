@@ -931,17 +931,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               {userData?.certificationApproved ? (
                                 <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-green-500/20 border-2 border-green-500/50 text-green-300 flex items-center gap-2">
                                   <CheckCircle className="h-4 w-4" />
-                                  ✓ Certified Provider (Admin Approved)
+                                  Certified Provider (Admin Approved)
                                 </div>
                               ) : userData?.certificationRejected ? (
                                 <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-red-500/20 border-2 border-red-500/50 text-red-300 flex items-center gap-2">
                                   <AlertCircle className="h-4 w-4" />
-                                  ✗ Certification Request Rejected
+                                  Certification Request Rejected
                                 </div>
                               ) : (
                                 <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-300 flex items-center gap-2 animate-pulse">
                                   <AlertCircle className="h-4 w-4" />
-                                  ⏳ Pending Admin Approval
+                                  Pending Admin Approval
                                 </div>
                               )}
                               <p className="text-xs text-gray-400">
@@ -1026,9 +1026,9 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               </button>
                             </div>
                             <p className="text-xs text-gray-400">
-                              {formData.certificationStatus === 'certified'
-                                ? '⚠️ Selecting certified status requires admin approval before premium pricing applies'
-                                : '✓ Non-certified providers have maximum price limits'}
+                              {formData.certificationStatus === 'certified' 
+                                ? 'Selecting certified status requires admin approval before premium pricing applies'
+                                : 'Non-certified providers have standard rate limits'}
                             </p>
                           </div>
                         </div>
@@ -1083,16 +1083,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <label className="block text-xs font-medium text-gray-300 mb-1">
-                                    Full Day Price (LKR) * 
-                                    {formData.certificationStatus === 'certified' ? (
-                                      userData?.certificationApproved ? (
-                                        <span className="text-yellow-400 ml-1">(Min: 25,000)</span>
-                                      ) : (
-                                        <span className="text-emerald-400 ml-1">(Max: 25,000 - Pending Approval)</span>
-                                      )
-                                    ) : (
-                                      <span className="text-emerald-400 ml-1">(Max: 25,000)</span>
-                                    )}
+                                    Full Day Price (LKR) *
                                   </label>
                                   <input
                                     type="text"
@@ -1107,25 +1098,15 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     }}
                                     required
                                     className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    placeholder={
-                                      formData.certificationStatus === 'certified' && userData?.certificationApproved
-                                        ? "Minimum: 25,000"
-                                        : "Maximum: 25,000"
-                                    }
+                                    placeholder="Enter full day price (e.g., 20,000)"
                                   />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-gray-300 mb-1">
                                     Half Day Price (LKR) *
-                                    {formData.certificationStatus === 'certified' ? (
-                                      userData?.certificationApproved ? (
-                                        <span className="text-yellow-400 ml-1">(Min: 12,000)</span>
-                                      ) : (
-                                        <span className="text-emerald-400 ml-1">(Max: 12,000 - Pending Approval)</span>
                                       )
                                     ) : (
                                       <span className="text-emerald-400 ml-1">(Max: 12,000)</span>
-                                    )}
                                   </label>
                                   <input
                                     type="text"
@@ -1140,11 +1121,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     }}
                                     required
                                     className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    placeholder={
-                                      formData.certificationStatus === 'certified' && userData?.certificationApproved
-                                        ? "Minimum: 12,000"
-                                        : "Maximum: 12,000"
-                                    }
+                                    placeholder="Enter half day price (e.g., 10,000)"
                                   />
                                 </div>
                               </div>
@@ -1159,15 +1136,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                 <div>
                                   <label className="block text-xs font-medium text-gray-300 mb-1">
                                     Full Day Price (LKR) *
-                                    {formData.certificationStatus === 'certified' ? (
-                                      userData?.certificationApproved ? (
-                                        <span className="text-yellow-400 ml-1">(Min: 35,000)</span>
-                                      ) : (
-                                        <span className="text-emerald-400 ml-1">(Max: 35,000 - Pending Approval)</span>
-                                      )
-                                    ) : (
-                                      <span className="text-emerald-400 ml-1">(Max: 35,000)</span>
-                                    )}
                                   </label>
                                   <input
                                     type="text"
@@ -1182,25 +1150,12 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     }}
                                     required
                                     className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    placeholder={
-                                      formData.certificationStatus === 'certified' && userData?.certificationApproved
-                                        ? "Minimum: 35,000"
-                                        : "Maximum: 35,000"
-                                    }
+                                    placeholder="Enter full day price (e.g., 30,000)"
                                   />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-gray-300 mb-1">
                                     Half Day Price (LKR) *
-                                    {formData.certificationStatus === 'certified' ? (
-                                      userData?.certificationApproved ? (
-                                        <span className="text-yellow-400 ml-1">(Min: 18,000)</span>
-                                      ) : (
-                                        <span className="text-emerald-400 ml-1">(Max: 18,000 - Pending Approval)</span>
-                                      )
-                                    ) : (
-                                      <span className="text-emerald-400 ml-1">(Max: 18,000)</span>
-                                    )}
                                   </label>
                                   <input
                                     type="text"
@@ -1215,11 +1170,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     }}
                                     required
                                     className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    placeholder={
-                                      formData.certificationStatus === 'certified' && userData?.certificationApproved
-                                        ? "Minimum: 18,000"
-                                        : "Maximum: 18,000"
-                                    }
+                                    placeholder="Enter half day price (e.g., 15,000)"
                                   />
                                 </div>
                               </div>
@@ -1618,10 +1569,16 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                       <button
                                         onClick={async () => {
                                           try {
-                                            const url = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
-                                            window.open(url, '_blank');
+                                            const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                            if (error) {
+                                              console.error('Error getting document URL:', error);
+                                              setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                              return;
+                                            }
+                                            window.open(signedUrl, '_blank', 'noopener,noreferrer');
                                           } catch (error) {
                                             console.error('Error opening document:', error);
+                                            setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
                                           }
                                         }}
                                         className="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
@@ -1668,10 +1625,16 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                         type="button"
                                         onClick={async () => {
                                           try {
-                                            const url = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
-                                            window.open(url, '_blank');
+                                            const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                            if (error) {
+                                              console.error('Error getting document URL:', error);
+                                              setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                              return;
+                                            }
+                                            window.open(signedUrl, '_blank', 'noopener,noreferrer');
                                           } catch (error) {
                                             console.error('Error opening document:', error);
+                                            setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
                                           }
                                         }}
                                         className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
@@ -2280,11 +2243,19 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   )}
                 </div>
               </div>
-              <p className="text-gray-400 text-sm mb-6">
-                {isEditingCalendar 
-                  ? 'Click on dates to set availability. All dates are unselected by default until you mark them.'
-                  : 'View your availability calendar. Click "Edit Calendar" to make changes.'}
-              </p>
+              {isEditingCalendar ? (
+                <div className="bg-emerald-900/20 border border-emerald-700 rounded-lg p-3 mb-6">
+                  <p className="text-emerald-300 text-sm font-medium">
+                    Editing Mode: Click on dates to set availability. All dates are unselected by default until you mark them.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3 mb-6">
+                  <p className="text-blue-300 text-sm font-medium">
+                    View Mode: Click the "Edit Calendar" button above to mark or change dates.
+                  </p>
+                </div>
+              )}
               <AvailabilityCalendar
                 availability={isEditingCalendar ? tempAvailabilityCalendar : availabilityCalendar}
                 onChange={(newAvailability) => {
