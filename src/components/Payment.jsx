@@ -321,7 +321,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Loading state
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
           <Loader className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-green-500 mx-auto mb-3 sm:mb-4" />
           <p className="text-sm sm:text-base text-gray-600">Loading payment details...</p>
@@ -333,7 +333,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Error state
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
           <AlertCircle className="h-12 w-12 sm:h-16 sm:w-16 text-red-500 mx-auto mb-3 sm:mb-4" />
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Error</h2>
@@ -352,7 +352,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Payment confirmation modal
   if (showPaymentConfirmation) {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
           <div className="mb-4 sm:mb-6">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
@@ -378,7 +378,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
   if (!booking) {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
           <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
           <p className="text-sm sm:text-base text-gray-600">No booking found</p>
@@ -395,7 +395,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-5xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
           {/* Header */}
           <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
@@ -442,12 +442,32 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                           <p className="text-xs text-gray-500">{serviceType}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <div>
-                          <p className="text-gray-500 text-xs">Selected Dates</p>
-                          <p className="font-semibold text-gray-900 text-xs">{formatDates(booking.selectedDates)}</p>
-                          <p className="text-xs text-gray-500">{booking.numberOfDays || 0} day(s)</p>
+                      <div className="flex items-start gap-2">
+                        <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-gray-500 text-xs mb-1">Selected Dates</p>
+                          <div className="space-y-1">
+                            {booking.datesWithTypes && booking.datesWithTypes.length > 0 ? (
+                              booking.datesWithTypes.map((item, index) => {
+                                const dateObj = item.date?.toDate ? item.date.toDate() : new Date(item.date);
+                                const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                const typeLabel = (item.type === 'half-day') ? 'Half Day' : 'Full Day';
+                                const safariTypeLabel = item.type === 'half-day' ? `(${item.safariType || 'Safari'})` : '';
+                                return (
+                                  <div key={index} className="font-semibold text-gray-900 text-xs flex flex-wrap gap-1">
+                                    <span>{dateStr}</span>
+                                    <span className="text-gray-500">-</span>
+                                    <span className={item.type === 'half-day' ? 'text-yellow-600' : 'text-green-600'}>
+                                      {typeLabel} {safariTypeLabel}
+                                    </span>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="font-semibold text-gray-900 text-xs">{formatDates(booking.selectedDates)}</p>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{booking.numberOfDays || 0} day(s)</p>
                         </div>
                       </div>
                       {booking.nationalPark && (
@@ -653,32 +673,76 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                   <div className="space-y-2 text-xs sm:text-sm mb-4">
                     {/* Calculate proper pricing */}
                     {(() => {
-                      // Get the actual price per day from booking (driver's/guide's rate)
+                      const fullDayCount = booking.datesWithTypes?.filter(d => d.type === 'full-day' || d.type === 'full').length || 0;
+                      const halfDayCount = booking.datesWithTypes?.filter(d => d.type === 'half-day').length || 0;
+
                       const actualPricePerDay = booking.pricePerDay || 0;
-                      
-                      // Calculate base service charge (from driver/guide rate)
-                      const baseServiceCharge = actualPricePerDay * (booking.numberOfDays || 1);
-                      
+                      const priceFullDay = booking.priceFullDay || actualPricePerDay;
+                      const priceHalfDay = booking.priceHalfDay || (actualPricePerDay * 0.6); // approximate fallback if not set
+
+                      let baseServiceCharge = 0;
+
+                      const hasTypes = fullDayCount > 0 || halfDayCount > 0;
+
+                      if (hasTypes) {
+                        baseServiceCharge = (fullDayCount * priceFullDay) + (halfDayCount * priceHalfDay);
+                      } else {
+                        // Fallback logic
+                        baseServiceCharge = actualPricePerDay * (booking.numberOfDays || 1);
+                      }
+
                       // Calculate add-ons total
                       let addOnsTotal = 0;
                       if (booking.needsBinoculars) addOnsTotal += 500;
                       if (booking.needsChildSeat) addOnsTotal += 1000;
                       if (booking.needsWater) addOnsTotal += 300;
-                      
+
                       // Calculate actual total (base + add-ons)
                       const calculatedTotal = baseServiceCharge + addOnsTotal;
-                      
+
                       return (
                         <>
-                          {/* Base Service Charge */}
-                          <div className="flex justify-between text-gray-700">
-                            <span>Service Charge (per day)</span>
-                            <span className="font-medium">LKR {actualPricePerDay.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-gray-600">
-                            <span className="text-xs">× {booking.numberOfDays || 1} day(s)</span>
-                            <span className="font-medium">LKR {baseServiceCharge.toLocaleString()}</span>
-                          </div>
+                          {/* Service Charges Breakdown */}
+                          {hasTypes ? (
+                            <>
+                              {fullDayCount > 0 && (
+                                <>
+                                  <div className="flex justify-between text-gray-700">
+                                    <span>Full Day Service</span>
+                                    <span className="font-medium">LKR {priceFullDay.toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex justify-between text-gray-600 mb-2">
+                                    <span className="text-xs">× {fullDayCount} day(s)</span>
+                                    <span className="font-medium">LKR {(fullDayCount * priceFullDay).toLocaleString()}</span>
+                                  </div>
+                                </>
+                              )}
+
+                              {halfDayCount > 0 && (
+                                <>
+                                  <div className="flex justify-between text-gray-700">
+                                    <span>Half Day Service</span>
+                                    <span className="font-medium">LKR {priceHalfDay.toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex justify-between text-gray-600 mb-2">
+                                    <span className="text-xs">× {halfDayCount} day(s)</span>
+                                    <span className="font-medium">LKR {(halfDayCount * priceHalfDay).toLocaleString()}</span>
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex justify-between text-gray-700">
+                                <span>Service Charge (per day)</span>
+                                <span className="font-medium">LKR {actualPricePerDay.toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between text-gray-600">
+                                <span className="text-xs">× {booking.numberOfDays || 1} day(s)</span>
+                                <span className="font-medium">LKR {baseServiceCharge.toLocaleString()}</span>
+                              </div>
+                            </>
+                          )}
 
                           {/* Add-ons */}
                           {(booking.needsBinoculars || booking.needsChildSeat || booking.needsWater) && (
@@ -715,7 +779,6 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                             <div className="flex justify-between items-center">
                               <span className="font-bold text-gray-900 text-sm sm:text-base">Total Amount</span>
                               <div className="flex items-center gap-1">
-                                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                                 <span className="text-lg sm:text-2xl font-bold text-green-600">
                                   LKR {calculatedTotal.toLocaleString()}
                                 </span>

@@ -814,7 +814,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             {/* Certification Filter - Dropdown */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📜 Certification
+                Certification
               </label>
               <select
                 value={filters.certification}

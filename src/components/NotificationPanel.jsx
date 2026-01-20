@@ -11,7 +11,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
       const now = new Date();
       const diffInHours = (now - date) / (1000 * 60 * 60);
-      
+
       if (diffInHours < 1) {
         const minutes = Math.floor(diffInHours * 60);
         return minutes < 1 ? 'Just now' : `${minutes}m ago`;
@@ -95,7 +95,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
   }, [notifications]);
 
   const isProcessing = (notificationId) => processingButtons.has(notificationId);
-  
+
   const setProcessing = (notificationId, value) => {
     setProcessingButtons(prev => {
       const newSet = new Set(prev);
@@ -111,26 +111,26 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
   // Check if notification is for customer receiving booking acceptance
   const isCustomerBookingAccepted = (notification) => {
     const bookingInfo = bookingStatuses[notification.id];
-    return notification.type === 'booking' && 
-           notification.bookingId && 
-           currentUser && 
-           notification.recipientId === currentUser.uid &&
-           notification.message && 
-           notification.message.toLowerCase().includes('accepted') &&
-           bookingInfo &&
-           bookingInfo.status === 'accepted' &&
-           bookingInfo.paymentStatus !== 'paid'; // Only show if not paid yet
+    return notification.type === 'booking' &&
+      notification.bookingId &&
+      currentUser &&
+      notification.recipientId === currentUser.uid &&
+      notification.message &&
+      notification.message.toLowerCase().includes('accepted') &&
+      bookingInfo &&
+      bookingInfo.status === 'accepted' &&
+      bookingInfo.paymentStatus !== 'paid'; // Only show if not paid yet
   };
 
   // Check if notification is for provider receiving booking request
   const isProviderBookingRequest = (notification) => {
     const bookingInfo = bookingStatuses[notification.id];
-    return notification.type === 'booking' && 
-           notification.bookingId && 
-           currentUser && 
-           notification.recipientId === currentUser.uid &&
-           bookingInfo &&
-           bookingInfo.status === 'pending';
+    return notification.type === 'booking' &&
+      notification.bookingId &&
+      currentUser &&
+      notification.recipientId === currentUser.uid &&
+      bookingInfo &&
+      bookingInfo.status === 'pending';
   };
 
   return (
@@ -175,20 +175,18 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
               <div
                 key={notification.id}
                 onClick={() => handleNotificationClick(notification)}
-                className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${
-                  notification.read ? 'bg-white' : 'bg-blue-50'
-                }`}
+                className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${notification.read ? 'bg-white' : 'bg-blue-50'
+                  }`}
               >
                 <div className="flex items-start space-x-3">
                   <div className="flex-shrink-0">
                     {getNotificationIcon(notification.type)}
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <p className={`font-medium text-sm truncate ${
-                        notification.read ? 'text-gray-600' : 'text-gray-900'
-                      }`}>
+                      <p className={`font-medium text-sm truncate ${notification.read ? 'text-gray-600' : 'text-gray-900'
+                        }`}>
                         {notification.title || notification.senderName || 'System'}
                       </p>
                       <div className="flex items-center space-x-1 text-xs text-gray-500 flex-shrink-0 ml-2">
@@ -196,19 +194,17 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                         <span className="whitespace-nowrap">{formatTime(notification.timestamp)}</span>
                       </div>
                     </div>
-                    
+
                     <p
-                      className={`text-sm mb-2 break-words ${
-                        notification.read ? 'text-gray-500' : 'text-gray-700'
-                      } ${
-                        notification.type === 'booking' && notification.bookingData
+                      className={`text-sm mb-2 break-words ${notification.read ? 'text-gray-500' : 'text-gray-700'
+                        } ${notification.type === 'booking' && notification.bookingData
                           ? 'whitespace-pre-line'
                           : 'line-clamp-3'
-                      }`}
+                        }`}
                     >
                       {notification.message || 'New notification'}
                     </p>
-                    
+
                     {/* Booking Details - show full booking info to related driver/guide */}
                     {notification.type === 'booking' && notification.bookingData && (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-2 text-xs space-y-1.5">
@@ -220,28 +216,28 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                           {notification.bookingData.dates ||
                             (notification.bookingData.datesWithTypes && notification.bookingData.datesWithTypes.length > 0
                               ? notification.bookingData.datesWithTypes
-                                  .map((dateObj) => {
+                                .map((dateObj) => {
+                                  try {
+                                    const date = new Date(dateObj.date);
+                                    const dateStr = date.toLocaleDateString();
+                                    const typeStr = dateObj.type === 'half-day' ? ' (Half-day)' : ' (Full-day)';
+                                    return dateStr + typeStr;
+                                  } catch {
+                                    return dateObj.date;
+                                  }
+                                })
+                                .join(', ')
+                              : notification.bookingData.selectedDates
+                                ? notification.bookingData.selectedDates
+                                  .map((d) => {
                                     try {
-                                      const date = new Date(dateObj.date);
-                                      const dateStr = date.toLocaleDateString();
-                                      const typeStr = dateObj.type === 'half-day' ? ' (Half-day)' : ' (Full-day)';
-                                      return dateStr + typeStr;
+                                      const date = new Date(d);
+                                      return date.toLocaleDateString();
                                     } catch {
-                                      return dateObj.date;
+                                      return d;
                                     }
                                   })
                                   .join(', ')
-                              : notification.bookingData.selectedDates
-                                ? notification.bookingData.selectedDates
-                                    .map((d) => {
-                                      try {
-                                        const date = new Date(d);
-                                        return date.toLocaleDateString();
-                                      } catch {
-                                        return d;
-                                      }
-                                    })
-                                    .join(', ')
                                 : 'N/A')}
                         </p>
                         <p className="text-green-800">
@@ -279,20 +275,20 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                         )}
                         {(notification.bookingData.pickupLocation ||
                           notification.bookingData.dropoffLocation) && (
-                          <p className="text-green-800">
-                            {notification.bookingData.pickupLocation && (
-                              <>
-                                <strong>Pickup:</strong> {notification.bookingData.pickupLocation}
-                              </>
-                            )}
-                            {notification.bookingData.dropoffLocation && (
-                              <>
-                                {' · '}
-                                <strong>Drop-off:</strong> {notification.bookingData.dropoffLocation}
-                              </>
-                            )}
-                          </p>
-                        )}
+                            <p className="text-green-800">
+                              {notification.bookingData.pickupLocation && (
+                                <>
+                                  <strong>Pickup:</strong> {notification.bookingData.pickupLocation}
+                                </>
+                              )}
+                              {notification.bookingData.dropoffLocation && (
+                                <>
+                                  {' · '}
+                                  <strong>Drop-off:</strong> {notification.bookingData.dropoffLocation}
+                                </>
+                              )}
+                            </p>
+                          )}
                         {notification.bookingData.needsHotelPickup &&
                           (notification.bookingData.hotelName ||
                             notification.bookingData.hotelAddress) && (
@@ -307,28 +303,28 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                         {(notification.bookingData.specialAssistance ||
                           notification.bookingData.emergencyContactName ||
                           notification.bookingData.emergencyContactPhone) && (
-                          <p className="text-green-800">
-                            {notification.bookingData.specialAssistance && (
-                              <>
-                                <strong>Special Requests:</strong>{' '}
-                                {notification.bookingData.specialAssistance}
-                                <br />
-                              </>
-                            )}
-                            {notification.bookingData.emergencyContactName && (
-                              <>
-                                <strong>Emergency Contact:</strong>{' '}
-                                {notification.bookingData.emergencyContactName}
-                                {notification.bookingData.emergencyContactPhone
-                                  ? ` - ${notification.bookingData.emergencyContactPhone}`
-                                  : ''}
-                              </>
-                            )}
-                          </p>
-                        )}
+                            <p className="text-green-800">
+                              {notification.bookingData.specialAssistance && (
+                                <>
+                                  <strong>Special Requests:</strong>{' '}
+                                  {notification.bookingData.specialAssistance}
+                                  <br />
+                                </>
+                              )}
+                              {notification.bookingData.emergencyContactName && (
+                                <>
+                                  <strong>Emergency Contact:</strong>{' '}
+                                  {notification.bookingData.emergencyContactName}
+                                  {notification.bookingData.emergencyContactPhone
+                                    ? ` - ${notification.bookingData.emergencyContactPhone}`
+                                    : ''}
+                                </>
+                              )}
+                            </p>
+                          )}
                       </div>
                     )}
-                    
+
                     {/* Accept/Decline Buttons for Providers (drivers/guides) receiving booking requests */}
                     {isProviderBookingRequest(notification) && (
                       <div className="flex gap-2 mt-2">
@@ -336,7 +332,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (isProcessing(notification.id)) return;
-                            
+
                             setProcessing(notification.id, true);
                             try {
                               // Provider (driver/guide) is accepting, so providerId is currentUser.uid, customerId is senderId
@@ -373,7 +369,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (isProcessing(notification.id)) return;
-                            
+
                             setProcessing(notification.id, true);
                             try {
                               // Provider (driver/guide) is declining, so providerId is currentUser.uid, customerId is senderId
@@ -416,12 +412,12 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (isProcessing(notification.id)) return;
-                            
+
                             setProcessing(notification.id, true);
                             try {
                               // Mark notification as read
                               await onMarkAsRead(notification.id);
-                              
+
                               // Get booking to check payment status
                               const booking = await getBookingById(notification.bookingId);
                               if (booking && booking.paymentStatus === 'paid') {
@@ -429,7 +425,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                                 setProcessing(notification.id, false);
                                 return;
                               }
-                              
+
                               // Redirect to payment page
                               window.location.href = `/payment/${notification.bookingId}`;
                             } catch (error) {
@@ -454,7 +450,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (isProcessing(notification.id)) return;
-                            
+
                             setProcessing(notification.id, true);
                             try {
                               // Customer is declining the accepted booking
@@ -463,7 +459,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                               if (!booking) {
                                 throw new Error('Booking not found');
                               }
-                              
+
                               // Update booking status to declined
                               await updateBookingStatus(
                                 notification.bookingId,
@@ -473,7 +469,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                                 booking.driverName || booking.guideName || 'Service Provider', // providerName
                                 currentUser.displayName || 'Customer' // customerName
                               );
-                              
+
                               await onMarkAsRead(notification.id);
                               alert('❌ Booking declined. The service provider has been notified.');
                             } catch (error) {
@@ -497,7 +493,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                         </button>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center justify-between">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getNotificationColor(notification.type)}`}>
                         {getNotificationIcon(notification.type)}
@@ -505,7 +501,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                           {notification.type || 'notification'}
                         </span>
                       </span>
-                      
+
                       {!notification.read && (
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                       )}

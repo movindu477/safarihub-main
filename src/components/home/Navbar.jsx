@@ -69,7 +69,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   useEffect(() => {
     let lastScrollY = window.scrollY;
     let ticking = false;
-    
+
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
@@ -84,7 +84,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         ticking = true;
       }
     };
-    
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -307,7 +307,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
   // Determine user role (must be after userData is set) - memoized
   const userRole = useMemo(() => userData?.serviceType || null, [userData?.serviceType]);
-  const isServiceProvider = useMemo(() => 
+  const isServiceProvider = useMemo(() =>
     Boolean(userData && (userRole === "Jeep Driver" || userRole === "Tour Guide")),
     [userData, userRole]
   );
@@ -401,13 +401,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   // Memoize user profile data to prevent unnecessary recalculations
   const userProfileData = useMemo(() => {
     if (!currentUser) return defaultUserData;
-    
-    const joinDate = userData?.createdAt 
-      ? (userData.createdAt.toDate 
-          ? new Date(userData.createdAt.toDate()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-          : new Date(userData.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }))
+
+    const joinDate = userData?.createdAt
+      ? (userData.createdAt.toDate
+        ? new Date(userData.createdAt.toDate()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        : new Date(userData.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }))
       : "Recently";
-    
+
     return {
       name: currentUser.displayName || userData?.fullName || userData?.fullname || "User",
       email: currentUser.email || "No email",
@@ -448,7 +448,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     { icon: ShoppingBag, label: "Find a Renting Store", onClick: handleRentClick, path: "/rent" },
   ], [handleGuideClick, handleDestinationClick, handleJeepDriverClick, handleRentClick]);
 
-  const isServicesActive = useMemo(() => 
+  const isServicesActive = useMemo(() =>
     servicesItems.some((item) => item.path && isActivePath(item.path)),
     [servicesItems, isActivePath]
   );

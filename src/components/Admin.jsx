@@ -14,10 +14,10 @@ import AvailabilityCalendar from './AvailabilityCalendar';
 const formatDate = (date) => {
   if (!date) return 'N/A';
   const dateObj = date instanceof Date ? date : new Date(date);
-  return dateObj.toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  return dateObj.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
 };
 
@@ -286,7 +286,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           // Prioritize pending bookings first
           if (a.status === 'pending' && b.status !== 'pending') return -1;
           if (a.status !== 'pending' && b.status === 'pending') return 1;
-          
+
           // Then sort by date (newest first)
           const dateA = a.createdAt?.toDate?.() || a.createdAt || new Date(0);
           const dateB = b.createdAt?.toDate?.() || b.createdAt || new Date(0);
@@ -333,11 +333,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             exists: snapshot.exists(),
             hasData: !!snapshot.data()
           });
-          
+
           if (snapshot.exists()) {
             const data = snapshot.data();
             const documents = data.documents || [];
-            
+
             console.log(`📄 Found ${documents.length} document(s) in Firestore`);
             console.log('📋 Raw documents:', documents.map((d, i) => ({
               index: i,
@@ -348,16 +348,16 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
               uploadStatus: d.uploadStatus,
               documentId: d.documentId
             })));
-            
+
             const certs = documents.map((docItem, index) => {
               // Determine status: if path exists and no failed status, mark as uploaded
               const hasValidPath = (docItem.supabasePath && docItem.supabasePath.trim()) || (docItem.fileUrl && docItem.fileUrl.trim());
-              const status = docItem.uploadStatus === 'failed' 
-                ? 'failed' 
-                : hasValidPath 
-                  ? 'uploaded' 
+              const status = docItem.uploadStatus === 'failed'
+                ? 'failed'
+                : hasValidPath
+                  ? 'uploaded'
                   : (docItem.uploadStatus === 'uploaded' ? 'uploaded' : null); // Preserve 'uploaded' status if set
-              
+
               // Handle uploadedAt - can be Date, Timestamp, or null
               let uploadedAt = null;
               if (docItem.uploadedAt) {
@@ -372,7 +372,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   uploadedAt = new Date(docItem.uploadedAt);
                 }
               }
-              
+
               return {
                 id: docItem.documentId || `${currentUser.uid}_${index}`,
                 certificationName: docItem.certificationName || docItem.fileName || 'Unknown',
@@ -388,7 +388,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 uploadError: docItem.uploadError || null // Include uploadError
               };
             });
-            
+
             console.log(`✅ Processed ${certs.length} certification(s) for display`);
             console.log('📋 Processed documents:', certs.map(c => ({
               name: c.certificationName,
@@ -397,7 +397,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
               uploadStatus: c.uploadStatus,
               id: c.id
             })));
-            
+
             setUploadedCertifications(certs);
           } else {
             console.log('⚠️ No documents found in Firestore for user:', currentUser.uid);
@@ -553,7 +553,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
       if (profileFile) {
         try {
           const { url: photoURL, error } = await uploadProfileImage(profileFile, uid);
-          
+
           if (error) {
             console.error('Profile image upload failed:', error);
             setMessage({ type: 'error', text: 'Profile updated but image upload failed. Please try uploading again.' });
@@ -945,11 +945,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                 </div>
                               )}
                               <p className="text-xs text-gray-400">
-                                {userData?.certificationApproved 
+                                {userData?.certificationApproved
                                   ? `Approved by ${userData.certificationApprovedByName || 'Admin'} on ${userData.certificationApprovedAt?.toDate?.().toLocaleDateString() || 'N/A'}`
                                   : userData?.certificationRejected
-                                  ? `Rejected: ${userData.certificationRejectionReason || 'Please contact admin for more details'}`
-                                  : 'Your certification request is being reviewed by an admin. You will be notified once approved.'}
+                                    ? `Rejected: ${userData.certificationRejectionReason || 'Please contact admin for more details'}`
+                                    : 'Your certification request is being reviewed by an admin. You will be notified once approved.'}
                               </p>
                             </div>
                           ) : (
@@ -1005,22 +1005,20 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               <button
                                 type="button"
                                 onClick={() => handleInputChange('certificationStatus', 'non-certified')}
-                                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${
-                                  formData.certificationStatus === 'non-certified'
+                                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'non-certified'
                                     ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
                                     : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                                }`}
+                                  }`}
                               >
                                 Non-Certified Service Provider
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleInputChange('certificationStatus', 'certified')}
-                                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${
-                                  formData.certificationStatus === 'certified'
+                                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'certified'
                                     ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
                                     : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                                }`}
+                                  }`}
                               >
                                 Certified Service Provider
                               </button>
@@ -1075,7 +1073,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       {isEditing && formData.vehicleTypes && formData.vehicleTypes.length > 0 && (
                         <div className="space-y-3">
                           <h4 className="text-white font-semibold text-sm">Pricing Information</h4>
-                          
+
                           {/* Standard Safari Jeep Prices */}
                           {formData.vehicleTypes.includes("Standard Safari Jeep") && (
                             <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">
@@ -1084,6 +1082,18 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                 <div>
                                   <label className="block text-xs font-medium text-gray-300 mb-1">
                                     Full Day Price (LKR) *
+<<<<<<< HEAD
+=======
+                                    {formData.certificationStatus === 'certified' ? (
+                                      userData?.certificationApproved ? (
+                                        <span className="text-yellow-400 ml-1">(Min: 25,000)</span>
+                                      ) : (
+                                        <span className="text-emerald-400 ml-1">(Max: 25,000 - Pending Approval)</span>
+                                      )
+                                    ) : (
+                                      <span className="text-emerald-400 ml-1">(Max: 25,000)</span>
+                                    )}
+>>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
                                   </label>
                                   <input
                                     type="text"
@@ -1510,7 +1520,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         className="hidden"
                       />
                     </div>
-                    
+
                     {/* View Mode - Display Documents from Registration */}
                     {!isEditing && (
                       <>
@@ -1521,7 +1531,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                             <div>
                               <h4 className="text-xs font-semibold text-blue-300 mb-1">Documents from Registration</h4>
                               <p className="text-xs text-blue-200">
-                                The documents shown below were uploaded during your registration. 
+                                The documents shown below were uploaded during your registration.
                                 Click "Edit Profile" to add or modify documents.
                               </p>
                             </div>
@@ -1771,7 +1781,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         <div className="space-y-1.5">
                           {formData.verificationDocuments && formData.verificationDocuments.length > 0 ? (
                             formData.verificationDocuments.map((doc, index) => {
-                              const uploadedDoc = uploadedCertifications.find(cert => 
+                              const uploadedDoc = uploadedCertifications.find(cert =>
                                 cert.name === doc || cert.certificationName === doc
                               );
                               const hasDocument = uploadedDoc && (uploadedDoc.supabasePath || uploadedDoc.fileUrl);
@@ -1893,51 +1903,55 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setBookingFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      bookingFilter === 'all'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'all'
                         ? 'bg-emerald-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                      }`}
                   >
                     All ({bookings.length})
                   </button>
                   <button
                     onClick={() => setBookingFilter('pending')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      bookingFilter === 'pending'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'pending'
                         ? 'bg-yellow-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                      }`}
                   >
                     Pending ({bookings.filter(b => b.status === 'pending').length})
                   </button>
                   <button
                     onClick={() => setBookingFilter('accepted')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      bookingFilter === 'accepted'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'accepted'
                         ? 'bg-green-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                      }`}
                   >
-                    Accepted ({bookings.filter(b => b.status === 'accepted').length})
+                    Accepted ({bookings.filter(b => b.status === 'accepted' && b.paymentStatus !== 'paid').length})
+                  </button>
+                  <button
+                    onClick={() => setBookingFilter('confirmed')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'confirmed'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                  >
+                    Confirmed ({bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && b.paymentStatus === 'paid').length})
                   </button>
                   <button
                     onClick={() => setBookingFilter('completed')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      bookingFilter === 'completed'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'completed'
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                      }`}
                   >
                     Completed ({bookings.filter(b => b.status === 'completed').length})
                   </button>
                   <button
                     onClick={() => setBookingFilter('declined')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      bookingFilter === 'declined'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'declined'
                         ? 'bg-red-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                      }`}
                   >
                     Declined ({bookings.filter(b => b.status === 'declined').length})
                   </button>
@@ -1957,8 +1971,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <p className="text-gray-400">No bookings yet</p>
                 </div>
               ) : (() => {
-                const filteredBookings = bookings.filter(booking => bookingFilter === 'all' || booking.status === bookingFilter);
-                
+                const filteredBookings = bookings.filter(booking => {
+                  if (bookingFilter === 'all') return true;
+                  if (bookingFilter === 'accepted') {
+                    return booking.status === 'accepted' && booking.paymentStatus !== 'paid';
+                  }
+                  if (bookingFilter === 'confirmed') {
+                    return (booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus === 'paid';
+                  }
+                  return booking.status === bookingFilter;
+                });
+
                 if (filteredBookings.length === 0) {
                   return (
                     <div className="text-center py-12">
@@ -1975,202 +1998,203 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                     </div>
                   );
                 }
-                
+
                 return (
                   <div className="space-y-4">
                     {filteredBookings.map((booking) => {
                       const bookingDate = booking.createdAt?.toDate?.() || booking.createdAt || new Date();
                       const formattedDate = formatDate(bookingDate);
-                    
-                    // Calculate hours pending
-                    const now = new Date();
-                    const createdAt = booking.createdAt?.toDate?.() || new Date(booking.createdAt);
-                    const hoursPending = Math.floor((now - createdAt) / (1000 * 60 * 60));
-                    const isPendingOver16Hours = booking.status === 'pending' && hoursPending >= 16;
-                    const isPendingOver24Hours = booking.status === 'pending' && hoursPending >= 24;
-                    
-                    const statusColors = {
-                      pending: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
-                      accepted: 'bg-green-900/50 text-green-300 border-green-700',
-                      declined: 'bg-red-900/50 text-red-300 border-red-700',
-                      completed: 'bg-blue-900/50 text-blue-300 border-blue-700',
-                      cancelled: 'bg-gray-700/50 text-gray-300 border-gray-600'
-                    };
 
-                    return (
-                      <div
-                        key={booking.id}
-                        onClick={() => {
-                          setSelectedBooking(booking);
-                          setShowBookingDetails(true);
-                        }}
-                        className={`rounded-lg p-4 border cursor-pointer transition-colors hover:bg-gray-700 ${
-                          isPendingOver24Hours 
-                            ? 'bg-red-900/30 border-red-500/50 ring-2 ring-red-500/50' 
-                            : isPendingOver16Hours 
-                              ? 'bg-orange-900/30 border-orange-500/50 ring-2 ring-orange-500/50' 
-                              : 'bg-gray-700/50 border-gray-600'
-                        }`}
-                      >
-                        {/* Urgent Alert Banner */}
-                        {isPendingOver16Hours && (
-                          <div className={`mb-3 px-3 py-2 rounded-lg border-2 ${
-                            isPendingOver24Hours 
-                              ? 'bg-red-900/50 border-red-500 text-red-200' 
-                              : 'bg-orange-900/50 border-orange-500 text-orange-200'
-                          }`}>
-                            <div className="flex items-center gap-2 mb-1">
-                              <AlertCircle className="h-4 w-4" />
-                              <span className="font-bold text-sm">
-                                {isPendingOver24Hours ? '⚠️ URGENT: 24+ Hours No Response' : '⏰ WARNING: 16+ Hours Pending'}
-                              </span>
-                            </div>
-                            <p className="text-xs">
-                              {isPendingOver24Hours 
-                                ? `This booking has been pending for ${hoursPending} hours. Customer is waiting!` 
-                                : `This booking has been pending for ${hoursPending} hours. Please respond soon.`}
-                            </p>
-                          </div>
-                        )}
+                      // Calculate hours pending
+                      const now = new Date();
+                      const createdAt = booking.createdAt?.toDate?.() || new Date(booking.createdAt);
+                      const hoursPending = Math.floor((now - createdAt) / (1000 * 60 * 60));
+                      const isPendingOver16Hours = booking.status === 'pending' && hoursPending >= 16;
+                      const isPendingOver24Hours = booking.status === 'pending' && hoursPending >= 24;
 
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                              <h3 className="text-lg font-semibold text-white">
-                                {booking.customerName || 'Customer'}
-                              </h3>
-                              <span className={`px-2 py-1 rounded text-xs font-medium border ${statusColors[booking.status] || statusColors.pending
-                                }`}>
-                                {booking.status?.toUpperCase() || 'PENDING'}
-                              </span>
-                              {booking.status === 'pending' && (
-                                <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300 border border-gray-600">
-                                  {hoursPending}h pending
+                      const statusColors = {
+                        pending: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
+                        accepted: 'bg-green-900/50 text-green-300 border-green-700',
+                        confirmed: 'bg-emerald-900/50 text-emerald-300 border-emerald-700',
+                        declined: 'bg-red-900/50 text-red-300 border-red-700',
+                        completed: 'bg-blue-900/50 text-blue-300 border-blue-700',
+                        cancelled: 'bg-gray-700/50 text-gray-300 border-gray-600'
+                      };
+
+                      return (
+                        <div
+                          key={booking.id}
+                          onClick={() => {
+                            setSelectedBooking(booking);
+                            setShowBookingDetails(true);
+                          }}
+                          className={`rounded-lg p-4 border cursor-pointer transition-colors hover:bg-gray-700 ${isPendingOver24Hours
+                              ? 'bg-red-900/30 border-red-500/50 ring-2 ring-red-500/50'
+                              : isPendingOver16Hours
+                                ? 'bg-orange-900/30 border-orange-500/50 ring-2 ring-orange-500/50'
+                                : 'bg-gray-700/50 border-gray-600'
+                            }`}
+                        >
+                          {/* Urgent Alert Banner */}
+                          {isPendingOver16Hours && (
+                            <div className={`mb-3 px-3 py-2 rounded-lg border-2 ${isPendingOver24Hours
+                                ? 'bg-red-900/50 border-red-500 text-red-200'
+                                : 'bg-orange-900/50 border-orange-500 text-orange-200'
+                              }`}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <AlertCircle className="h-4 w-4" />
+                                <span className="font-bold text-sm">
+                                  {isPendingOver24Hours ? '⚠️ URGENT: 24+ Hours No Response' : '⏰ WARNING: 16+ Hours Pending'}
                                 </span>
-                              )}
+                              </div>
+                              <p className="text-xs">
+                                {isPendingOver24Hours
+                                  ? `This booking has been pending for ${hoursPending} hours. Customer is waiting!`
+                                  : `This booking has been pending for ${hoursPending} hours. Please respond soon.`}
+                              </p>
                             </div>
-                            <div className="space-y-1 text-sm text-gray-300">
-                              <p><span className="font-medium">Email:</span> {booking.customerEmail || 'N/A'}</p>
-                              {booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0 ? (
-                                <div>
-                                  <p className="font-medium mb-1">Dates:</p>
-                                  <div className="space-y-1">
-                                    {booking.datesWithTypes.map((item, index) => {
-                                      const date = item.date ? new Date(item.date) : null;
-                                      const type = item.type || 'full-day';
-                                      const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
-                                      const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
-                                      // Calculate price for this day
-                                      const isFullDay = type === 'full' || type === 'full-day';
-                                      const dayPrice = isFullDay 
-                                        ? booking.priceFullDay || booking.pricePerDay 
-                                        : booking.priceHalfDay || (booking.pricePerDay * 0.6);
-                                      if (!date) return null;
-                                      return (
-                                        <div key={index} className="flex items-center justify-between text-xs">
-                                          <span className="text-gray-300">{formatDate(date)}</span>
-                                          <div className="flex items-center gap-2">
-                                            <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
-                                            {dayPrice && (
-                                              <span className="text-gray-300 font-medium">LKR {dayPrice.toLocaleString()}</span>
-                                            )}
+                          )}
+
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                <h3 className="text-lg font-semibold text-white">
+                                  {booking.customerName || 'Customer'}
+                                </h3>
+                                <span className={`px-2 py-1 rounded text-xs font-medium border ${booking.paymentStatus === 'paid'
+                                    ? statusColors.confirmed
+                                    : statusColors[booking.status] || statusColors.pending
+                                  }`}>
+                                  {booking.paymentStatus === 'paid' ? 'CONFIRMED' : (booking.status?.toUpperCase() || 'PENDING')}
+                                </span>
+                                {booking.status === 'pending' && (
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300 border border-gray-600">
+                                    {hoursPending}h pending
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-1 text-sm text-gray-300">
+                                <p><span className="font-medium">Email:</span> {booking.customerEmail || 'N/A'}</p>
+                                {booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0 ? (
+                                  <div>
+                                    <p className="font-medium mb-1">Dates:</p>
+                                    <div className="space-y-1">
+                                      {booking.datesWithTypes.map((item, index) => {
+                                        const date = item.date ? new Date(item.date) : null;
+                                        const type = item.type || 'full-day';
+                                        const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                                        const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
+                                        // Calculate price for this day
+                                        const isFullDay = type === 'full' || type === 'full-day';
+                                        const dayPrice = isFullDay
+                                          ? booking.priceFullDay || booking.pricePerDay
+                                          : booking.priceHalfDay || (booking.pricePerDay * 0.6);
+                                        if (!date) return null;
+                                        return (
+                                          <div key={index} className="flex items-center justify-between text-xs">
+                                            <span className="text-gray-300">{formatDate(date)}</span>
+                                            <div className="flex items-center gap-2">
+                                              <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                                              {dayPrice && (
+                                                <span className="text-gray-300 font-medium">LKR {dayPrice.toLocaleString()}</span>
+                                              )}
+                                            </div>
                                           </div>
-                                        </div>
-                                      );
-                                    })}
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
-                              ) : booking.selectedDates ? (
-                                <p><span className="font-medium">Dates:</span> {
-                                  Array.isArray(booking.selectedDates)
-                                    ? booking.selectedDates.map(d => formatDate(new Date(d))).join(', ')
-                                    : formatDate(new Date(booking.selectedDates))
-                                }</p>
-                              ) : booking.datesString ? (
-                                <p><span className="font-medium">Dates:</span> {booking.datesString}</p>
-                              ) : null}
-                              {booking.destination && (
-                                <p><span className="font-medium">Destination:</span> {booking.destination}</p>
-                              )}
-                              {booking.totalPrice && (
-                                <p className="border-t border-gray-700 pt-2 mt-2">
-                                  <span className="font-medium">Total Price:</span>{' '}
-                                  <span className="font-bold text-base">LKR {booking.totalPrice.toLocaleString()}</span>
-                                </p>
-                              )}
-                              <p><span className="font-medium">Booked on:</span> {formattedDate}</p>
+                                ) : booking.selectedDates ? (
+                                  <p><span className="font-medium">Dates:</span> {
+                                    Array.isArray(booking.selectedDates)
+                                      ? booking.selectedDates.map(d => formatDate(new Date(d))).join(', ')
+                                      : formatDate(new Date(booking.selectedDates))
+                                  }</p>
+                                ) : booking.datesString ? (
+                                  <p><span className="font-medium">Dates:</span> {booking.datesString}</p>
+                                ) : null}
+                                {booking.destination && (
+                                  <p><span className="font-medium">Destination:</span> {booking.destination}</p>
+                                )}
+                                {booking.totalPrice && (
+                                  <p className="border-t border-gray-700 pt-2 mt-2">
+                                    <span className="font-medium">Total Price:</span>{' '}
+                                    <span className="font-bold text-base">LKR {booking.totalPrice.toLocaleString()}</span>
+                                  </p>
+                                )}
+                                <p><span className="font-medium">Booked on:</span> {formattedDate}</p>
+                              </div>
                             </div>
-                          </div>
-                          {(() => {
-                            // Check if booking date has passed (for completed button)
-                            const getLatestBookingDate = () => {
-                              if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
-                                const dates = booking.datesWithTypes.map(d => new Date(d.date));
-                                return new Date(Math.max(...dates));
-                              } else if (booking.selectedDates) {
-                                const dates = Array.isArray(booking.selectedDates) 
-                                  ? booking.selectedDates.map(d => new Date(d))
-                                  : [new Date(booking.selectedDates)];
-                                return new Date(Math.max(...dates));
+                            {(() => {
+                              // Check if booking date has passed (for completed button)
+                              const getLatestBookingDate = () => {
+                                if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
+                                  const dates = booking.datesWithTypes.map(d => new Date(d.date));
+                                  return new Date(Math.max(...dates));
+                                } else if (booking.selectedDates) {
+                                  const dates = Array.isArray(booking.selectedDates)
+                                    ? booking.selectedDates.map(d => new Date(d))
+                                    : [new Date(booking.selectedDates)];
+                                  return new Date(Math.max(...dates));
+                                }
+                                return null;
+                              };
+
+                              const latestDate = getLatestBookingDate();
+                              let hasBookingPassed = false;
+
+                              if (latestDate) {
+                                // Normalize both dates to midnight (start of day) for proper date-only comparison
+                                const latestDateMidnight = new Date(latestDate);
+                                latestDateMidnight.setHours(0, 0, 0, 0);
+
+                                const nowMidnight = new Date();
+                                nowMidnight.setHours(0, 0, 0, 0);
+
+                                // Booking is considered "passed" if today is after the latest booking date
+                                hasBookingPassed = nowMidnight > latestDateMidnight;
+                              }
+
+                              // Show different buttons based on status
+                              if (booking.status === 'pending') {
+                                return (
+                                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={() => handleBookingStatusUpdate(booking.id, 'accepted')}
+                                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                    >
+                                      <Check className="h-4 w-4" />
+                                      Accept
+                                    </button>
+                                    <button
+                                      onClick={() => handleBookingStatusUpdate(booking.id, 'declined')}
+                                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                    >
+                                      <X className="h-4 w-4" />
+                                      Decline
+                                    </button>
+                                  </div>
+                                );
+                              } else if (booking.status === 'accepted' && hasBookingPassed) {
+                                return (
+                                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={() => handleBookingStatusUpdate(booking.id, 'completed')}
+                                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                    >
+                                      <CheckCircle className="h-4 w-4" />
+                                      Mark as Completed
+                                    </button>
+                                  </div>
+                                );
                               }
                               return null;
-                            };
-
-                            const latestDate = getLatestBookingDate();
-                            let hasBookingPassed = false;
-                            
-                            if (latestDate) {
-                              // Normalize both dates to midnight (start of day) for proper date-only comparison
-                              const latestDateMidnight = new Date(latestDate);
-                              latestDateMidnight.setHours(0, 0, 0, 0);
-                              
-                              const nowMidnight = new Date();
-                              nowMidnight.setHours(0, 0, 0, 0);
-                              
-                              // Booking is considered "passed" if today is after the latest booking date
-                              hasBookingPassed = nowMidnight > latestDateMidnight;
-                            }
-
-                            // Show different buttons based on status
-                            if (booking.status === 'pending') {
-                              return (
-                                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    onClick={() => handleBookingStatusUpdate(booking.id, 'accepted')}
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                  >
-                                    <Check className="h-4 w-4" />
-                                    Accept
-                                  </button>
-                                  <button
-                                    onClick={() => handleBookingStatusUpdate(booking.id, 'declined')}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                  >
-                                    <X className="h-4 w-4" />
-                                    Decline
-                                  </button>
-                                </div>
-                              );
-                            } else if (booking.status === 'accepted' && hasBookingPassed) {
-                              return (
-                                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    onClick={() => handleBookingStatusUpdate(booking.id, 'completed')}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                    Mark as Completed
-                                  </button>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
+                            })()}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
                 );
               })()}
             </div>
@@ -2212,7 +2236,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               setAvailabilityCalendar(tempAvailabilityCalendar);
                               setIsEditingCalendar(false);
                               setMessage({ type: 'success', text: 'Availability calendar updated successfully!' });
-                              
+
                               // Clear message after 3 seconds
                               setTimeout(() => {
                                 setMessage({ type: '', text: '' });
@@ -2243,6 +2267,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   )}
                 </div>
               </div>
+<<<<<<< HEAD
               {isEditingCalendar ? (
                 <div className="bg-emerald-900/20 border border-emerald-700 rounded-lg p-3 mb-6">
                   <p className="text-emerald-300 text-sm font-medium">
@@ -2256,6 +2281,13 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   </p>
                 </div>
               )}
+=======
+              <p className="text-gray-400 text-sm mb-6">
+                {isEditingCalendar
+                  ? 'Click on dates to set availability. All dates are unselected by default until you mark them.'
+                  : 'View your availability calendar. Click "Edit Calendar" to make changes.'}
+              </p>
+>>>>>>> 1e531a4c82b0800c49f437f1889c87373d018404
               <AvailabilityCalendar
                 availability={isEditingCalendar ? tempAvailabilityCalendar : availabilityCalendar}
                 onChange={(newAvailability) => {
@@ -2302,13 +2334,14 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             <div className="p-6 space-y-6">
               {/* Status Badge */}
               <div>
-                <span className={`inline-block px-3 py-1 rounded text-sm font-medium border ${selectedBooking.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300 border-yellow-700' :
-                  selectedBooking.status === 'accepted' ? 'bg-green-900/50 text-green-300 border-green-700' :
-                    selectedBooking.status === 'declined' ? 'bg-red-900/50 text-red-300 border-red-700' :
-                      selectedBooking.status === 'completed' ? 'bg-blue-900/50 text-blue-300 border-blue-700' :
-                        'bg-gray-700/50 text-gray-300 border-gray-600'
+                <span className={`inline-block px-3 py-1 rounded text-sm font-medium border ${selectedBooking.paymentStatus === 'paid' ? 'bg-emerald-900/50 text-emerald-300 border-emerald-700' :
+                    selectedBooking.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300 border-yellow-700' :
+                      selectedBooking.status === 'accepted' ? 'bg-green-900/50 text-green-300 border-green-700' :
+                        selectedBooking.status === 'declined' ? 'bg-red-900/50 text-red-300 border-red-700' :
+                          selectedBooking.status === 'completed' ? 'bg-blue-900/50 text-blue-300 border-blue-700' :
+                            'bg-gray-700/50 text-gray-300 border-gray-600'
                   }`}>
-                  {selectedBooking.status?.toUpperCase() || 'PENDING'}
+                  {selectedBooking.paymentStatus === 'paid' ? 'CONFIRMED' : (selectedBooking.status?.toUpperCase() || 'PENDING')}
                 </span>
               </div>
 
@@ -2369,8 +2402,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
                           // Calculate price for this day
                           const isFullDay = type === 'full' || type === 'full-day';
-                          const dayPrice = isFullDay 
-                            ? selectedBooking.priceFullDay || selectedBooking.pricePerDay 
+                          const dayPrice = isFullDay
+                            ? selectedBooking.priceFullDay || selectedBooking.pricePerDay
                             : selectedBooking.priceHalfDay || (selectedBooking.pricePerDay * 0.6);
                           if (!date) return null;
                           return (

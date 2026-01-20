@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { collection, query, where, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { updateBookingStatus } from '../App';
-import { Calendar, CheckCircle, XCircle, Clock, MapPin, User, DollarSign, X, Check, ArrowRight } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, Clock, MapPin, User, DollarSign, X, Check, ArrowRight, Star } from 'lucide-react';
+import { getDocs, limit, orderBy } from 'firebase/firestore';
 
 const BookingSection = ({ user }) => {
   const navigate = useNavigate();
@@ -136,6 +137,11 @@ const BookingSection = ({ user }) => {
     if (selectedStatus === 'all') return true;
     if (selectedStatus === 'pending') return booking.status === 'pending';
     if (selectedStatus === 'accepted') {
+      // Show accepted bookings that are NOT yet paid
+      return booking.status === 'accepted' && booking.paymentStatus !== 'paid';
+    }
+    if (selectedStatus === 'confirmed') {
+      // Show confirmed bookings (accepted or confirmed) that ARE paid
       return (booking.status === 'accepted' || booking.status === 'confirmed') && booking.paymentStatus === 'paid';
     }
     if (selectedStatus === 'declined') return booking.status === 'declined';
@@ -143,13 +149,14 @@ const BookingSection = ({ user }) => {
   });
 
   const pendingBookings = bookings.filter(b => b.status === 'pending');
-  const acceptedBookings = bookings.filter(b => b.status === 'accepted' || b.status === 'confirmed');
+  const acceptedBookings = bookings.filter(b => b.status === 'accepted' && b.paymentStatus !== 'paid');
   const confirmedBookings = bookings.filter(b =>
     (b.status === 'accepted' || b.status === 'confirmed') && b.paymentStatus === 'paid'
   );
   const declinedBookings = bookings.filter(b => b.status === 'declined');
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status, paymentStatus) => {
+    if (paymentStatus === 'paid') return 'bg-emerald-100 text-emerald-800 border-emerald-300';
     switch (status) {
       case 'accepted':
       case 'confirmed':
@@ -163,7 +170,8 @@ const BookingSection = ({ user }) => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status, paymentStatus) => {
+    if (paymentStatus === 'paid') return <CheckCircle className="h-4 w-4" />;
     switch (status) {
       case 'accepted':
       case 'confirmed':
@@ -316,6 +324,15 @@ const BookingSection = ({ user }) => {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
             >
+              Accepted ({acceptedBookings.length})
+            </button>
+            <button
+              onClick={() => setSelectedStatus('confirmed')}
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'confirmed'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+            >
               Confirmed ({confirmedBookings.length})
             </button>
             <button
@@ -357,9 +374,9 @@ const BookingSection = ({ user }) => {
                       }}
                     >
                       {/* Status Badge */}
-                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border mb-2 ${getStatusColor(booking.status)}`}>
-                        {getStatusIcon(booking.status)}
-                        <span className="uppercase">{booking.status || 'Pending'}</span>
+                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border mb-2 ${getStatusColor(booking.status, booking.paymentStatus)}`}>
+                        {getStatusIcon(booking.status, booking.paymentStatus)}
+                        <span className="uppercase">{booking.paymentStatus === 'paid' ? 'Confirmed' : (booking.status || 'Pending')}</span>
                       </div>
 
                       {/* Service Provider/Customer Info */}
@@ -440,8 +457,14 @@ const BookingSection = ({ user }) => {
                                   if (!date) return null;
                                   return (
                                     <div key={index} className="flex items-center justify-between text-xs">
-                                      <span className="text-gray-300">{date.toLocaleDateString()}</span>
-                                      <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                                      <span className="text-gray-300">{date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                      <span className={`font-medium ${typeColor}`}>
+                                        {typeLabel}
+                                        {((type === 'full-day' || type === 'full') && booking.priceFullDay) && ` - LKR ${booking.priceFullDay.toLocaleString()}`}
+                                        {type === 'half-day' && booking.priceHalfDay && ` - LKR ${booking.priceHalfDay.toLocaleString()}`}
+                                        {/* Fallback to pricePerDay if specific prices not available */}
+                                        {!booking.priceFullDay && !booking.priceHalfDay && booking.pricePerDay && ` - LKR ${(type === 'half-day' ? booking.pricePerDay * 0.5 : booking.pricePerDay).toLocaleString()}`}
+                                      </span>
                                     </div>
                                   );
                                 })
@@ -518,34 +541,38 @@ const BookingSection = ({ user }) => {
                                 }}
                                 className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded transition-colors text-xs font-medium"
                               >
-                                <DollarSign className="h-3 w-3" />
                                 Pay Now
                               </button>
                             )}
 
                             {/* Book Another Provider button for declined bookings */}
                             {userRole === 'tourist' && booking.status === 'declined' && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandedBookingId(null);
-                                  // Navigate to jeep/guide/renting page with filters for the national park and dates
-                                  const serviceType = booking.driverId ? 'jeep' : booking.guideId ? 'guide' : 'renting';
-                                  const destination = booking.nationalPark;
-                                  // Store booking details for filtering
-                                  sessionStorage.setItem('rebookingDetails', JSON.stringify({
-                                    nationalPark: booking.nationalPark,
-                                    selectedDates: booking.selectedDates || [],
-                                    datesWithTypes: booking.datesWithTypes || [],
-                                    numberOfDays: booking.numberOfDays
-                                  }));
-                                  navigate(`/${serviceType}?destination=${encodeURIComponent(destination)}&rebook=true`);
-                                }}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all text-xs font-semibold shadow-lg"
-                              >
-                                <User className="h-4 w-4" />
-                                {booking.driverId ? 'Book Another Driver' : booking.guideId ? 'Book Another Guide' : 'Book Another Provider'}
-                              </button>
+                              <div className="space-y-3">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedBookingId(null);
+                                    // Navigate to jeep/guide/renting page with filters for the national park and dates
+                                    const serviceType = booking.driverId ? 'jeep' : booking.guideId ? 'guide' : 'renting';
+                                    const destination = booking.nationalPark;
+                                    // Store booking details for filtering
+                                    sessionStorage.setItem('rebookingDetails', JSON.stringify({
+                                      nationalPark: booking.nationalPark,
+                                      selectedDates: booking.selectedDates || [],
+                                      datesWithTypes: booking.datesWithTypes || [],
+                                      numberOfDays: booking.numberOfDays
+                                    }));
+                                    navigate(`/${serviceType}?destination=${encodeURIComponent(destination)}&rebook=true`);
+                                  }}
+                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all text-xs font-semibold shadow-lg"
+                                >
+                                  <User className="h-4 w-4" />
+                                  {booking.driverId ? 'Book Another Driver' : booking.guideId ? 'Book Another Guide' : 'Book Another Provider'}
+                                </button>
+
+                                {/* Suggested Highly Rated Providers */}
+                                <SuggestedProviders booking={booking} navigate={navigate} />
+                              </div>
                             )}
                           </div>
                         </div>
@@ -558,6 +585,102 @@ const BookingSection = ({ user }) => {
           </div>
         </div>
       </section>
+    </div>
+  );
+};
+
+// Suggested Providers Component
+const SuggestedProviders = ({ booking, navigate }) => {
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (!booking.nationalPark) return;
+      setLoading(true);
+      try {
+        const serviceProvidersRef = collection(db, 'serviceProviders');
+        const serviceType = booking.driverId ? 'Jeep Driver' : booking.guideId ? 'Tour Guide' : '';
+
+        let q;
+        if (serviceType) {
+          q = query(
+            serviceProvidersRef,
+            where('serviceType', '==', serviceType),
+            where('destinations', 'array-contains', booking.nationalPark),
+            orderBy('rating', 'desc'),
+            limit(3)
+          );
+        } else {
+          q = query(
+            serviceProvidersRef,
+            where('destinations', 'array-contains', booking.nationalPark),
+            orderBy('rating', 'desc'),
+            limit(3)
+          );
+        }
+
+        const querySnapshot = await getDocs(q);
+        const providers = querySnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(p => p.id !== (booking.driverId || booking.guideId)); // Don't suggest the same driver
+
+        setSuggestions(providers);
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, [booking]);
+
+  if (loading) return <div className="text-xs text-gray-500 animate-pulse text-center py-2">Finding top rated alternatives...</div>;
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+      <h4 className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-1">
+        <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
+        Highly Rated Alternatives in {booking.nationalPark}
+      </h4>
+      <div className="space-y-2">
+        {suggestions.map((provider) => (
+          <div
+            key={provider.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              const profilePath = provider.serviceType === 'Jeep Driver' ? '/jeepprofile' : '/guideprofile';
+              const paramName = provider.serviceType === 'Jeep Driver' ? 'driverId' : 'guideId';
+              navigate(`${profilePath}?${paramName}=${provider.id}`);
+            }}
+            className="flex items-center gap-3 p-2 bg-white rounded border border-emerald-100 hover:border-emerald-300 hover:shadow-sm transition-all cursor-pointer group"
+          >
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex-shrink-0 overflow-hidden border border-emerald-200">
+              {provider.profilePicture || provider.imageUrl ? (
+                <img src={provider.profilePicture || provider.imageUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-full h-full p-1.5 text-emerald-600" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-900 truncate group-hover:text-emerald-700">{provider.fullName || provider.driverName}</span>
+                <div className="flex items-center gap-0.5">
+                  <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                  <span className="text-[10px] font-bold text-gray-700">{provider.rating || '5.0'}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-gray-500">{provider.experienceYears || provider.experience || 'Experienced'} exp.</span>
+                <span className="text-[10px] font-semibold text-emerald-600">LKR {(provider.priceHalfDay || provider.pricePerDay || 0).toLocaleString()}</span>
+              </div>
+            </div>
+            <ArrowRight className="h-3 w-3 text-gray-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
