@@ -67,6 +67,7 @@ import Favorites from "./components/Favorites";
 import PaymentWallet from "./components/PaymentWallet";
 import BookingHistory from "./components/BookingHistory";
 import TouristBookings from "./components/TouristBookings";
+import MyPackages from "./components/MyPackages";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -2277,6 +2278,14 @@ function App() {
             />
           }
         />
+        <Route
+          path="/my-packages"
+          element={
+            <MyPackages
+              user={user}
+            />
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
@@ -2738,22 +2747,31 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       const fullDayLux = parsePrice(priceFullDayLuxury);
       const halfDayLux = parsePrice(priceHalfDayLuxury);
 
-      // All prices must be at least 1 LKR (minimum validation)
-      if (fullDayStd < 1) {
-        setMsg("❌ Full Day Standard price must be at least 1 LKR");
-        return;
+      // Check if vehicle types are selected
+      const hasStandardJeep = vehicleTypes && vehicleTypes.includes("Standard Safari Jeep");
+      const hasLuxuryJeep = vehicleTypes && vehicleTypes.includes("Luxury Safari Jeep");
+
+      // Compulsory price validation based on vehicle type selection
+      if (hasStandardJeep) {
+        if (!priceFullDayStandard || fullDayStd < 1) {
+          setMsg("❌ Full Day Standard price is required and must be at least 1 LKR");
+          return;
+        }
+        if (!priceHalfDayStandard || halfDayStd < 1) {
+          setMsg("❌ Half Day Standard price is required and must be at least 1 LKR");
+          return;
+        }
       }
-      if (halfDayStd < 1) {
-        setMsg("❌ Half Day Standard price must be at least 1 LKR");
-        return;
-      }
-      if (fullDayLux < 1 && formData.vehicleTypes.includes("Luxury Safari Jeep")) {
-        setMsg("❌ Full Day Luxury price must be at least 1 LKR");
-        return;
-      }
-      if (halfDayLux < 1 && formData.vehicleTypes.includes("Luxury Safari Jeep")) {
-        setMsg("❌ Half Day Luxury price must be at least 1 LKR");
-        return;
+
+      if (hasLuxuryJeep) {
+        if (!priceFullDayLuxury || fullDayLux < 1) {
+          setMsg("❌ Full Day Luxury price is required and must be at least 1 LKR");
+          return;
+        }
+        if (!priceHalfDayLuxury || halfDayLux < 1) {
+          setMsg("❌ Half Day Luxury price is required and must be at least 1 LKR");
+          return;
+        }
       }
 
       if (certificationStatus === 'non-certified') {

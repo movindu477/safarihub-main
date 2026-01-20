@@ -967,6 +967,23 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     </span>
                   </button>
 
+                  {/* My Packages */}
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      navigate('/my-packages');
+                    }}
+                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                    style={{ animationDelay: "600ms" }}
+                  >
+                    <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                      <Package className="h-5 w-5 text-gray-300" />
+                    </div>
+                    <span className="font-medium text-gray-200">
+                      My Packages
+                    </span>
+                  </button>
+
                   {/* Help & Support */}
                   <button
                     onClick={() => {

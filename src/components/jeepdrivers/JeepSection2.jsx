@@ -104,13 +104,14 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
 
   // Filter states
   const [filters, setFilters] = useState({
-    rating: '',
-    priceRange: '',
     vehicleType: '',
     languages: [],
     specialSkills: [],
-    certifications: [],
+    certification: '', // Changed from array to single value
   });
+  
+  // Sort state
+  const [sortBy, setSortBy] = useState(''); // 'price-high', 'price-low', 'a-z', 'recent', 'rating-high', 'rating-low'
 
   // Filter options
   const filterOptions = {
@@ -140,14 +141,12 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       'French', 'German', 'Chinese', 'Japanese'
     ],
     specialSkills: [
-      'Wildlife photography knowledge',
-      'Birdwatching expertise',
-      'Family-friendly tours',
-      'Private tours',
-      'Full-day safari',
-      'Half-day safari',
-      'Off-road adventures',
-      'Night safari tours'
+      'Bird identification knowledge',
+      'Tusker identification knowledge',
+      'Leopard identification knowledge',
+      'Reptile identification knowledge',
+      'Flora identification knowledge',
+      'First aid knowledge'
     ],
     certifications: [
       'Certified',
@@ -190,9 +189,15 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             totalReviews: providerData.totalReviews || 0,
             priceFullDay: providerData.priceFullDay || providerData.pricePerDay || providerData.price || providerData.dailyRate || 0,
             priceHalfDay: providerData.priceHalfDay || (providerData.pricePerDay ? providerData.pricePerDay * 0.6 : 0) || 0,
+            priceFullDayStandard: providerData.priceFullDayStandard || 0,
+            priceHalfDayStandard: providerData.priceHalfDayStandard || 0,
+            priceFullDayLuxury: providerData.priceFullDayLuxury || 0,
+            priceHalfDayLuxury: providerData.priceHalfDayLuxury || 0,
             vehicleType: Array.isArray(providerData.vehicleType) ? providerData.vehicleType : 
                         providerData.vehicleType ? [providerData.vehicleType] : ['Standard Safari Jeep'],
+            vehicleTypes: Array.isArray(providerData.vehicleTypes) ? providerData.vehicleTypes : [],
             experience: providerData.experienceYears || providerData.experience || 0,
+            createdAt: providerData.createdAt || null,
             
             // Arrays with proper fallbacks
             destinations: Array.isArray(providerData.destinations) ? providerData.destinations : 
@@ -220,9 +225,30 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             certificationStatus: providerData.certificationStatus || 'uncertified',
             certifiedAt: providerData.certifiedAt || null,
             certifiedBy: providerData.certifiedBy || null,
-
           });
         }
+      });
+
+      // Calculate starting price for each jeep (for sorting and display)
+      updatedJeeps.forEach(jeep => {
+        // Starting price based on half-day price (Standard first, then Luxury)
+        let startingPrice = 0;
+        
+        if (jeep.vehicleTypes && jeep.vehicleTypes.length > 0) {
+          // New pricing structure with separate prices
+          if (jeep.vehicleTypes.includes('Standard Safari Jeep') && jeep.priceHalfDayStandard) {
+            startingPrice = jeep.priceHalfDayStandard;
+          } else if (jeep.vehicleTypes.includes('Luxury Safari Jeep') && jeep.priceHalfDayLuxury) {
+            startingPrice = jeep.priceHalfDayLuxury;
+          }
+        }
+        
+        // Fallback to legacy pricing if new structure not available
+        if (!startingPrice) {
+          startingPrice = jeep.priceHalfDay || jeep.priceFullDay || 0;
+        }
+        
+        jeep.startingPrice = startingPrice;
       });
 
       const currentUserJeep = updatedJeeps.find(j => j.isCurrentUser);
@@ -252,9 +278,9 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     };
   }, [currentUser, loading]);
 
-  // Filter logic
+  // Filter and sort logic
   useEffect(() => {
-    console.log('🔄 Applying filters...', filters);
+    console.log('🔄 Applying filters and sorting...', filters, sortBy);
     
     let filtered = [...jeeps];
 
@@ -267,32 +293,17 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       );
     }
 
-    // Rating filter
-    if (filters.rating) {
-      const minRating = parseInt(filters.rating);
-      filtered = filtered.filter(jeep => 
-        (jeep.rating || 0) >= minRating
-      );
-    }
-
-    // Price range filter - check both full day and half day prices
-    if (filters.priceRange) {
-      const [minPrice, maxPrice] = filters.priceRange.split('-').map(Number);
-      filtered = filtered.filter(jeep => {
-        const fullDayPrice = jeep.priceFullDay || 0;
-        const halfDayPrice = jeep.priceHalfDay || 0;
-        return (fullDayPrice >= minPrice && fullDayPrice <= maxPrice) || 
-               (halfDayPrice >= minPrice && halfDayPrice <= maxPrice);
-      });
-    }
-
     // Vehicle type filter - support multiple vehicle types
     if (filters.vehicleType) {
-      filtered = filtered.filter(jeep => 
-        Array.isArray(jeep.vehicleType) 
-          ? jeep.vehicleType.some(type => type.toLowerCase() === filters.vehicleType.toLowerCase())
-          : jeep.vehicleType?.toLowerCase() === filters.vehicleType.toLowerCase()
-      );
+      filtered = filtered.filter(jeep => {
+        const vehicleTypesArray = jeep.vehicleTypes && jeep.vehicleTypes.length > 0 
+          ? jeep.vehicleTypes 
+          : (Array.isArray(jeep.vehicleType) ? jeep.vehicleType : [jeep.vehicleType]);
+        
+        return vehicleTypesArray.some(type => 
+          type && type.toLowerCase() === filters.vehicleType.toLowerCase()
+        );
+      });
     }
 
     // Languages filter
@@ -317,21 +328,41 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       );
     }
 
-    // Certifications filter - based on certification status
-    if (filters.certifications.length > 0) {
-      filtered = filtered.filter(jeep => {
-        if (filters.certifications.includes('Certified')) {
-          return jeep.certificationStatus === 'certified';
-        }
-        if (filters.certifications.includes('Uncertified')) {
-          return jeep.certificationStatus !== 'certified';
-        }
-        return false;
-      });
+    // Certification filter - based on certification status (single selection)
+    if (filters.certification) {
+      if (filters.certification === 'Certified') {
+        filtered = filtered.filter(jeep => jeep.certificationStatus === 'certified');
+      } else if (filters.certification === 'Uncertified') {
+        filtered = filtered.filter(jeep => jeep.certificationStatus !== 'certified');
+      }
     }
 
-    // If in rebooking mode, sort by: certified first, then by rating (highest first)
-    if (rebookingSuggestion) {
+    // Apply sorting
+    if (sortBy) {
+      console.log(`📊 Sorting by: ${sortBy}`);
+      filtered.sort((a, b) => {
+        switch (sortBy) {
+          case 'price-high':
+            return (b.startingPrice || 0) - (a.startingPrice || 0);
+          case 'price-low':
+            return (a.startingPrice || 0) - (b.startingPrice || 0);
+          case 'a-z':
+            return (a.driverName || '').localeCompare(b.driverName || '');
+          case 'recent':
+            // Sort by createdAt (newest first)
+            const aDate = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+            const bDate = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+            return bDate - aDate;
+          case 'rating-high':
+            return (b.rating || 0) - (a.rating || 0);
+          case 'rating-low':
+            return (a.rating || 0) - (b.rating || 0);
+          default:
+            return 0;
+        }
+      });
+    } else if (rebookingSuggestion) {
+      // If in rebooking mode and no sort selected, sort by: certified first, then by rating (highest first)
       console.log('🔄 Rebooking mode: prioritizing certified drivers with highest ratings');
       filtered.sort((a, b) => {
         // First, prioritize certified drivers
@@ -345,9 +376,9 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       });
     }
 
-    console.log('✅ Filtered results:', filtered.length);
+    console.log('✅ Filtered and sorted results:', filtered.length);
     setFilteredJeeps(filtered);
-  }, [filters, jeeps, selectedDestination, rebookingSuggestion]);
+  }, [filters, sortBy, jeeps, selectedDestination, rebookingSuggestion]);
 
   const handleFilterChange = (filterType, value) => {
     setFilters(prev => ({
@@ -496,13 +527,12 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
   // Clear filters completely
   const clearFilters = () => {
     setFilters({
-      rating: '',
-      priceRange: '',
       vehicleType: '',
       languages: [],
       specialSkills: [],
-      certifications: [],
+      certification: '',
     });
+    setSortBy('');
     
     // Clear destination filter if callback is provided
     if (onClearDestination) {
@@ -510,7 +540,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     }
 
     // The useEffect will automatically update filteredJeeps when filters change
-    console.log('🧹 All filters cleared, showing all jeeps:', jeeps.length);
+    console.log('🧹 All filters and sorting cleared, showing all jeeps:', jeeps.length);
   };
 
   // Format price with commas
@@ -694,42 +724,24 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
           </div>
 
           {/* Single Row Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Ratings Filter */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Sort By Filter */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Rating
+                Sort By
               </label>
               <select
-                value={filters.rating}
-                onChange={(e) => handleFilterChange('rating', e.target.value)}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
               >
-                <option value="">All Ratings</option>
-                {filterOptions.ratings.map(rating => (
-                  <option key={rating.value} value={rating.value}>
-                    {rating.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Price Range Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Price Range
-              </label>
-              <select
-                value={filters.priceRange}
-                onChange={(e) => handleFilterChange('priceRange', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-              >
-                <option value="">All Prices</option>
-                {filterOptions.priceRanges.map(range => (
-                  <option key={range.value} value={range.value}>
-                    {range.label}
-                  </option>
-                ))}
+                <option value="">Default (Certified First)</option>
+                <option value="price-high">Price: High to Low</option>
+                <option value="price-low">Price: Low to High</option>
+                <option value="a-z">Name: A-Z</option>
+                <option value="recent">Recently Joined</option>
+                <option value="rating-high">Highest Rated</option>
+                <option value="rating-low">Lowest Rated</option>
               </select>
             </div>
 
@@ -749,7 +761,6 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                 ))}
               </select>
             </div>
-
           </div>
 
           {/* Multi-select Filters */}
@@ -800,27 +811,23 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
               </div>
             </div>
 
-            {/* Certifications Filter */}
+            {/* Certification Filter - Dropdown */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📜 Certifications
+                📜 Certification
               </label>
-              <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-white">
+              <select
+                value={filters.certification}
+                onChange={(e) => handleFilterChange('certification', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+              >
+                <option value="">Select Certification</option>
                 {filterOptions.certifications.map(cert => (
-                  <div key={cert} className="flex items-center mb-2">
-                    <input
-                      type="checkbox"
-                      id={`cert-${cert}`}
-                      checked={filters.certifications.includes(cert)}
-                      onChange={() => handleMultiSelectChange('certifications', cert)}
-                      className="mr-3 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`cert-${cert}`} className="text-sm text-gray-700 flex-1">
-                      {cert}
-                    </label>
-                  </div>
+                  <option key={cert} value={cert}>
+                    {cert}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           </div>
         </div>
@@ -958,22 +965,69 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                             </p>
                           </div>
 
-                          {/* Price */}
+                          {/* Detailed Pricing */}
                           <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-gray-700 mb-2">Pricing:</p>
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">Full Day:</span>
-                                <span className="text-sm font-bold text-green-600">
-                                  LKR {jeep.priceFullDay ? new Intl.NumberFormat('en-LK').format(jeep.priceFullDay) : 'Contact'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">Half Day:</span>
-                                <span className="text-sm font-bold text-green-600">
-                                  LKR {jeep.priceHalfDay ? new Intl.NumberFormat('en-LK').format(jeep.priceHalfDay) : 'Contact'}
-                                </span>
-                              </div>
+                            <p className="text-xs font-semibold text-gray-700 mb-2">Pricing Details:</p>
+                            <div className="space-y-2">
+                              {/* Standard Safari Jeep Pricing */}
+                              {jeep.vehicleTypes?.includes('Standard Safari Jeep') && 
+                               (jeep.priceHalfDayStandard > 0 || jeep.priceFullDayStandard > 0 || jeep.priceHalfDay > 0 || jeep.priceFullDay > 0) && (
+                                <div className="border-b border-green-200 pb-2">
+                                  <p className="text-xs font-medium text-green-700 mb-1">Standard Safari Jeep:</p>
+                                  <div className="space-y-0.5">
+                                    {(jeep.priceHalfDayStandard > 0 || jeep.priceHalfDay > 0) && (
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600">Half Day:</span>
+                                        <span className="font-bold text-green-600">
+                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceHalfDayStandard || jeep.priceHalfDay)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {(jeep.priceFullDayStandard > 0 || jeep.priceFullDay > 0) && (
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600">Full Day:</span>
+                                        <span className="font-bold text-green-600">
+                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceFullDayStandard || jeep.priceFullDay)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Luxury Safari Jeep Pricing */}
+                              {jeep.vehicleTypes?.includes('Luxury Safari Jeep') && 
+                               (jeep.priceHalfDayLuxury > 0 || jeep.priceFullDayLuxury > 0) && (
+                                <div className="pt-1">
+                                  <p className="text-xs font-medium text-yellow-700 mb-1">Luxury Safari Jeep:</p>
+                                  <div className="space-y-0.5">
+                                    {jeep.priceHalfDayLuxury > 0 && (
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600">Half Day:</span>
+                                        <span className="font-bold text-yellow-600">
+                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceHalfDayLuxury)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {jeep.priceFullDayLuxury > 0 && (
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600">Full Day:</span>
+                                        <span className="font-bold text-yellow-600">
+                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceFullDayLuxury)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Fallback if no prices available */}
+                              {(!jeep.vehicleTypes?.includes('Standard Safari Jeep') || 
+                                (jeep.priceHalfDayStandard <= 0 && jeep.priceFullDayStandard <= 0 && jeep.priceHalfDay <= 0 && jeep.priceFullDay <= 0)) &&
+                               (!jeep.vehicleTypes?.includes('Luxury Safari Jeep') || 
+                                (jeep.priceHalfDayLuxury <= 0 && jeep.priceFullDayLuxury <= 0)) && (
+                                <p className="text-xs text-gray-500 text-center">Contact for pricing</p>
+                              )}
                             </div>
                           </div>
 
@@ -1116,22 +1170,69 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
                             </p>
                           </div>
 
-                          {/* Price */}
+                          {/* Detailed Pricing */}
                           <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-gray-700 mb-2">Pricing:</p>
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">Full Day:</span>
-                                <span className="text-sm font-bold text-green-600">
-                                  LKR {jeep.priceFullDay ? new Intl.NumberFormat('en-LK').format(jeep.priceFullDay) : 'Contact'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">Half Day:</span>
-                                <span className="text-sm font-bold text-green-600">
-                                  LKR {jeep.priceHalfDay ? new Intl.NumberFormat('en-LK').format(jeep.priceHalfDay) : 'Contact'}
-                                </span>
-                              </div>
+                            <p className="text-xs font-semibold text-gray-700 mb-2">Pricing Details:</p>
+                            <div className="space-y-2">
+                              {/* Standard Safari Jeep Pricing */}
+                              {jeep.vehicleTypes?.includes('Standard Safari Jeep') && 
+                               (jeep.priceHalfDayStandard > 0 || jeep.priceFullDayStandard > 0 || jeep.priceHalfDay > 0 || jeep.priceFullDay > 0) && (
+                                <div className="border-b border-green-200 pb-2">
+                                  <p className="text-xs font-medium text-green-700 mb-1">Standard Safari Jeep:</p>
+                                  <div className="space-y-0.5">
+                                    {(jeep.priceHalfDayStandard > 0 || jeep.priceHalfDay > 0) && (
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600">Half Day:</span>
+                                        <span className="font-bold text-green-600">
+                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceHalfDayStandard || jeep.priceHalfDay)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {(jeep.priceFullDayStandard > 0 || jeep.priceFullDay > 0) && (
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600">Full Day:</span>
+                                        <span className="font-bold text-green-600">
+                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceFullDayStandard || jeep.priceFullDay)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Luxury Safari Jeep Pricing */}
+                              {jeep.vehicleTypes?.includes('Luxury Safari Jeep') && 
+                               (jeep.priceHalfDayLuxury > 0 || jeep.priceFullDayLuxury > 0) && (
+                                <div className="pt-1">
+                                  <p className="text-xs font-medium text-yellow-700 mb-1">Luxury Safari Jeep:</p>
+                                  <div className="space-y-0.5">
+                                    {jeep.priceHalfDayLuxury > 0 && (
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600">Half Day:</span>
+                                        <span className="font-bold text-yellow-600">
+                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceHalfDayLuxury)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {jeep.priceFullDayLuxury > 0 && (
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-600">Full Day:</span>
+                                        <span className="font-bold text-yellow-600">
+                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceFullDayLuxury)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Fallback if no prices available */}
+                              {(!jeep.vehicleTypes?.includes('Standard Safari Jeep') || 
+                                (jeep.priceHalfDayStandard <= 0 && jeep.priceFullDayStandard <= 0 && jeep.priceHalfDay <= 0 && jeep.priceFullDay <= 0)) &&
+                               (!jeep.vehicleTypes?.includes('Luxury Safari Jeep') || 
+                                (jeep.priceHalfDayLuxury <= 0 && jeep.priceFullDayLuxury <= 0)) && (
+                                <p className="text-xs text-gray-500 text-center">Contact for pricing</p>
+                              )}
                             </div>
                           </div>
 

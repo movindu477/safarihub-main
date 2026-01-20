@@ -162,9 +162,30 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     return date < today;
   };
 
+  const [lastClickTime, setLastClickTime] = useState({});
+  
   const handleDateClick = (date) => {
     if (!date || isDatePast(date)) return;
     if (!isDateAvailable(date)) return; // Don't allow selection of unavailable dates
+    
+    // Handle double-click to unselect
+    const dateKey = date.toDateString();
+    const now = Date.now();
+    const lastClick = lastClickTime[dateKey] || 0;
+    
+    if (now - lastClick < 300) { // Double click within 300ms
+      // Double-clicked - unselect if already selected
+      const isSelected = selectedDates.some(d => d.toDateString() === dateKey);
+      if (isSelected) {
+        // Remove the date from selection
+        const newDates = selectedDates.filter(d => d.toDateString() !== dateKey);
+        selectedDates.length = 0;
+        newDates.forEach(d => selectedDates.push(d));
+        return;
+      }
+    }
+    
+    setLastClickTime(prev => ({ ...prev, [dateKey]: now }));
     onDateSelect(date);
   };
 
@@ -182,14 +203,21 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     }
 
     if (selected) {
-      return `${baseClasses} bg-black text-white ring-2 ring-yellow-400 shadow-lg`;
+      const dateString = date.toDateString();
+      const dateType = selectedDatesWithType[dateString] || 'full-day';
+      // Highlight selected dates in red (full day) or yellow (half day) without outline
+      if (dateType === 'half-day') {
+        return `${baseClasses} bg-yellow-500 text-white shadow-lg`;
+      } else {
+        return `${baseClasses} bg-red-600 text-white shadow-lg`;
+      }
     }
 
     // Handle availability statuses
     if (status === 'busy') {
-      return `${baseClasses} bg-red-500 text-white hover:bg-red-600`;
+      return `${baseClasses} bg-red-600 text-white hover:bg-red-700`; // Full Day = Red
     } else if (status === 'halfday') {
-      return `${baseClasses} bg-yellow-500 text-white hover:bg-yellow-600`;
+      return `${baseClasses} bg-yellow-500 text-white hover:bg-yellow-600`; // Half Day = Yellow
     } else if (status === 'unavailable') {
       return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
     } else {
@@ -228,8 +256,8 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
           <span className="text-gray-300">Available</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span className="text-gray-300">Busy</span>
+          <div className="w-3 h-3 bg-red-600 rounded"></div>
+          <span className="text-gray-300">Full Day</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <div className="w-3 h-3 bg-yellow-500 rounded"></div>
@@ -288,56 +316,6 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
           );
         })}
       </div>
-
-      {selectedDates.length > 0 && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
-          <h4 className="font-bold text-black mb-3">Selected Dates:</h4>
-          <div className="space-y-2">
-            {selectedDates.map((date, index) => {
-              const dateString = date.toDateString();
-              const dateType = selectedDatesWithType?.[dateString] || 'full-day';
-              return (
-                <div key={index} className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-200">
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-700">
-                      {date.toLocaleDateString()}
-                    </span>
-                    <span className="ml-2 text-xs text-black font-semibold">
-                      ({dateType === 'half-day' ? 'Half Day' : 'Full Day'})
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
-                      }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
-                        ? 'bg-black text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600'
-                        }`}
-                    >
-                      Half Day
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
-                      }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
-                        ? 'bg-black text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600'
-                        }`}
-                    >
-                      Full Day
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -356,15 +334,24 @@ const BookingFormModal = ({
   driver,
   selectedDates,
   selectedDatesWithType,
-  onDateTypeChange
+  onDateTypeChange,
+  selectedPackage
 }) => {
-  const steps = [
+  // Filter out step 4 (Additional Requests) if booking a package
+  const allSteps = [
     { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
     { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
     { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
     { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
     { number: 5, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
   ];
+  
+  const steps = selectedPackage 
+    ? allSteps.filter(step => step.number !== 4).map((step, index) => ({
+        ...step,
+        number: index + 1 // Re-number steps
+      }))
+    : allSteps;
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -843,8 +830,8 @@ const BookingFormModal = ({
             </div>
           )}
 
-          {/* Step 4: Additional Requests - Abbreviated */}
-          {currentStep === 4 && (
+          {/* Step 4: Additional Requests - Abbreviated (Hidden for package bookings) */}
+          {currentStep === 4 && !selectedPackage && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Package className="h-5 w-5 text-black" />
@@ -1068,6 +1055,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const [packages, setPackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
   // Old chat state removed - using Chat component instead
   // const [message, setMessage] = useState("");
   // const [messages, setMessages] = useState([]);
@@ -1082,6 +1071,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [isBooking, setIsBooking] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [selectedPackage, setSelectedPackage] = useState(null);
+  const [selectedVehicleType, setSelectedVehicleType] = useState('');
+  const [dateTypeMenuDate, setDateTypeMenuDate] = useState(null);
+  const [showTimeMenu, setShowTimeMenu] = useState(false);
+  const [halfDayTimes, setHalfDayTimes] = useState({}); // {dateString: 'morning' | 'evening'}
   const [formErrors, setFormErrors] = useState({});
   const [bookingFormData, setBookingFormData] = useState({
     // Personal Details
@@ -1227,16 +1221,43 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const calculateTotalPrice = () => {
     if (!driver || selectedDates.length === 0) return 0;
     
-    // Calculate base price from dates
-    const dailyPrice = driver.pricePerDay || 0;
     let total = 0;
+    
+    // If package is selected, use package prices
+    if (selectedPackage) {
+      selectedDates.forEach(date => {
+        const dateString = date.toDateString();
+        const dateType = selectedDatesWithType[dateString] || 'full-day';
+        total += dateType === 'half-day' ? selectedPackage.priceHalfDay : selectedPackage.priceFullDay;
+      });
+      // No add-ons for package bookings
+      return total;
+    }
+    
+    // Regular booking - use vehicle-specific prices if available
     selectedDates.forEach(date => {
       const dateString = date.toDateString();
       const dateType = selectedDatesWithType[dateString] || 'full-day';
-      total += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
+      
+      // Determine price based on vehicle type
+      let dayPrice = 0;
+      if (selectedVehicleType === 'Standard Safari Jeep') {
+        dayPrice = dateType === 'half-day' 
+          ? (driver.priceHalfDayStandard || driver.pricePerDay * 0.6 || 0)
+          : (driver.priceFullDayStandard || driver.pricePerDay || 0);
+      } else if (selectedVehicleType === 'Luxury Safari Jeep') {
+        dayPrice = dateType === 'half-day' 
+          ? (driver.priceHalfDayLuxury || driver.pricePerDay * 0.8 || 0)
+          : (driver.priceFullDayLuxury || driver.pricePerDay * 1.5 || 0);
+      } else {
+        // Fallback to legacy pricing
+        dayPrice = dateType === 'half-day' ? (driver.pricePerDay * 0.6 || 0) : (driver.pricePerDay || 0);
+      }
+      
+      total += dayPrice;
     });
     
-    // Add add-ons prices
+    // Add add-ons prices (only for regular bookings)
     if (bookingFormData.needsBinoculars) total += 500;
     if (bookingFormData.needsChildSeat) total += 1000;
     if (bookingFormData.needsWater) total += 300;
@@ -1465,12 +1486,23 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
       // Calculate total price based on half-day/full-day
       let totalPrice = 0;
-      selectedDates.forEach(date => {
-        const dateString = date.toDateString();
-        const dateType = selectedDatesWithType[dateString] || 'full-day';
-        const dailyPrice = driver.pricePerDay || 0;
-        totalPrice += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
-      });
+      
+      // If package booking, use package prices
+      if (selectedPackage) {
+        selectedDates.forEach(date => {
+          const dateString = date.toDateString();
+          const dateType = selectedDatesWithType[dateString] || 'full-day';
+          totalPrice += dateType === 'half-day' ? selectedPackage.priceHalfDay : selectedPackage.priceFullDay;
+        });
+      } else {
+        // Regular booking - use driver's regular prices
+        selectedDates.forEach(date => {
+          const dateString = date.toDateString();
+          const dateType = selectedDatesWithType[dateString] || 'full-day';
+          const dailyPrice = driver.pricePerDay || 0;
+          totalPrice += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
+        });
+      }
 
       const datesString = selectedDates.map(d => {
         const dateType = selectedDatesWithType[d.toDateString()] || 'full-day';
@@ -1516,6 +1548,15 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         numberOfDays: Number(selectedDates.length),
         serviceType: driver.serviceType || 'Jeep Driver',
         status: 'pending',
+        // Vehicle type information (if applicable)
+        selectedVehicleType: selectedVehicleType || null,
+        halfDayTimes: halfDayTimes || {},
+        // Package booking information (if applicable)
+        isPackageBooking: !!selectedPackage,
+        packageId: selectedPackage?.id || null,
+        packageTitle: selectedPackage?.title || null,
+        packagePriceFullDay: selectedPackage?.priceFullDay || null,
+        packagePriceHalfDay: selectedPackage?.priceHalfDay || null,
         // Include all booking form data
         ...bookingFormData,
         createdAt: serverTimestamp(),
@@ -1920,6 +1961,52 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     }
   }, [driverId]);
 
+  // Fetch packages when packages tab is active
+  useEffect(() => {
+    const fetchPackages = async () => {
+      if (activeTab === 'packages' && driverId) {
+        setLoadingPackages(true);
+        try {
+          const q = query(
+            collection(db, 'servicePackages'),
+            where('providerId', '==', driverId)
+          );
+          const querySnapshot = await getDocs(q);
+          const packagesData = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setPackages(packagesData);
+        } catch (error) {
+          console.error('Error fetching packages:', error);
+        } finally {
+          setLoadingPackages(false);
+        }
+      }
+    };
+
+    fetchPackages();
+  }, [activeTab, driverId]);
+
+  // Load selected package from sessionStorage when booking tab is active
+  useEffect(() => {
+    if (activeTab === 'booking') {
+      const packageData = sessionStorage.getItem('selectedPackage');
+      if (packageData) {
+        try {
+          const pkg = JSON.parse(packageData);
+          setSelectedPackage(pkg);
+          console.log('📦 Package booking mode:', pkg.title);
+        } catch (error) {
+          console.error('Error parsing package data:', error);
+          setSelectedPackage(null);
+        }
+      } else {
+        setSelectedPackage(null);
+      }
+    }
+  }, [activeTab]);
+
   // Old conversation initialization removed - using Chat component instead
   // const initializeConversation = async () => {
   //   if (!currentUser || !driverId || !driver) return;
@@ -2186,6 +2273,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         selectedDates={selectedDates}
         selectedDatesWithType={selectedDatesWithType}
         onDateTypeChange={handleDateTypeChange}
+        selectedPackage={selectedPackage}
       />
 
       <GlobalNotificationBell
@@ -2312,6 +2400,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     Overview
                   </button>
                   <button
+                    onClick={() => setActiveTab('packages')}
+                    className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'packages'
+                      ? 'border-black text-black bg-white'
+                      : 'border-transparent text-gray-600 hover:text-black'
+                      }`}
+                  >
+                    <span className="hidden sm:inline">Service Packages</span>
+                    <span className="sm:hidden">Packages</span>
+                  </button>
+                  <button
                     onClick={() => setActiveTab('reviews')}
                     className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'reviews'
                       ? 'border-black text-black bg-white'
@@ -2360,6 +2458,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <div className="space-y-2 sm:space-y-2.5 md:space-y-3 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
+                    {/* About - Service Provider Bio */}
+                    {driver.description && (
+                      <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <h3 className="font-bold text-black mb-1 text-xs sm:text-sm md:text-base">About</h3>
+                        <p className="text-gray-700 leading-relaxed text-xs sm:text-sm line-clamp-2">
+                          {driver.description}
+                        </p>
+                      </div>
+                    )}
+
                     {/* Experience */}
                     <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                       <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
@@ -2373,78 +2481,149 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       </div>
                     </div>
 
-                    {/* Description */}
-                    {driver.description && (
-                      <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <h3 className="font-bold text-black mb-1 text-xs sm:text-sm md:text-base">About</h3>
-                        <p className="text-gray-700 leading-relaxed text-xs sm:text-sm line-clamp-2">
-                          {driver.description}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Vehicle Type */}
-                    {driver.vehicleType && (
+                    {/* Vehicle Type(s) */}
+                    {((driver.vehicleTypes && driver.vehicleTypes.length > 0) || driver.vehicleType) && (
                       <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <h3 className="font-bold text-black mb-1 flex items-center text-xs sm:text-sm md:text-base">
                           <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
                             <Car className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                           </div>
-                          Vehicle Type
+                          Vehicle Type{driver.vehicleTypes && driver.vehicleTypes.length > 1 ? 's' : ''}
                         </h3>
-                        <p className="text-gray-700 text-sm sm:text-base md:text-lg font-bold mt-1">{driver.vehicleType}</p>
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1">
+                          {driver.vehicleTypes && driver.vehicleTypes.length > 0 ? (
+                            driver.vehicleTypes.map((type, index) => (
+                              <span
+                                key={index}
+                                className="bg-emerald-100 text-emerald-800 px-2 sm:px-2.5 py-1 rounded-md text-xs sm:text-sm border border-emerald-300 font-semibold"
+                              >
+                                {type}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-gray-700 text-sm sm:text-base md:text-lg font-bold">{driver.vehicleType}</p>
+                          )}
+                        </div>
                       </div>
                     )}
 
-                    {/* Pricing */}
-                    {driver.pricePerDay && (
+                    {/* Pricing - Dynamic based on Vehicle Types and Certification */}
+                    {(driver.priceFullDayStandard > 0 || driver.priceHalfDayStandard > 0 || 
+                      driver.priceFullDayLuxury > 0 || driver.priceHalfDayLuxury > 0 || 
+                      driver.pricePerDay > 0) && (
                       <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <h3 className="font-bold text-black mb-2 sm:mb-2.5 flex items-center text-xs sm:text-sm md:text-base">
                           <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
                             <DollarSign className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                           </div>
                           Rates
+                          {driver.certificationStatus === 'certified' && driver.certificationApproved && (
+                            <span className="ml-2 text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium border border-yellow-300">
+                              Certified Rates
+                            </span>
+                          )}
                         </h3>
                         <div className="space-y-1.5 sm:space-y-2">
-                          {/* Full Day Price */}
-                          <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
-                            <div className="flex-1 min-w-0 pr-2">
-                              <span className="text-black font-bold text-xs sm:text-sm block">Full Day Safari:</span>
-                              <p className="text-xs text-gray-600 mt-0.5">Full day safari tours</p>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <span className="text-sm sm:text-base md:text-lg font-black text-black">
-                                LKR {driver.pricePerDay.toLocaleString()}
-                              </span>
-                              <span className="text-xs font-semibold text-gray-600 block">/day</span>
-                            </div>
-                          </div>
-                          {/* Half Day Price */}
-                          <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
-                            <div className="flex-1 min-w-0 pr-2">
-                              <span className="text-black font-bold text-xs sm:text-sm block">Half Day Safari:</span>
-                              <p className="text-xs text-gray-600 mt-0.5">Half day safari tours</p>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <span className="text-sm sm:text-base md:text-lg font-black text-black">
-                                LKR {Math.round(driver.pricePerDay * 0.6).toLocaleString()}
-                              </span>
-                              <span className="text-xs font-semibold text-gray-600 block">/half day</span>
-                            </div>
-                          </div>
-                          {driver.pricePerHour && (
-                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
-                              <div className="flex-1 min-w-0 pr-2">
-                                <span className="text-black font-bold text-xs sm:text-sm block">Price per hour:</span>
-                                <p className="text-xs text-gray-600 mt-0.5">Hourly rate</p>
+                          {/* Standard Safari Jeep Rates */}
+                          {driver.vehicleTypes && driver.vehicleTypes.includes('Standard Safari Jeep') && (
+                            <>
+                              {/* Standard Full Day */}
+                              {driver.priceFullDayStandard > 0 && (
+                                <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                                  <div className="flex-1 min-w-0 pr-2">
+                                    <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Standard Full Day:</span>
+                                    <p className="text-xs text-emerald-600 mt-0.5">Full day safari (Standard Jeep)</p>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
+                                      LKR {driver.priceFullDayStandard.toLocaleString()}
+                                    </span>
+                                    <span className="text-xs font-semibold text-emerald-600 block">/day</span>
+                                  </div>
+                                </div>
+                              )}
+                              {/* Standard Half Day */}
+                              {driver.priceHalfDayStandard > 0 && (
+                                <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                                  <div className="flex-1 min-w-0 pr-2">
+                                    <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Standard Half Day:</span>
+                                    <p className="text-xs text-emerald-600 mt-0.5">Half day safari (Standard Jeep)</p>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
+                                      LKR {driver.priceHalfDayStandard.toLocaleString()}
+                                    </span>
+                                    <span className="text-xs font-semibold text-emerald-600 block">/half day</span>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          
+                          {/* Luxury Safari Jeep Rates */}
+                          {driver.vehicleTypes && driver.vehicleTypes.includes('Luxury Safari Jeep') && (
+                            <>
+                              {/* Luxury Full Day */}
+                              {driver.priceFullDayLuxury > 0 && (
+                                <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                  <div className="flex-1 min-w-0 pr-2">
+                                    <span className="text-yellow-800 font-bold text-xs sm:text-sm block">Luxury Full Day:</span>
+                                    <p className="text-xs text-yellow-600 mt-0.5">Full day safari (Luxury Jeep)</p>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <span className="text-sm sm:text-base md:text-lg font-black text-yellow-700">
+                                      LKR {driver.priceFullDayLuxury.toLocaleString()}
+                                    </span>
+                                    <span className="text-xs font-semibold text-yellow-600 block">/day</span>
+                                  </div>
+                                </div>
+                              )}
+                              {/* Luxury Half Day */}
+                              {driver.priceHalfDayLuxury > 0 && (
+                                <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                  <div className="flex-1 min-w-0 pr-2">
+                                    <span className="text-yellow-800 font-bold text-xs sm:text-sm block">Luxury Half Day:</span>
+                                    <p className="text-xs text-yellow-600 mt-0.5">Half day safari (Luxury Jeep)</p>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <span className="text-sm sm:text-base md:text-lg font-black text-yellow-700">
+                                      LKR {driver.priceHalfDayLuxury.toLocaleString()}
+                                    </span>
+                                    <span className="text-xs font-semibold text-yellow-600 block">/half day</span>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {/* Legacy Pricing (Fallback for old data) */}
+                          {driver.pricePerDay > 0 && !driver.priceFullDayStandard && !driver.priceHalfDayStandard && (
+                            <>
+                              <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <span className="text-black font-bold text-xs sm:text-sm block">Full Day Safari:</span>
+                                  <p className="text-xs text-gray-600 mt-0.5">Full day safari tours</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <span className="text-sm sm:text-base md:text-lg font-black text-black">
+                                    LKR {driver.pricePerDay.toLocaleString()}
+                                  </span>
+                                  <span className="text-xs font-semibold text-gray-600 block">/day</span>
+                                </div>
                               </div>
-                              <div className="text-right flex-shrink-0">
-                                <span className="text-xs sm:text-sm md:text-base font-black text-black">
-                                  LKR {driver.pricePerHour.toLocaleString()}
-                                </span>
-                                <span className="text-xs font-semibold text-gray-600 block">/hour</span>
+                              <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-300">
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <span className="text-black font-bold text-xs sm:text-sm block">Half Day Safari:</span>
+                                  <p className="text-xs text-gray-600 mt-0.5">Half day safari tours</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <span className="text-sm sm:text-base md:text-lg font-black text-black">
+                                    LKR {Math.round(driver.pricePerDay * 0.6).toLocaleString()}
+                                  </span>
+                                  <span className="text-xs font-semibold text-gray-600 block">/half day</span>
+                                </div>
                               </div>
-                            </div>
+                            </>
                           )}
                         </div>
                       </div>
@@ -2479,7 +2658,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Destinations Covered</h3>
+                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Destination Covered</h3>
                           <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {driver.destinations.map((destination, index) => (
                               <span
@@ -2540,6 +2719,112 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   </div>
                 )}
 
+                {/* Service Packages Tab */}
+                {activeTab === 'packages' && (
+                  <div className="lg:h-full lg:overflow-y-auto">
+                    {loadingPackages ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="text-gray-600">Loading packages...</div>
+                      </div>
+                    ) : packages.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <Package className="h-16 w-16 text-gray-400 mb-4" />
+                        <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                          No Packages Available
+                        </h3>
+                        <p className="text-gray-500">
+                          This service provider hasn't created any packages yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <h2 className="text-2xl font-bold text-black mb-4">Available Service Packages</h2>
+                        {packages.map((pkg) => (
+                          <div
+                            key={pkg.id}
+                            className="bg-white border border-gray-300 rounded-lg p-4 hover:shadow-lg transition-shadow"
+                          >
+                            {/* Package Header */}
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <h3 className="text-xl font-bold text-black mb-1">{pkg.title}</h3>
+                                <p className="text-gray-600 text-sm">{pkg.description}</p>
+                              </div>
+                              <div className="flex-shrink-0 ml-4">
+                                <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2 text-right">
+                                  <p className="text-xs text-emerald-700 font-medium">Full Day</p>
+                                  <p className="text-lg font-bold text-emerald-800">
+                                    LKR {pkg.priceFullDay?.toLocaleString()}
+                                  </p>
+                                </div>
+                                <div className="bg-blue-100 border border-blue-300 rounded-lg px-3 py-2 text-right mt-2">
+                                  <p className="text-xs text-blue-700 font-medium">Half Day</p>
+                                  <p className="text-lg font-bold text-blue-800">
+                                    LKR {pkg.priceHalfDay?.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Package Includes */}
+                            {pkg.includes && pkg.includes.length > 0 && (
+                              <div className="mb-3">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                  Package Includes:
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {pkg.includes.map((item, index) => (
+                                    <span
+                                      key={index}
+                                      className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs border border-emerald-200 font-medium"
+                                    >
+                                      ✓ {item}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Rules and Regulations */}
+                            {pkg.rulesAndRegulations && (
+                              <div className="mb-3">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-blue-600" />
+                                  Rules & Regulations:
+                                </h4>
+                                <p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                  {pkg.rulesAndRegulations}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Book Package Button - Only for logged-in tourists */}
+                            {currentUser && userRole === 'tourist' && (
+                              <button
+                                onClick={() => {
+                                  // Store selected package in session storage
+                                  sessionStorage.setItem('selectedPackage', JSON.stringify({
+                                    id: pkg.id,
+                                    title: pkg.title,
+                                    priceFullDay: pkg.priceFullDay,
+                                    priceHalfDay: pkg.priceHalfDay,
+                                    providerId: driverId
+                                  }));
+                                  setActiveTab('booking');
+                                }}
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+                              >
+                                <CalendarIcon className="h-5 w-5" />
+                                Book This Package
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {activeTab === 'reviews' && (
                   <div className="lg:h-full lg:overflow-y-auto">
@@ -2558,16 +2843,137 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
                       {/* Calendar */}
                       <div className="min-h-0">
+                        {/* Vehicle Type Selection */}
+                        {!selectedPackage && (
+                          <div className="mb-4">
+                            <label className="block text-sm font-semibold text-black mb-2">
+                              Select Vehicle Type *
+                            </label>
+                            <select
+                              value={selectedVehicleType}
+                              onChange={(e) => setSelectedVehicleType(e.target.value)}
+                              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-black focus:outline-none focus:border-emerald-500"
+                            >
+                              <option value="">Choose a vehicle type</option>
+                              {driver?.vehicleTypes && driver.vehicleTypes.length > 0 ? (
+                                driver.vehicleTypes.map((type, index) => (
+                                  <option key={index} value={type}>
+                                    {type}
+                                  </option>
+                                ))
+                              ) : (
+                                <>
+                                  <option value="Standard Safari Jeep">Standard Safari Jeep</option>
+                                  <option value="Luxury Safari Jeep">Luxury Safari Jeep</option>
+                                </>
+                              )}
+                            </select>
+                            {selectedVehicleType && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                ✓ Selected: {selectedVehicleType}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
                         <h3 className="font-semibold text-black mb-2 sm:mb-3 md:mb-4 text-xs sm:text-sm md:text-base">Select Your Dates</h3>
-                        <div className="overflow-y-auto max-h-[300px] sm:max-h-[350px] md:max-h-[400px]">
+                        <div className="overflow-y-auto max-h-[300px] sm:max-h-[350px] md:max-h-[400px] relative">
                           <DatePickerCalendar
                             selectedDates={selectedDates}
-                            onDateSelect={handleDateSelect}
+                            onDateSelect={(date) => {
+                              if (!selectedPackage && !selectedVehicleType) {
+                                alert('Please select a vehicle type first');
+                                return;
+                              }
+                              setDateTypeMenuDate(date);
+                            }}
                             selectedDatesWithType={selectedDatesWithType}
                             availabilityCalendar={driver?.availabilityCalendar}
                             availableDates={driver?.availableDates}
                             onDateTypeChange={handleDateTypeChange}
                           />
+
+                          {/* Date Type Menu (Full Day / Half Day) - Smaller Size */}
+                          {dateTypeMenuDate && (
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-3 min-w-[200px]">
+                              <h4 className="text-xs font-semibold text-black mb-2 text-center">
+                                {dateTypeMenuDate.toLocaleDateString()}
+                              </h4>
+                              <div className="space-y-1.5">
+                                <button
+                                  onClick={() => {
+                                    handleDateSelect(dateTypeMenuDate);
+                                    handleDateTypeChange(dateTypeMenuDate, 'full-day');
+                                    setDateTypeMenuDate(null);
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+                                >
+                                  Full Day
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setShowTimeMenu(true);
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
+                                >
+                                  Half Day
+                                </button>
+                                <button
+                                  onClick={() => setDateTypeMenuDate(null)}
+                                  className="w-full px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+
+                              {/* Time Menu (Morning / Evening) - appears if Half Day selected */}
+                              {showTimeMenu && (
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                  <h4 className="text-xs font-semibold text-black mb-1.5 text-center">
+                                    Select Time
+                                  </h4>
+                                  <div className="space-y-1.5">
+                                    <button
+                                      onClick={() => {
+                                        handleDateSelect(dateTypeMenuDate);
+                                        handleDateTypeChange(dateTypeMenuDate, 'half-day');
+                                        setHalfDayTimes(prev => ({
+                                          ...prev,
+                                          [dateTypeMenuDate.toDateString()]: 'morning'
+                                        }));
+                                        setDateTypeMenuDate(null);
+                                        setShowTimeMenu(false);
+                                      }}
+                                      className="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition-colors"
+                                    >
+                                      ☀️ Morning
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        handleDateSelect(dateTypeMenuDate);
+                                        handleDateTypeChange(dateTypeMenuDate, 'half-day');
+                                        setHalfDayTimes(prev => ({
+                                          ...prev,
+                                          [dateTypeMenuDate.toDateString()]: 'evening'
+                                        }));
+                                        setDateTypeMenuDate(null);
+                                        setShowTimeMenu(false);
+                                      }}
+                                      className="w-full px-3 py-1.5 bg-yellow-700 hover:bg-yellow-800 text-white rounded text-xs font-medium transition-colors"
+                                    >
+                                      🌙 Evening
+                                    </button>
+                                    <button
+                                      onClick={() => setShowTimeMenu(false)}
+                                      className="w-full px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+                                    >
+                                      Back
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -2582,6 +2988,28 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             </p>
                           ) : (
                             <div className="space-y-2 sm:space-y-3">
+                              {/* Package Information */}
+                              {selectedPackage && (
+                                <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2 sm:p-2.5 mb-3">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Package className="h-4 w-4 text-emerald-600" />
+                                    <span className="text-emerald-800 font-semibold text-xs sm:text-sm">Package Booking</span>
+                                  </div>
+                                  <p className="text-emerald-700 text-xs font-medium">{selectedPackage.title}</p>
+                                  <p className="text-emerald-600 text-xs mt-1">All amenities included</p>
+                                </div>
+                              )}
+
+                              {/* Vehicle Type Information */}
+                              {selectedVehicleType && !selectedPackage && (
+                                <div className="bg-blue-50 border border-blue-300 rounded-lg p-2 sm:p-2.5 mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <Car className="h-4 w-4 text-blue-600" />
+                                    <span className="text-blue-800 font-semibold text-xs sm:text-sm">{selectedVehicleType}</span>
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-700 text-xs sm:text-sm">Selected dates:</span>
                                 <span className="font-medium text-black text-xs sm:text-sm">{selectedDates.length} day(s)</span>
@@ -2592,11 +3020,39 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 {selectedDates.map((date, index) => {
                                   const dateString = date.toDateString();
                                   const dateType = selectedDatesWithType[dateString] || 'full-day';
-                                  const dayPrice = dateType === 'half-day' ? (driver.pricePerDay || 0) * 0.6 : (driver.pricePerDay || 0);
+                                  const timeOfDay = halfDayTimes[dateString] || '';
+                                  
+                                  // Calculate price based on booking type
+                                  let dayPrice;
+                                  if (selectedPackage) {
+                                    dayPrice = dateType === 'half-day' ? selectedPackage.priceHalfDay : selectedPackage.priceFullDay;
+                                  } else if (selectedVehicleType === 'Standard Safari Jeep') {
+                                    dayPrice = dateType === 'half-day' 
+                                      ? (driver.priceHalfDayStandard || driver.pricePerDay * 0.6 || 0)
+                                      : (driver.priceFullDayStandard || driver.pricePerDay || 0);
+                                  } else if (selectedVehicleType === 'Luxury Safari Jeep') {
+                                    dayPrice = dateType === 'half-day' 
+                                      ? (driver.priceHalfDayLuxury || driver.pricePerDay * 0.8 || 0)
+                                      : (driver.priceFullDayLuxury || driver.pricePerDay * 1.5 || 0);
+                                  } else {
+                                    dayPrice = dateType === 'half-day' ? (driver.pricePerDay || 0) * 0.6 : (driver.pricePerDay || 0);
+                                  }
+                                  
                                   return (
                                     <div key={index} className="flex justify-between items-center text-xs">
                                       <span className="text-gray-700 flex-1 min-w-0 pr-2">
-                                        {date.toLocaleDateString()} ({dateType === 'half-day' ? 'Half Day' : 'Full Day'})
+                                        {date.toLocaleDateString()} 
+                                        <span className={`ml-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                          dateType === 'half-day' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                                        }`}>
+                                          {dateType === 'half-day' ? 'Half Day' : 'Full Day'}
+                                        </span>
+                                        {timeOfDay && (
+                                          <span className="ml-1 text-[10px] text-gray-500">
+                                            ({timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening'})
+                                          </span>
+                                        )}
+                                        {selectedPackage && <span className="text-emerald-600 ml-1">📦</span>}
                                       </span>
                                       <span className="font-medium text-black flex-shrink-0">
                                         LKR {dayPrice.toLocaleString()}
