@@ -347,6 +347,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   const [dateBookingTypes, setDateBookingTypes] = useState({}); // { 'dateKey': 'fullDay' | 'halfDay' }
   const [showDayTypeModal, setShowDayTypeModal] = useState(false);
   const [pendingDate, setPendingDate] = useState(null);
+  const [expandedPackage, setExpandedPackage] = useState(null); // Track which package is expanded
 
   const searchParams = new URLSearchParams(location.search);
   const openChat = searchParams.get('openChat');
@@ -488,39 +489,64 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
             rating: typeof guideData.rating === 'number' ? guideData.rating :
               typeof guideData.rating === 'string' ? parseFloat(guideData.rating) || 0 : 0,
             totalReviews: guideData.totalReviews || 0,
+
+            // Pricing - map all possible field names
             hourlyRate: guideData.hourlyRate || 0,
-            dailyRate: guideData.dailyRate || 0,
-            priceFullDayStandard: guideData.priceFullDayStandard || guideData.dailyRate || 0,
-            priceHalfDayStandard: guideData.priceHalfDayStandard || Math.round((guideData.dailyRate || 0) * 0.6),
+            dailyRate: guideData.dailyRate || guideData.fullDayPrice || guideData.priceFullDay || 0,
+            priceFullDayStandard: guideData.priceFullDayStandard || guideData.fullDayPrice || guideData.priceFullDay || guideData.dailyRate || 0,
+            priceHalfDayStandard: guideData.priceHalfDayStandard || guideData.halfDayPrice || guideData.priceHalfDay || Math.round((guideData.dailyRate || guideData.fullDayPrice || 0) * 0.6),
+            fullDayPrice: guideData.fullDayPrice || guideData.priceFullDay || guideData.dailyRate || 0,
+            halfDayPrice: guideData.halfDayPrice || guideData.priceHalfDay || Math.round((guideData.fullDayPrice || guideData.dailyRate || 0) * 0.6),
+
             specialPackageRates: guideData.specialPackageRates || '',
             currencyPreference: guideData.currencyPreference || 'LKR',
-            experience: guideData.experienceYears || guideData.experience || 0,
+            experience: guideData.experienceYears || guideData.experience || guideData.yearsOfExperience || 0,
+
             specialQualifications: Array.isArray(guideData.specialQualifications) ? guideData.specialQualifications :
               guideData.specialQualifications ? [guideData.specialQualifications] : [],
+
             areasOfExpertise: Array.isArray(guideData.areasOfExpertise) ? guideData.areasOfExpertise :
-              guideData.areasOfExpertise ? [guideData.areasOfExpertise] : [],
+              Array.isArray(guideData.expertise) ? guideData.expertise :
+                guideData.areasOfExpertise ? [guideData.areasOfExpertise] :
+                  guideData.expertise ? [guideData.expertise] : [],
+
+            // Destinations - map all possible field names
             destinations: Array.isArray(guideData.destinations) ? guideData.destinations :
-              guideData.destinations ? [guideData.destinations] : [],
+              Array.isArray(guideData.destinationsCovered) ? guideData.destinationsCovered :
+                Array.isArray(guideData.destination) ? guideData.destination :
+                  guideData.destinations ? [guideData.destinations] :
+                    guideData.destinationsCovered ? [guideData.destinationsCovered] :
+                      guideData.destination ? [guideData.destination] : [],
+
+            // Certifications
             certifications: Array.isArray(guideData.certifications) ? guideData.certifications :
               guideData.certifications ? [guideData.certifications] : [],
             certificationStatus: guideData.certificationStatus || 'non-certified',
             verificationDocuments: Array.isArray(guideData.verificationDocuments) ? guideData.verificationDocuments :
               guideData.verificationDocuments ? [guideData.verificationDocuments] : [],
+
+            // Languages
             languages: Array.isArray(guideData.languages) ? guideData.languages :
               Array.isArray(guideData.languagesSpoken) ? guideData.languagesSpoken :
                 guideData.languagesSpoken ? [guideData.languagesSpoken] :
                   guideData.languages ? [guideData.languages] :
                     ['English', 'Sinhala'],
+
             contactPhone: guideData.contactPhone || guideData.phone || guideData.phoneNumber || 'Not provided',
             contactEmail: guideData.contactEmail || guideData.email || '',
-            description: guideData.description || guideData.bio || 'Experienced tour guide',
+            description: guideData.description || guideData.bio || guideData.about || 'Experienced tour guide',
             featured: guideData.featured || false,
             availability: guideData.availability !== false,
+
             // Ensure availability is an object, not array
             availabilityCalendar: (guideData.availability && typeof guideData.availability === 'object' && !Array.isArray(guideData.availability))
               ? guideData.availability
               : {}, // Object: { "YYYY-MM-DD": "busy"|"halfday"|"unavailable" }
             availableDates: guideData.availableDates || [], // Keep for backward compatibility
+
+            // Packages - will be fetched separately via useEffect
+            packages: [],
+
             isCurrentUser: currentUser && currentUser.uid === guideId
           };
 
@@ -576,6 +602,9 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
         ...doc.data()
       }));
       setPackages(packagesData);
+
+      // Also update guide object with packages
+      setGuide(prev => prev ? { ...prev, packages: packagesData } : null);
     });
 
     return () => unsubscribe();
@@ -1469,7 +1498,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     )}
 
                     {/* Certifications - Only for certified guides */}
-                    {guide.certificationStatus === 'certified' && guide.certificationDocuments && guide.certificationDocuments.length > 0 && (
+                    {guide.certificationStatus === 'certified' && (guide.certificationDocuments?.length > 0 || guide.certifications?.length > 0) && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
                           <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -1477,9 +1506,10 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                         <div className="flex-1 min-w-0">
                           <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Certifications</h3>
                           <div className="space-y-1.5">
-                            {guide.certificationDocuments.map((doc, index) => (
+                            {/* Display certificationDocuments (with URLs) */}
+                            {guide.certificationDocuments?.map((doc, index) => (
                               <div
-                                key={index}
+                                key={`doc-${index}`}
                                 className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm border border-gray-300 flex items-center justify-between gap-2"
                               >
                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -1497,6 +1527,19 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                     View
                                   </a>
                                 )}
+                              </div>
+                            ))}
+
+                            {/* Display certifications array (names only) */}
+                            {guide.certifications?.filter(cert =>
+                              !guide.certificationDocuments?.some(doc => doc.certificationName === cert)
+                            ).map((cert, index) => (
+                              <div
+                                key={`cert-${index}`}
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm border border-gray-300 flex items-center gap-1.5"
+                              >
+                                <FileText size={14} className="text-gray-600 flex-shrink-0" />
+                                <span className="font-semibold">{cert}</span>
                               </div>
                             ))}
                           </div>
@@ -1616,6 +1659,44 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                               </div>
                             </div>
 
+                            {/* Expanded Details - Shows ABOVE button when expanded */}
+                            {expandedPackage === pkg.id && (pkg.rules || pkg.benefits || pkg.facilities) && (
+                              <div className="mt-4 space-y-4">
+                                {/* Rules & Regulations */}
+                                {pkg.rules && pkg.rules.trim() && (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <FileText className="h-5 w-5 text-blue-600" />
+                                      <h4 className="font-semibold text-blue-900">Rules & Regulations</h4>
+                                    </div>
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.rules}</p>
+                                  </div>
+                                )}
+
+                                {/* Benefits */}
+                                {pkg.benefits && pkg.benefits.trim() && (
+                                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                      <h4 className="font-semibold text-green-900">Benefits</h4>
+                                    </div>
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.benefits}</p>
+                                  </div>
+                                )}
+
+                                {/* Facilities */}
+                                {pkg.facilities && pkg.facilities.trim() && (
+                                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Package className="h-5 w-5 text-purple-600" />
+                                      <h4 className="font-semibold text-purple-900">Facilities</h4>
+                                    </div>
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.facilities}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {/* Book Button */}
                             {currentUser && userRole === 'tourist' && (
                               <button
@@ -1633,11 +1714,14 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                               </button>
                             )}
 
-                            {/* Details Link */}
-                            {pkg.details && (
-                              <p className="text-center text-sm text-gray-500 mt-3 cursor-pointer hover:text-gray-700">
-                                Click to see more details
-                              </p>
+                            {/* Expand/Collapse Trigger - BELOW button */}
+                            {(pkg.rules || pkg.benefits || pkg.facilities) && (
+                              <div
+                                className="text-center text-sm text-gray-500 mt-3 cursor-pointer hover:text-gray-700 transition-colors"
+                                onClick={() => setExpandedPackage(expandedPackage === pkg.id ? null : pkg.id)}
+                              >
+                                {expandedPackage === pkg.id ? 'Click to collapse' : 'Click to see more details'}
+                              </div>
                             )}
                           </div>
                         ))}
@@ -1836,8 +1920,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                 onClick={handleBooking}
                                 disabled={isBooking || selectedDates.length === 0}
                                 className={`w-full bg-black text-white py-3 px-4 rounded-lg font-semibold text-sm transition-colors ${isBooking || selectedDates.length === 0
-                                    ? 'opacity-50 cursor-not-allowed'
-                                    : 'hover:bg-gray-800'
+                                  ? 'opacity-50 cursor-not-allowed'
+                                  : 'hover:bg-gray-800'
                                   }`}
                               >
                                 {isBooking ? 'Processing...' : 'Continue to Booking Details'}
