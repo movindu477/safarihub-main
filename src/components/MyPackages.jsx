@@ -20,6 +20,7 @@ const MyPackages = () => {
   const [editingPackage, setEditingPackage] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [saving, setSaving] = useState(false);
+  const [expandedPackage, setExpandedPackage] = useState(null); // For expand/collapse functionality
 
   // Form state
   const [formData, setFormData] = useState({
@@ -454,81 +455,105 @@ const MyPackages = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {packages.map((pkg) => (
-              <div
-                key={pkg.id}
-                className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/50 transition-all"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    {/* Package Header */}
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="flex-shrink-0 w-12 h-12 bg-emerald-600/20 rounded-lg flex items-center justify-center">
-                        <Package className="h-6 w-6 text-emerald-400" />
+            {packages.map((pkg) => {
+              const isExpanded = expandedPackage === pkg.id;
+              return (
+                <div
+                  key={pkg.id}
+                  className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/50 transition-all cursor-pointer"
+                  onClick={() => setExpandedPackage(isExpanded ? null : pkg.id)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      {/* Package Header */}
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="flex-shrink-0 w-12 h-12 bg-emerald-600/20 rounded-lg flex items-center justify-center">
+                          <Package className="h-6 w-6 text-emerald-400" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-white mb-2">{pkg.title}</h3>
+                          <p className={`text-gray-400 text-sm leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
+                            {pkg.description}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-white mb-2">{pkg.title}</h3>
-                        <p className="text-gray-400 text-sm leading-relaxed">{pkg.description}</p>
+
+                      {/* Pricing */}
+                      <div className="flex items-center gap-6 mb-4">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-emerald-400" />
+                          <span className="text-sm text-gray-400">Full Day:</span>
+                          <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPrice)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-yellow-400" />
+                          <span className="text-sm text-gray-400">Half Day:</span>
+                          <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPrice)}</span>
+                        </div>
                       </div>
+
+                      {/* Expanded Content - Benefits, Facilities, Rules */}
+                      {isExpanded && (
+                        <div className="space-y-3 border-t border-gray-700 pt-4 mt-4">
+                          {pkg.benefits && pkg.benefits.trim() && (
+                            <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <CheckCircle className="h-4 w-4 text-emerald-400" />
+                                <span className="text-emerald-300 font-semibold text-sm">Benefits</span>
+                              </div>
+                              <p className="text-gray-300 text-sm whitespace-pre-wrap">{pkg.benefits}</p>
+                            </div>
+                          )}
+                          {pkg.facilities && pkg.facilities.trim() && (
+                            <div className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Package className="h-4 w-4 text-purple-400" />
+                                <span className="text-purple-300 font-semibold text-sm">Facilities</span>
+                              </div>
+                              <p className="text-gray-300 text-sm whitespace-pre-wrap">{pkg.facilities}</p>
+                            </div>
+                          )}
+                          {pkg.rules && pkg.rules.trim() && (
+                            <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <FileText className="h-4 w-4 text-blue-400" />
+                                <span className="text-blue-300 font-semibold text-sm">Rules & Regulations</span>
+                              </div>
+                              <p className="text-gray-300 text-sm whitespace-pre-wrap">{pkg.rules}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Pricing */}
-                    <div className="flex items-center gap-6 mb-4">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-emerald-400" />
-                        <span className="text-sm text-gray-400">Full Day:</span>
-                        <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPrice)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-yellow-400" />
-                        <span className="text-sm text-gray-400">Half Day:</span>
-                        <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPrice)}</span>
-                      </div>
-                    </div>
-
-                    {/* Benefits, Facilities, Rules (if provided) */}
-                    <div className="space-y-2">
-                      {pkg.benefits && (
-                        <div className="text-sm">
-                          <span className="text-gray-500 font-medium">Benefits: </span>
-                          <span className="text-gray-400">{pkg.benefits}</span>
-                        </div>
-                      )}
-                      {pkg.facilities && (
-                        <div className="text-sm">
-                          <span className="text-gray-500 font-medium">Facilities: </span>
-                          <span className="text-gray-400">{pkg.facilities}</span>
-                        </div>
-                      )}
-                      {pkg.rules && (
-                        <div className="text-sm">
-                          <span className="text-gray-500 font-medium">Rules: </span>
-                          <span className="text-gray-400">{pkg.rules}</span>
-                        </div>
-                      )}
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleEditPackage(pkg)}
+                        className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
+                        title="Edit Package"
+                      >
+                        <Edit className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePackage(pkg)}
+                        className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                        title="Delete Package"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 ml-4">
-                    <button
-                      onClick={() => handleEditPackage(pkg)}
-                      className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
-                      title="Edit Package"
-                    >
-                      <Edit className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeletePackage(pkg)}
-                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                      title="Delete Package"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
+                  {/* Expand/Collapse Indicator */}
+                  <div className="mt-3 text-center">
+                    <span className="text-xs text-gray-500">
+                      {isExpanded ? 'Click to collapse' : 'Click to see more details'}
+                    </span>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

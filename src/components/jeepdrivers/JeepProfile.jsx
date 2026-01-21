@@ -1023,6 +1023,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [activeTab, setActiveTab] = useState("overview");
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
+  const [expandedPackage, setExpandedPackage] = useState(null); // For expand/collapse functionality
   // Old chat state removed - using Chat component instead
   // const [message, setMessage] = useState("");
   // const [messages, setMessages] = useState([]);
@@ -1190,6 +1191,36 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     }));
   };
 
+  // Helper function to get availability status for a date
+  const getAvailabilityStatus = (date) => {
+    if (!date) return null;
+    const dateKey = date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+
+    // Check new availability calendar format (object)
+    if (driver?.availabilityCalendar && typeof driver.availabilityCalendar === 'object' && !Array.isArray(driver.availabilityCalendar)) {
+      const status = driver.availabilityCalendar[dateKey];
+      // Return status if it exists, otherwise return null (which means available)
+      if (status && ['busy', 'halfday', 'unavailable', 'halfday-morning', 'halfday-evening'].includes(status)) {
+        return status;
+      }
+      // If no status marked, return null (available by default)
+      return null;
+    }
+
+    // Fallback to old availableDates array format
+    if (driver?.availableDates && Array.isArray(driver.availableDates)) {
+      const dateString = date.toISOString().split('T')[0];
+      const isInArray = driver.availableDates.some(availableDate => {
+        const availableDateString = new Date(availableDate).toISOString().split('T')[0];
+        return availableDateString === dateString;
+      });
+      return isInArray ? null : 'unavailable'; // If in array = available, if not = unavailable
+    }
+
+    // Default: no status means available
+    return null;
+  };
+
   // Calculate total price based on selected dates and their types (half-day vs full-day) + add-ons
   const calculateTotalPrice = () => {
     if (!driver || selectedDates.length === 0) return 0;
@@ -1201,7 +1232,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       selectedDates.forEach(date => {
         const dateString = date.toDateString();
         const dateType = selectedDatesWithType[dateString] || 'full-day';
-        total += dateType === 'half-day' ? selectedPackage.priceHalfDay : selectedPackage.priceFullDay;
+        total += dateType === 'half-day' ? selectedPackage.halfDayPrice : selectedPackage.fullDayPrice;
       });
       // No add-ons for package bookings
       return total;
@@ -1465,7 +1496,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         selectedDates.forEach(date => {
           const dateString = date.toDateString();
           const dateType = selectedDatesWithType[dateString] || 'full-day';
-          totalPrice += dateType === 'half-day' ? selectedPackage.priceHalfDay : selectedPackage.priceFullDay;
+          totalPrice += dateType === 'half-day' ? selectedPackage.halfDayPrice : selectedPackage.fullDayPrice;
         });
       } else {
         // Regular booking - use driver's regular prices
@@ -1528,8 +1559,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         isPackageBooking: !!selectedPackage,
         packageId: selectedPackage?.id || null,
         packageTitle: selectedPackage?.title || null,
-        packagePriceFullDay: selectedPackage?.priceFullDay || null,
-        packagePriceHalfDay: selectedPackage?.priceHalfDay || null,
+        packagePriceFullDay: selectedPackage?.fullDayPrice || null,
+        packagePriceHalfDay: selectedPackage?.halfDayPrice || null,
         // Include all booking form data
         ...bookingFormData,
         createdAt: serverTimestamp(),
@@ -2745,88 +2776,124 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                     ) : (
                       <div className="space-y-4">
                         <h2 className="text-2xl font-bold text-black mb-4">Available Service Packages</h2>
-                        {packages.map((pkg) => (
-                          <div
-                            key={pkg.id}
-                            className="bg-white border border-gray-300 rounded-lg p-4 hover:shadow-lg transition-shadow"
-                          >
-                            {/* Package Header */}
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1">
-                                <h3 className="text-xl font-bold text-black mb-1">{pkg.title}</h3>
-                                <p className="text-gray-600 text-sm">{pkg.description}</p>
+                        {packages.map((pkg) => {
+                          const isExpanded = expandedPackage === pkg.id;
+                          return (
+                            <div
+                              key={pkg.id}
+                              className="bg-white border border-gray-300 rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer"
+                              onClick={() => setExpandedPackage(isExpanded ? null : pkg.id)}
+                            >
+                              {/* Package Header */}
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <h3 className="text-xl font-bold text-black mb-1">{pkg.title}</h3>
+                                  <p className={`text-gray-600 text-sm ${!isExpanded ? 'line-clamp-2' : ''}`}>
+                                    {pkg.description}
+                                  </p>
+                                </div>
+                                <div className="flex-shrink-0 ml-4">
+                                  <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2 text-right">
+                                    <p className="text-xs text-emerald-700 font-medium">Full Day</p>
+                                    <p className="text-lg font-bold text-emerald-800">
+                                      LKR {pkg.fullDayPrice?.toLocaleString() || 0}
+                                    </p>
+                                  </div>
+                                  <div className="bg-blue-100 border border-blue-300 rounded-lg px-3 py-2 text-right mt-2">
+                                    <p className="text-xs text-blue-700 font-medium">Half Day</p>
+                                    <p className="text-lg font-bold text-blue-800">
+                                      LKR {pkg.halfDayPrice?.toLocaleString() || 0}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex-shrink-0 ml-4">
-                                <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2 text-right">
-                                  <p className="text-xs text-emerald-700 font-medium">Full Day</p>
-                                  <p className="text-lg font-bold text-emerald-800">
-                                    LKR {pkg.priceFullDay?.toLocaleString()}
-                                  </p>
+
+                              {/* Expanded Content */}
+                              {isExpanded && (
+                                <div className="mt-4 space-y-3 border-t border-gray-200 pt-4">
+                                  {/* Rules & Regulations */}
+                                  {pkg.rules && pkg.rules.trim() && (
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-blue-600" />
+                                        Rules & Regulations
+                                      </h4>
+                                      <p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                        {pkg.rules}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Benefits */}
+                                  {pkg.benefits && pkg.benefits.trim() && (
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                        Benefits
+                                      </h4>
+                                      <p className="text-sm text-gray-600 whitespace-pre-wrap bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                                        {pkg.benefits}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Facilities */}
+                                  {pkg.facilities && pkg.facilities.trim() && (
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                        <Package className="h-4 w-4 text-purple-600" />
+                                        Facilities
+                                      </h4>
+                                      <p className="text-sm text-gray-600 whitespace-pre-wrap bg-purple-50 p-3 rounded-lg border border-purple-200">
+                                        {pkg.facilities}
+                                      </p>
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="bg-blue-100 border border-blue-300 rounded-lg px-3 py-2 text-right mt-2">
-                                  <p className="text-xs text-blue-700 font-medium">Half Day</p>
-                                  <p className="text-lg font-bold text-blue-800">
-                                    LKR {pkg.priceHalfDay?.toLocaleString()}
-                                  </p>
-                                </div>
+                              )}
+
+                              {/* Book Package Button - Only for logged-in tourists */}
+                              {currentUser && userRole === 'tourist' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    
+                                    // Clear all existing booking selections to start fresh
+                                    setSelectedDates([]);
+                                    setSelectedDatesWithType({});
+                                    setSelectedVehicleType('');
+                                    setHalfDayTimes({});
+                                    setDateTypeMenuDate(null);
+                                    setShowTimeMenu(false);
+                                    
+                                    // Store selected package in session storage
+                                    sessionStorage.setItem('selectedPackage', JSON.stringify({
+                                      id: pkg.id,
+                                      title: pkg.title,
+                                      fullDayPrice: pkg.fullDayPrice,
+                                      halfDayPrice: pkg.halfDayPrice,
+                                      providerId: driverId
+                                    }));
+                                    
+                                    // Switch to booking tab
+                                    setActiveTab('booking');
+                                  }}
+                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 mt-4"
+                                >
+                                  <CalendarIcon className="h-5 w-5" />
+                                  Book This Package
+                                </button>
+                              )}
+
+                              {/* Expand/Collapse Indicator */}
+                              <div className="mt-3 text-center">
+                                <span className="text-xs text-gray-500">
+                                  {isExpanded ? 'Click to collapse' : 'Click to see more details'}
+                                </span>
                               </div>
                             </div>
-
-                            {/* Package Includes */}
-                            {pkg.includes && pkg.includes.length > 0 && (
-                              <div className="mb-3">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                  <CheckCircle className="h-4 w-4 text-emerald-600" />
-                                  Package Includes:
-                                </h4>
-                                <div className="flex flex-wrap gap-2">
-                                  {pkg.includes.map((item, index) => (
-                                    <span
-                                      key={index}
-                                      className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs border border-emerald-200 font-medium"
-                                    >
-                                      ✓ {item}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Rules and Regulations */}
-                            {pkg.rulesAndRegulations && (
-                              <div className="mb-3">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-blue-600" />
-                                  Rules & Regulations:
-                                </h4>
-                                <p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                  {pkg.rulesAndRegulations}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Book Package Button - Only for logged-in tourists */}
-                            {currentUser && userRole === 'tourist' && (
-                              <button
-                                onClick={() => {
-                                  // Store selected package in session storage
-                                  sessionStorage.setItem('selectedPackage', JSON.stringify({
-                                    id: pkg.id,
-                                    title: pkg.title,
-                                    priceFullDay: pkg.priceFullDay,
-                                    priceHalfDay: pkg.priceHalfDay,
-                                    providerId: driverId
-                                  }));
-                                  setActiveTab('booking');
-                                }}
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
-                              >
-                                <CalendarIcon className="h-5 w-5" />
-                                Book This Package
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -2846,43 +2913,100 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 {/* Booking Tab */}
                 {activeTab === 'booking' && currentUser && userRole === 'tourist' && (
                   <div className="space-y-2.5 sm:space-y-3 md:space-y-4 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
+                    {/* Package Info Banner (if package is selected) */}
+                    {selectedPackage && (
+                      <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 border-2 border-emerald-400 rounded-lg p-4 mb-4 relative">
+                        {/* Close/Unselect Button */}
+                        <button
+                          onClick={() => {
+                            // Clear selected package
+                            setSelectedPackage(null);
+                            sessionStorage.removeItem('selectedPackage');
+                            // Reset selections to start fresh
+                            setSelectedDates([]);
+                            setSelectedDatesWithType({});
+                            setSelectedVehicleType('');
+                            setHalfDayTimes({});
+                          }}
+                          className="absolute top-3 right-3 p-1.5 rounded-full bg-white/80 hover:bg-white border border-emerald-400 text-emerald-700 hover:text-emerald-900 transition-all hover:scale-110"
+                          title="Remove package and return to normal booking"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                        
+                        <div className="flex items-center gap-2 mb-2">
+                          <Package className="h-6 w-6 text-emerald-600" />
+                          <h3 className="text-lg font-bold text-emerald-900 pr-8">{selectedPackage.title}</h3>
+                        </div>
+                        <div className="flex gap-4 text-sm">
+                          <div className="flex items-center gap-1 text-emerald-700">
+                            <span className="font-semibold">Full Day:</span>
+                            <span>LKR {selectedPackage.fullDayPrice?.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-emerald-700">
+                            <span className="font-semibold">Half Day:</span>
+                            <span>LKR {selectedPackage.halfDayPrice?.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-emerald-600 mt-2 italic">
+                          📦 Package booking mode active - Click X to return to regular booking
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Vehicle Type Selection - ALWAYS VISIBLE AT TOP */}
+                    <div className="bg-emerald-50 border-2 border-emerald-500 rounded-lg p-4 mb-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Car className="h-5 w-5 text-emerald-600" />
+                        <label className="block text-base font-bold text-emerald-900">
+                          {selectedPackage ? 'Select Jeep Type for Your Package *' : 'Step 1: Select Vehicle Type *'}
+                        </label>
+                      </div>
+                      <select
+                        value={selectedVehicleType}
+                        onChange={(e) => setSelectedVehicleType(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-emerald-400 rounded-lg text-black font-medium focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200"
+                      >
+                        <option value="" disabled hidden>Choose a vehicle type</option>
+                        <option value="Standard Safari Jeep">Standard Safari Jeep</option>
+                        <option value="Luxury Safari Jeep">Luxury Safari Jeep</option>
+                      </select>
+                      {selectedVehicleType && (
+                        <div className="mt-2 flex items-center gap-2 text-emerald-700">
+                          <CheckCircle className="h-4 w-4" />
+                          <p className="text-sm font-medium">
+                            ✓ Selected: {selectedVehicleType}
+                          </p>
+                        </div>
+                      )}
+                      {!selectedVehicleType && (
+                        <p className="mt-2 text-xs text-emerald-700 font-medium">
+                          ⚠️ {selectedPackage ? 'Select jeep type to continue' : 'Please select a vehicle type before choosing dates'}
+                        </p>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
                       {/* Calendar */}
                       <div className="min-h-0">
-                        {/* Vehicle Type Selection */}
-                        {!selectedPackage && (
-                          <div className="mb-4">
-                            <label className="block text-sm font-semibold text-black mb-2">
-                              Select Vehicle Type *
-                            </label>
-                            <select
-                              value={selectedVehicleType}
-                              onChange={(e) => setSelectedVehicleType(e.target.value)}
-                              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-black focus:outline-none focus:border-emerald-500"
-                            >
-                              <option value="" disabled hidden>Choose a vehicle type</option>
-                              <option value="Standard Safari Jeep">Standard Safari Jeep</option>
-                              <option value="Luxury Safari Jeep">Luxury Safari Jeep</option>
-                            </select>
-                            {selectedVehicleType && (
-                              <p className="text-xs text-gray-600 mt-1">
-                                ✓ Selected: {selectedVehicleType}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        <h3 className="font-semibold text-black mb-2 sm:mb-3 md:mb-4 text-xs sm:text-sm md:text-base">Select Your Dates</h3>
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3 md:mb-4">
+                          <CalendarIcon className="h-5 w-5 text-gray-700" />
+                          <h3 className="font-semibold text-black text-xs sm:text-sm md:text-base">
+                            {selectedPackage ? 'Step 2: Select Your Dates' : 'Step 2: Select Your Dates'}
+                          </h3>
+                        </div>
                         <div className="overflow-y-auto max-h-[300px] sm:max-h-[350px] md:max-h-[400px] relative">
-                          <DatePickerCalendar
-                            selectedDates={selectedDates}
-                            onDateSelect={(date) => {
-                              if (!selectedPackage && !selectedVehicleType) {
-                                alert('Please select a vehicle type first');
-                                return;
-                              }
-                              setDateTypeMenuDate(date);
-                            }}
+                          <div className={`${!selectedVehicleType ? 'opacity-40 pointer-events-none' : ''}`}>
+                            <DatePickerCalendar
+                              selectedDates={selectedDates}
+                              onDateSelect={(date) => {
+                                if (!selectedVehicleType) {
+                                  // This shouldn't happen because calendar is disabled
+                                  alert('⚠️ Please select a vehicle type first!');
+                                  return;
+                                }
+                                setDateTypeMenuDate(date);
+                              }}
                             selectedDatesWithType={selectedDatesWithType}
                             availabilityCalendar={driver?.availabilityCalendar}
                             availableDates={driver?.availableDates}
@@ -3014,6 +3138,18 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                               )}
                             </div>
                           )}
+                          </div>
+                          {/* Show message if vehicle type not selected */}
+                          {!selectedVehicleType && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/20 backdrop-blur-sm rounded-lg">
+                              <div className="bg-white p-4 rounded-lg shadow-lg text-center">
+                                <Car className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
+                                <p className="text-sm font-semibold text-gray-800">
+                                  {selectedPackage ? 'Select jeep type above to continue' : 'Please select a vehicle type above'}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -3036,11 +3172,14 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     <span className="text-emerald-800 font-semibold text-xs sm:text-sm">Package Booking</span>
                                   </div>
                                   <p className="text-emerald-700 text-xs font-medium">{selectedPackage.title}</p>
-                                  <p className="text-emerald-600 text-xs mt-1">All amenities included</p>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <Car className="h-3.5 w-3.5 text-emerald-600" />
+                                    <span className="text-emerald-700 text-xs font-medium">{selectedVehicleType || 'Select jeep type'}</span>
+                                  </div>
                                 </div>
                               )}
 
-                              {/* Vehicle Type Information */}
+                              {/* Vehicle Type Information (for non-package bookings) */}
                               {selectedVehicleType && !selectedPackage && (
                                 <div className="bg-blue-50 border border-blue-300 rounded-lg p-2 sm:p-2.5 mb-3">
                                   <div className="flex items-center gap-2">
@@ -3065,7 +3204,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                   // Calculate price based on booking type
                                   let dayPrice;
                                   if (selectedPackage) {
-                                    dayPrice = dateType === 'half-day' ? selectedPackage.priceHalfDay : selectedPackage.priceFullDay;
+                                    dayPrice = dateType === 'half-day' ? selectedPackage.halfDayPrice : selectedPackage.fullDayPrice;
                                   } else if (selectedVehicleType === 'Standard Safari Jeep') {
                                     dayPrice = dateType === 'half-day'
                                       ? (driver.priceHalfDayStandard || driver.pricePerDay * 0.6 || 0)
