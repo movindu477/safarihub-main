@@ -75,9 +75,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
     specialSkills: [],
     certifications: [],
     // Guide fields
-    specialQualifications: [],
     areasOfExpertise: [],
-    verificationDocuments: [],
     hourlyRate: '',
     dailyRate: '',
     specialPackageRates: '',
@@ -229,9 +227,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             specialSkills: Array.isArray(data.specialSkills) ? data.specialSkills : [],
             certifications: Array.isArray(data.certifications) ? data.certifications : [],
             // Guide fields
-            specialQualifications: Array.isArray(data.specialQualifications) ? data.specialQualifications : [],
             areasOfExpertise: Array.isArray(data.areasOfExpertise) ? data.areasOfExpertise : [],
-            verificationDocuments: Array.isArray(data.verificationDocuments) ? data.verificationDocuments : [],
             hourlyRate: data.hourlyRate || '',
             dailyRate: data.dailyRate || '',
             specialPackageRates: data.specialPackageRates || '',
@@ -746,9 +742,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
         updateData = {
           ...updateData,
           destinations: formData.destinations ? [formData.destinations] : [],
-          specialQualifications: formData.specialQualifications || [],
           areasOfExpertise: formData.areasOfExpertise || [],
-          verificationDocuments: formData.verificationDocuments || [],
           hourlyRate: formData.hourlyRate ? parseInt(formData.hourlyRate) : 0,
           dailyRate: formData.dailyRate ? parseInt(formData.dailyRate) : 0,
           priceFullDayStandard: parsePrice(formData.priceFullDayStandard),
@@ -1044,9 +1038,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               languages: userData.languages || [],
                               specialSkills: userData.specialSkills || [],
                               certifications: userData.certifications || [],
-                              specialQualifications: userData.specialQualifications || [],
                               areasOfExpertise: userData.areasOfExpertise || [],
-                              verificationDocuments: userData.verificationDocuments || [],
                               hourlyRate: userData.hourlyRate || '',
                               dailyRate: userData.dailyRate || '',
                               specialPackageRates: userData.specialPackageRates || '',
@@ -2084,44 +2076,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
               )}
 
               {isGuide && (
-                <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 mt-4">
-                  {/* Qualifications Box */}
-                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                    <label className="block text-sm font-semibold text-white mb-3">Qualifications</label>
-                    <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 max-h-48 overflow-y-auto">
-                      {isEditing ? (
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {specialQualifications.map(qual => (
-                            <div key={qual} className="flex items-center">
-                              <input
-                                type="checkbox"
-                                id={`qual-${qual}`}
-                                checked={formData.specialQualifications.includes(qual)}
-                                onChange={() => handleMultiSelectChange('specialQualifications', qual)}
-                                className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                              />
-                              <label htmlFor={`qual-${qual}`} className="text-xs text-gray-300">
-                                {qual}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {formData.specialQualifications && formData.specialQualifications.length > 0 ? (
-                            formData.specialQualifications.map((qual, index) => (
-                              <div key={index} className="text-sm text-gray-300">
-                                • {qual}
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-xs text-gray-500 italic">No qualifications selected</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
                   {/* Areas of Expertise Box */}
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <label className="block text-sm font-semibold text-white mb-3">Areas of Expertise</label>
@@ -2158,77 +2113,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       )}
                     </div>
                   </div>
-
-                  {/* Verification Documents Box - Only show if certified */}
-                  {userData.certificationStatus === 'certified' && (
-                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                    <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-1">
-                      <FileText className="h-4 w-4 text-emerald-400" />
-                      Verification Docs
-                    </label>
-                    <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50 max-h-32 overflow-y-auto">
-                      {isEditing ? (
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {verificationDocuments.map(doc => (
-                            <div key={doc} className="flex items-center">
-                              <input
-                                type="checkbox"
-                                id={`verif-${doc}`}
-                                checked={formData.verificationDocuments.includes(doc)}
-                                onChange={() => handleMultiSelectChange('verificationDocuments', doc)}
-                                className="mr-1.5 h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500 border-gray-500 rounded bg-gray-800"
-                              />
-                              <label htmlFor={`verif-${doc}`} className="text-xs text-gray-300">
-                                {doc}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {formData.verificationDocuments && formData.verificationDocuments.length > 0 ? (
-                            formData.verificationDocuments.map((doc, index) => {
-                              const uploadedDoc = uploadedCertifications.find(cert =>
-                                cert.name === doc || cert.certificationName === doc
-                              );
-                              const hasDocument = uploadedDoc && (uploadedDoc.supabasePath || uploadedDoc.fileUrl);
-                              return (
-                                <div key={index} className="text-sm">
-                                  {hasDocument ? (
-                                    <button
-                                      onClick={async () => {
-                                        try {
-                                          const { signedUrl, error } = await getDocumentUrl(uploadedDoc.supabasePath || uploadedDoc.fileUrl);
-                                          if (error) {
-                                            console.error('Error getting document URL:', error);
-                                            setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
-                                            return;
-                                          }
-                                          window.open(signedUrl, '_blank', 'noopener,noreferrer');
-                                        } catch (error) {
-                                          console.error('Error opening document:', error);
-                                        }
-                                      }}
-                                      className="text-emerald-400 hover:text-emerald-300 underline decoration-dotted hover:decoration-solid transition-all text-left"
-                                    >
-                                      • {doc}
-                                    </button>
-                                  ) : (
-                                    <div className="text-gray-300">
-                                      • {doc}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-xs text-gray-500 italic">No documents selected</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  )}
 
                   {/* Languages Box */}
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
@@ -2269,6 +2153,321 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Tour Guide Certifications - Same as Jeep Driver - Only show if certified */}
+              {isGuide && userData.certificationStatus === 'certified' && (
+                <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-semibold text-white flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-emerald-400" />
+                      Tour Guide Certifications
+                    </label>
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Trigger file input click
+                          document.getElementById('guide-certification-upload-input')?.click();
+                        }}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-xs font-medium"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Add Document
+                      </button>
+                    )}
+                    <input
+                      id="guide-certification-upload-input"
+                      type="file"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        try {
+                          setMessage({ type: 'info', text: 'Uploading document...' });
+                          setSaving(true);
+
+                          console.log('📤 Uploading document:', file.name);
+
+                          // Upload to Supabase using client-side method
+                          const { url, path, error } = await uploadDocumentClientSide(file, currentUser.uid, file.name);
+
+                          if (error) {
+                            console.error('Upload failed:', error);
+                            setMessage({ type: 'error', text: `Upload failed: ${error}` });
+                            setSaving(false);
+                            return;
+                          }
+
+                          console.log('✅ Upload successful:', { url, path });
+
+                          // Create document metadata
+                          const newDocument = {
+                            certificationName: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+                            fileName: file.name,
+                            fileUrl: url,
+                            supabasePath: path,
+                            fileSize: file.size,
+                            fileType: file.type,
+                            uploadedAt: new Date(),
+                            documentId: `${currentUser.uid}_${Date.now()}`,
+                            uploadStatus: 'uploaded'
+                          };
+
+                          // Save to guideCertifications collection
+                          const userCertDocRef = doc(db, 'guideCertifications', currentUser.uid);
+
+                          // Get existing documents
+                          const existingDoc = await getDoc(userCertDocRef);
+                          const existingDocuments = existingDoc.exists() ? (existingDoc.data().documents || []) : [];
+
+                          // Add new document to array
+                          const updatedDocuments = [...existingDocuments, newDocument];
+
+                          // Save to Firestore
+                          await setDoc(userCertDocRef, {
+                            providerId: currentUser.uid,
+                            documents: updatedDocuments,
+                            updatedAt: serverTimestamp()
+                          }, { merge: true });
+
+                          console.log('✅ Document saved to Firestore');
+                          setMessage({ type: 'success', text: 'Document uploaded successfully!' });
+                          setSaving(false);
+
+                          // Reset file input
+                          e.target.value = '';
+                        } catch (error) {
+                          console.error('❌ Upload error:', error);
+                          setMessage({ type: 'error', text: `Upload failed: ${error.message}` });
+                          setSaving(false);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </div>
+
+                  {/* View Mode - Display Documents */}
+                  {!isEditing && (
+                    <>
+                      {/* Documents Info Banner */}
+                      <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3 mb-3">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-xs font-semibold text-blue-300 mb-1">Documents from Registration</h4>
+                            <p className="text-xs text-blue-200">
+                              The documents shown below were uploaded during your registration.
+                              Click "Edit Profile" to add or modify documents.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Uploaded Documents List */}
+                      <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-xs font-semibold text-white flex items-center gap-1">
+                            <FileText className="h-3 w-3 text-emerald-400" />
+                            Uploaded Documents
+                            {uploadedCertifications.length > 0 && (
+                              <span className="text-xs text-gray-400 font-normal">
+                                ({uploadedCertifications.length})
+                              </span>
+                            )}
+                          </h4>
+                        </div>
+
+                        {uploadedCertifications.length === 0 ? (
+                          <div className="text-center py-6">
+                            <p className="text-gray-400 text-xs mb-1">No documents uploaded yet</p>
+                            <p className="text-gray-500 text-xs">
+                              Documents uploaded during registration will appear here automatically
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {uploadedCertifications.map((cert) => {
+                              const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
+                              const hasError = cert.uploadStatus === 'failed' || (!hasValidPath && cert.uploadStatus !== 'uploaded');
+                              return (
+                                <div key={cert.id} className={`bg-gray-900/50 rounded-lg p-2 border ${hasError ? 'border-red-600' : 'border-gray-600'} flex items-center justify-between`}>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <FileText className="h-4 w-4 text-emerald-400" />
+                                      <span className="text-sm text-white font-medium">{cert.certificationName || cert.fileName || 'Document'}</span>
+                                    </div>
+                                    {(cert.fileSize || cert.size) && (
+                                      <p className="text-xs text-gray-400 ml-6">
+                                        {cert.fileSize 
+                                          ? `${(cert.fileSize / 1024).toFixed(2)} KB` 
+                                          : cert.size}
+                                      </p>
+                                    )}
+                                    {cert.uploadedAt && (
+                                      <p className="text-xs text-gray-500 ml-6">
+                                        Uploaded: {cert.uploadedAt.toDate 
+                                          ? cert.uploadedAt.toDate().toLocaleDateString() 
+                                          : new Date(cert.uploadedAt).toLocaleDateString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={async () => {
+                                      if (!hasValidPath) {
+                                        console.error('No document path available:', cert);
+                                        setMessage({ type: 'error', text: 'Document path not found. Please re-upload the document.' });
+                                        return;
+                                      }
+                                      try {
+                                        const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                        if (error) {
+                                          console.error('Error getting document URL:', error);
+                                          setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                          return;
+                                        }
+                                        window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                                      } catch (error) {
+                                        console.error('Error opening document:', error);
+                                        setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                      }
+                                    }}
+                                    disabled={!hasValidPath}
+                                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                                      hasValidPath 
+                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                    title={hasValidPath ? 'View document' : 'Document path not available'}
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Edit Mode - Add/Manage Documents */}
+                  {isEditing && (
+                    <>
+                      {uploadedCertifications.length === 0 ? (
+                        <div className="text-center py-8">
+                          <FileText className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+                          <p className="text-gray-400 text-sm">No documents uploaded yet</p>
+                          <p className="text-gray-500 text-xs mt-1">Click "Add Document" to upload your certifications</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {uploadedCertifications.map((cert, index) => {
+                            const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
+                            return (
+                              <div key={cert.id || index} className="bg-gray-900/50 rounded-lg p-3 border border-gray-600 flex items-center justify-between">
+                                <div className="flex items-center gap-3 flex-1">
+                                  <FileText className="h-5 w-5 text-emerald-400" />
+                                  <div>
+                                    <p className="text-white font-medium text-sm">{cert.name || cert.certificationName || 'Document'}</p>
+                                    {cert.size && (
+                                      <p className="text-gray-400 text-xs">{cert.size}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!hasValidPath) {
+                                        console.error('No document path available:', cert);
+                                        setMessage({ type: 'error', text: 'Document path not found. Please re-upload the document.' });
+                                        return;
+                                      }
+                                      try {
+                                        const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                        if (error) {
+                                          console.error('Error getting document URL:', error);
+                                          setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                          return;
+                                        }
+                                        window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                                      } catch (error) {
+                                        console.error('Error opening document:', error);
+                                        setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                      }
+                                    }}
+                                    disabled={!hasValidPath}
+                                    className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                                      hasValidPath 
+                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                    title={hasValidPath ? 'View document' : 'Document path not available'}
+                                  >
+                                    View
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!confirm(`Are you sure you want to delete "${cert.certificationName || cert.fileName}"?`)) {
+                                        return;
+                                      }
+
+                                      try {
+                                        setSaving(true);
+                                        setMessage({ type: 'info', text: 'Deleting document...' });
+
+                                        console.log('🗑️ Deleting document:', cert);
+
+                                        // Delete from Supabase Storage if path exists
+                                        if (cert.supabasePath || cert.fileUrl) {
+                                          const { success, error } = await deleteDocumentClientSide(cert.supabasePath || cert.fileUrl);
+                                          if (error) {
+                                            console.warn('⚠️ Supabase delete warning:', error);
+                                            // Continue with Firestore deletion even if Storage delete fails
+                                          }
+                                        }
+
+                                        // Remove from Firestore guideCertifications collection
+                                        const userCertDocRef = doc(db, 'guideCertifications', currentUser.uid);
+
+                                        const existingDoc = await getDoc(userCertDocRef);
+                                        if (existingDoc.exists()) {
+                                          const existingDocuments = existingDoc.data().documents || [];
+                                          const updatedDocuments = existingDocuments.filter(d => d.documentId !== cert.documentId);
+
+                                          await setDoc(userCertDocRef, {
+                                            providerId: currentUser.uid,
+                                            documents: updatedDocuments,
+                                            updatedAt: serverTimestamp()
+                                          }, { merge: true });
+                                        }
+
+                                        console.log('✅ Document deleted');
+                                        setMessage({ type: 'success', text: 'Document deleted successfully!' });
+                                        setSaving(false);
+                                      } catch (error) {
+                                        console.error('❌ Delete error:', error);
+                                        setMessage({ type: 'error', text: `Delete failed: ${error.message}` });
+                                        setSaving(false);
+                                      }
+                                    }}
+                                    className="text-red-400 hover:text-red-300 transition-colors p-1.5"
+                                    title="Delete document"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 
