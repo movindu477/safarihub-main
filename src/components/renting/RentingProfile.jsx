@@ -358,12 +358,12 @@ const BookingFormModal = ({
   selectedDatesWithType,
   onDateTypeChange
 }) => {
+  // Emergency Contact step removed - form submits from Additional Requests
   const steps = [
     { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
     { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
     { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
-    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
-    { number: 5, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
+    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package }
   ];
 
   const updateFormData = (field, value) => {
@@ -407,13 +407,6 @@ const BookingFormModal = ({
       } else {
         if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
         if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
-      }
-    } else if (currentStep === 5) {
-      if (!formData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
-      if (!formData.emergencyContactPhone.trim()) {
-        errors.emergencyContactPhone = 'Emergency contact phone is required';
-      } else if (formData.emergencyContactPhone.replace(/\D/g, '').length !== 10) {
-        errors.emergencyContactPhone = 'Phone number must be exactly 10 digits';
       }
     }
 
@@ -912,83 +905,6 @@ const BookingFormModal = ({
             </div>
           )}
 
-          {/* Step 5: Emergency Contact */}
-          {currentStep === 5 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Phone className="h-5 w-5 text-black" />
-                Emergency Contact
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="emergencyContactName"
-                    id="emergencyContactName"
-                    value={formData.emergencyContactName}
-                    onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                  />
-                  {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact Phone <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="emergencyContactPhone"
-                    id="emergencyContactPhone"
-                    value={formData.emergencyContactPhone}
-                    onChange={(e) => {
-                      let value = e.target.value.replace(/[^0-9+]/g, '');
-                      
-                      // Format: +94 XX XXX XXXX
-                      if (value.startsWith('+94')) {
-                        const digits = value.slice(3);
-                        const limitedDigits = digits.slice(0, 9);
-                        let formatted = '+94';
-                        if (limitedDigits.length > 0) {
-                          formatted += ' ' + limitedDigits.slice(0, 2);
-                        }
-                        if (limitedDigits.length > 2) {
-                          formatted += ' ' + limitedDigits.slice(2, 5);
-                        }
-                        if (limitedDigits.length > 5) {
-                          formatted += ' ' + limitedDigits.slice(5, 9);
-                        }
-                        value = formatted;
-                      } else if (value.startsWith('0')) {
-                        const digits = value.slice(1);
-                        const limitedDigits = digits.slice(0, 9);
-                        let formatted = '+94';
-                        if (limitedDigits.length > 0) {
-                          formatted += ' ' + limitedDigits.slice(0, 2);
-                        }
-                        if (limitedDigits.length > 2) {
-                          formatted += ' ' + limitedDigits.slice(2, 5);
-                        }
-                        if (limitedDigits.length > 5) {
-                          formatted += ' ' + limitedDigits.slice(5, 9);
-                        }
-                        value = formatted;
-                      }
-                      
-                      updateFormData('emergencyContactPhone', value);
-                    }}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                    placeholder="+94 77 123 4567"
-                  />
-                  {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Navigation Buttons */}
@@ -1107,10 +1023,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
     needsWater: false,
     needsSnacks: false,
     selectedSnacks: [],
-    dateSafariTypes: {},
-    // Emergency Contact
-    emergencyContactName: '',
-    emergencyContactPhone: ''
+    dateSafariTypes: {}
   });
 
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
@@ -1292,14 +1205,6 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
       if (!safeTrim(bookingFormData.dropoffLocation)) errors.dropoffLocation = 'Drop-off location is required';
     }
 
-    // Step 6: Emergency Contact
-    if (!safeTrim(bookingFormData.emergencyContactName)) errors.emergencyContactName = 'Emergency contact name is required';
-    if (!safeTrim(bookingFormData.emergencyContactPhone)) {
-      errors.emergencyContactPhone = 'Emergency contact phone is required';
-    } else if (bookingFormData.emergencyContactPhone.replace(/\D/g, '').length !== 10) {
-      errors.emergencyContactPhone = 'Phone number must be exactly 10 digits';
-    }
-
     setFormErrors(errors);
     return { isValid: Object.keys(errors).length === 0, errors };
   };
@@ -1309,8 +1214,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
     const stepMap = {
       fullName: 1, email: 1, phone: 1, country: 1, numberOfPassengers: 1,
       nationalPark: 2, safariType: 2,
-      hotelName: 3, hotelAddress: 3, pickupLocation: 3, dropoffLocation: 3,
-      emergencyContactName: 6, emergencyContactPhone: 6
+      hotelName: 3, hotelAddress: 3, pickupLocation: 3, dropoffLocation: 3
     };
     return stepMap[fieldName] || 1;
   };
@@ -1665,8 +1569,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
 📍 Pickup: ${bookingFormData.pickupLocation}
 📍 Drop-off: ${bookingFormData.dropoffLocation}${bookingFormData.needsHotelPickup ? `\n🏨 Hotel: ${bookingFormData.hotelName}, ${bookingFormData.hotelAddress}` : ''}
 
-📝 Special Requests: ${bookingFormData.specialAssistance || 'None'}
-🆘 Emergency Contact: ${bookingFormData.emergencyContactName} - ${bookingFormData.emergencyContactPhone}`;
+📝 Special Requests: ${bookingFormData.specialAssistance || 'None'}`;
 
         const notificationData = {
           type: 'booking',
@@ -1773,9 +1676,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
         needsWater: false,
         needsSnacks: false,
         selectedSnacks: [],
-        dateSafariTypes: {},
-        emergencyContactName: '',
-        emergencyContactPhone: ''
+        dateSafariTypes: {}
       });
       setIsBooking(false);
 

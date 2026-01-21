@@ -1039,7 +1039,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 </div>
 
                 {/* Right Box - Service Specific Details */}
-                {isJeepDriver && (
+                {(isJeepDriver || isRenting) && (
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                       <Car className="h-4 w-4 text-emerald-400" />
@@ -1448,7 +1448,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
               </div>
 
               {/* Additional Sections Below - Languages, Skills, etc. in separate boxes */}
-              {isJeepDriver && (
+              {(isJeepDriver || isRenting) && (
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
                   {/* Languages Box */}
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">

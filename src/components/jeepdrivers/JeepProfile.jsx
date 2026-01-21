@@ -340,17 +340,15 @@ const BookingFormModal = ({
   onDateTypeChange,
   selectedPackage,
   selectedVehicleType,
-  halfDayTimes,
-  emergencyCountryCode,
-  setEmergencyCountryCode
+  halfDayTimes
 }) => {
   // Filter out step 4 (Additional Requests) if booking a package
+  // Emergency Contact step removed - form submits from Additional Requests (normal) or Pickup & Drop-off (package)
   const allSteps = [
     { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
     { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
     { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
-    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
-    { number: 5, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
+    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package }
   ];
 
   const steps = selectedPackage
@@ -360,12 +358,7 @@ const BookingFormModal = ({
     }))
     : allSteps;
   
-  console.log('📊 Modal State - currentStep:', currentStep, '| stepsLength:', steps.length, '| hasPackage:', !!selectedPackage, 
-    '| emergencyStepShouldRender:', ((currentStep === 5 && !selectedPackage) || (currentStep === 4 && selectedPackage) || currentStep === steps.length),
-    '| formData:', {
-      emergencyContactName: formData.emergencyContactName,
-      emergencyContactPhone: formData.emergencyContactPhone
-    });
+  console.log('📊 Modal State - currentStep:', currentStep, '| stepsLength:', steps.length, '| hasPackage:', !!selectedPackage);
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -410,32 +403,9 @@ const BookingFormModal = ({
         if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
       }
     } else if (currentStep === 4 && !selectedPackage) {
-      // Step 4: Additional Requests (only for non-package bookings)
+      // Step 4: Additional Requests (only for non-package bookings) - Final step for normal bookings
       if (formData.needsSnacks && (!formData.selectedSnacks || formData.selectedSnacks.length === 0)) {
         errors.selectedSnacks = 'Please select at least one snack/meal';
-      }
-    } else if ((currentStep === 5 && !selectedPackage) || (currentStep === 4 && selectedPackage)) {
-      // Emergency Contact: Step 5 for regular bookings, Step 4 for package bookings
-      console.log('🔍 Validating Emergency Contact:', {
-        currentStep,
-        selectedPackage: !!selectedPackage,
-        emergencyContactName: formData.emergencyContactName,
-        emergencyContactPhone: formData.emergencyContactPhone,
-        phoneLength: formData.emergencyContactPhone?.length
-      });
-      
-      if (!formData.emergencyContactName || !formData.emergencyContactName.trim()) {
-        errors.emergencyContactName = 'Emergency contact name is required';
-      }
-      
-      // Check phone number - ensure it's a string and has exactly 9 digits
-      const phoneValue = String(formData.emergencyContactPhone || '').trim();
-      if (!phoneValue || phoneValue.length === 0) {
-        errors.emergencyContactPhone = 'Emergency contact phone is required';
-      } else if (phoneValue.length !== 9) {
-        errors.emergencyContactPhone = `Phone number must be exactly 9 digits (you entered ${phoneValue.length} digits)`;
-      } else if (!/^\d{9}$/.test(phoneValue)) {
-        errors.emergencyContactPhone = 'Phone number must contain only digits';
       }
     }
 
@@ -445,11 +415,7 @@ const BookingFormModal = ({
     if (Object.keys(errors).length > 0) {
       const firstErrorField = Object.keys(errors)[0];
       const errorMessages = Object.entries(errors).map(([field, msg]) => {
-        const fieldLabels = {
-          emergencyContactName: 'Emergency Contact Name',
-          emergencyContactPhone: 'Emergency Contact Phone'
-        };
-        return `${fieldLabels[field] || field}: ${msg}`;
+        return `${field}: ${msg}`;
       }).join('\n');
       
       alert(`Please fill in:\n\n${errorMessages}\n\nNavigating to the required field...`);
@@ -955,102 +921,6 @@ const BookingFormModal = ({
             </div>
           )}
 
-          {/* Step 5: Emergency Contact (Step 4 for package bookings) */}
-          {(() => {
-            const shouldRender = ((currentStep === 5 && !selectedPackage) || (currentStep === 4 && selectedPackage) || currentStep === steps.length);
-            console.log('🔍 Emergency Contact Render Check:', {
-              currentStep,
-              stepsLength: steps.length,
-              hasPackage: !!selectedPackage,
-              condition1: currentStep === 5 && !selectedPackage,
-              condition2: currentStep === 4 && selectedPackage,
-              condition3: currentStep === steps.length,
-              shouldRender
-            });
-            return shouldRender;
-          })() && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Phone className="h-5 w-5 text-black" />
-                Emergency Contact
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="emergencyContactName"
-                    id="emergencyContactName"
-                    value={formData.emergencyContactName}
-                    onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                  />
-                  {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact Phone <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    {/* Country Code Dropdown */}
-                    <select
-                      value={emergencyCountryCode}
-                      onChange={(e) => {
-                        setEmergencyCountryCode(e.target.value);
-                        // Reset phone number when country code changes
-                        updateFormData('emergencyContactPhone', '');
-                      }}
-                      className="w-28 px-2 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
-                    >
-                      <option value="+94">🇱🇰 +94</option>
-                      <option value="+1">🇺🇸 +1</option>
-                      <option value="+44">🇬🇧 +44</option>
-                      <option value="+91">🇮🇳 +91</option>
-                      <option value="+61">🇦🇺 +61</option>
-                      <option value="+86">🇨🇳 +86</option>
-                      <option value="+81">🇯🇵 +81</option>
-                      <option value="+82">🇰🇷 +82</option>
-                      <option value="+65">🇸🇬 +65</option>
-                      <option value="+60">🇲🇾 +60</option>
-                      <option value="+66">🇹🇭 +66</option>
-                      <option value="+971">🇦🇪 +971</option>
-                      <option value="+966">🇸🇦 +966</option>
-                      <option value="+33">🇫🇷 +33</option>
-                      <option value="+49">🇩🇪 +49</option>
-                      <option value="+39">🇮🇹 +39</option>
-                      <option value="+34">🇪🇸 +34</option>
-                      <option value="+7">🇷🇺 +7</option>
-                      <option value="+55">🇧🇷 +55</option>
-                      <option value="+27">🇿🇦 +27</option>
-                    </select>
-                    
-                    {/* Phone Number Input (9 digits) */}
-                    <input
-                      type="tel"
-                      name="emergencyContactPhone"
-                      id="emergencyContactPhone"
-                      value={formData.emergencyContactPhone}
-                      onChange={(e) => {
-                        // Only allow numbers, limit to 9 digits
-                        let value = e.target.value.replace(/\D/g, '');
-                        value = value.slice(0, 9);
-                        updateFormData('emergencyContactPhone', value);
-                      }}
-                      className={`flex-1 px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                        }`}
-                      placeholder="123456789 (9 digits)"
-                      maxLength="9"
-                    />
-                  </div>
-                  {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
-                  <p className="text-xs text-gray-500 mt-1">Enter 9 digits after country code</p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Navigation Buttons */}
@@ -1152,7 +1022,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [dateTypeMenuDate, setDateTypeMenuDate] = useState(null);
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [halfDayTimes, setHalfDayTimes] = useState({}); // {dateString: 'morning' | 'evening'}
-  const [emergencyCountryCode, setEmergencyCountryCode] = useState('+94'); // Default to Sri Lanka
   
   // Reset showTimeMenu when dateTypeMenuDate changes
   useEffect(() => {
@@ -1185,10 +1054,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     needsWater: false,
     needsSnacks: false,
     selectedSnacks: [],
-    dateSafariTypes: {},
-    // Emergency Contact
-    emergencyContactName: '',
-    emergencyContactPhone: ''
+    dateSafariTypes: {}
   });
 
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
@@ -1439,14 +1305,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       if (!safeTrim(bookingFormData.dropoffLocation)) errors.dropoffLocation = 'Drop-off location is required';
     }
 
-    // Step 6: Emergency Contact
-    if (!safeTrim(bookingFormData.emergencyContactName)) errors.emergencyContactName = 'Emergency contact name is required';
-    if (!safeTrim(bookingFormData.emergencyContactPhone)) {
-      errors.emergencyContactPhone = 'Emergency contact phone is required';
-    } else if (bookingFormData.emergencyContactPhone.replace(/\D/g, '').length !== 10) {
-      errors.emergencyContactPhone = 'Phone number must be exactly 10 digits';
-    }
-
     setFormErrors(errors);
     return { isValid: Object.keys(errors).length === 0, errors };
   };
@@ -1456,8 +1314,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     const stepMap = {
       fullName: 1, email: 1, phone: 1, country: 1, numberOfPassengers: 1,
       nationalPark: 2, safariType: 2,
-      hotelName: 3, hotelAddress: 3, pickupLocation: 3, dropoffLocation: 3,
-      emergencyContactName: 6, emergencyContactPhone: 6
+      hotelName: 3, hotelAddress: 3, pickupLocation: 3, dropoffLocation: 3
     };
     return stepMap[fieldName] || 1;
   };
@@ -1610,7 +1467,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         console.warn('⚠️ Could not verify user role:', roleCheckError);
       }
 
-      // Calculate total price based on half-day/full-day
+      // Calculate total price - use the same logic as calculateTotalPrice() function
       let totalPrice = 0;
 
       // If package booking, use package prices based on vehicle type
@@ -1633,13 +1490,50 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           totalPrice += dateType === 'half-day' ? halfDayPrice : fullDayPrice;
         });
       } else {
-        // Regular booking - use driver's regular prices
+        // Regular booking - use vehicle-specific prices (matches calculateTotalPrice())
         selectedDates.forEach(date => {
           const dateString = date.toDateString();
           const dateType = selectedDatesWithType[dateString] || 'full-day';
-          const dailyPrice = driver.pricePerDay || 0;
-          totalPrice += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
+
+          // Determine price based on vehicle type (same logic as calculateTotalPrice)
+          let dayPrice = 0;
+          if (selectedVehicleType === 'Standard Safari Jeep') {
+            dayPrice = dateType === 'half-day'
+              ? (driver.priceHalfDayStandard || driver.pricePerDay * 0.6 || 0)
+              : (driver.priceFullDayStandard || driver.pricePerDay || 0);
+          } else if (selectedVehicleType === 'Luxury Safari Jeep') {
+            dayPrice = dateType === 'half-day'
+              ? (driver.priceHalfDayLuxury || driver.pricePerDay * 0.8 || 0)
+              : (driver.priceFullDayLuxury || driver.pricePerDay * 1.5 || 0);
+          } else {
+            // Fallback to legacy pricing
+            dayPrice = dateType === 'half-day' ? (driver.pricePerDay * 0.6 || 0) : (driver.pricePerDay || 0);
+          }
+
+          totalPrice += dayPrice;
         });
+
+        // Add add-ons prices (only for regular bookings)
+        if (bookingFormData.needsBinoculars) totalPrice += 500;
+        if (bookingFormData.needsChildSeat) totalPrice += 1000;
+        if (bookingFormData.needsWater) totalPrice += 300;
+
+        // Add snacks prices
+        if (bookingFormData.needsSnacks && bookingFormData.selectedSnacks) {
+          const snackPrices = {
+            'Biscuits': 200,
+            'Chips': 250,
+            'Fruits': 400,
+            'Sandwiches': 500,
+            'Rice & Curry': 800,
+            'Fried Rice': 700,
+            'Noodles': 600,
+            'Soft Drinks': 150
+          };
+          bookingFormData.selectedSnacks.forEach(snack => {
+            totalPrice += snackPrices[snack] || 0;
+          });
+        }
       }
 
       const datesString = selectedDates.map(d => {
@@ -1697,8 +1591,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         packagePriceHalfDay: selectedPackage?.halfDayPrice || null,
         // Include all booking form data
         ...bookingFormData,
-        // Combine country code with phone number for emergency contact
-        emergencyContactPhone: emergencyCountryCode + bookingFormData.emergencyContactPhone,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -1846,8 +1738,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 📍 Pickup: ${bookingFormData.pickupLocation}
 📍 Drop-off: ${bookingFormData.dropoffLocation}${bookingFormData.needsHotelPickup ? `\n🏨 Hotel: ${bookingFormData.hotelName}, ${bookingFormData.hotelAddress}` : ''}
 
-📝 Special Requests: ${bookingFormData.specialAssistance || 'None'}
-🆘 Emergency Contact: ${bookingFormData.emergencyContactName} - ${bookingFormData.emergencyContactPhone}`;
+📝 Special Requests: ${bookingFormData.specialAssistance || 'None'}`;
 
         const notificationData = {
           type: 'booking',
@@ -1969,9 +1860,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         needsWater: false,
         needsSnacks: false,
         selectedSnacks: [],
-        dateSafariTypes: {},
-        emergencyContactName: '',
-        emergencyContactPhone: ''
+        dateSafariTypes: {}
       });
       setIsBooking(false);
 
@@ -2510,8 +2399,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         selectedPackage={selectedPackage}
         selectedVehicleType={selectedVehicleType}
         halfDayTimes={halfDayTimes}
-        emergencyCountryCode={emergencyCountryCode}
-        setEmergencyCountryCode={setEmergencyCountryCode}
       />
 
       <GlobalNotificationBell

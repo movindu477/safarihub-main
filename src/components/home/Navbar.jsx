@@ -310,7 +310,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   // Determine user role (must be after userData is set) - memoized
   const userRole = useMemo(() => userData?.serviceType || null, [userData?.serviceType]);
   const isServiceProvider = useMemo(() =>
-    Boolean(userData && (userRole === "Jeep Driver" || userRole === "Tour Guide")),
+    Boolean(userData && (userRole === "Jeep Driver" || userRole === "Tour Guide" || userRole === "Renting")),
     [userData, userRole]
   );
 
@@ -499,7 +499,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             </button>
           ))}
 
-          {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers & guides) */}
+          {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers, tour guides & renting stores) */}
           {/* Wait for user data to load before showing to prevent glitch */}
           {!loading && !isServiceProvider && (
             <div
@@ -694,7 +694,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                   </button>
                 ))}
 
-                {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers & guides) */}
+                {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers, tour guides & renting stores) */}
                 {/* Wait for user data to load before showing to prevent glitch */}
                 {!loading && !isServiceProvider && (
                   <div className="border-b border-gray-700/40">
@@ -995,7 +995,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     </button>
                   )}
 
-                  {/* Manage Products - Only for Renting Shops */}
+                  {/* My Products - Only for Renting Shops */}
                   {userData?.serviceType === 'Renting' && (
                     <button
                       onClick={() => {
@@ -1009,7 +1009,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                         <Package className="h-5 w-5 text-gray-300" />
                       </div>
                       <span className="font-medium text-gray-200">
-                        Manage Products
+                        My Products
                       </span>
                     </button>
                   )}
@@ -1033,22 +1033,24 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     </button>
                   )}
 
-                  {/* Payment Wallet - For ALL Service Providers */}
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      navigate('/payment-wallet');
-                    }}
-                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                    style={{ animationDelay: "700ms" }}
-                  >
-                    <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                      <CreditCard className="h-5 w-5 text-gray-300" />
-                    </div>
-                    <span className="font-medium text-gray-200">
-                      Payment Wallet
-                    </span>
-                  </button>
+                  {/* Payment Wallet - For Jeep Drivers and Tour Guides only (NOT Renting) */}
+                  {userData?.serviceType !== 'Renting' && (
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/payment-wallet');
+                      }}
+                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                      style={{ animationDelay: "700ms" }}
+                    >
+                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                        <CreditCard className="h-5 w-5 text-gray-300" />
+                      </div>
+                      <span className="font-medium text-gray-200">
+                        Payment Wallet
+                      </span>
+                    </button>
+                  )}
 
                   {/* Help & Support */}
                   <button

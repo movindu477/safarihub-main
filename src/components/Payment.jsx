@@ -225,14 +225,6 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   const handlePayment = async () => {
     if (!booking) return;
 
-    // Validate emergency contact phone if provided
-    if (formData.emergencyContactPhone) {
-      const phoneDigits = formData.emergencyContactPhone.replace(/\D/g, '');
-      if (phoneDigits.length !== 10) {
-        alert('Emergency contact phone must be exactly 10 digits');
-        return;
-      }
-    }
 
     const validationError = validateCard();
     if (validationError) {
@@ -833,12 +825,12 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
 // Booking Form Component
 function BookingForm({ formData, setFormData, formErrors, currentStep, setCurrentStep, onSubmit, booking }) {
+  // Emergency Contact step removed - form submits from Additional Requests
   const steps = [
     { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
     { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
     { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
-    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package },
-    { number: 5, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
+    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package }
   ];
 
   const updateFormData = (field, value) => {
@@ -1262,52 +1254,6 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
           </div>
         )}
 
-        {/* Step 5: Emergency Contact */}
-        {currentStep === 5 && (
-          <div className="space-y-3 sm:space-y-4">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
-              <span>Emergency Contact</span>
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Emergency Contact Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.emergencyContactName}
-                  onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                    }`}
-                  placeholder="Full name"
-                />
-                {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Emergency Contact Phone <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={formData.emergencyContactPhone}
-                  onChange={(e) => {
-                    // Only allow digits, max 10 digits
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                    updateFormData('emergencyContactPhone', value);
-                  }}
-                  maxLength={10}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
-                    }`}
-                  placeholder="771234567"
-                />
-                {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Navigation Buttons */}

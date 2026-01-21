@@ -479,6 +479,16 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
         if (guideDoc.exists()) {
           const guideData = guideDoc.data();
           console.log('✅ Guide data found in Firestore:', guideData);
+          
+          // Debug: Log pricing fields from database
+          console.log('💰 Pricing fields from database:', {
+            priceFullDayStandard: guideData.priceFullDayStandard,
+            priceHalfDayStandard: guideData.priceHalfDayStandard,
+            fullDayPrice: guideData.fullDayPrice,
+            halfDayPrice: guideData.halfDayPrice,
+            dailyRate: guideData.dailyRate,
+            hourlyRate: guideData.hourlyRate
+          });
 
           // Transform data to match the structure expected by the profile page
           const transformedGuide = {
@@ -549,6 +559,14 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
             isCurrentUser: currentUser && currentUser.uid === guideId
           };
+
+          // Debug: Log transformed pricing values
+          console.log('💰 Transformed pricing values:', {
+            priceFullDayStandard: transformedGuide.priceFullDayStandard,
+            priceHalfDayStandard: transformedGuide.priceHalfDayStandard,
+            fullDayPrice: transformedGuide.fullDayPrice,
+            halfDayPrice: transformedGuide.halfDayPrice
+          });
 
           setGuide(transformedGuide);
 
@@ -1404,13 +1422,13 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       </div>
                     </div>
 
-                    {/* Pricing - Full Day and Half Day Rates */}
-                    {(guide.priceFullDayStandard > 0 || guide.priceHalfDayStandard > 0) && (
-                      <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                    {/* Pricing - Guide's Registered Rates (Always Visible) */}
+                    <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                      <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <DollarSign className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-black mb-2 sm:mb-2.5 flex items-center text-xs sm:text-sm md:text-base">
-                          <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
-                            <DollarSign className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
-                          </div>
                           Rates
                           {guide.certificationStatus === 'certified' && guide.certificationApproved && (
                             <span className="ml-2 text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium border border-yellow-300">
@@ -1420,7 +1438,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                         </h3>
                         <div className="space-y-1.5 sm:space-y-2">
                           {/* Full Day Price */}
-                          {guide.priceFullDayStandard > 0 && (
+                          {guide.priceFullDayStandard > 0 ? (
                             <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                               <div className="flex-1 min-w-0 pr-2">
                                 <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Full Day Tour:</span>
@@ -1433,9 +1451,19 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                 <span className="text-xs font-semibold text-emerald-600 block">/day</span>
                               </div>
                             </div>
+                          ) : (
+                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="text-gray-800 font-bold text-xs sm:text-sm block">Full Day Tour:</span>
+                                <p className="text-xs text-gray-600 mt-0.5">Full day guided tour</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-xs sm:text-sm text-gray-500 italic">Not Set</span>
+                              </div>
+                            </div>
                           )}
                           {/* Half Day Price */}
-                          {guide.priceHalfDayStandard > 0 && (
+                          {guide.priceHalfDayStandard > 0 ? (
                             <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                               <div className="flex-1 min-w-0 pr-2">
                                 <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Half Day Tour:</span>
@@ -1448,10 +1476,20 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                 <span className="text-xs font-semibold text-emerald-600 block">/half day</span>
                               </div>
                             </div>
+                          ) : (
+                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="text-gray-800 font-bold text-xs sm:text-sm block">Half Day Tour:</span>
+                                <p className="text-xs text-gray-600 mt-0.5">Half day guided tour</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-xs sm:text-sm text-gray-500 italic">Not Set</span>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
-                    )}
+                    </div>
 
                     {/* Languages */}
                     {guide.languages && guide.languages.length > 0 && (
@@ -1475,14 +1513,14 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       </div>
                     )}
 
-                    {/* Destination Covered */}
-                    {guide.destinations && guide.destinations.length > 0 && (
-                      <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
-                          <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Destination Covered</h3>
+                    {/* Destination Covered (Always Visible) */}
+                    <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                      <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Destination Covered</h3>
+                        {guide.destinations && guide.destinations.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {guide.destinations.map((dest, index) => (
                               <span
@@ -1493,9 +1531,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                               </span>
                             ))}
                           </div>
-                        </div>
+                        ) : (
+                          <p className="text-xs sm:text-sm text-gray-500 italic">No destinations specified</p>
+                        )}
                       </div>
-                    )}
+                    </div>
 
                     {/* Certifications - Only for certified guides */}
                     {guide.certificationStatus === 'certified' && (guide.certificationDocuments?.length > 0 || guide.certifications?.length > 0) && (
@@ -1661,37 +1701,43 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                             {/* Expanded Details - Shows ABOVE button when expanded */}
                             {expandedPackage === pkg.id && (pkg.rules || pkg.benefits || pkg.facilities) && (
-                              <div className="mt-4 space-y-4">
+                              <div className="mt-4 space-y-3 border-t border-gray-200 pt-4">
                                 {/* Rules & Regulations */}
                                 {pkg.rules && pkg.rules.trim() && (
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <FileText className="h-5 w-5 text-blue-600" />
-                                      <h4 className="font-semibold text-blue-900">Rules & Regulations</h4>
-                                    </div>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.rules}</p>
+                                  <div>
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                      <FileText className="h-4 w-4 text-blue-600" />
+                                      Rules & Regulations
+                                    </h4>
+                                    <p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                      {pkg.rules}
+                                    </p>
                                   </div>
                                 )}
 
                                 {/* Benefits */}
                                 {pkg.benefits && pkg.benefits.trim() && (
-                                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <CheckCircle className="h-5 w-5 text-green-600" />
-                                      <h4 className="font-semibold text-green-900">Benefits</h4>
-                                    </div>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.benefits}</p>
+                                  <div>
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                      Benefits
+                                    </h4>
+                                    <p className="text-sm text-gray-600 whitespace-pre-wrap bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                                      {pkg.benefits}
+                                    </p>
                                   </div>
                                 )}
 
                                 {/* Facilities */}
                                 {pkg.facilities && pkg.facilities.trim() && (
-                                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Package className="h-5 w-5 text-purple-600" />
-                                      <h4 className="font-semibold text-purple-900">Facilities</h4>
-                                    </div>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.facilities}</p>
+                                  <div>
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                      <Package className="h-4 w-4 text-purple-600" />
+                                      Facilities
+                                    </h4>
+                                    <p className="text-sm text-gray-600 whitespace-pre-wrap bg-purple-50 p-3 rounded-lg border border-purple-200">
+                                      {pkg.facilities}
+                                    </p>
                                   </div>
                                 )}
                               </div>

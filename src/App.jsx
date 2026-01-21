@@ -2939,6 +2939,13 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         if (serviceType === "Tour Guide") {
           // Convert single destination to array format for Firestore compatibility
           const destinationsArray = destinations ? [destinations] : [];
+          
+          // Parse pricing - Remove commas and convert to numbers
+          const parsePrice = (priceString) => {
+            if (!priceString) return 0;
+            return parseInt(String(priceString).replace(/,/g, '')) || 0;
+          };
+          
           userData = {
             ...userData,
             destinations: destinationsArray,
@@ -2947,8 +2954,14 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             certifications: certifications || [], // Add certifications field
             verificationDocuments: verificationDocuments || [],
             verificationDocumentUrls: {}, // Will be populated after file uploads
+            // Save Guide's Registered Rates (from registration form)
+            priceFullDayStandard: parsePrice(priceFullDayStandard),
+            priceHalfDayStandard: parsePrice(priceHalfDayStandard),
+            // Legacy fields for backward compatibility
             hourlyRate: hourlyRate ? parseInt(hourlyRate) : 0,
             dailyRate: dailyRate ? parseInt(dailyRate) : 0,
+            fullDayPrice: parsePrice(priceFullDayStandard), // Alias
+            halfDayPrice: parsePrice(priceHalfDayStandard), // Alias
             specialPackageRates: specialPackageRates || "",
             currencyPreference: currencyPreference || "LKR",
             languages: languages || [],
@@ -2957,12 +2970,15 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             featured: false,
           };
         } else if (serviceType === "Renting") {
-          // For Renting Shop
+          // For Renting Shop - Same features as Jeep Driver
+          // Convert single destination to array format for Firestore compatibility
+          const destinationsArray = destinations ? [destinations] : [];
           userData = {
             ...userData,
-            province: destinations || "", // Store province instead of destination for renting shops
-            languages: [], // Not applicable for renting shops
-            specialSkills: [], // Not applicable for renting shops
+            destinations: destinationsArray, // Use destinations like jeep drivers
+            province: destinations || "", // Keep province for backward compatibility
+            languages: languages || [], // Include languages (same as jeep drivers)
+            specialSkills: specialSkills || [], // Include special skills (same as jeep drivers)
             certifications: certifications || [],
             certificationUrls: {}, // Will be populated after file uploads
             availability: availableDates || {}, // Object mapping dates to status (busy, halfday, unavailable)
@@ -4808,8 +4824,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       </div>
                     )}
 
-                    {/* Languages Spoken (Only for Jeep Driver - NOT for Renting) */}
-                    {isJeepDriver && (
+                    {/* Languages Spoken (For Jeep Driver and Renting Stores) */}
+                    {(isJeepDriver || isRenting) && (
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Languages Spoken
@@ -4833,8 +4849,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       </div>
                     )}
 
-                    {/* Special Skills (Only for Jeep Driver - NOT for Renting) */}
-                    {isJeepDriver && (
+                    {/* Special Skills (For Jeep Driver and Renting Stores) */}
+                    {(isJeepDriver || isRenting) && (
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Special Skills

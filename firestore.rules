@@ -164,11 +164,12 @@ service cloud.firestore {
 
     function hasProviderId() {
       return request.resource.data.driverId != null
-             || request.resource.data.guideId != null;
+             || request.resource.data.guideId != null
+             || request.resource.data.providerId != null;
     }
 
     // =========================
-    // Reviews (user → driver/guide)
+    // Reviews (user → driver/guide/renting provider)
     // =========================
     match /reviews/{reviewId} {
       // Anyone can read reviews
@@ -222,10 +223,10 @@ service cloud.firestore {
     }
 
     // =========================
-    // Bookings (customer ↔ driver/guide)
+    // Bookings (customer ↔ driver/guide) - UPDATED FOR PACKAGE BOOKING
     // =========================
     match /bookings/{bookingId} {
-      // Customer creates booking
+      // Customer creates booking (supports both regular and package bookings)
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.customerId
         && hasProviderId()
@@ -237,6 +238,7 @@ service cloud.firestore {
         request.auth.uid == resource.data.customerId
         || request.auth.uid == resource.data.driverId
         || request.auth.uid == resource.data.guideId
+        || request.auth.uid == resource.data.providerId
         || isAdmin()
       );
 
@@ -245,6 +247,7 @@ service cloud.firestore {
         request.auth.uid == resource.data.customerId
         || request.auth.uid == resource.data.driverId
         || request.auth.uid == resource.data.guideId
+        || request.auth.uid == resource.data.providerId
         || isAdmin()
       );
 
@@ -266,6 +269,7 @@ service cloud.firestore {
         request.auth.uid == resource.data.customerId
         || request.auth.uid == resource.data.driverId
         || request.auth.uid == resource.data.guideId
+        || request.auth.uid == resource.data.providerId
         || isAdmin()
       );
     }
@@ -304,13 +308,15 @@ service cloud.firestore {
     }
 
     // =========================
-    // Service Providers (drivers & guides)
+    // Service Providers (drivers, guides & renting shops) - ENHANCED
     // =========================
     match /serviceProviders/{providerId} {
-      // Public profiles are readable by anyone
+      // ✅ Public profiles are readable by anyone (for guide/driver/renting listings and profiles)
       allow read: if true;
 
       // Provider or admin can create/update
+      // Supports all field variations: destinations, destinationsCovered, certifications, etc.
+      // Supports all service types: Jeep Driver, Tour Guide, Renting
       allow create, update: if request.auth != null && (
         request.auth.uid == providerId
         || isAdmin()
@@ -344,10 +350,10 @@ service cloud.firestore {
     }
 
     // =========================
-    // Jeep Driver Certifications
+    // Jeep Driver Certifications (Also used by Renting Shops)
     // =========================
     match /jeepDriverCertifications/{userId} {
-      // Anyone can read certifications
+      // ✅ Anyone can read certifications (public profile display)
       allow read: if true;
 
       // Provider or admin can create/update
@@ -369,7 +375,7 @@ service cloud.firestore {
     // Guide Certifications
     // =========================
     match /guideCertifications/{userId} {
-      // Anyone can read certifications
+      // ✅ Anyone can read certifications (public profile display)
       allow read: if true;
 
       // Provider or admin can create/update
@@ -400,6 +406,228 @@ service cloud.firestore {
       // Admin documents are created/updated ONLY manually (Firestore Console)
       // No UI-based registration or modification allowed
       allow create, update, delete: if false;
+    }
+
+    // =========================
+    // 📦 SERVICE PACKAGES (Jeep Drivers & Tour Guides) - ENHANCED
+    // =========================
+    match /servicePackages/{packageId} {
+      // ✅ Anyone can read packages (public visibility for booking)
+      allow read: if true;
+
+      // Provider can create their own packages
+      // Supports both Tour Guide (simple pricing) and Jeep Driver (vehicle-based pricing)
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.providerId
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        // Tour Guide: Must have fullDayPrice and halfDayPrice
+        && (
+          (request.resource.data.fullDayPrice is number
+            && request.resource.data.halfDayPrice is number)
+          ||
+          // Jeep Driver: Must have vehicle types and their prices
+          (request.resource.data.hasStandardJeep == true
+            && request.resource.data.fullDayPriceStandard is number
+            && request.resource.data.halfDayPriceStandard is number)
+          ||
+          (request.resource.data.hasLuxuryJeep == true
+            && request.resource.data.fullDayPriceLuxury is number
+            && request.resource.data.halfDayPriceLuxury is number)
+        );
+
+      // Provider or admin can update
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.providerId
+        || isAdmin()
+      );
+
+      // Provider or admin can delete
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.providerId
+        || isAdmin()
+      );
+    }
+
+    // =========================
+    // 🎒 RENTAL PRODUCTS (Equipment Renting)
+    // =========================
+    match /rentalProducts/{productId} {
+      // Anyone can read available products (public listing)
+      allow read: if true;
+
+      // Renting shop provider can create products
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.providerId
+        && request.resource.data.title is string
+        && request.resource.data.category is string
+        && request.resource.data.pricePerDay is number
+        && request.resource.data.quantity is number;
+
+      // Provider or admin can update
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.providerId
+        || isAdmin()
+      );
+
+      // Provider or admin can delete
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.providerId
+        || isAdmin()
+      );
+    }
+
+    // =========================
+    // 🏕️ RENTALS (Equipment Rental Requests)
+    // =========================
+    match /rentals/{rentalId} {
+      // Customer creates rental request
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.customerId
+        && request.resource.data.productId != null
+        && request.resource.data.providerId != null
+        && request.resource.data.startDate is string
+        && request.resource.data.endDate is string;
+
+      // Customer, provider, or admin can read
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.customerId
+        || request.auth.uid == resource.data.providerId
+        || isAdmin()
+      );
+
+      // Customer, provider, or admin can update
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.customerId
+        || request.auth.uid == resource.data.providerId
+        || isAdmin()
+      );
+
+      // Customer or admin can delete
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.customerId
+        || isAdmin()
+      );
+    }
+
+    // =========================
+    // 🎯 USER PREFERENCES (Personalization)
+    // =========================
+    match /userPreferences/{userId} {
+      // User can read their own preferences
+      allow read: if request.auth != null && (
+        request.auth.uid == userId
+        || isAdmin()
+      );
+
+      // User can create/update their own preferences
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId;
+
+      // User or admin can delete
+      allow delete: if request.auth != null && (
+        request.auth.uid == userId
+        || isAdmin()
+      );
+    }
+
+    // =========================
+    // 📊 USER ACTIVITIES (Tracking)
+    // =========================
+    match /userActivities/{activityId} {
+      // User can read their own activities, admin can read all
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.userId
+        || isAdmin()
+      );
+
+      // User can create their own activities
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId
+        && request.resource.data.type is string
+        && request.resource.data.itemId is string
+        && request.resource.data.itemType is string;
+
+      // No direct updates allowed (activities are immutable records)
+      allow update: if false;
+
+      // User or admin can delete
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.userId
+        || isAdmin()
+      );
+    }
+
+    // =========================
+    // 👁️ RECENTLY VIEWED
+    // =========================
+    match /recentlyViewed/{userId} {
+      // User can read their own recently viewed
+      allow read: if request.auth != null && (
+        request.auth.uid == userId
+        || isAdmin()
+      );
+
+      // User can create/update their own recently viewed
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.items is list;
+
+      // User or admin can delete
+      allow delete: if request.auth != null && (
+        request.auth.uid == userId
+        || isAdmin()
+      );
+    }
+
+    // =========================
+    // ❤️ FAVORITES
+    // =========================
+    match /favorites/{userId} {
+      // User can read their own favorites
+      allow read: if request.auth != null && (
+        request.auth.uid == userId
+        || isAdmin()
+      );
+
+      // User can create/update their own favorites
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.items is list;
+
+      // User or admin can delete
+      allow delete: if request.auth != null && (
+        request.auth.uid == userId
+        || isAdmin()
+      );
+    }
+
+    // =========================
+    // 🔔 ADMIN NOTIFICATIONS
+    // =========================
+    match /adminNotifications/{notificationId} {
+      // Only admins can read admin notifications
+      allow read: if isAdmin();
+
+      // System can create admin notifications
+      allow create: if request.auth != null;
+
+      // Only admins can update/delete
+      allow update, delete: if isAdmin();
+    }
+
+    // =========================
+    // 📋 ADMIN AUDIT LOG
+    // =========================
+    match /adminAuditLog/{logId} {
+      // Only admins can read audit logs
+      allow read: if isAdmin();
+
+      // System can create audit logs
+      allow create: if request.auth != null;
+
+      // Audit logs are immutable (no updates/deletes)
+      allow update, delete: if false;
     }
   }
 }
