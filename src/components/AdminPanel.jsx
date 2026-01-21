@@ -275,10 +275,10 @@ const AdminPanel = () => {
     }
   };
 
-  // Handle certification status update
-  const handleCertificationUpdate = async (status) => {
+  // Handle certification approval/rejection
+  const handleCertificationUpdate = async (action) => {
     try {
-      setCertificationAction(status);
+      setCertificationAction(action);
       setCertificationSuccess(null);
       setDocumentError(null);
 
@@ -286,45 +286,96 @@ const AdminPanel = () => {
         throw new Error('No user selected');
       }
 
-      // Update the serviceProvider document
-      const providerRef = doc(db, 'serviceProviders', selectedUser.id);
-      await updateDoc(providerRef, {
-        certificationStatus: status,
-        certifiedAt: status === 'certified' ? serverTimestamp() : null,
-        certifiedBy: status === 'certified' ? currentUser.uid : null,
-        lastUpdated: serverTimestamp()
-      });
-
-      // Show success message
-      const statusText = status === 'certified' ? 'Certified' : 'Uncertified';
-      setCertificationSuccess(`Successfully marked as ${statusText}! The ${selectedUser.userType === 'jeepDriver' ? 'driver' : 'guide'} will now appear in the ${statusText} section.`);
-
-      // Update local state
-      setSelectedUser(prev => ({
-        ...prev,
-        certificationStatus: status
-      }));
-
-      // Update the lists
-      if (selectedUser.userType === 'jeepDriver') {
-        setJeepDrivers(prev => prev.map(driver => 
-          driver.id === selectedUser.id 
-            ? { ...driver, certificationStatus: status }
-            : driver
-        ));
-      } else if (selectedUser.userType === 'tourGuide') {
-        setTourGuides(prev => prev.map(guide => 
-          guide.id === selectedUser.id 
-            ? { ...guide, certificationStatus: status }
-            : guide
-        ));
+      // Only allow approval/rejection for providers who registered as certified
+      if (selectedUser.certificationStatus !== 'certified') {
+        throw new Error('This provider did not register as a certified service provider');
       }
 
-      console.log(`✅ Successfully updated certification status to: ${status}`);
+      const providerRef = doc(db, 'serviceProviders', selectedUser.id);
+      
+      if (action === 'approve') {
+        // Approve certification
+        await updateDoc(providerRef, {
+          certificationStatus: 'certified',
+          certificationApproved: true,
+          certificationRejected: false,
+          certifiedAt: serverTimestamp(),
+          certifiedBy: currentUser.uid,
+          lastUpdated: serverTimestamp()
+        });
+
+        setCertificationSuccess(`✅ Certification approved! The ${selectedUser.userType === 'jeepDriver' ? 'driver' : 'guide'} is now a certified service provider.`);
+        
+        // Update local state
+        setSelectedUser(prev => ({
+          ...prev,
+          certificationApproved: true,
+          certificationRejected: false,
+          certifiedAt: new Date(),
+          certifiedBy: currentUser.uid
+        }));
+
+        // Update the lists
+        if (selectedUser.userType === 'jeepDriver') {
+          setJeepDrivers(prev => prev.map(driver => 
+            driver.id === selectedUser.id 
+              ? { ...driver, certificationApproved: true, certificationRejected: false }
+              : driver
+          ));
+        } else if (selectedUser.userType === 'tourGuide') {
+          setTourGuides(prev => prev.map(guide => 
+            guide.id === selectedUser.id 
+              ? { ...guide, certificationApproved: true, certificationRejected: false }
+              : guide
+          ));
+        }
+
+      } else if (action === 'reject') {
+        // Reject certification
+        await updateDoc(providerRef, {
+          certificationStatus: 'uncertified',
+          certificationApproved: false,
+          certificationRejected: true,
+          rejectedAt: serverTimestamp(),
+          rejectedBy: currentUser.uid,
+          certifiedAt: null,
+          certifiedBy: null,
+          lastUpdated: serverTimestamp()
+        });
+
+        setCertificationSuccess(`❌ Certification rejected. The provider has been marked as uncertified.`);
+        
+        // Update local state
+        setSelectedUser(prev => ({
+          ...prev,
+          certificationStatus: 'uncertified',
+          certificationApproved: false,
+          certificationRejected: true,
+          rejectedAt: new Date(),
+          rejectedBy: currentUser.uid
+        }));
+
+        // Update the lists
+        if (selectedUser.userType === 'jeepDriver') {
+          setJeepDrivers(prev => prev.map(driver => 
+            driver.id === selectedUser.id 
+              ? { ...driver, certificationStatus: 'uncertified', certificationApproved: false, certificationRejected: true }
+              : driver
+          ));
+        } else if (selectedUser.userType === 'tourGuide') {
+          setTourGuides(prev => prev.map(guide => 
+            guide.id === selectedUser.id 
+              ? { ...guide, certificationStatus: 'uncertified', certificationApproved: false, certificationRejected: true }
+              : guide
+          ));
+        }
+      }
+
+      console.log(`✅ Successfully ${action}ed certification for ${selectedUser.userType}`);
 
     } catch (error) {
-      console.error('❌ Error updating certification status:', error);
-      setDocumentError(error.message || 'Failed to update certification status. Please try again.');
+      console.error('❌ Error updating certification:', error);
+      setDocumentError(error.message || 'Failed to update certification. Please try again.');
     } finally {
       setCertificationAction(null);
     }
@@ -1169,26 +1220,33 @@ const AdminPanel = () => {
                     {/* Certification Status Badge */}
                     <div className="flex items-center gap-2">
                       <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${
-                        selectedUser.certificationStatus === 'certified' 
+                        selectedUser.certificationStatus === 'certified' && selectedUser.certificationApproved === true
                           ? 'bg-green-900/50 text-green-300 border border-green-500/30' 
-                          : selectedUser.certificationStatus === 'uncertified'
+                          : selectedUser.certificationStatus === 'certified' && selectedUser.certificationApproved !== true
+                          ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30'
+                          : selectedUser.certificationRejected || selectedUser.certificationStatus === 'uncertified'
                           ? 'bg-red-900/50 text-red-300 border border-red-500/30'
-                          : 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30'
+                          : 'bg-gray-700/50 text-gray-300 border border-gray-600/30'
                       }`}>
-                        {selectedUser.certificationStatus === 'certified' ? (
+                        {selectedUser.certificationStatus === 'certified' && selectedUser.certificationApproved === true ? (
                           <>
                             <CheckCircle className="h-3.5 w-3.5" />
-                            Certified
+                            Certified & Approved
                           </>
-                        ) : selectedUser.certificationStatus === 'uncertified' ? (
+                        ) : selectedUser.certificationStatus === 'certified' && selectedUser.certificationApproved !== true ? (
+                          <>
+                            <Clock className="h-3.5 w-3.5" />
+                            Pending Approval
+                          </>
+                        ) : selectedUser.certificationRejected || selectedUser.certificationStatus === 'uncertified' ? (
                           <>
                             <XCircle className="h-3.5 w-3.5" />
-                            Uncertified
+                            Rejected / Uncertified
                           </>
                         ) : (
                           <>
-                            <Clock className="h-3.5 w-3.5" />
-                            Pending Review
+                            <Shield className="h-3.5 w-3.5" />
+                            Non-Certified Service
                           </>
                         )}
                       </span>
@@ -1215,56 +1273,72 @@ const AdminPanel = () => {
                     </div>
                   )}
 
-                  {/* Certification Action Buttons */}
-                  <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    <button
-                      onClick={() => handleCertificationUpdate('certified')}
-                      disabled={certificationAction !== null || selectedUser.certificationStatus === 'certified'}
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
-                        selectedUser.certificationStatus === 'certified'
-                          ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                          : certificationAction === 'certified'
-                          ? 'bg-green-700 text-white cursor-wait'
-                          : 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-green-500/20'
-                      }`}
-                    >
-                      {certificationAction === 'certified' ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4" />
-                          Mark as Certified
-                        </>
-                      )}
-                    </button>
+                  {/* Certification Action Buttons - Only show if provider registered as certified */}
+                  {selectedUser.certificationStatus === 'certified' && (
+                    <div className="mb-4 sm:mb-6">
+                      <p className="text-gray-400 text-xs mb-3">
+                        Review the certification documents above and approve or reject this provider's certification:
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <button
+                          onClick={() => handleCertificationUpdate('approve')}
+                          disabled={certificationAction !== null || selectedUser.certificationApproved === true}
+                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                            selectedUser.certificationApproved === true
+                              ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                              : certificationAction === 'approve'
+                              ? 'bg-green-700 text-white cursor-wait'
+                              : 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-green-500/20'
+                          }`}
+                        >
+                          {certificationAction === 'approve' ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Approving...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4" />
+                              {selectedUser.certificationApproved === true ? 'Already Approved' : 'Approve Certification'}
+                            </>
+                          )}
+                        </button>
 
-                    <button
-                      onClick={() => handleCertificationUpdate('uncertified')}
-                      disabled={certificationAction !== null || selectedUser.certificationStatus === 'uncertified'}
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
-                        selectedUser.certificationStatus === 'uncertified'
-                          ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                          : certificationAction === 'uncertified'
-                          ? 'bg-red-700 text-white cursor-wait'
-                          : 'bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-red-500/20'
-                      }`}
-                    >
-                      {certificationAction === 'uncertified' ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-4 w-4" />
-                          Mark as Uncertified
-                        </>
-                      )}
-                    </button>
-                  </div>
+                        <button
+                          onClick={() => handleCertificationUpdate('reject')}
+                          disabled={certificationAction !== null || selectedUser.certificationRejected === true}
+                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                            selectedUser.certificationRejected === true
+                              ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                              : certificationAction === 'reject'
+                              ? 'bg-red-700 text-white cursor-wait'
+                              : 'bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-red-500/20'
+                          }`}
+                        >
+                          {certificationAction === 'reject' ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Rejecting...
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-4 w-4" />
+                              {selectedUser.certificationRejected === true ? 'Already Rejected' : 'Reject Certification'}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Message for non-certified providers */}
+                  {selectedUser.certificationStatus !== 'certified' && (
+                    <div className="mb-4 sm:mb-6 bg-gray-700/30 border border-gray-600 rounded-lg p-4">
+                      <p className="text-gray-400 text-sm">
+                        ℹ️ This service provider registered as a non-certified provider. Certification approval is not required.
+                      </p>
+                    </div>
+                  )}
                   
                   {loadingDetails ? (
                     <div className="flex items-center justify-center py-6 sm:py-8">
