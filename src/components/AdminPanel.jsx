@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth, signOut } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, where, query, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, where, query, doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { getDocumentUrl } from '../lib/supabase';
 import { 
@@ -26,7 +26,10 @@ import {
   Shield,
   ExternalLink,
   CheckCircle,
-  XCircle
+  XCircle,
+  Trash2,
+  Store,
+  ShoppingBag
 } from 'lucide-react';
 
 const AdminPanel = () => {
@@ -45,6 +48,8 @@ const AdminPanel = () => {
   const [documentError, setDocumentError] = useState(null);
   const [certificationAction, setCertificationAction] = useState(null);
   const [certificationSuccess, setCertificationSuccess] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   
   // Dashboard Stats
   const [stats, setStats] = useState({
@@ -148,24 +153,59 @@ const AdminPanel = () => {
     }
   };
 
-  // View full details of a user (jeep driver, guide, or tourist)
+  // View full details of a user (jeep driver, guide, renting store, or tourist)
   const handleViewDetails = async (user, userType) => {
     setSelectedUser({ ...user, userType });
     setShowDetailModal(true);
     setLoadingDetails(true);
     setUserDocuments([]);
+    setDeleteConfirm(null);
 
     try {
       // Fetch documents for service providers only
       if (userType === 'jeepDriver' || userType === 'tourGuide') {
-        const collectionName = userType === 'jeepDriver' ? 'jeepDriverCertifications' : 'guideCertifications';
-        const docRef = doc(db, collectionName, user.id);
-        const docSnap = await getDoc(docRef);
+        let documents = [];
         
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setUserDocuments(data.documents || []);
+        // Try to get documents from the certification collections first
+        const collectionName = userType === 'jeepDriver' ? 'jeepDriverCertifications' : 
+                              userType === 'tourGuide' ? 'guideCertifications' : null;
+        
+        if (collectionName) {
+          try {
+            const docRef = doc(db, collectionName, user.id);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              documents = data.documents || [];
+            }
+          } catch (err) {
+            console.warn('Could not fetch from certification collection:', err);
+          }
         }
+        
+        // If no documents found, check the serviceProviders document itself
+        if (documents.length === 0) {
+          try {
+            const providerRef = doc(db, 'serviceProviders', user.id);
+            const providerSnap = await getDoc(providerRef);
+            
+            if (providerSnap.exists()) {
+              const providerData = providerSnap.data();
+              // Check for documents in various possible fields
+              documents = providerData.documents || 
+                         providerData.certificationDocuments || 
+                         providerData.uploadedDocuments || 
+                         [];
+              
+              console.log('📄 Documents found in serviceProviders:', documents.length);
+            }
+          } catch (err) {
+            console.error('Error fetching from serviceProviders:', err);
+          }
+        }
+        
+        setUserDocuments(documents);
       }
     } catch (error) {
       console.error('Error fetching user documents:', error);
@@ -181,6 +221,58 @@ const AdminPanel = () => {
     setUserDocuments([]);
     setDocumentError(null);
     setCertificationSuccess(null);
+    setDeleteConfirm(null);
+  };
+
+  // Handle user deletion
+  const handleDeleteUser = async () => {
+    if (!selectedUser || !deleteConfirm) return;
+    
+    try {
+      setDeleting(true);
+      setDocumentError(null);
+      
+      const { id, userType } = selectedUser;
+      
+      // Determine the collection to delete from
+      if (userType === 'tourist') {
+        await deleteDoc(doc(db, 'tourists', id));
+      } else {
+        await deleteDoc(doc(db, 'serviceProviders', id));
+        
+        // Also try to delete from certification collections (if exists)
+        try {
+          if (userType === 'jeepDriver') {
+            await deleteDoc(doc(db, 'jeepDriverCertifications', id));
+          } else if (userType === 'tourGuide') {
+            await deleteDoc(doc(db, 'guideCertifications', id));
+          }
+        } catch (err) {
+          console.warn('Certification docs not found or already deleted:', err);
+        }
+      }
+      
+      console.log(`✅ Successfully deleted ${userType} with ID: ${id}`);
+      
+      // Close modal and show success
+      closeDetailModal();
+      
+      // Update local state
+      if (userType === 'jeepDriver') {
+        setJeepDrivers(prev => prev.filter(d => d.id !== id));
+      } else if (userType === 'tourGuide') {
+        setTourGuides(prev => prev.filter(g => g.id !== id));
+      } else if (userType === 'tourist') {
+        setTourists(prev => prev.filter(t => t.id !== id));
+      }
+      
+    } catch (error) {
+      console.error('❌ Error deleting user:', error);
+      setDocumentError(error.message || 'Failed to delete user. Please try again.');
+    } finally {
+      setDeleting(false);
+      setDeleteConfirm(null);
+    }
   };
 
   // Handle certification status update
@@ -868,6 +960,7 @@ const AdminPanel = () => {
               </div>
             </div>
           )}
+
         </div>
       </div>
 
@@ -882,7 +975,8 @@ const AdminPanel = () => {
                 {selectedUser.userType === 'tourGuide' && <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400" />}
                 {selectedUser.userType === 'tourist' && <Users className="h-5 w-5 sm:h-6 sm:w-6 text-blue-400" />}
                 <span className="truncate">
-                  {selectedUser.userType === 'jeepDriver' ? 'Jeep Driver' : selectedUser.userType === 'tourGuide' ? 'Tour Guide' : 'Tourist'}
+                  {selectedUser.userType === 'jeepDriver' ? 'Jeep Driver' : 
+                   selectedUser.userType === 'tourGuide' ? 'Tour Guide' : 'Tourist'}
                   <span className="hidden sm:inline"> Details</span>
                 </span>
               </h2>
@@ -1230,12 +1324,70 @@ const AdminPanel = () => {
 
             {/* Modal Footer */}
             <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-gray-700 p-3 sm:p-4 lg:p-6">
-              <button
-                onClick={closeDetailModal}
-                className="w-full px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium text-sm sm:text-base"
-              >
-                Close
-              </button>
+              {/* Delete Confirmation */}
+              {deleteConfirm && (
+                <div className="mb-4 bg-red-900/30 border border-red-500/50 rounded-lg p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="p-2 bg-red-600 rounded-lg flex-shrink-0">
+                      <Trash2 className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white font-semibold mb-1">⚠️ Confirm Deletion</p>
+                      <p className="text-red-300 text-sm">
+                        Are you absolutely sure you want to delete this {selectedUser.userType === 'jeepDriver' ? 'jeep driver' : 
+                        selectedUser.userType === 'tourGuide' ? 'tour guide' : 'tourist'}?
+                        This action cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDeleteUser}
+                      disabled={deleting}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deleting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4" />
+                          Yes, Delete Permanently
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(null)}
+                      disabled={deleting}
+                      className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 sm:gap-3">
+                <button
+                  onClick={closeDetailModal}
+                  className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium text-sm sm:text-base"
+                >
+                  Close
+                </button>
+                {!deleteConfirm && (
+                  <button
+                    onClick={() => setDeleteConfirm(true)}
+                    disabled={deleting}
+                    className="flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Delete User</span>
+                    <span className="sm:hidden">Delete</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

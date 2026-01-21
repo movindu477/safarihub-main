@@ -990,7 +990,31 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700">
               {/* Header with Edit/Save Buttons */}
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-white">Profile Information</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-semibold text-white">Profile Information</h2>
+                  {/* Certification Status Badge */}
+                  {userData && (
+                    <span className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
+                      userData.certificationStatus === 'certified' && userData.certificationApproved === true
+                        ? 'bg-green-900/50 text-green-300 border border-green-500/30'
+                        : userData.certificationStatus === 'certified' && userData.certificationApproved !== true
+                        ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30'
+                        : userData.certificationStatus === 'uncertified' || userData.certificationRejected
+                        ? 'bg-red-900/50 text-red-300 border border-red-500/30'
+                        : 'bg-gray-700/50 text-gray-300 border border-gray-600/30'
+                    }`}>
+                      {userData.certificationStatus === 'certified' && userData.certificationApproved === true ? (
+                        <>✓ Certified</>
+                      ) : userData.certificationStatus === 'certified' && userData.certificationApproved !== true ? (
+                        <>⏳ Pending Approval</>
+                      ) : userData.certificationStatus === 'uncertified' || userData.certificationRejected ? (
+                        <>✗ Not Certified</>
+                      ) : (
+                        <>○ Non-Certified Service</>
+                      )}
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   {isEditing ? (
                     <>
