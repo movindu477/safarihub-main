@@ -1042,6 +1042,13 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [dateTypeMenuDate, setDateTypeMenuDate] = useState(null);
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [halfDayTimes, setHalfDayTimes] = useState({}); // {dateString: 'morning' | 'evening'}
+  
+  // Reset showTimeMenu when dateTypeMenuDate changes
+  useEffect(() => {
+    if (!dateTypeMenuDate) {
+      setShowTimeMenu(false);
+    }
+  }, [dateTypeMenuDate]);
   const [formErrors, setFormErrors] = useState({});
   const [bookingFormData, setBookingFormData] = useState({
     // Personal Details
@@ -2889,18 +2896,37 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           {/* Date Type Menu (Full Day / Half Day) - Smaller Size */}
                           {dateTypeMenuDate && (
                             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-3 min-w-[200px]">
-                              <h4 className="text-xs font-semibold text-black mb-2 text-center">
-                                {dateTypeMenuDate.toLocaleDateString()}
-                              </h4>
+                              <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-xs font-semibold text-black text-center flex-1">
+                                  {dateTypeMenuDate.toLocaleDateString()}
+                                </h4>
+                                <button
+                                  onClick={() => {
+                                    setDateTypeMenuDate(null);
+                                    setShowTimeMenu(false);
+                                  }}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                  aria-label="Close"
+                                >
+                                  <X className="h-4 w-4 text-gray-600" />
+                                </button>
+                              </div>
                               {!showTimeMenu ? (
                                 <div className="space-y-1.5">
                                   {/* Only show Full Day if the day is not partially booked */}
-                                  {!(getAvailabilityStatus(dateTypeMenuDate) === 'halfday-morning' || getAvailabilityStatus(dateTypeMenuDate) === 'halfday-evening') && (
+                                  {dateTypeMenuDate && !(getAvailabilityStatus(dateTypeMenuDate) === 'halfday-morning' || getAvailabilityStatus(dateTypeMenuDate) === 'halfday-evening') && (
                                     <button
                                       onClick={() => {
-                                        handleDateSelect(dateTypeMenuDate);
-                                        handleDateTypeChange(dateTypeMenuDate.toDateString(), 'full-day');
-                                        setDateTypeMenuDate(null);
+                                        try {
+                                          handleDateSelect(dateTypeMenuDate);
+                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'full-day');
+                                          setDateTypeMenuDate(null);
+                                          setShowTimeMenu(false);
+                                        } catch (error) {
+                                          console.error('Error selecting full day:', error);
+                                          setDateTypeMenuDate(null);
+                                          setShowTimeMenu(false);
+                                        }
                                       }}
                                       className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
                                     >
@@ -2916,7 +2942,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     Half Day
                                   </button>
                                   <button
-                                    onClick={() => setDateTypeMenuDate(null)}
+                                    onClick={() => {
+                                      setDateTypeMenuDate(null);
+                                      setShowTimeMenu(false);
+                                    }}
                                     className="w-full px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs transition-colors"
                                   >
                                     Cancel
@@ -2928,39 +2957,51 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     Select Time
                                   </h4>
                                   {/* Only show Morning if not already booked as halfday-morning */}
-                                  {getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-morning' && (
+                                  {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-morning' && (
                                     <button
                                       onClick={() => {
-                                        handleDateSelect(dateTypeMenuDate, 'half-day');
-                                        handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
-                                        setHalfDayTimes(prev => ({
-                                          ...prev,
-                                          [dateTypeMenuDate.toDateString()]: 'morning'
-                                        }));
-                                        setDateTypeMenuDate(null);
-                                        setShowTimeMenu(false);
+                                        try {
+                                          handleDateSelect(dateTypeMenuDate, 'half-day');
+                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
+                                          setHalfDayTimes(prev => ({
+                                            ...prev,
+                                            [dateTypeMenuDate.toDateString()]: 'morning'
+                                          }));
+                                          setDateTypeMenuDate(null);
+                                          setShowTimeMenu(false);
+                                        } catch (error) {
+                                          console.error('Error selecting morning:', error);
+                                          setDateTypeMenuDate(null);
+                                          setShowTimeMenu(false);
+                                        }
                                       }}
                                       className="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition-colors"
                                     >
-                                      ☀️ Morning
+                                      Morning
                                     </button>
                                   )}
                                   {/* Only show Evening if not already booked as halfday-evening */}
-                                  {getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-evening' && (
+                                  {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-evening' && (
                                     <button
                                       onClick={() => {
-                                        handleDateSelect(dateTypeMenuDate, 'half-day');
-                                        handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
-                                        setHalfDayTimes(prev => ({
-                                          ...prev,
-                                          [dateTypeMenuDate.toDateString()]: 'evening'
-                                        }));
-                                        setDateTypeMenuDate(null);
-                                        setShowTimeMenu(false);
+                                        try {
+                                          handleDateSelect(dateTypeMenuDate, 'half-day');
+                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
+                                          setHalfDayTimes(prev => ({
+                                            ...prev,
+                                            [dateTypeMenuDate.toDateString()]: 'evening'
+                                          }));
+                                          setDateTypeMenuDate(null);
+                                          setShowTimeMenu(false);
+                                        } catch (error) {
+                                          console.error('Error selecting evening:', error);
+                                          setDateTypeMenuDate(null);
+                                          setShowTimeMenu(false);
+                                        }
                                       }}
                                       className="w-full px-3 py-1.5 bg-yellow-700 hover:bg-yellow-800 text-white rounded text-xs font-medium transition-colors"
                                     >
-                                      🌙 Evening
+                                      Evening
                                     </button>
                                   )}
                                   <button

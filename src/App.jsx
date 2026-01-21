@@ -57,6 +57,11 @@ import GuideProfile from "./components/guides/GuideProfile";
 // Import Renting App
 import RentingMain from "./components/renting/RentingMain";
 import RentingProfile from "./components/renting/RentingProfile";
+import ManageProducts from "./components/ManageProducts";
+import ManageRentals from "./components/ManageRentals";
+import PersonalizedDashboard from "./components/PersonalizedDashboard";
+import UserPreferences from "./components/UserPreferences";
+import EnhancedAdminDashboard from "./components/EnhancedAdminDashboard";
 import Payment from "./components/Payment";
 import AboutUs from "./components/home/AboutUs";
 import Admin from "./components/Admin";
@@ -2172,6 +2177,50 @@ function App() {
             />
           }
         />
+        {/* My Packages Route - For Jeep Drivers and Tour Guides */}
+        <Route
+          path="/my-packages"
+          element={
+            <MyPackages />
+          }
+        />
+        {/* Manage Products Route - For Renting Shops */}
+        <Route
+          path="/manage-products"
+          element={
+            <ManageProducts />
+          }
+        />
+        {/* Manage Rentals Route - For Renting Shops */}
+        <Route
+          path="/manage-rentals"
+          element={
+            <ManageRentals />
+          }
+        />
+        {/* Personalized Dashboard Route */}
+        <Route
+          path="/personalized-dashboard"
+          element={
+            <PersonalizedDashboard />
+          }
+        />
+        {/* User Preferences Route */}
+        <Route
+          path="/user-preferences"
+          element={
+            <UserPreferences />
+          }
+        />
+        {/* Enhanced Admin Dashboard Route */}
+        <Route
+          path="/enhanced-admin"
+          element={
+            <ProtectedRoute requireAdmin={true}>
+              <EnhancedAdminDashboard adminUser={user} />
+            </ProtectedRoute>
+          }
+        />
         {/* Payment Route */}
         <Route
           path="/payment/:bookingId"
@@ -2276,6 +2325,12 @@ function App() {
               onLogout={handleLogout}
               onShowAuth={handleShowAuth}
             />
+          }
+        />
+        <Route
+          path="/my-packages"
+          element={
+            <MyPackages />
           }
         />
         <Route
@@ -2834,7 +2889,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         userData = {
           ...userData,
           location: locationBase?.trim() || "",
-          experienceYears: experience ? parseInt(experience) : 0,
+          experienceYears: (serviceType === "Renting") ? 0 : (experience ? parseInt(experience) : 0),
           serviceType: serviceType || "Jeep Driver",
           certificationStatus: certificationStatus || "non-certified", // 'certified' or 'non-certified'
           // Certification approval fields (only for certified providers)
@@ -2881,8 +2936,21 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             description: description?.trim() || "",
             featured: false,
           };
+        } else if (serviceType === "Renting") {
+          // For Renting Shop
+          userData = {
+            ...userData,
+            province: destinations || "", // Store province instead of destination for renting shops
+            languages: [], // Not applicable for renting shops
+            specialSkills: [], // Not applicable for renting shops
+            certifications: certifications || [],
+            certificationUrls: {}, // Will be populated after file uploads
+            availability: availableDates || {}, // Object mapping dates to status (busy, halfday, unavailable)
+            description: description?.trim() || "",
+            featured: false,
+          };
         } else {
-          // For Jeep Driver and other services
+          // For Jeep Driver
           // Convert single destination to array format for Firestore compatibility
           const destinationsArray = destinations ? [destinations] : [];
           userData = {
@@ -3697,6 +3765,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   const isTourist = role === 'tourist';
   const isJeepDriver = serviceType === "Jeep Driver";
   const isTourGuide = serviceType === "Tour Guide";
+  const isRenting = serviceType === "Renting";
 
   // Reset ALL form fields when service type changes
   useEffect(() => {
@@ -3934,7 +4003,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-white font-medium text-xs">
               <User className="h-3 w-3 text-yellow-400" />
-              Full Name *
+              {isRenting ? 'Store Name *' : 'Full Name *'}
             </label>
             <input
               type="text"
@@ -3947,7 +4016,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               required
               pattern="[A-Za-z\s]+"
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-              placeholder="Enter your full name"
+              placeholder={isRenting ? "Enter your store name" : "Enter your full name"}
             />
           </div>
 
@@ -4605,139 +4674,177 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             {/* Jeep Driver Specific Fields */}
             {!isTourGuide && (
               <>
-                {/* Destination (Custom dropdown for Jeep Driver) */}
-                <div className="space-y-1 relative">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Destination *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
+                {/* Destination (Custom dropdown for Jeep Driver only - NOT for Renting) */}
+                {isJeepDriver && (
+                  <div className="space-y-1 relative">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      Destination *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formData.destinations || ""}
+                        onChange={(e) => {
+                          handlers.setDestinations(e.target.value);
+                          setShowDestinationDropdown(true);
+                        }}
+                        onFocus={() => setShowDestinationDropdown(true)}
+                        required
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                        placeholder="Type to search destinations..."
+                        autoComplete="off"
+                      />
+                      <ChevronDown 
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 cursor-pointer"
+                        onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
+                      />
+                      {showDestinationDropdown && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setShowDestinationDropdown(false)}
+                          />
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                            {destinations
+                              .filter(dest => 
+                                dest.toLowerCase().includes((formData.destinations || '').toLowerCase())
+                              )
+                              .map((destination) => (
+                                <button
+                                  key={destination}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handlers.setDestinations(destination);
+                                    setShowDestinationDropdown(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${
+                                    (formData.destinations || '') === destination ? 'bg-yellow-500/20' : ''
+                                  }`}
+                                >
+                                  {destination}
+                                </button>
+                              ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-gray-400 text-[10px] mt-1">
+                      Select the primary destination where you operate
+                    </p>
+                  </div>
+                )}
+
+                {/* Province (For Renting Shops only) */}
+                {isRenting && (
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      <MapPin className="h-3 w-3 text-yellow-400" />
+                      Province *
+                    </label>
+                    <select
                       value={formData.destinations || ""}
-                      onChange={(e) => {
-                        handlers.setDestinations(e.target.value);
-                        setShowDestinationDropdown(true);
-                      }}
-                      onFocus={() => setShowDestinationDropdown(true)}
+                      onChange={(e) => handlers.setDestinations(e.target.value)}
                       required
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                    >
+                      <option value="">Select province</option>
+                      <option value="Western Province">Western Province</option>
+                      <option value="Central Province">Central Province</option>
+                      <option value="Southern Province">Southern Province</option>
+                      <option value="Northern Province">Northern Province</option>
+                      <option value="Eastern Province">Eastern Province</option>
+                      <option value="North Western Province">North Western Province</option>
+                      <option value="North Central Province">North Central Province</option>
+                      <option value="Uva Province">Uva Province</option>
+                      <option value="Sabaragamuwa Province">Sabaragamuwa Province</option>
+                    </select>
+                    <p className="text-gray-400 text-[10px] mt-1">
+                      Select the province where your store is located
+                    </p>
+                  </div>
+                )}
+
+                {/* Years of Experience (Only for Jeep Driver - NOT for Renting) */}
+                {isJeepDriver && (
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      Years of Experience *
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.experience}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Prevent 0 and ensure minimum is 1
+                        if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
+                          handlers.setExperience(value);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        // Prevent typing 0 as first digit
+                        if (e.key === '0' && e.target.value === '') {
+                          e.preventDefault();
+                        }
+                      }}
+                      required
+                      min="1"
+                      max="50"
                       className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                      placeholder="Type to search destinations..."
-                      autoComplete="off"
+                      placeholder="Enter years of experience"
                     />
-                    <ChevronDown 
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 cursor-pointer"
-                      onClick={() => setShowDestinationDropdown(!showDestinationDropdown)}
-                    />
-                    {showDestinationDropdown && (
-                      <>
-                        <div 
-                          className="fixed inset-0 z-10" 
-                          onClick={() => setShowDestinationDropdown(false)}
-                        />
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-white/10 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-                          {destinations
-                            .filter(dest => 
-                              dest.toLowerCase().includes((formData.destinations || '').toLowerCase())
-                            )
-                            .map((destination) => (
-                              <button
-                                key={destination}
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handlers.setDestinations(destination);
-                                  setShowDestinationDropdown(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors text-white ${
-                                  (formData.destinations || '') === destination ? 'bg-yellow-500/20' : ''
-                                }`}
-                              >
-                                {destination}
-                              </button>
-                            ))}
+                  </div>
+                )}
+
+                {/* Languages Spoken (Only for Jeep Driver - NOT for Renting) */}
+                {isJeepDriver && (
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      Languages Spoken
+                    </label>
+                    <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                      {languages.map(language => (
+                        <div key={language} className="flex items-center mb-1">
+                          <input
+                            type="checkbox"
+                            id={`lang-${language}`}
+                            checked={formData.languages?.includes(language) || false}
+                            onChange={(e) => handleMultiSelectChange('languages', language)}
+                            className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                          />
+                          <label htmlFor={`lang-${language}`} className="text-white text-xs">
+                            {language}
+                          </label>
                         </div>
-                      </>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-gray-400 text-[10px] mt-1">
-                    Select the primary destination where you operate
-                  </p>
-                </div>
+                )}
 
-                {/* Years of Experience (Full Width) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Years of Experience *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.experience}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Prevent 0 and ensure minimum is 1
-                      if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
-                        handlers.setExperience(value);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      // Prevent typing 0 as first digit
-                      if (e.key === '0' && e.target.value === '') {
-                        e.preventDefault();
-                      }
-                    }}
-                    required
-                    min="1"
-                    max="50"
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                    placeholder="Enter years of experience"
-                  />
-                </div>
-
-                {/* Languages Spoken (Multi-select) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Languages Spoken
-                  </label>
-                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                    {languages.map(language => (
-                      <div key={language} className="flex items-center mb-1">
-                        <input
-                          type="checkbox"
-                          id={`lang-${language}`}
-                          checked={formData.languages?.includes(language) || false}
-                          onChange={(e) => handleMultiSelectChange('languages', language)}
-                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`lang-${language}`} className="text-white text-xs">
-                          {language}
-                        </label>
-                      </div>
-                    ))}
+                {/* Special Skills (Only for Jeep Driver - NOT for Renting) */}
+                {isJeepDriver && (
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-white font-medium text-xs">
+                      Special Skills
+                    </label>
+                    <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                      {specialSkills.map(skill => (
+                        <div key={skill} className="flex items-center mb-1">
+                          <input
+                            type="checkbox"
+                            id={`skill-${skill}`}
+                            checked={formData.specialSkills?.includes(skill) || false}
+                            onChange={(e) => handleMultiSelectChange('specialSkills', skill)}
+                            className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                          />
+                          <label htmlFor={`skill-${skill}`} className="text-white text-xs">
+                            {skill}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-
-                {/* Special Skills (Multi-select) */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 text-white font-medium text-xs">
-                    Special Skills
-                  </label>
-                  <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                    {specialSkills.map(skill => (
-                      <div key={skill} className="flex items-center mb-1">
-                        <input
-                          type="checkbox"
-                          id={`skill-${skill}`}
-                          checked={formData.specialSkills?.includes(skill) || false}
-                          onChange={(e) => handleMultiSelectChange('specialSkills', skill)}
-                          className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`skill-${skill}`} className="text-white text-xs">
-                          {skill}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                )}
 
                 {/* Certifications (Multi-select) - Only shown for certified providers */}
                 {formData.certificationStatus === 'certified' && (

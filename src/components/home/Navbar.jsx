@@ -18,7 +18,9 @@ import {
   Car,
   ShoppingBag,
   FileText,
-  Package
+  Package,
+  TrendingUp,
+  Settings
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc, onSnapshot, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
@@ -320,7 +322,12 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
   const handleFavoritesClick = useCallback(() => {
     setProfileOpen(false);
-    navigate('/favorites');
+    navigate('/personalized-dashboard');
+  }, [navigate]);
+
+  const handlePreferencesClick = useCallback(() => {
+    setProfileOpen(false);
+    navigate('/user-preferences');
   }, [navigate]);
 
   const handlePaymentWalletClick = useCallback(() => {
@@ -352,12 +359,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       return [
         { icon: User, label: "My Profile", href: "/profile", onClick: handleProfileClick },
         { icon: Calendar, label: "My Bookings", href: "/my-bookings", onClick: handleMyBookingsClick },
-        { icon: Heart, label: "My Favorites", href: "/favorites", onClick: handleFavoritesClick },
+        { icon: TrendingUp, label: "For You", href: "/personalized-dashboard", onClick: handleFavoritesClick },
         { icon: CreditCard, label: "Payment Wallet", href: "/payment-wallet", onClick: handlePaymentWalletClick },
+        { icon: Settings, label: "Preferences", href: "/user-preferences", onClick: handlePreferencesClick },
         { icon: HelpCircle, label: "Help & Support", href: "#", onClick: handleUserSupportClick },
       ];
     }
-  }, [isServiceProvider, handleProfileClick, handleMyBookingsClick, handleFavoritesClick, handlePaymentWalletClick, handleUserSupportClick]);
+  }, [isServiceProvider, handleProfileClick, handleMyBookingsClick, handleFavoritesClick, handlePreferencesClick, handlePaymentWalletClick, handleUserSupportClick]);
 
   // Memoize navigation handlers
   const handleAdminClick = useCallback(() => navigate("/admin"), [navigate]);
@@ -968,20 +976,77 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     </span>
                   </button>
 
-                  {/* My Packages */}
+                  {/* My Packages - Only for Jeep Drivers and Tour Guides */}
+                  {userData?.serviceType !== 'Renting' && (
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/my-packages');
+                      }}
+                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                      style={{ animationDelay: "600ms" }}
+                    >
+                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                        <Package className="h-5 w-5 text-gray-300" />
+                      </div>
+                      <span className="font-medium text-gray-200">
+                        My Packages
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Manage Products - Only for Renting Shops */}
+                  {userData?.serviceType === 'Renting' && (
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/manage-products');
+                      }}
+                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                      style={{ animationDelay: "600ms" }}
+                    >
+                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                        <Package className="h-5 w-5 text-gray-300" />
+                      </div>
+                      <span className="font-medium text-gray-200">
+                        Manage Products
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Manage Rentals - Only for Renting Shops */}
+                  {userData?.serviceType === 'Renting' && (
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/manage-rentals');
+                      }}
+                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                      style={{ animationDelay: "650ms" }}
+                    >
+                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                        <Calendar className="h-5 w-5 text-gray-300" />
+                      </div>
+                      <span className="font-medium text-gray-200">
+                        Manage Rentals
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Payment Wallet - For ALL Service Providers */}
                   <button
                     onClick={() => {
                       setProfileOpen(false);
-                      navigate('/my-packages');
+                      navigate('/payment-wallet');
                     }}
                     className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                    style={{ animationDelay: "600ms" }}
+                    style={{ animationDelay: "700ms" }}
                   >
                     <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                      <Package className="h-5 w-5 text-gray-300" />
+                      <CreditCard className="h-5 w-5 text-gray-300" />
                     </div>
                     <span className="font-medium text-gray-200">
-                      My Packages
+                      Payment Wallet
                     </span>
                   </button>
 

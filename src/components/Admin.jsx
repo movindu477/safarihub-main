@@ -606,6 +606,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
 
   const isGuide = userData.serviceType === 'Tour Guide';
   const isJeepDriver = userData.serviceType === 'Jeep Driver';
+  const isRenting = userData.serviceType === 'Renting';
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -624,7 +625,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
               <div>
                 <h1 className="text-2xl font-bold text-white">Service Provider Dashboard</h1>
                 <p className="text-gray-400 text-sm mt-1">
-                  {isGuide ? 'Manage your Tour Guide profile' : 'Manage your Jeep Driver profile'}
+                  {isGuide ? 'Manage your Tour Guide profile' : isRenting ? 'Manage your Renting Shop profile' : 'Manage your Jeep Driver profile'}
                 </p>
               </div>
               {userData.profilePicture && (
@@ -674,6 +675,18 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             >
               My Bookings
             </button>
+            
+            {/* My Products Tab - Only for Renting Shops */}
+            {isRenting && (
+              <button
+                type="button"
+                onClick={() => navigate('/manage-products')}
+                className="flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-700"
+              >
+                My Products
+              </button>
+            )}
+            
             <button
               type="button"
               onClick={() => setActiveTab('availability')}

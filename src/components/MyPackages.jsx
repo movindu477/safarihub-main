@@ -1,494 +1,534 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { Package, Plus, Edit2, Trash2, Save, X, DollarSign, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, collection, query, where, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { Package, Plus, Edit, Trash2, Eye, DollarSign, FileText, CheckCircle, X, Save } from 'lucide-react';
 
-const MyPackages = ({ user }) => {
-  const navigate = useNavigate();
+/**
+ * MyPackages Component
+ * Allows Jeep Drivers and Tour Guides to create, view, edit, and delete their service packages
+ * Follows the same UI/UX structure as BookingSection
+ */
+const MyPackages = () => {
+  const auth = getAuth();
   const db = getFirestore();
-  
+  const currentUser = auth.currentUser;
+
+  // State management
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPackage, setSelectedPackage] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingPackage, setEditingPackage] = useState(null);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [saving, setSaving] = useState(false);
+
+  // Form state
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    includes: [],
-    rulesAndRegulations: '',
-    priceFullDay: '',
-    priceHalfDay: ''
+    fullDayPrice: '',
+    halfDayPrice: '',
+    rules: '',
+    benefits: '',
+    facilities: ''
   });
 
-  // Default includes options
-  const defaultIncludes = [
-    'Breakfast',
-    'Lunch',
-    'Binoculars',
-    'Animal Field Guide Books',
-    'Cool Box',
-    'Snacks',
-    'Water Bottles',
-    'First Aid Kit'
-  ];
-
+  // Fetch packages
   useEffect(() => {
-    if (!user) {
-      navigate('/');
+    if (!currentUser) {
+      setLoading(false);
       return;
     }
-    fetchPackages();
-  }, [user]);
 
-  const fetchPackages = async () => {
-    try {
-      setLoading(true);
-      const q = query(
-        collection(db, 'servicePackages'),
-        where('providerId', '==', user.uid)
-      );
-      const querySnapshot = await getDocs(q);
-      const packagesData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setPackages(packagesData);
-    } catch (error) {
-      console.error('Error fetching packages:', error);
-    } finally {
-      setLoading(false);
-    }
+    const packagesQuery = query(
+      collection(db, 'servicePackages'),
+      where('providerId', '==', currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      packagesQuery,
+      (snapshot) => {
+        const packagesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        // Sort by creation date (newest first)
+        packagesData.sort((a, b) => {
+          const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+          const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+          return bTime - aTime;
+        });
+
+        setPackages(packagesData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching packages:', error);
+        setMessage({ type: 'error', text: 'Failed to load packages' });
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser, db]);
+
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleAddNew = () => {
-    setIsAddingNew(true);
-    setIsEditing(true);
-    setSelectedPackage(null);
+  // Reset form
+  const resetForm = () => {
     setFormData({
       title: '',
       description: '',
-      includes: [],
-      rulesAndRegulations: '',
-      priceFullDay: '',
-      priceHalfDay: ''
+      fullDayPrice: '',
+      halfDayPrice: '',
+      rules: '',
+      benefits: '',
+      facilities: ''
     });
+    setEditingPackage(null);
+    setShowForm(false);
   };
 
-  const handleSelectPackage = (pkg) => {
-    setSelectedPackage(pkg);
-    setIsAddingNew(false);
-    setIsEditing(false);
-    setFormData({
-      title: pkg.title || '',
-      description: pkg.description || '',
-      includes: pkg.includes || [],
-      rulesAndRegulations: pkg.rulesAndRegulations || '',
-      priceFullDay: pkg.priceFullDay || '',
-      priceHalfDay: pkg.priceHalfDay || ''
-    });
-  };
-
-  const handleEdit = () => {
-    setIsEditing(true);
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
-    setIsAddingNew(false);
-    if (selectedPackage) {
-      setFormData({
-        title: selectedPackage.title || '',
-        description: selectedPackage.description || '',
-        includes: selectedPackage.includes || [],
-        rulesAndRegulations: selectedPackage.rulesAndRegulations || '',
-        priceFullDay: selectedPackage.priceFullDay || '',
-        priceHalfDay: selectedPackage.priceHalfDay || ''
-      });
-    } else {
-      setSelectedPackage(null);
+  // Handle create/edit package
+  const handleSavePackage = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.title.trim()) {
+      setMessage({ type: 'error', text: 'Package title is required' });
+      return;
     }
-  };
+    if (!formData.description.trim()) {
+      setMessage({ type: 'error', text: 'Description is required' });
+      return;
+    }
+    if (!formData.fullDayPrice || parseFloat(formData.fullDayPrice) <= 0) {
+      setMessage({ type: 'error', text: 'Valid full-day price is required' });
+      return;
+    }
+    if (!formData.halfDayPrice || parseFloat(formData.halfDayPrice) <= 0) {
+      setMessage({ type: 'error', text: 'Valid half-day price is required' });
+      return;
+    }
 
-  const handleSave = async () => {
+    setSaving(true);
+    setMessage({ type: 'info', text: editingPackage ? 'Updating package...' : 'Creating package...' });
+
     try {
-      // Validation
-      if (!formData.title.trim()) {
-        alert('Please enter a package title');
-        return;
-      }
-      if (!formData.description.trim()) {
-        alert('Please enter a package description');
-        return;
-      }
-      if (formData.includes.length === 0) {
-        alert('Please select at least one item to include in the package');
-        return;
-      }
-      if (!formData.priceFullDay || parseFloat(formData.priceFullDay) < 1) {
-        alert('Please enter a valid full day price');
-        return;
-      }
-      if (!formData.priceHalfDay || parseFloat(formData.priceHalfDay) < 1) {
-        alert('Please enter a valid half day price');
-        return;
-      }
+      // Get provider data to determine service type
+      const providerDoc = await getDoc(doc(db, 'serviceProviders', currentUser.uid));
+      const providerData = providerDoc.data();
+      const serviceType = providerData?.serviceType || 'Unknown';
 
       const packageData = {
-        ...formData,
-        priceFullDay: parseFloat(formData.priceFullDay),
-        priceHalfDay: parseFloat(formData.priceHalfDay),
-        providerId: user.uid,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        fullDayPrice: parseFloat(formData.fullDayPrice),
+        halfDayPrice: parseFloat(formData.halfDayPrice),
+        rules: formData.rules.trim(),
+        benefits: formData.benefits.trim(),
+        facilities: formData.facilities.trim(),
+        providerId: currentUser.uid,
+        providerName: providerData?.fullName || 'Unknown',
+        serviceType: serviceType,
         updatedAt: serverTimestamp()
       };
 
-      if (isAddingNew) {
-        // Add new package
-        const docRef = await addDoc(collection(db, 'servicePackages'), {
-          ...packageData,
-          createdAt: serverTimestamp()
-        });
-        alert('Package created successfully!');
-        setSelectedPackage({ id: docRef.id, ...packageData });
-      } else {
+      if (editingPackage) {
         // Update existing package
-        await updateDoc(doc(db, 'servicePackages', selectedPackage.id), packageData);
-        alert('Package updated successfully!');
-        setSelectedPackage({ ...selectedPackage, ...packageData });
+        await updateDoc(doc(db, 'servicePackages', editingPackage.id), packageData);
+        setMessage({ type: 'success', text: 'Package updated successfully!' });
+      } else {
+        // Create new package
+        const newPackageRef = doc(collection(db, 'servicePackages'));
+        await setDoc(newPackageRef, {
+          ...packageData,
+          createdAt: serverTimestamp(),
+          active: true
+        });
+        setMessage({ type: 'success', text: 'Package created successfully!' });
       }
 
-      setIsEditing(false);
-      setIsAddingNew(false);
-      fetchPackages();
+      resetForm();
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setMessage({ type: '', text: '' });
+      }, 3000);
     } catch (error) {
       console.error('Error saving package:', error);
-      alert('Error saving package. Please try again.');
+      setMessage({ type: 'error', text: 'Failed to save package. Please try again.' });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (packageId) => {
-    if (!window.confirm('Are you sure you want to delete this package?')) {
+  // Handle edit package
+  const handleEditPackage = (pkg) => {
+    setFormData({
+      title: pkg.title,
+      description: pkg.description,
+      fullDayPrice: pkg.fullDayPrice.toString(),
+      halfDayPrice: pkg.halfDayPrice.toString(),
+      rules: pkg.rules || '',
+      benefits: pkg.benefits || '',
+      facilities: pkg.facilities || ''
+    });
+    setEditingPackage(pkg);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handle delete package
+  const handleDeletePackage = async (pkg) => {
+    if (!window.confirm(`Are you sure you want to delete "${pkg.title}"?`)) {
       return;
     }
 
     try {
-      await deleteDoc(doc(db, 'servicePackages', packageId));
-      alert('Package deleted successfully!');
-      setSelectedPackage(null);
-      fetchPackages();
+      await deleteDoc(doc(db, 'servicePackages', pkg.id));
+      setMessage({ type: 'success', text: 'Package deleted successfully!' });
+      
+      setTimeout(() => {
+        setMessage({ type: '', text: '' });
+      }, 3000);
     } catch (error) {
       console.error('Error deleting package:', error);
-      alert('Error deleting package. Please try again.');
+      setMessage({ type: 'error', text: 'Failed to delete package. Please try again.' });
     }
   };
 
-  const toggleInclude = (item) => {
-    setFormData(prev => ({
-      ...prev,
-      includes: prev.includes.includes(item)
-        ? prev.includes.filter(i => i !== item)
-        : [...prev.includes, item]
-    }));
+  // Format price
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(price);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">Loading packages...</div>
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 pt-20 pb-10">
-      <div className="max-w-7xl mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">My Service Packages</h1>
-          <p className="text-gray-400">Create and manage your service packages for customers</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Packages List */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-              {/* Add New Package Button */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <Package className="h-8 w-8 text-emerald-500" />
+                My Service Packages
+              </h1>
+              <p className="text-gray-400 mt-2">
+                Create and manage your service packages for customers to book
+              </p>
+            </div>
+            
+            {!showForm && (
               <button
-                onClick={handleAddNew}
-                className="w-full mb-4 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-4 rounded-lg transition-colors"
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
               >
                 <Plus className="h-5 w-5" />
                 Add New Package
               </button>
-
-              {/* Packages List */}
-              <div className="space-y-2">
-                {packages.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No packages yet</p>
-                    <p className="text-sm">Create your first package</p>
-                  </div>
-                ) : (
-                  packages.map((pkg) => (
-                    <div
-                      key={pkg.id}
-                      onClick={() => handleSelectPackage(pkg)}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                        selectedPackage?.id === pkg.id
-                          ? 'bg-emerald-600/20 border-emerald-500'
-                          : 'bg-gray-700/50 border-gray-600 hover:bg-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-white font-semibold text-sm truncate">
-                            {pkg.title}
-                          </h3>
-                          <p className="text-gray-400 text-xs mt-1 line-clamp-2">
-                            {pkg.description}
-                          </p>
-                          <div className="flex items-center gap-3 mt-2 text-xs">
-                            <span className="text-emerald-400 font-semibold">
-                              LKR {pkg.priceFullDay?.toLocaleString()}
-                            </span>
-                            <span className="text-gray-500">•</span>
-                            <span className="text-gray-400">
-                              {pkg.includes?.length || 0} items
-                            </span>
-                          </div>
-                        </div>
-                        <Package className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Package Details/Editor */}
-          <div className="lg:col-span-2">
-            {!selectedPackage && !isAddingNew ? (
-              <div className="bg-gray-800 rounded-lg border border-gray-700 p-8 text-center">
-                <Package className="h-16 w-16 mx-auto mb-4 text-gray-600" />
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  Select a package to view details
-                </h3>
-                <p className="text-gray-400">
-                  Or create a new package to get started
-                </p>
-              </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-                {/* Header with Actions */}
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white">
-                    {isAddingNew ? 'New Package' : 'Package Details'}
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    {!isEditing ? (
-                      <>
-                        <button
-                          onClick={handleEdit}
-                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                          Edit
-                        </button>
-                        {selectedPackage && (
-                          <button
-                            onClick={() => handleDelete(selectedPackage.id)}
-                            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={handleSave}
-                          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg transition-colors"
-                        >
-                          <Save className="h-4 w-4" />
-                          Save
-                        </button>
-                        <button
-                          onClick={handleCancel}
-                          className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors"
-                        >
-                          <X className="h-4 w-4" />
-                          Cancel
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Package Form/Details */}
-                <div className="space-y-6">
-                  {/* Title */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Package Title *
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        placeholder="e.g., Premium Safari Package"
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
-                      />
-                    ) : (
-                      <p className="text-white text-lg font-semibold">{formData.title}</p>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Description *
-                    </label>
-                    {isEditing ? (
-                      <textarea
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        placeholder="Describe your package..."
-                        rows={4}
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
-                      />
-                    ) : (
-                      <p className="text-gray-300">{formData.description}</p>
-                    )}
-                  </div>
-
-                  {/* Includes */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Package Includes *
-                    </label>
-                    {isEditing ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        {defaultIncludes.map((item) => (
-                          <label
-                            key={item}
-                            className="flex items-center gap-2 p-3 bg-gray-700 border border-gray-600 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.includes.includes(item)}
-                              onChange={() => toggleInclude(item)}
-                              className="w-4 h-4 text-emerald-600 bg-gray-800 border-gray-600 rounded focus:ring-emerald-500"
-                            />
-                            <span className="text-white text-sm">{item}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {formData.includes.map((item, index) => (
-                          <span
-                            key={index}
-                            className="flex items-center gap-1 bg-emerald-600/20 text-emerald-400 px-3 py-1 rounded-full text-sm border border-emerald-500/30"
-                          >
-                            <CheckCircle className="h-3 w-3" />
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Rules and Regulations */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Rules & Regulations
-                    </label>
-                    {isEditing ? (
-                      <textarea
-                        value={formData.rulesAndRegulations}
-                        onChange={(e) => setFormData({ ...formData, rulesAndRegulations: e.target.value })}
-                        placeholder="Enter your terms and conditions..."
-                        rows={4}
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
-                      />
-                    ) : (
-                      <p className="text-gray-300 whitespace-pre-wrap">
-                        {formData.rulesAndRegulations || 'No rules specified'}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Pricing */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Full Day Price (LKR) *
-                      </label>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          value={formData.priceFullDay}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '0' || (value.startsWith('0') && !value.includes('.'))) {
-                              return;
-                            }
-                            setFormData({ ...formData, priceFullDay: value });
-                          }}
-                          placeholder="25000"
-                          min="1"
-                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-5 w-5 text-emerald-400" />
-                          <span className="text-white text-xl font-bold">
-                            LKR {parseFloat(formData.priceFullDay || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Half Day Price (LKR) *
-                      </label>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          value={formData.priceHalfDay}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '0' || (value.startsWith('0') && !value.includes('.'))) {
-                              return;
-                            }
-                            setFormData({ ...formData, priceHalfDay: value });
-                          }}
-                          placeholder="15000"
-                          min="1"
-                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-5 w-5 text-emerald-400" />
-                          <span className="text-white text-xl font-bold">
-                            LKR {parseFloat(formData.priceHalfDay || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
           </div>
         </div>
+
+        {/* Message Display */}
+        {message.text && (
+          <div className={`mb-6 p-4 rounded-lg border ${
+            message.type === 'success' ? 'bg-emerald-900/20 border-emerald-700 text-emerald-300' :
+            message.type === 'error' ? 'bg-red-900/20 border-red-700 text-red-300' :
+            'bg-blue-900/20 border-blue-700 text-blue-300'
+          }`}>
+            <div className="flex items-center gap-2">
+              {message.type === 'success' && <CheckCircle className="h-5 w-5" />}
+              {message.type === 'error' && <X className="h-5 w-5" />}
+              <p>{message.text}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Package Form */}
+        {showForm && (
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-white">
+                {editingPackage ? 'Edit Package' : 'Create New Package'}
+              </h2>
+              <button
+                onClick={resetForm}
+                className="text-gray-400 hover:text-white transition-colors"
+                disabled={saving}
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePackage} className="space-y-6">
+              {/* Package Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Package Title *
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Yala National Park Full Safari Experience"
+                  className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                  required
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Detailed Description *
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="Describe your package in detail..."
+                  rows="4"
+                  className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 resize-none"
+                  required
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Pricing */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Full Day Price (LKR) *
+                  </label>
+                  <input
+                    type="number"
+                    name="fullDayPrice"
+                    value={formData.fullDayPrice}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 25000"
+                    min="1"
+                    step="1"
+                    className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                    required
+                    disabled={saving}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Half Day Price (LKR) *
+                  </label>
+                  <input
+                    type="number"
+                    name="halfDayPrice"
+                    value={formData.halfDayPrice}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 15000"
+                    min="1"
+                    step="1"
+                    className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                    required
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+
+              {/* Benefits */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Benefits Included
+                </label>
+                <textarea
+                  name="benefits"
+                  value={formData.benefits}
+                  onChange={handleInputChange}
+                  placeholder="List the benefits included (e.g., Experienced guide, Wildlife spotting, Photography support)"
+                  rows="3"
+                  className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 resize-none"
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Facilities */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Facilities Provided
+                </label>
+                <textarea
+                  name="facilities"
+                  value={formData.facilities}
+                  onChange={handleInputChange}
+                  placeholder="List the facilities provided (e.g., Air-conditioned vehicle, Water bottles, Binoculars)"
+                  rows="3"
+                  className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 resize-none"
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Rules */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Rules and Regulations
+                </label>
+                <textarea
+                  name="rules"
+                  value={formData.rules}
+                  onChange={handleInputChange}
+                  placeholder="List any rules or regulations (e.g., No smoking, Maintain silence near animals)"
+                  rows="3"
+                  className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 resize-none"
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save className="h-5 w-5" />
+                  {saving ? 'Saving...' : (editingPackage ? 'Update Package' : 'Create Package')}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={saving}
+                  className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Packages List */}
+        {packages.length === 0 && !showForm ? (
+          <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-12 text-center">
+            <Package className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-400 mb-2">No Packages Yet</h3>
+            <p className="text-gray-500 mb-6">Create your first service package to get started</p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              <Plus className="h-5 w-5" />
+              Create Your First Package
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {packages.map((pkg) => (
+              <div
+                key={pkg.id}
+                className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/50 transition-all"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    {/* Package Header */}
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className="flex-shrink-0 w-12 h-12 bg-emerald-600/20 rounded-lg flex items-center justify-center">
+                        <Package className="h-6 w-6 text-emerald-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-white mb-2">{pkg.title}</h3>
+                        <p className="text-gray-400 text-sm leading-relaxed">{pkg.description}</p>
+                      </div>
+                    </div>
+
+                    {/* Pricing */}
+                    <div className="flex items-center gap-6 mb-4">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-emerald-400" />
+                        <span className="text-sm text-gray-400">Full Day:</span>
+                        <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPrice)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-yellow-400" />
+                        <span className="text-sm text-gray-400">Half Day:</span>
+                        <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPrice)}</span>
+                      </div>
+                    </div>
+
+                    {/* Benefits, Facilities, Rules (if provided) */}
+                    <div className="space-y-2">
+                      {pkg.benefits && (
+                        <div className="text-sm">
+                          <span className="text-gray-500 font-medium">Benefits: </span>
+                          <span className="text-gray-400">{pkg.benefits}</span>
+                        </div>
+                      )}
+                      {pkg.facilities && (
+                        <div className="text-sm">
+                          <span className="text-gray-500 font-medium">Facilities: </span>
+                          <span className="text-gray-400">{pkg.facilities}</span>
+                        </div>
+                      )}
+                      {pkg.rules && (
+                        <div className="text-sm">
+                          <span className="text-gray-500 font-medium">Rules: </span>
+                          <span className="text-gray-400">{pkg.rules}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 ml-4">
+                    <button
+                      onClick={() => handleEditPackage(pkg)}
+                      className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
+                      title="Edit Package"
+                    >
+                      <Edit className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeletePackage(pkg)}
+                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                      title="Delete Package"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+// Add missing import for getDoc
+import { getDoc } from 'firebase/firestore';
 
 export default MyPackages;
