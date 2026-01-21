@@ -359,13 +359,13 @@ const BookingFormModal = ({
       number: index + 1 // Re-number steps
     }))
     : allSteps;
-  
-  console.log('📊 Modal State - currentStep:', currentStep, '| stepsLength:', steps.length, '| hasPackage:', !!selectedPackage, 
+
+  console.log('📊 Modal State - currentStep:', currentStep, '| stepsLength:', steps.length, '| hasPackage:', !!selectedPackage,
     '| emergencyStepShouldRender:', ((currentStep === 5 && !selectedPackage) || (currentStep === 4 && selectedPackage) || currentStep === steps.length),
     '| formData:', {
-      emergencyContactName: formData.emergencyContactName,
-      emergencyContactPhone: formData.emergencyContactPhone
-    });
+    emergencyContactName: formData.emergencyContactName,
+    emergencyContactPhone: formData.emergencyContactPhone
+  });
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -423,11 +423,11 @@ const BookingFormModal = ({
         emergencyContactPhone: formData.emergencyContactPhone,
         phoneLength: formData.emergencyContactPhone?.length
       });
-      
+
       if (!formData.emergencyContactName || !formData.emergencyContactName.trim()) {
         errors.emergencyContactName = 'Emergency contact name is required';
       }
-      
+
       // Check phone number - ensure it's a string and has exactly 9 digits
       const phoneValue = String(formData.emergencyContactPhone || '').trim();
       if (!phoneValue || phoneValue.length === 0) {
@@ -440,7 +440,7 @@ const BookingFormModal = ({
     }
 
     setFormErrors(errors);
-    
+
     // If there are errors, show an alert with details and scroll to first error
     if (Object.keys(errors).length > 0) {
       const firstErrorField = Object.keys(errors)[0];
@@ -451,9 +451,9 @@ const BookingFormModal = ({
         };
         return `${fieldLabels[field] || field}: ${msg}`;
       }).join('\n');
-      
+
       alert(`Please fill in:\n\n${errorMessages}\n\nNavigating to the required field...`);
-      
+
       // Scroll to and focus the first error field
       setTimeout(() => {
         const element = document.getElementById(firstErrorField);
@@ -462,10 +462,10 @@ const BookingFormModal = ({
           element.focus();
         }
       }, 200);
-      
+
       return false; // Prevent form submission
     }
-    
+
     return true; // Allow form submission
   };
 
@@ -729,7 +729,7 @@ const BookingFormModal = ({
                     <Package className="h-5 w-5 text-emerald-600" />
                     Booking Summary
                   </h3>
-                  
+
                   {/* Package Information (if booking a package) */}
                   {selectedPackage && (
                     <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
@@ -764,7 +764,7 @@ const BookingFormModal = ({
                       <p className="text-xs text-emerald-600 mt-2">📦 All package amenities included • {selectedVehicleType || 'Select jeep type'}</p>
                     </div>
                   )}
-                  
+
                   <div className="space-y-3">
                     <p className="text-sm text-gray-700">
                       You have selected <strong>{selectedDates.length}</strong> date{selectedDates.length > 1 ? 's' : ''}.
@@ -969,88 +969,88 @@ const BookingFormModal = ({
             });
             return shouldRender;
           })() && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Phone className="h-5 w-5 text-black" />
-                Emergency Contact
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="emergencyContactName"
-                    id="emergencyContactName"
-                    value={formData.emergencyContactName}
-                    onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                  />
-                  {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact Phone <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    {/* Country Code Dropdown */}
-                    <select
-                      value={emergencyCountryCode}
-                      onChange={(e) => {
-                        setEmergencyCountryCode(e.target.value);
-                        // Reset phone number when country code changes
-                        updateFormData('emergencyContactPhone', '');
-                      }}
-                      className="w-28 px-2 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
-                    >
-                      <option value="+94">🇱🇰 +94</option>
-                      <option value="+1">🇺🇸 +1</option>
-                      <option value="+44">🇬🇧 +44</option>
-                      <option value="+91">🇮🇳 +91</option>
-                      <option value="+61">🇦🇺 +61</option>
-                      <option value="+86">🇨🇳 +86</option>
-                      <option value="+81">🇯🇵 +81</option>
-                      <option value="+82">🇰🇷 +82</option>
-                      <option value="+65">🇸🇬 +65</option>
-                      <option value="+60">🇲🇾 +60</option>
-                      <option value="+66">🇹🇭 +66</option>
-                      <option value="+971">🇦🇪 +971</option>
-                      <option value="+966">🇸🇦 +966</option>
-                      <option value="+33">🇫🇷 +33</option>
-                      <option value="+49">🇩🇪 +49</option>
-                      <option value="+39">🇮🇹 +39</option>
-                      <option value="+34">🇪🇸 +34</option>
-                      <option value="+7">🇷🇺 +7</option>
-                      <option value="+55">🇧🇷 +55</option>
-                      <option value="+27">🇿🇦 +27</option>
-                    </select>
-                    
-                    {/* Phone Number Input (9 digits) */}
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-black" />
+                  Emergency Contact
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contact Name <span className="text-red-500">*</span>
+                    </label>
                     <input
-                      type="tel"
-                      name="emergencyContactPhone"
-                      id="emergencyContactPhone"
-                      value={formData.emergencyContactPhone}
-                      onChange={(e) => {
-                        // Only allow numbers, limit to 9 digits
-                        let value = e.target.value.replace(/\D/g, '');
-                        value = value.slice(0, 9);
-                        updateFormData('emergencyContactPhone', value);
-                      }}
-                      className={`flex-1 px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
+                      type="text"
+                      name="emergencyContactName"
+                      id="emergencyContactName"
+                      value={formData.emergencyContactName}
+                      onChange={(e) => updateFormData('emergencyContactName', e.target.value)}
+                      className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
                         }`}
-                      placeholder="123456789 (9 digits)"
-                      maxLength="9"
                     />
+                    {formErrors.emergencyContactName && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactName}</p>}
                   </div>
-                  {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
-                  <p className="text-xs text-gray-500 mt-1">Enter 9 digits after country code</p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contact Phone <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      {/* Country Code Dropdown */}
+                      <select
+                        value={emergencyCountryCode}
+                        onChange={(e) => {
+                          setEmergencyCountryCode(e.target.value);
+                          // Reset phone number when country code changes
+                          updateFormData('emergencyContactPhone', '');
+                        }}
+                        className="w-28 px-2 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
+                      >
+                        <option value="+94">🇱🇰 +94</option>
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+44">🇬🇧 +44</option>
+                        <option value="+91">🇮🇳 +91</option>
+                        <option value="+61">🇦🇺 +61</option>
+                        <option value="+86">🇨🇳 +86</option>
+                        <option value="+81">🇯🇵 +81</option>
+                        <option value="+82">🇰🇷 +82</option>
+                        <option value="+65">🇸🇬 +65</option>
+                        <option value="+60">🇲🇾 +60</option>
+                        <option value="+66">🇹🇭 +66</option>
+                        <option value="+971">🇦🇪 +971</option>
+                        <option value="+966">🇸🇦 +966</option>
+                        <option value="+33">🇫🇷 +33</option>
+                        <option value="+49">🇩🇪 +49</option>
+                        <option value="+39">🇮🇹 +39</option>
+                        <option value="+34">🇪🇸 +34</option>
+                        <option value="+7">🇷🇺 +7</option>
+                        <option value="+55">🇧🇷 +55</option>
+                        <option value="+27">🇿🇦 +27</option>
+                      </select>
+
+                      {/* Phone Number Input (9 digits) */}
+                      <input
+                        type="tel"
+                        name="emergencyContactPhone"
+                        id="emergencyContactPhone"
+                        value={formData.emergencyContactPhone}
+                        onChange={(e) => {
+                          // Only allow numbers, limit to 9 digits
+                          let value = e.target.value.replace(/\D/g, '');
+                          value = value.slice(0, 9);
+                          updateFormData('emergencyContactPhone', value);
+                        }}
+                        className={`flex-1 px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
+                          }`}
+                        placeholder="123456789 (9 digits)"
+                        maxLength="9"
+                      />
+                    </div>
+                    {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
+                    <p className="text-xs text-gray-500 mt-1">Enter 9 digits after country code</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
 
         {/* Navigation Buttons */}
@@ -1153,7 +1153,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [halfDayTimes, setHalfDayTimes] = useState({}); // {dateString: 'morning' | 'evening'}
   const [emergencyCountryCode, setEmergencyCountryCode] = useState('+94'); // Default to Sri Lanka
-  
+
   // Reset showTimeMenu when dateTypeMenuDate changes
   useEffect(() => {
     if (!dateTypeMenuDate) {
@@ -1342,7 +1342,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       selectedDates.forEach(date => {
         const dateString = date.toDateString();
         const dateType = selectedDatesWithType[dateString] || 'full-day';
-        
+
         // Use vehicle-specific pricing
         let fullDayPrice, halfDayPrice;
         if (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep) {
@@ -1353,7 +1353,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           fullDayPrice = selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice;
           halfDayPrice = selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice;
         }
-        
+
         total += dateType === 'half-day' ? halfDayPrice : fullDayPrice;
       });
       // No add-ons for package bookings
@@ -1618,7 +1618,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         selectedDates.forEach(date => {
           const dateString = date.toDateString();
           const dateType = selectedDatesWithType[dateString] || 'full-day';
-          
+
           // Use vehicle-specific pricing
           let fullDayPrice, halfDayPrice;
           if (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep) {
@@ -1629,7 +1629,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             fullDayPrice = selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice;
             halfDayPrice = selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice;
           }
-          
+
           totalPrice += dateType === 'half-day' ? halfDayPrice : fullDayPrice;
         });
       } else {
@@ -2106,11 +2106,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             try {
               const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
               const certDocSnap = await getDoc(certDocRef);
-              
+
               if (certDocSnap.exists()) {
                 const certData = certDocSnap.data();
                 console.log('✅ Certification documents found:', certData);
-                
+
                 if (certData.documents && Array.isArray(certData.documents)) {
                   driverInfo.certificationDocuments = certData.documents;
                 }
@@ -2319,7 +2319,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             try {
               const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
               const certDocSnap = await getDoc(certDocRef);
-              
+
               if (certDocSnap.exists()) {
                 const certData = certDocSnap.data();
                 if (certData.documents && Array.isArray(certData.documents)) {
@@ -2349,7 +2349,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             try {
               const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
               const certDocSnap = await getDoc(certDocRef);
-              
+
               if (certDocSnap.exists()) {
                 const certData = certDocSnap.data();
                 if (certData.documents && Array.isArray(certData.documents)) {
@@ -3025,7 +3025,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       </div>
                                     </div>
                                   )}
-                                  
+
                                   {/* Luxury Safari Jeep Prices */}
                                   {pkg.hasLuxuryJeep && (
                                     <div className="space-y-2">
@@ -3043,7 +3043,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       </div>
                                     </div>
                                   )}
-                                  
+
                                   {/* Legacy packages (backward compatibility) */}
                                   {!pkg.hasStandardJeep && !pkg.hasLuxuryJeep && (
                                     <>
@@ -3113,7 +3113,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    
+
                                     // Clear all existing booking selections to start fresh
                                     setSelectedDates([]);
                                     setSelectedDatesWithType({});
@@ -3121,7 +3121,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     setHalfDayTimes({});
                                     setDateTypeMenuDate(null);
                                     setShowTimeMenu(false);
-                                    
+
                                     // Store selected package in session storage with all vehicle-specific fields
                                     sessionStorage.setItem('selectedPackage', JSON.stringify({
                                       id: pkg.id,
@@ -3138,7 +3138,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       halfDayPriceLuxury: pkg.halfDayPriceLuxury,
                                       providerId: driverId
                                     }));
-                                    
+
                                     // Switch to booking tab
                                     setActiveTab('booking');
                                   }}
@@ -3197,12 +3197,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         >
                           <X className="h-5 w-5" />
                         </button>
-                        
+
                         <div className="flex items-center gap-2 mb-2">
                           <Package className="h-6 w-6 text-emerald-600" />
                           <h3 className="text-lg font-bold text-emerald-900 pr-8">{selectedPackage.title}</h3>
                         </div>
-                        
+
                         {/* Show vehicle-specific prices if vehicle type is selected */}
                         {selectedVehicleType ? (
                           <div className="space-y-2">
@@ -3258,7 +3258,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             )}
                           </div>
                         )}
-                        
+
                         <p className="text-xs text-emerald-600 mt-2 italic">
                           📦 Package booking mode active - Click X to return to regular booking
                         </p>
@@ -3333,137 +3333,137 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 }
                                 setDateTypeMenuDate(date);
                               }}
-                            selectedDatesWithType={selectedDatesWithType}
-                            availabilityCalendar={driver?.availabilityCalendar}
-                            availableDates={driver?.availableDates}
-                            onDateTypeChange={handleDateTypeChange}
-                            onDateDoubleClick={(date) => {
-                              handleDateSelect(date);
-                              setDateTypeMenuDate(null);
-                            }}
-                          />
+                              selectedDatesWithType={selectedDatesWithType}
+                              availabilityCalendar={driver?.availabilityCalendar}
+                              availableDates={driver?.availableDates}
+                              onDateTypeChange={handleDateTypeChange}
+                              onDateDoubleClick={(date) => {
+                                handleDateSelect(date);
+                                setDateTypeMenuDate(null);
+                              }}
+                            />
 
-                          {/* Date Type Menu (Full Day / Half Day) - Smaller Size */}
-                          {dateTypeMenuDate && (
-                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-3 min-w-[200px]">
-                              <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-xs font-semibold text-black text-center flex-1">
-                                  {dateTypeMenuDate.toLocaleDateString()}
-                                </h4>
-                                <button
-                                  onClick={() => {
-                                    setDateTypeMenuDate(null);
-                                    setShowTimeMenu(false);
-                                  }}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                  aria-label="Close"
-                                >
-                                  <X className="h-4 w-4 text-gray-600" />
-                                </button>
-                              </div>
-                              {!showTimeMenu ? (
-                                <div className="space-y-1.5">
-                                  {/* Only show Full Day if the day is not partially booked */}
-                                  {dateTypeMenuDate && !(getAvailabilityStatus(dateTypeMenuDate) === 'halfday-morning' || getAvailabilityStatus(dateTypeMenuDate) === 'halfday-evening') && (
-                                    <button
-                                      onClick={() => {
-                                        try {
-                                          handleDateSelect(dateTypeMenuDate);
-                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'full-day');
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        } catch (error) {
-                                          console.error('Error selecting full day:', error);
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        }
-                                      }}
-                                      className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
-                                    >
-                                      Full Day
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => {
-                                      setShowTimeMenu(true);
-                                    }}
-                                    className="w-full px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
-                                  >
-                                    Half Day
-                                  </button>
+                            {/* Date Type Menu (Full Day / Half Day) - Smaller Size */}
+                            {dateTypeMenuDate && (
+                              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-3 min-w-[200px]">
+                                <div className="flex justify-between items-center mb-2">
+                                  <h4 className="text-xs font-semibold text-black text-center flex-1">
+                                    {dateTypeMenuDate.toLocaleDateString()}
+                                  </h4>
                                   <button
                                     onClick={() => {
                                       setDateTypeMenuDate(null);
                                       setShowTimeMenu(false);
                                     }}
-                                    className="w-full px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs transition-colors"
+                                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                    aria-label="Close"
                                   >
-                                    Cancel
+                                    <X className="h-4 w-4 text-gray-600" />
                                   </button>
                                 </div>
-                              ) : (
-                                <div className="space-y-1.5">
-                                  <h4 className="text-xs font-semibold text-black mb-1.5 text-center">
-                                    Select Time
-                                  </h4>
-                                  {/* Only show Morning if not already booked as halfday-morning */}
-                                  {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-morning' && (
+                                {!showTimeMenu ? (
+                                  <div className="space-y-1.5">
+                                    {/* Only show Full Day if the day is not partially booked */}
+                                    {dateTypeMenuDate && !(getAvailabilityStatus(dateTypeMenuDate) === 'halfday-morning' || getAvailabilityStatus(dateTypeMenuDate) === 'halfday-evening') && (
+                                      <button
+                                        onClick={() => {
+                                          try {
+                                            handleDateSelect(dateTypeMenuDate);
+                                            handleDateTypeChange(dateTypeMenuDate.toDateString(), 'full-day');
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          } catch (error) {
+                                            console.error('Error selecting full day:', error);
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          }
+                                        }}
+                                        className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+                                      >
+                                        Full Day
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => {
-                                        try {
-                                          handleDateSelect(dateTypeMenuDate, 'half-day');
-                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
-                                          setHalfDayTimes(prev => ({
-                                            ...prev,
-                                            [dateTypeMenuDate.toDateString()]: 'morning'
-                                          }));
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        } catch (error) {
-                                          console.error('Error selecting morning:', error);
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        }
+                                        setShowTimeMenu(true);
                                       }}
-                                      className="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition-colors"
+                                      className="w-full px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
                                     >
-                                      Morning
+                                      Half Day
                                     </button>
-                                  )}
-                                  {/* Only show Evening if not already booked as halfday-evening */}
-                                  {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-evening' && (
                                     <button
                                       onClick={() => {
-                                        try {
-                                          handleDateSelect(dateTypeMenuDate, 'half-day');
-                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
-                                          setHalfDayTimes(prev => ({
-                                            ...prev,
-                                            [dateTypeMenuDate.toDateString()]: 'evening'
-                                          }));
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        } catch (error) {
-                                          console.error('Error selecting evening:', error);
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        }
+                                        setDateTypeMenuDate(null);
+                                        setShowTimeMenu(false);
                                       }}
-                                      className="w-full px-3 py-1.5 bg-yellow-700 hover:bg-yellow-800 text-white rounded text-xs font-medium transition-colors"
+                                      className="w-full px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs transition-colors"
                                     >
-                                      Evening
+                                      Cancel
                                     </button>
-                                  )}
-                                  <button
-                                    onClick={() => setShowTimeMenu(false)}
-                                    className="w-full px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
-                                  >
-                                    Back
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    <h4 className="text-xs font-semibold text-black mb-1.5 text-center">
+                                      Select Time
+                                    </h4>
+                                    {/* Only show Morning if not already booked as halfday-morning */}
+                                    {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-morning' && (
+                                      <button
+                                        onClick={() => {
+                                          try {
+                                            handleDateSelect(dateTypeMenuDate, 'half-day');
+                                            handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
+                                            setHalfDayTimes(prev => ({
+                                              ...prev,
+                                              [dateTypeMenuDate.toDateString()]: 'morning'
+                                            }));
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          } catch (error) {
+                                            console.error('Error selecting morning:', error);
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          }
+                                        }}
+                                        className="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition-colors"
+                                      >
+                                        Morning
+                                      </button>
+                                    )}
+                                    {/* Only show Evening if not already booked as halfday-evening */}
+                                    {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-evening' && (
+                                      <button
+                                        onClick={() => {
+                                          try {
+                                            handleDateSelect(dateTypeMenuDate, 'half-day');
+                                            handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
+                                            setHalfDayTimes(prev => ({
+                                              ...prev,
+                                              [dateTypeMenuDate.toDateString()]: 'evening'
+                                            }));
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          } catch (error) {
+                                            console.error('Error selecting evening:', error);
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          }
+                                        }}
+                                        className="w-full px-3 py-1.5 bg-yellow-700 hover:bg-yellow-800 text-white rounded text-xs font-medium transition-colors"
+                                      >
+                                        Evening
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => setShowTimeMenu(false)}
+                                      className="w-full px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+                                    >
+                                      Back
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           {/* Show message if vehicle type not selected */}
                           {!selectedVehicleType && (

@@ -116,7 +116,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
   const getAvailabilityStatus = (date) => {
     if (!date) return null;
     const dateKey = getDateKey(date);
-    
+
     // Check new availability calendar format (object)
     if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
       const status = availabilityCalendar[dateKey];
@@ -127,7 +127,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
       // If no status marked, return null (available by default)
       return null;
     }
-    
+
     // Fallback to old availableDates array format
     if (availableDates && Array.isArray(availableDates)) {
       const dateString = date.toISOString().split('T')[0];
@@ -137,7 +137,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
       });
       return isInArray ? null : 'unavailable'; // If in array = available, if not = unavailable
     }
-    
+
     // Default: no status means available
     return null;
   };
@@ -538,7 +538,7 @@ const BookingFormModal = ({
                     value={formData.phone}
                     onChange={(e) => {
                       let value = e.target.value.replace(/[^0-9+]/g, '');
-                      
+
                       // Format: +94 XX XXX XXXX
                       if (value.startsWith('+94')) {
                         // Remove +94 prefix for processing
@@ -573,7 +573,7 @@ const BookingFormModal = ({
                         }
                         value = formatted;
                       }
-                      
+
                       updateFormData('phone', value);
                     }}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
@@ -729,7 +729,7 @@ const BookingFormModal = ({
                               </button>
                             </div>
                           </div>
-                          
+
                           {/* Safari Type Dropdown - Shows for both Half Day and Full Day */}
                           <div className="mt-2">
                             <label className="block text-xs font-medium text-gray-600 mb-1">Safari Type:</label>
@@ -946,7 +946,7 @@ const BookingFormModal = ({
                     value={formData.emergencyContactPhone}
                     onChange={(e) => {
                       let value = e.target.value.replace(/[^0-9+]/g, '');
-                      
+
                       // Format: +94 XX XXX XXXX
                       if (value.startsWith('+94')) {
                         const digits = value.slice(3);
@@ -977,7 +977,7 @@ const BookingFormModal = ({
                         }
                         value = formatted;
                       }
-                      
+
                       updateFormData('emergencyContactPhone', value);
                     }}
                     className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
@@ -1226,7 +1226,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
   // Calculate total price based on selected dates and their types (half-day vs full-day) + add-ons
   const calculateTotalPrice = () => {
     if (!provider || selectedDates.length === 0) return 0;
-    
+
     // Calculate base price from dates
     const dailyPrice = provider.pricePerDay || 0;
     let total = 0;
@@ -1235,12 +1235,12 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
       const dateType = selectedDatesWithType[dateString] || 'full-day';
       total += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
     });
-    
+
     // Add add-ons prices
     if (bookingFormData.needsBinoculars) total += 500;
     if (bookingFormData.needsChildSeat) total += 1000;
     if (bookingFormData.needsWater) total += 300;
-    
+
     // Add snacks prices
     if (bookingFormData.needsSnacks && bookingFormData.selectedSnacks) {
       const snackPrices = {
@@ -1257,7 +1257,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
         total += snackPrices[snack] || 0;
       });
     }
-    
+
     return total;
   };
 
@@ -1899,8 +1899,8 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
             id: driverDoc.id,
             ...driverData,
             // Ensure availability is an object, not array
-            availabilityCalendar: (driverData.availability && typeof driverData.availability === 'object' && !Array.isArray(driverData.availability)) 
-              ? driverData.availability 
+            availabilityCalendar: (driverData.availability && typeof driverData.availability === 'object' && !Array.isArray(driverData.availability))
+              ? driverData.availability
               : {}, // Object mapping dates to status
             availableDates: driverData.availableDates || [] // Keep for backward compatibility
           });

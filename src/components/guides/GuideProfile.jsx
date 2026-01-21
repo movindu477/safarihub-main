@@ -26,6 +26,8 @@ import {
   Calendar,
   MessageCircle,
   ArrowLeft,
+  ArrowRight,
+  ChevronRight,
   Send,
   Check,
   CheckCheck,
@@ -45,7 +47,8 @@ import {
   Flag,
   AlertCircle,
   CheckCircle,
-  Package
+  Package,
+  Navigation
 } from "lucide-react";
 
 // Initialize Firebase
@@ -72,7 +75,7 @@ import {
 } from "../../App";
 
 // Calendar Component for Date Selection with Availability Display
-const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates, availabilityCalendar }) => {
+const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType, onDateTypeChange, availabilityCalendar, availableDates, onDateDoubleClick }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const getDaysInMonth = (date) => {
@@ -80,13 +83,14 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates, avail
     const month = date.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startDay = firstDay.getDay();
 
     const days = [];
     // Add empty cells for days before the first day of the month
+    const startDay = firstDay.getDay();
     for (let i = 0; i < startDay; i++) {
       days.push(null);
     }
+
     // Add all days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
@@ -103,182 +107,120 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates, avail
     });
   };
 
-  const getDateKey = (date) => {
-    if (!date) return null;
-    return date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+  const handleDateClick = (date) => {
+    if (!date) return;
+    onDateSelect(date);
   };
 
   const getAvailabilityStatus = (date) => {
     if (!date) return null;
-    const dateKey = getDateKey(date);
 
-    // Check new availability calendar format (object)
+    // Get year, month, day in local time to construct the key
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateKey = `${year}-${month}-${day}`;
+
+    // Priority 1: Check new availability calendar format (object)
     if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
       const status = availabilityCalendar[dateKey];
-      // Return status if it exists, otherwise return null (which means available)
-      if (status && ['busy', 'halfday', 'unavailable'].includes(status)) {
+      if (status && ['busy', 'halfday', 'unavailable', 'halfday-morning', 'halfday-evening'].includes(status)) {
         return status;
       }
-      // If no status marked, return null (available by default)
-      return null;
     }
 
-    // Fallback to old availableDates array format
-    if (availableDates && Array.isArray(availableDates)) {
-      const dateString = date.toISOString().split('T')[0];
-      const isInArray = availableDates.some(availableDate => {
-        const availableDateString = new Date(availableDate).toISOString().split('T')[0];
-        return availableDateString === dateString;
-      });
-      return isInArray ? null : 'unavailable'; // If in array = available, if not = unavailable
-    }
-
-    // Default: no status means available
+    // Default: Assume available (null)
+    // We removed the legacy availableDates fallback because empty arrays were marking all dates as unavailable.
     return null;
   };
 
-  const isDateAvailable = (date) => {
-    const status = getAvailabilityStatus(date);
-    // Available if status is null/undefined or 'available' (not marked as busy/unavailable)
-    return status === null || status === 'available' || status === 'halfday';
-  };
-
-  const isDateSelected = (date) => {
-    return selectedDates.some(selectedDate =>
-      selectedDate.toDateString() === date.toDateString()
-    );
-  };
-
   const isDatePast = (date) => {
-    if (!date) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return date < today;
   };
 
-  const handleDateClick = (date) => {
-    if (!date || isDatePast(date)) return;
-    if (!isDateAvailable(date)) return; // Don't allow selection of unavailable dates
-    onDateSelect(date);
-  };
-
   const getDateClassName = (date) => {
-    if (!date) return '';
+    if (!date) return "p-2 bg-transparent";
+
+    const baseClasses = "relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-200 cursor-pointer";
     const status = getAvailabilityStatus(date);
-    const selected = isDateSelected(date);
-    const isToday = date.toDateString() === new Date().toDateString();
     const isPast = isDatePast(date);
+    const selected = selectedDates.some(d => d.toDateString() === date.toDateString());
+    const isToday = date.toDateString() === new Date().toDateString();
 
-    const baseClasses = 'relative w-full h-8 sm:h-10 text-xs sm:text-sm rounded-lg transition-all duration-200 font-medium flex items-center justify-center';
-
-    if (isPast) {
-      return `${baseClasses} bg-gray-800/50 text-gray-600 cursor-not-allowed`;
-    }
+    if (isPast) return `${baseClasses} text-gray-300 cursor-not-allowed bg-gray-50`;
 
     if (selected) {
-      return `${baseClasses} bg-black text-white ring-2 ring-gray-400`;
+      const dateString = date.toDateString();
+      const dateType = selectedDatesWithType[dateString] || 'full-day';
+      if (dateType === 'half-day') {
+        return `${baseClasses} bg-yellow-500 text-white shadow-lg scale-105 z-10`;
+      } else {
+        return `${baseClasses} bg-red-600 text-white shadow-lg scale-105 z-10`;
+      }
     }
 
-    // Handle availability statuses
-    if (status === 'busy') {
-      return `${baseClasses} bg-red-500 text-white hover:bg-red-600`;
-    } else if (status === 'halfday') {
-      return `${baseClasses} bg-yellow-500 text-white hover:bg-yellow-600`;
-    } else if (status === 'unavailable') {
-      return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
-    } else {
-      // No status or null means available (green) - this is the default
-      return `${baseClasses} ${isToday ? 'bg-gray-200 text-black border-2 border-gray-400' : 'bg-gray-500/20 text-gray-300 border border-black/30 hover:bg-gray-500/30'} cursor-pointer`;
+    if (status === 'busy' || status === 'unavailable') {
+      return `${baseClasses} bg-gray-100 text-gray-400 cursor-not-allowed border-2 border-dashed border-gray-200`;
     }
+
+    if (status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening') {
+      return `${baseClasses} bg-yellow-50 text-yellow-700 border-2 border-yellow-200 hover:bg-yellow-100 font-bold`;
+    }
+
+    if (isToday) {
+      return `${baseClasses} bg-emerald-100 text-emerald-800 border-2 border-emerald-400 hover:scale-105 z-10 font-bold`;
+    }
+
+    return `${baseClasses} bg-emerald-50 text-emerald-600 border border-emerald-100 hover:border-emerald-600 hover:scale-105`;
   };
 
   const days = getDaysInMonth(currentMonth);
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   return (
-    <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/40 rounded-xl p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            navigateMonth(-1);
-          }}
-          className="p-2 rounded-lg bg-gray-800/50 hover:bg-gray-700 text-white transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <h3 className="text-base sm:text-lg font-semibold text-white">
-          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+    <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+          <CalendarIcon className="h-5 w-5 text-emerald-600" />
+          {currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
         </h3>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            navigateMonth(1);
-          }}
-          className="p-2 rounded-lg bg-gray-800/50 hover:bg-gray-700 text-white transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="h-5 w-5 rotate-180" />
-        </button>
-      </div>
-
-      {/* Legend */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2 bg-gray-800/30 rounded-lg border border-gray-700/40">
-        <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-gray-500/20 border border-black/30 rounded"></div>
-          <span className="text-gray-300">Available</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span className="text-gray-300">Busy</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-          <span className="text-gray-300">Half Day</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-gray-600 rounded"></div>
-          <span className="text-gray-300">Unavailable</span>
+        <div className="flex gap-2">
+          <button onClick={() => navigateMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 group">
+            <ArrowLeft className="h-4 w-4 text-gray-600 group-hover:text-black" />
+          </button>
+          <button onClick={() => navigateMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 group">
+            <ArrowRight className="h-4 w-4 text-gray-600 group-hover:text-black" />
+          </button>
         </div>
       </div>
 
-      {/* Day Headers */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="text-center text-xs font-medium text-gray-400 py-2">
-            {day}
-          </div>
+      <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+          <div key={day} className="h-8 flex items-center justify-center text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">{day}</div>
         ))}
       </div>
 
-      {/* Calendar Days */}
-      <div className="grid grid-cols-7 gap-1">
-        {days.map((date, index) => {
-          if (!date) {
-            return <div key={`empty-${index}`} className="h-8 sm:h-10"></div>;
-          }
-
-          const dateKey = getDateKey(date);
-          const status = getAvailabilityStatus(date);
-          const isPast = isDatePast(date);
-          const isAvailable = isDateAvailable(date);
+      <div className="grid grid-cols-7 gap-1 sm:gap-2">
+        {days.map((day, index) => {
+          if (!day) return <div key={`empty-${index}`} className="h-10 w-10 sm:h-12 sm:w-12" />;
+          const status = getAvailabilityStatus(day);
+          const isPast = isDatePast(day);
+          const isAvailable = (status !== 'busy' && status !== 'unavailable' && !isPast);
 
           return (
             <button
-              key={dateKey || `date-${index}`}
-              type="button"
-              onClick={(e) => {
+              key={day.toISOString()}
+              onClick={() => isAvailable && handleDateClick(day)}
+              onDoubleClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (!isPast && isAvailable) {
-                  handleDateClick(date);
+                if (onDateDoubleClick && selectedDates.some(d => d.toDateString() === day.toDateString())) {
+                  onDateDoubleClick(day);
                 }
               }}
-              disabled={!isAvailable || isPast}
-              className={getDateClassName(date)}
+              disabled={!isAvailable}
+              className={getDateClassName(day)}
               title={(() => {
                 if (isPast) return 'Past date';
                 if (status === 'busy') return 'Busy - Not available';
@@ -287,32 +229,277 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, availableDates, avail
                 return 'Available - Click to select';
               })()}
             >
-              {date.getDate()}
+              {day.getDate()}
             </button>
           );
         })}
       </div>
-
-      {selectedDates.length > 0 && (
-        <div className="mt-4 p-3 bg-gray-100 rounded-lg border border-gray-300">
-          <h4 className="font-medium text-gray-700 mb-2 text-sm">Selected Dates:</h4>
-          <div className="flex flex-wrap gap-2">
-            {selectedDates.map((date, index) => (
-              <span
-                key={index}
-                className="bg-black text-white px-2 py-1 rounded text-xs"
-              >
-                {date.toLocaleDateString()}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-// Old ChatModal component removed - using Chat component instead
+// Park ticket prices
+const parkTicketPrices = {
+  'Yala National Park': 5000,
+  'Wilpattu National Park': 4500,
+  'Udawalawe National Park': 4000,
+  'Minneriya National Park': 3500,
+  'Kaudulla National Park': 3500,
+  'Bundala National Park': 3000,
+  'Kumana National Park': 3000
+};
+
+const getParkTicketPrice = (parkName) => {
+  return parkTicketPrices[parkName] || 0;
+};
+
+// Booking Form Modal Component
+const BookingFormModal = ({
+  isOpen,
+  onClose,
+  formData,
+  setFormData,
+  formErrors,
+  setFormErrors,
+  currentStep,
+  setCurrentStep,
+  onSubmit,
+  guide,
+  selectedDates,
+  selectedDatesWithType,
+  onDateTypeChange,
+  selectedPackage,
+  halfDayTimes,
+  emergencyCountryCode,
+  setEmergencyCountryCode
+}) => {
+  const allSteps = [
+    { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
+    { number: 2, title: 'Tour Details', shortTitle: 'Tour', icon: Calendar },
+    { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
+    { number: 4, title: 'Emergency Contact', shortTitle: 'Emergency', icon: Phone }
+  ];
+
+  const steps = allSteps;
+
+  const updateFormData = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleNext = () => {
+    if (currentStep < steps.length) {
+      setFormErrors({});
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setFormErrors({});
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const validateStep = () => {
+    const errors = {};
+
+    if (currentStep === 1) {
+      if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
+      if (!formData.email.trim()) errors.email = 'Email is required';
+      if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+      if (!formData.country.trim()) errors.country = 'Country is required';
+      if (!formData.numberOfPassengers || formData.numberOfPassengers < 1 || formData.numberOfPassengers > 20) {
+        errors.numberOfPassengers = 'Number of passengers must be between 1 and 20';
+      }
+    } else if (currentStep === 2) {
+      if (!formData.nationalPark.trim()) errors.nationalPark = 'National park/Destination is required';
+    } else if (currentStep === 3) {
+      if (formData.needsHotelPickup) {
+        if (!formData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
+        if (!formData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
+      } else {
+        if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
+        if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
+      }
+    } else if (currentStep === 4) {
+      if (!formData.emergencyContactName || !formData.emergencyContactName.trim()) {
+        errors.emergencyContactName = 'Emergency contact name is required';
+      }
+      const phoneValue = String(formData.emergencyContactPhone || '').trim();
+      if (!phoneValue || phoneValue.length === 0) {
+        errors.emergencyContactPhone = 'Emergency contact phone is required';
+      } else if (phoneValue.length !== 9) {
+        errors.emergencyContactPhone = `Phone number must be exactly 9 digits`;
+      }
+    }
+
+    setFormErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      return false;
+    }
+
+    return true;
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-4xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="bg-linear-to-r from-black to-gray-900 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+                <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-xl font-bold truncate">Booking Details</h1>
+                <p className="text-gray-300 text-xs sm:text-sm hidden sm:block">Complete your booking information</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-1.5 sm:p-2 rounded-lg cursor-pointer shrink-0 ml-2"><X className="h-5 w-5 sm:h-6 sm:w-6" /></button>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 border-b border-gray-200">
+          <div className="flex items-start justify-between overflow-x-auto pb-2">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = currentStep === step.number;
+              const isCompleted = currentStep > step.number;
+              return (
+                <div key={step.number} className="flex items-start shrink-0" style={{ width: 'calc(25% - 8px)' }}>
+                  <div className="flex flex-col items-center w-full">
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 ${isActive ? 'bg-black border-black text-white' : isCompleted ? 'bg-gray-100 border-black text-black' : 'bg-gray-100 border-gray-300 text-gray-400'}`}>
+                      {isCompleted ? <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" /> : <Icon className="h-4 w-4 sm:h-5 sm:w-5" />}
+                    </div>
+                    <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${isActive ? 'text-black' : 'text-gray-500'}`}>
+                      <span className="hidden sm:inline">{step.title}</span><span className="sm:hidden">{step.shortTitle}</span>
+                    </span>
+                  </div>
+                  {index < steps.length - 1 && <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${isCompleted ? 'bg-black' : 'bg-gray-200'}`} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          {currentStep === 1 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><User className="h-5 w-5 text-black" />Personal Details</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                  <input type="text" value={formData.fullName} onChange={(e) => updateFormData('fullName', e.target.value)} className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.fullName ? 'border-red-500' : 'border-gray-300'}`} />
+                  {formErrors.fullName && <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
+                  <input type="email" value={formData.email} onChange={(e) => updateFormData('email', e.target.value)} className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.email ? 'border-red-500' : 'border-gray-300'}`} />
+                  {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
+                  <input type="tel" value={formData.phone} onChange={(e) => updateFormData('phone', e.target.value)} className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.phone ? 'border-red-500' : 'border-gray-300'}`} placeholder="+94 77 123 4567" />
+                  {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Country *</label>
+                  <input type="text" value={formData.country} onChange={(e) => updateFormData('country', e.target.value)} className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.country ? 'border-red-500' : 'border-gray-300'}`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Number of Passengers *</label>
+                  <input type="number" value={formData.numberOfPassengers} onChange={(e) => updateFormData('numberOfPassengers', e.target.value)} className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.numberOfPassengers ? 'border-red-500' : 'border-gray-300'}`} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><CalendarIcon className="h-5 w-5 text-black" />Tour Details</h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Destination *</label>
+                <select value={formData.nationalPark} onChange={(e) => updateFormData('nationalPark', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50">
+                  <option value="">Select Destination</option>
+                  {guide?.destinations?.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                {formErrors.nationalPark && <p className="text-red-500 text-xs mt-1">{formErrors.nationalPark}</p>}
+              </div>
+              {selectedDates.length > 0 && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><Package className="h-5 w-5 text-emerald-600" />Booking Summary</h3>
+                  <div className="space-y-2">
+                    {selectedDates.map((date, index) => {
+                      const dateString = date.toDateString();
+                      const dateType = selectedDatesWithType[dateString] || 'full-day';
+                      const timeOfDay = halfDayTimes[dateString];
+                      return (
+                        <div key={index} className="text-sm text-gray-700 border-b border-gray-200 pb-2">
+                          <p className="font-medium">{date.toLocaleDateString()}</p>
+                          <p className="text-xs text-gray-500">{dateType === 'half-day' ? 'Half Day' : 'Full Day'}{timeOfDay ? ` (${timeOfDay === 'morning' ? 'Morning' : 'Evening'})` : ''}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentStep === 3 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><Navigation className="h-5 w-5 text-black" />Pickup & Drop-off</h2>
+              <label className="flex items-center gap-2 cursor-pointer mb-4">
+                <input type="checkbox" checked={formData.needsHotelPickup} onChange={(e) => updateFormData('needsHotelPickup', e.target.checked)} className="w-5 h-5 text-black rounded" />
+                <span className="text-sm font-medium text-gray-700">Do you need hotel pickup?</span>
+              </label>
+              {formData.needsHotelPickup ? (
+                <div className="space-y-4">
+                  <input type="text" placeholder="Hotel Name" value={formData.hotelName} onChange={(e) => updateFormData('hotelName', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+                  <input type="text" placeholder="Hotel Address" value={formData.hotelAddress} onChange={(e) => updateFormData('hotelAddress', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <input type="text" placeholder="Pickup Location" value={formData.pickupLocation} onChange={(e) => updateFormData('pickupLocation', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+                  <input type="text" placeholder="Drop-off Location" value={formData.dropoffLocation} onChange={(e) => updateFormData('dropoffLocation', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><Phone className="h-5 w-5 text-black" />Emergency Contact</h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Emergency Contact Name *</label>
+                <input type="text" value={formData.emergencyContactName} onChange={(e) => updateFormData('emergencyContactName', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Emergency Contact Phone (9 digits) *</label>
+                <div className="flex gap-2">
+                  <select value={emergencyCountryCode} onChange={(e) => setEmergencyCountryCode(e.target.value)} className="px-2 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-black font-medium"><option value="+94">+94</option></select>
+                  <input type="tel" value={formData.emergencyContactPhone} onChange={(e) => updateFormData('emergencyContactPhone', e.target.value.replace(/\D/g, '').slice(0, 9))} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg" placeholder="771234567" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 sm:p-6 border-t border-gray-200 flex justify-between items-center gap-3">
+          <button onClick={handlePrevious} disabled={currentStep === 1} className="px-6 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 disabled:opacity-50">Previous</button>
+          {currentStep < steps.length ? (
+            <button onClick={() => { if (validateStep()) handleNext(); }} className="px-6 py-2 bg-black text-white rounded-lg font-medium">Next</button>
+          ) : (
+            <button onClick={() => { if (validateStep()) onSubmit(); }} className="px-6 py-2 bg-black text-white rounded-lg font-medium">Confirm Booking</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const { guideId } = useParams();
@@ -335,6 +522,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessageData, setSuccessMessageData] = useState(null);
   const [isBooking, setIsBooking] = useState(false);
+  const [userTouristData, setUserTouristData] = useState(null);
 
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   // const [chatConversationId, setChatConversationId] = useState(null); // Removed - using Chat component instead
@@ -343,11 +531,61 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
   // Package booking states
   const [packages, setPackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [dateBookingTypes, setDateBookingTypes] = useState({}); // { 'dateKey': 'fullDay' | 'halfDay' }
   const [showDayTypeModal, setShowDayTypeModal] = useState(false);
   const [pendingDate, setPendingDate] = useState(null);
   const [expandedPackage, setExpandedPackage] = useState(null); // Track which package is expanded
+
+  // Jeep Driver style booking states
+  const [selectedDatesWithType, setSelectedDatesWithType] = useState({}); // { 'dateKey': 'full-day' | 'half-day' }
+  const [dateTypeMenuDate, setDateTypeMenuDate] = useState(null);
+  const [showTimeMenu, setShowTimeMenu] = useState(false);
+  const [halfDayTimes, setHalfDayTimes] = useState({}); // {dateString: 'morning' | 'evening'}
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formErrors, setFormErrors] = useState({});
+  const [emergencyCountryCode, setEmergencyCountryCode] = useState('+94');
+  const [bookingFormData, setBookingFormData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    country: '',
+    numberOfPassengers: 1,
+    specialAssistance: '',
+    nationalPark: '',
+    safariType: 'Morning Safari',
+    pickupLocation: '',
+    hotelName: '',
+    hotelAddress: '',
+    roomNumber: '',
+    dropoffLocation: '',
+    needsHotelPickup: true,
+    emergencyContactName: '',
+    emergencyContactPhone: ''
+  });
+
+  // Reset showTimeMenu when dateTypeMenuDate changes
+  useEffect(() => {
+    if (!dateTypeMenuDate) {
+      setShowTimeMenu(false);
+    }
+  }, [dateTypeMenuDate]);
+
+  // Auto-fill booking form data when form opens
+  useEffect(() => {
+    if (showBookingForm && currentUser && userTouristData) {
+      setBookingFormData(prev => ({
+        ...prev,
+        fullName: prev.fullName || currentUser.displayName || userTouristData.fullName || userTouristData.name || '',
+        email: prev.email || currentUser.email || userTouristData.email || '',
+        phone: prev.phone || userTouristData.phone || userTouristData.phoneNumber || '',
+        country: prev.country || userTouristData.country || userTouristData.location || '',
+        nationalPark: prev.nationalPark || (guide?.destinations && guide.destinations.length > 0 ? guide.destinations[0] : ''),
+      }));
+    }
+  }, [showBookingForm, currentUser, userTouristData, guide]);
 
   const searchParams = new URLSearchParams(location.search);
   const openChat = searchParams.get('openChat');
@@ -428,6 +666,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
           const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
           if (touristDoc.exists()) {
             setUserRole('tourist');
+            setUserTouristData(touristDoc.data());
           } else {
             const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
             if (providerDoc.exists()) {
@@ -602,9 +841,13 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
         ...doc.data()
       }));
       setPackages(packagesData);
+      setLoadingPackages(false);
 
       // Also update guide object with packages
       setGuide(prev => prev ? { ...prev, packages: packagesData } : null);
+    }, (error) => {
+      console.error("Error fetching packages:", error);
+      setLoadingPackages(false);
     });
 
     return () => unsubscribe();
@@ -619,27 +862,42 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   //   // Old message loading code removed
   // }, [conversationId, currentUser]);
 
-  const handleDateSelect = (date) => {
-    if (selectedPackage) {
-      // Package booking mode - show Full Day/Half Day modal
-      setPendingDate(date);
-      setShowDayTypeModal(true);
-    } else {
-      // Regular booking mode - toggle date selection
-      setSelectedDates(prev => {
-        const isSelected = prev.some(selectedDate =>
-          selectedDate.toDateString() === date.toDateString()
-        );
+  const handleDateSelect = (date, type = 'full-day') => {
+    setSelectedDates(prev => {
+      const isSelected = prev.some(selectedDate =>
+        selectedDate.toDateString() === date.toDateString()
+      );
 
-        if (isSelected) {
-          return prev.filter(selectedDate =>
-            selectedDate.toDateString() !== date.toDateString()
-          );
-        } else {
-          return [...prev, date];
-        }
-      });
-    }
+      if (isSelected) {
+        // Remove date and its type
+        const newTypes = { ...selectedDatesWithType };
+        delete newTypes[date.toDateString()];
+        setSelectedDatesWithType(newTypes);
+
+        // Also remove half day time if exists
+        const newTimes = { ...halfDayTimes };
+        delete newTimes[date.toDateString()];
+        setHalfDayTimes(newTimes);
+
+        return prev.filter(selectedDate =>
+          selectedDate.toDateString() !== date.toDateString()
+        );
+      } else {
+        // Add date with specified type (default 'full-day')
+        setSelectedDatesWithType(prev => ({
+          ...prev,
+          [date.toDateString()]: type
+        }));
+        return [...prev, date].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const handleDateTypeChange = (dateString, type) => {
+    setSelectedDatesWithType(prev => ({
+      ...prev,
+      [dateString]: type
+    }));
   };
 
   const handleDayTypeSelection = (dayType) => {
@@ -676,23 +934,42 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   };
 
   const calculateTotal = () => {
-    if (!selectedPackage) {
-      // Regular booking
-      return selectedDates.length * (guide?.dailyRate || guide?.hourlyRate * 8 || 0);
+    if (!guide || selectedDates.length === 0) return 0;
+
+    let total = 0;
+
+    // If package is selected, use package prices
+    if (selectedPackage) {
+      selectedDates.forEach(date => {
+        const dateString = date.toDateString();
+        const dateType = selectedDatesWithType[dateString] || 'full-day';
+        total += dateType === 'half-day' ? (selectedPackage.halfDayPrice || 0) : (selectedPackage.fullDayPrice || 0);
+      });
+      return total;
     }
 
-    // Package booking
-    let total = 0;
+    // Regular booking - use guide's standard prices from register form
     selectedDates.forEach(date => {
-      const dateKey = date.toDateString();
-      const dayType = dateBookingTypes[dateKey];
-      if (dayType === 'fullDay') {
-        total += selectedPackage.fullDayPrice || 0;
-      } else if (dayType === 'halfDay') {
-        total += selectedPackage.halfDayPrice || 0;
-      }
+      const dateString = date.toDateString();
+      const dateType = selectedDatesWithType[dateString] || 'full-day';
+
+      let dayPrice = 0;
+      dayPrice = dateType === 'half-day'
+        ? (guide.priceHalfDayStandard || (guide.dailyRate || 0) * 0.6 || 0)
+        : (guide.priceFullDayStandard || guide.dailyRate || 0);
+
+      total += dayPrice;
     });
+
     return total;
+  };
+
+  const handleBookingFormSubmit = async () => {
+    try {
+      await handleBooking();
+    } catch (error) {
+      console.error('Error in handleBookingFormSubmit:', error);
+    }
   };
 
   const handleBooking = async () => {
@@ -701,15 +978,6 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
       console.warn('⚠️ Booking already in progress, ignoring click');
       return;
     }
-
-    console.log('🔵 handleBooking called');
-    console.log('🔵 Current state:', {
-      selectedDates: selectedDates.length,
-      currentUser: !!currentUser,
-      guide: !!guide,
-      guideId: guide?.id,
-      isBooking: isBooking
-    });
 
     if (selectedDates.length === 0) {
       console.warn('⚠️ No dates selected');
@@ -736,183 +1004,127 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
       return;
     }
 
-    console.log('✅ All pre-checks passed, starting booking process...');
     setIsBooking(true);
 
     try {
-      // Get the authenticated user directly from Firebase Auth
       const authUser = auth.currentUser;
 
-      console.log('🔐 Auth check:', {
-        authUser: !!authUser,
-        authUserUid: authUser?.uid,
-        authUserEmail: authUser?.email,
-        currentUser: !!currentUser,
-        currentUserUid: currentUser?.uid
-      });
-
       if (!authUser) {
-        console.error('❌ No authenticated user found');
-        alert('Please login to make a booking. No authenticated user found.');
+        alert('Please login to make a booking.');
         return;
       }
 
-      if (!authUser.uid) {
-        console.error('❌ No user ID found in auth user');
-        alert('Authentication error. Please try logging in again.');
-        return;
-      }
+      // Calculate total price using standard full-day/half-day prices
+      const totalPrice = calculateTotal();
 
-      // Calculate total price - use dailyRate or calculate from hourlyRate
-      const pricePerDay = guide.dailyRate || (guide.hourlyRate ? guide.hourlyRate * 8 : 0);
-      const totalPrice = selectedDates.length * pricePerDay;
-      const datesString = selectedDates.map(d => d.toLocaleDateString()).join(', ');
+      const datesString = selectedDates.map(d => {
+        const dateType = selectedDatesWithType[d.toDateString()] || 'full-day';
+        const timeOfDay = halfDayTimes[d.toDateString()];
+        return `${d.toLocaleDateString()} (${dateType === 'half-day' ? 'Half Day' : 'Full Day'}${timeOfDay ? ' - ' + timeOfDay : ''})`;
+      }).join(', ');
+
+      const datesWithTypes = selectedDates.map(d => {
+        const dString = d.toDateString();
+        return {
+          date: d.toISOString(),
+          type: selectedDatesWithType[dString] || 'full-day',
+          price: selectedDatesWithType[dString] === 'half-day'
+            ? (selectedPackage ? (selectedPackage.halfDayPrice || 0) : (guide.priceHalfDayStandard || (guide.dailyRate || 0) * 0.6))
+            : (selectedPackage ? (selectedPackage.fullDayPrice || 0) : (guide.priceFullDayStandard || guide.dailyRate || 0)),
+          timeOfDay: halfDayTimes[dString] || ''
+        };
+      });
 
       // Get guide email
       const guideEmail = guide.contactEmail || guide.email || '';
 
-      // Validate guide ID
-      const guideIdString = String(guide.id || '');
-      if (!guideIdString || guideIdString === 'undefined' || guideIdString === 'null' || guideIdString.trim() === '') {
-        console.error('❌ Invalid guide ID:', guide.id);
-        alert('Invalid guide information. Please refresh the page and try again.');
-        return;
-      }
-
       // Create booking in Firestore
       const bookingData = {
-        guideId: guideIdString, // Guide ID (similar to driverId)
+        guideId: String(guide.id),
         guideName: guide.guideName || guide.fullName || 'Tour Guide',
         guideEmail: guideEmail,
-        customerId: authUser.uid, // MUST match request.auth.uid
-        customerName: authUser.displayName || 'Customer',
-        customerEmail: authUser.email || '',
-        selectedDates: selectedDates.map(d => d.toISOString()), // Must be an array
+        customerId: authUser.uid,
+        customerName: bookingFormData.fullName || authUser.displayName || 'Customer',
+        customerEmail: bookingFormData.email || authUser.email || '',
+        customerPhone: bookingFormData.phone,
+        customerCountry: bookingFormData.country,
+        numberOfPassengers: Number(bookingFormData.numberOfPassengers),
+
+        nationalPark: bookingFormData.nationalPark,
+        needsHotelPickup: bookingFormData.needsHotelPickup,
+        hotelName: bookingFormData.hotelName || '',
+        hotelAddress: bookingFormData.hotelAddress || '',
+        pickupLocation: bookingFormData.pickupLocation || '',
+        dropoffLocation: bookingFormData.dropoffLocation || '',
+
+        emergencyContactName: bookingFormData.emergencyContactName,
+        emergencyContactPhone: emergencyCountryCode + bookingFormData.emergencyContactPhone,
+
+        selectedDates: selectedDates.map(d => d.toISOString()),
+        datesWithTypes: datesWithTypes,
         datesString: datesString,
-        totalPrice: Number(totalPrice), // Must be a number
-        pricePerDay: Number(pricePerDay),
-        numberOfDays: Number(selectedDates.length),
+        totalPrice: Number(totalPrice),
         serviceType: 'Tour Guide',
+        packageId: selectedPackage ? selectedPackage.id : null,
+        packageName: selectedPackage ? selectedPackage.title : null,
         status: 'pending',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
-      console.log('📝 Creating booking with data:', {
-        authUid: authUser.uid,
-        customerId: bookingData.customerId,
-        guideId: bookingData.guideId,
-        selectedDates: bookingData.selectedDates,
-        totalPrice: bookingData.totalPrice
-      });
-
-      // Validate data types
-      const validatedBookingData = {
-        ...bookingData,
-        guideId: String(bookingData.guideId),
-        selectedDates: Array.isArray(bookingData.selectedDates) ? bookingData.selectedDates : [],
-        totalPrice: Number(bookingData.totalPrice)
-      };
-
       const bookingRef = collection(db, 'bookings');
-      const finalBookingData = validatedBookingData;
+      const bookingDoc = await addDoc(bookingRef, bookingData);
+      const bookingId = bookingDoc.id;
 
+      // Create confirmation record
       try {
-        console.log('🚀 Attempting to create booking in Firestore...');
-        const bookingDoc = await addDoc(bookingRef, finalBookingData);
-        const bookingId = bookingDoc.id;
+        const confirmationData = {
+          bookingId: bookingId,
+          ...bookingData,
+          confirmationStatus: 'pending',
+          confirmedAt: serverTimestamp(),
+          confirmationType: 'booking_request'
+        };
+        await addDoc(collection(db, 'confirmations'), confirmationData);
+      } catch (e) {
+        console.warn('Confirmation error:', e);
+      }
 
-        console.log('✅ Booking created successfully with ID:', bookingId);
-
-        // Create confirmation record
-        try {
-          const confirmationRef = collection(db, 'confirmations');
-          const confirmationData = {
-            bookingId: bookingId,
-            ...bookingData,
-            confirmationStatus: 'pending',
-            confirmedAt: serverTimestamp(),
-            confirmationType: 'booking_request'
-          };
-          await addDoc(confirmationRef, confirmationData);
-          console.log('✅ Confirmation record created');
-        } catch (confirmationError) {
-          console.warn('⚠️ Could not create confirmation record (non-critical):', confirmationError);
-        }
-
-        // Create notification for guide
-        try {
-          const notificationData = {
-            type: 'booking',
-            title: 'New Booking Request',
-            message: `You have a new booking request from ${authUser.displayName || 'a customer'} for ${selectedDates.length} day(s). Dates: ${datesString}. Total: ${guide.currencyPreference || 'LKR'} ${totalPrice.toLocaleString()}`,
-            recipientId: guide.id, // Guide's user ID
-            senderId: authUser.uid, // Tourist's user ID
-            senderName: authUser.displayName || 'Customer',
-            senderEmail: authUser.email || '',
-            guideEmail: guideEmail,
-            relatedId: bookingId,
-            bookingId: bookingId,
-            bookingData: {
-              dates: datesString,
-              selectedDates: selectedDates.map(d => d.toISOString()),
-              numberOfDays: selectedDates.length,
-              totalPrice: totalPrice,
-              customerName: authUser.displayName || 'Customer',
-              customerEmail: authUser.email || '',
-              guideId: guide.id,
-              guideName: guide.guideName || guide.fullName || 'Tour Guide',
-              guideEmail: guideEmail,
-              pricePerDay: pricePerDay,
-              status: 'pending'
-            }
-          };
-
-          await createNotification(notificationData);
-          console.log('✅ Notification created for guide');
-        } catch (notificationError) {
-          console.warn('⚠️ Could not create notification (non-critical):', notificationError);
-        }
-
-        // Show success message
-        setSuccessMessageData({
-          guideName: guide.guideName || guide.fullName,
-          dates: datesString,
-          totalPrice: totalPrice,
-          numberOfDays: selectedDates.length,
+      // Create notification
+      try {
+        await createNotification({
+          type: 'booking',
+          title: 'New Guide Booking',
+          message: `New booking request from ${bookingData.customerName} for ${selectedDates.length} day(s).`,
+          recipientId: guide.id,
+          senderId: authUser.uid,
+          relatedId: bookingId,
           bookingId: bookingId
         });
-        setShowSuccessMessage(true);
-
-        // Reset selected dates
-        setSelectedDates([]);
-        setIsBooking(false);
-
-        // Don't auto-redirect - wait for user to click "Got it!" button
-
-      } catch (bookingError) {
-        console.error('❌ CRITICAL: Failed to create booking document:', bookingError);
-        throw bookingError;
+      } catch (e) {
+        console.warn('Notification error:', e);
       }
+
+      setSuccessMessageData({
+        guideName: guide.guideName || guide.fullName,
+        dates: datesString,
+        datesWithTypes: datesWithTypes,
+        totalPrice: totalPrice,
+        numberOfDays: selectedDates.length,
+        bookingId: bookingId,
+        nationalPark: bookingFormData.nationalPark
+      });
+      setShowSuccessMessage(true);
+      setShowBookingForm(false);
+      setSelectedDates([]);
+      setSelectedDatesWithType({});
+      setHalfDayTimes({});
+      setIsBooking(false);
 
     } catch (error) {
       setIsBooking(false);
       console.error('❌ Error creating booking:', error);
-
-      setShowSuccessMessage(false);
-      setSuccessMessageData(null);
-
-      let errorMessage = 'Failed to create booking. ';
-
-      if (error.code === 'permission-denied') {
-        errorMessage = 'Unable to complete your booking request.\n\nThis may be due to:\n• Your session may have expired\n• Database permissions need to be updated\n\nPlease try:\n1. Log out and log back in\n2. Wait a few moments and try again\n\nIf the problem continues, please contact support.';
-      } else if (error.code === 'unavailable') {
-        errorMessage = 'Unable to connect to the server.\n\nPlease check your internet connection and try again.';
-      } else {
-        errorMessage = 'An unexpected error occurred while processing your booking.\n\nPlease try again. If the problem persists, please contact support.';
-      }
-
-      alert(errorMessage);
+      alert('Failed to create booking. Please try again.');
     }
   };
 
@@ -1251,7 +1463,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
               <div className="space-y-2 sm:space-y-2.5 md:space-y-3 mb-3 sm:mb-4 md:mb-5 flex-1">
                 {guide.contactPhone && guide.contactPhone !== 'Not provided' && (
                   <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-gray-50 border border-gray-300">
-                    <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                    <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                       <Phone size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
                     <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{guide.contactPhone}</span>
@@ -1260,7 +1472,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                 {guide.contactEmail && (
                   <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-gray-50 border border-gray-300">
-                    <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                    <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                       <Mail size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
                     <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{guide.contactEmail}</span>
@@ -1377,7 +1589,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
               </div>
 
               {/* Tab Content */}
-              <div className="p-2.5 sm:p-3 md:p-4 lg:p-5 lg:overflow-hidden lg:flex-1 bg-gradient-to-b from-white to-gray-50 text-black">
+              <div className="p-2.5 sm:p-3 md:p-4 lg:p-5 lg:overflow-hidden lg:flex-1 bg-linear-to-b from-white to-gray-50 text-black">
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <div className="space-y-2 sm:space-y-2.5 md:space-y-3 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
@@ -1393,7 +1605,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Experience */}
                     <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                      <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                      <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                         <Clock className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1423,10 +1635,10 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                           {guide.priceFullDayStandard > 0 && (
                             <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                               <div className="flex-1 min-w-0 pr-2">
-                                <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Full Day Tour:</span>
-                                <p className="text-xs text-emerald-600 mt-0.5">Full day guided tour</p>
+                                <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Standard Full Day:</span>
+                                <p className="text-xs text-emerald-600 mt-0.5">Full day safari tour guiding</p>
                               </div>
-                              <div className="text-right flex-shrink-0">
+                              <div className="text-right shrink-0">
                                 <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
                                   LKR {guide.priceFullDayStandard.toLocaleString()}
                                 </span>
@@ -1438,10 +1650,10 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                           {guide.priceHalfDayStandard > 0 && (
                             <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                               <div className="flex-1 min-w-0 pr-2">
-                                <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Half Day Tour:</span>
-                                <p className="text-xs text-emerald-600 mt-0.5">Half day guided tour</p>
+                                <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Standard Half Day:</span>
+                                <p className="text-xs text-emerald-600 mt-0.5">Half day safari tour guiding</p>
                               </div>
-                              <div className="text-right flex-shrink-0">
+                              <div className="text-right shrink-0">
                                 <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
                                   LKR {guide.priceHalfDayStandard.toLocaleString()}
                                 </span>
@@ -1456,7 +1668,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     {/* Languages */}
                     {guide.languages && guide.languages.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Languages className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1478,7 +1690,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     {/* Destination Covered */}
                     {guide.destinations && guide.destinations.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1500,7 +1712,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     {/* Certifications - Only for certified guides */}
                     {guide.certificationStatus === 'certified' && (guide.certificationDocuments?.length > 0 || guide.certifications?.length > 0) && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1513,7 +1725,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                 className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm border border-gray-300 flex items-center justify-between gap-2"
                               >
                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                  <FileText size={14} className="text-gray-600 flex-shrink-0" />
+                                  <FileText size={14} className="text-gray-600 shrink-0" />
                                   <span className="font-semibold truncate">{doc.certificationName || 'Certification'}</span>
                                 </div>
                                 {doc.fileUrl && (
@@ -1521,7 +1733,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                     href={doc.fileUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex-shrink-0 text-blue-600 hover:text-blue-800 underline text-xs"
+                                    className="shrink-0 text-blue-600 hover:text-blue-800 underline text-xs"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     View
@@ -1538,7 +1750,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                 key={`cert-${index}`}
                                 className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm border border-gray-300 flex items-center gap-1.5"
                               >
-                                <FileText size={14} className="text-gray-600 flex-shrink-0" />
+                                <FileText size={14} className="text-gray-600 shrink-0" />
                                 <span className="font-semibold">{cert}</span>
                               </div>
                             ))}
@@ -1550,7 +1762,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     {/* Areas of Expertise */}
                     {guide.areasOfExpertise && guide.areasOfExpertise.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Globe className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1572,7 +1784,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     {/* Special Qualifications */}
                     {guide.specialQualifications && guide.specialQualifications.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <GraduationCap className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1594,7 +1806,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     {/* Verification Documents */}
                     {guide.verificationDocuments && guide.verificationDocuments.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <FileText className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1615,141 +1827,137 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                   </div>
                 )}
 
-                {/* Services & Rates Tab */}
+                {/* Service Packages Tab */}
                 {activeTab === 'services' && (
-                  <div className="space-y-2.5 sm:space-y-3 md:space-y-4 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
-                    {/* Check if packages exist */}
-                    {guide.packages && guide.packages.length > 0 ? (
-                      <div className="space-y-4">
-                        <h2 className="text-xl sm:text-2xl font-bold text-black mb-4">Available Service Packages</h2>
-                        {guide.packages.map((pkg, index) => (
-                          <div key={index} className="bg-white border-2 border-gray-300 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                              {/* Package Info */}
-                              <div className="flex-1">
-                                <h3 className="text-lg sm:text-xl font-bold text-black mb-2">{pkg.title || 'Tour Package'}</h3>
-                                <p className="text-sm sm:text-base text-gray-600 mb-4">{pkg.description || ''}</p>
-                              </div>
-
-                              {/* Pricing - Tour Guide (Single set of prices) */}
-                              <div className="flex flex-col gap-2 lg:min-w-[200px]">
-                                {/* Full Day Price */}
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-emerald-700 text-sm font-medium">🚙 Full Day</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-xl sm:text-2xl font-black text-emerald-700">
-                                      LKR {pkg.fullDayPrice?.toLocaleString() || '0'}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Half Day Price */}
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-emerald-700 text-sm font-medium">🚙 Half Day</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-xl sm:text-2xl font-black text-emerald-700">
-                                      LKR {pkg.halfDayPrice?.toLocaleString() || '0'}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Expanded Details - Shows ABOVE button when expanded */}
-                            {expandedPackage === pkg.id && (pkg.rules || pkg.benefits || pkg.facilities) && (
-                              <div className="mt-4 space-y-4">
-                                {/* Rules & Regulations */}
-                                {pkg.rules && pkg.rules.trim() && (
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <FileText className="h-5 w-5 text-blue-600" />
-                                      <h4 className="font-semibold text-blue-900">Rules & Regulations</h4>
-                                    </div>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.rules}</p>
-                                  </div>
-                                )}
-
-                                {/* Benefits */}
-                                {pkg.benefits && pkg.benefits.trim() && (
-                                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <CheckCircle className="h-5 w-5 text-green-600" />
-                                      <h4 className="font-semibold text-green-900">Benefits</h4>
-                                    </div>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.benefits}</p>
-                                  </div>
-                                )}
-
-                                {/* Facilities */}
-                                {pkg.facilities && pkg.facilities.trim() && (
-                                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Package className="h-5 w-5 text-purple-600" />
-                                      <h4 className="font-semibold text-purple-900">Facilities</h4>
-                                    </div>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{pkg.facilities}</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Book Button */}
-                            {currentUser && userRole === 'tourist' && (
-                              <button
-                                onClick={() => {
-                                  // Select package and navigate to booking tab
-                                  setSelectedPackage(pkg);
-                                  setActiveTab('booking');
-                                  setSelectedDates([]);
-                                  setDateBookingTypes({});
-                                }}
-                                className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors"
-                              >
-                                <CalendarIcon className="h-5 w-5" />
-                                Book This Package
-                              </button>
-                            )}
-
-                            {/* Expand/Collapse Trigger - BELOW button */}
-                            {(pkg.rules || pkg.benefits || pkg.facilities) && (
-                              <div
-                                className="text-center text-sm text-gray-500 mt-3 cursor-pointer hover:text-gray-700 transition-colors"
-                                onClick={() => setExpandedPackage(expandedPackage === pkg.id ? null : pkg.id)}
-                              >
-                                {expandedPackage === pkg.id ? 'Click to collapse' : 'Click to see more details'}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                  <div className="lg:h-full lg:overflow-y-auto">
+                    {loadingPackages ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="text-gray-600">Loading packages...</div>
                       </div>
-                    ) : (
-                      /* Empty state for packages */
-                      <div className="flex flex-col items-center justify-center py-16 sm:py-20 md:py-24">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 mb-4 sm:mb-6">
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="w-full h-full text-gray-400"
-                          >
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                            <line x1="12" y1="22.08" x2="12" y2="12" />
-                          </svg>
-                        </div>
-                        <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-700 mb-2">
+                    ) : packages.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <Package className="h-16 w-16 text-gray-400 mb-4" />
+                        <h3 className="text-xl font-semibold text-gray-700 mb-2">
                           No Packages Available
                         </h3>
-                        <p className="text-sm sm:text-base text-gray-500 text-center max-w-md">
+                        <p className="text-gray-500">
                           This service provider hasn't created any packages yet.
                         </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <h2 className="text-2xl font-bold text-black mb-4">Available Service Packages</h2>
+                        {packages.map((pkg) => {
+                          const isExpanded = expandedPackage === pkg.id;
+                          return (
+                            <div
+                              key={pkg.id}
+                              className="bg-white border border-gray-300 rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer"
+                              onClick={() => setExpandedPackage(isExpanded ? null : pkg.id)}
+                            >
+                              {/* Package Header */}
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <h3 className="text-xl font-bold text-black mb-1">{pkg.title}</h3>
+                                  <p className={`text-gray-600 text-sm ${!isExpanded ? 'line-clamp-2' : ''}`}>
+                                    {pkg.description}
+                                  </p>
+                                </div>
+                                <div className="shrink-0 ml-4 space-y-2">
+                                  <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2 text-right">
+                                    <p className="text-xs text-emerald-700 font-medium">Full Day</p>
+                                    <p className="text-lg font-bold text-emerald-800">
+                                      LKR {pkg.fullDayPrice?.toLocaleString() || 0}
+                                    </p>
+                                  </div>
+                                  <div className="bg-emerald-50 border border-emerald-300 rounded-lg px-3 py-2 text-right">
+                                    <p className="text-xs text-emerald-700 font-medium">Half Day</p>
+                                    <p className="text-base font-bold text-emerald-800">
+                                      LKR {pkg.halfDayPrice?.toLocaleString() || 0}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Expanded Content */}
+                              {isExpanded && (
+                                <div className="mt-4 space-y-3 border-t border-gray-200 pt-4">
+                                  {/* Rules & Regulations */}
+                                  {pkg.rules && pkg.rules.trim() && (
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-blue-600" />
+                                        Rules & Regulations
+                                      </h4>
+                                      <p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                        {pkg.rules}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Benefits */}
+                                  {pkg.benefits && pkg.benefits.trim() && (
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                        Benefits
+                                      </h4>
+                                      <p className="text-sm text-gray-600 whitespace-pre-wrap bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                                        {pkg.benefits}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Facilities */}
+                                  {pkg.facilities && pkg.facilities.trim() && (
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                        <Package className="h-4 w-4 text-purple-600" />
+                                        Facilities
+                                      </h4>
+                                      <p className="text-sm text-gray-600 whitespace-pre-wrap bg-purple-50 p-3 rounded-lg border border-purple-200">
+                                        {pkg.facilities}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Book Package Button - Only for logged-in tourists */}
+                              {currentUser && userRole === 'tourist' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+
+                                    // Clear all existing booking selections to start fresh
+                                    setSelectedDates([]);
+                                    setSelectedDatesWithType({});
+                                    setHalfDayTimes({});
+                                    setDateTypeMenuDate(null);
+                                    setShowTimeMenu(false);
+
+                                    // Store selected package
+                                    setSelectedPackage(pkg);
+
+                                    // Switch to booking tab
+                                    setActiveTab('booking');
+                                  }}
+                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 mt-4"
+                                >
+                                  <CalendarIcon className="h-5 w-5" />
+                                  Book This Package
+                                </button>
+                              )}
+
+                              {/* Expand/Collapse Indicator */}
+                              <div className="mt-3 text-center">
+                                <span className="text-xs text-gray-500">
+                                  {isExpanded ? 'Click to collapse' : 'Click to see more details'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1758,89 +1966,175 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                 {/* Booking Tab */}
                 {activeTab === 'booking' && currentUser && userRole === 'tourist' && (
                   <div className="space-y-2.5 sm:space-y-3 md:space-y-4 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
-                    {/* Package Selection Banner */}
+                    {/* Package Info Banner (if package is selected) */}
                     {selectedPackage && (
-                      <div className="bg-emerald-50 border-2 border-emerald-500 rounded-xl p-4 relative">
+                      <div className="bg-linear-to-r from-emerald-50 to-emerald-100 border-2 border-emerald-400 rounded-lg p-4 mb-4 relative">
+                        {/* Close/Unselect Button */}
                         <button
-                          onClick={clearPackageSelection}
-                          className="absolute top-3 right-3 p-1 hover:bg-emerald-100 rounded-full transition-colors"
-                          title="Clear package selection"
+                          onClick={() => {
+                            // Clear selected package
+                            setSelectedPackage(null);
+                            // Reset selections to start fresh
+                            setSelectedDates([]);
+                            setSelectedDatesWithType({});
+                            setHalfDayTimes({});
+                            setDateTypeMenuDate(null);
+                            setShowTimeMenu(false);
+                          }}
+                          className="absolute top-3 right-3 p-1.5 rounded-full bg-white/80 hover:bg-white border border-emerald-400 text-emerald-700 hover:text-emerald-900 transition-all hover:scale-110"
+                          title="Remove package and return to normal booking"
                         >
-                          <X className="h-5 w-5 text-emerald-700" />
+                          <X className="h-5 w-5" />
                         </button>
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 bg-emerald-600 rounded-lg">
-                            <Package className="h-5 w-5 text-white" />
-                          </div>
-                          <div className="flex-1 pr-8">
-                            <h4 className="font-bold text-emerald-900 text-base mb-2">{selectedPackage.title}</h4>
-                            <div className="flex flex-wrap gap-3 mb-2">
-                              <span className="text-sm text-emerald-800">
-                                <strong>Full Day:</strong> LKR {selectedPackage.fullDayPrice?.toLocaleString()}
-                              </span>
-                              <span className="text-sm text-emerald-800">
-                                <strong>Half Day:</strong> LKR {selectedPackage.halfDayPrice?.toLocaleString()}
-                              </span>
-                            </div>
-                            <p className="text-xs text-emerald-700 flex items-center gap-1">
-                              <Package className="h-3 w-3" />
-                              Package booking mode active - Click X to return to regular booking
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
-                    {/* Full Day/Half Day Selection Modal */}
-                    {showDayTypeModal && pendingDate && (
-                      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDayTypeModal(false)}>
-                        <div className="bg-white rounded-lg p-6 max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-                          <h3 className="text-lg font-bold text-gray-900 mb-4">
-                            Select Tour Duration
-                          </h3>
-                          <p className="text-sm text-gray-600 mb-4">
-                            {pendingDate.toLocaleDateString()}
-                          </p>
-                          <div className="space-y-3">
-                            <button
-                              onClick={() => handleDayTypeSelection('fullDay')}
-                              className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
-                            >
-                              Full Day
-                            </button>
-                            <button
-                              onClick={() => handleDayTypeSelection('halfDay')}
-                              className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
-                            >
-                              Half Day
-                            </button>
-                            <button
-                              onClick={() => {
-                                setShowDayTypeModal(false);
-                                setPendingDate(null);
-                              }}
-                              className="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-colors"
-                            >
-                              Cancel
-                            </button>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Package className="h-6 w-6 text-emerald-600" />
+                          <h3 className="text-lg font-bold text-emerald-900 pr-8">{selectedPackage.title}</h3>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex gap-4 text-sm">
+                            <div className="flex items-center gap-1 text-emerald-700">
+                              <span className="font-semibold">Full Day:</span>
+                              <span>LKR {selectedPackage.fullDayPrice?.toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-emerald-700">
+                              <span className="font-semibold">Half Day:</span>
+                              <span>LKR {selectedPackage.halfDayPrice?.toLocaleString()}</span>
+                            </div>
                           </div>
                         </div>
+
+                        <p className="text-xs text-emerald-600 mt-2 italic">
+                          📦 Package booking mode active - Click X to return to regular booking
+                        </p>
                       </div>
                     )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
                       {/* Calendar */}
                       <div className="min-h-0">
-                        <h3 className="font-semibold text-black mb-2 sm:mb-3 md:mb-4 text-xs sm:text-sm md:text-base">
-                          {selectedPackage ? 'Step 2: Select Your Dates' : 'Select Your Dates'}
-                        </h3>
-                        <div className="overflow-y-auto max-h-[300px] sm:max-h-[350px] md:max-h-[400px]">
-                          <DatePickerCalendar
-                            selectedDates={selectedDates}
-                            onDateSelect={handleDateSelect}
-                            availableDates={guide.availableDates}
-                            availabilityCalendar={guide.availabilityCalendar}
-                          />
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3 md:mb-4">
+                          <CalendarIcon className="h-5 w-5 text-gray-700" />
+                          <h3 className="font-semibold text-black text-xs sm:text-sm md:text-base">
+                            {selectedPackage ? 'Step 1: Select Your Dates' : 'Step 1: Select Your Dates'}
+                          </h3>
+                        </div>
+                        <div className="overflow-y-auto max-h-[300px] sm:max-h-[350px] md:max-h-[400px] relative">
+                          <div>
+                            <DatePickerCalendar
+                              selectedDates={selectedDates}
+                              onDateSelect={(date) => {
+                                if (selectedDates.find(d => d.toDateString() === date.toDateString())) {
+                                  handleDateSelect(date);
+                                  setDateTypeMenuDate(null);
+                                } else {
+                                  handleDateSelect(date);
+                                  setDateTypeMenuDate(date.toDateString());
+                                }
+                              }}
+                              selectedDatesWithType={selectedDatesWithType}
+                              availabilityCalendar={guide?.availabilityCalendar}
+                              availableDates={guide?.availableDates}
+                              onDateTypeChange={handleDateTypeChange}
+                              onDateDoubleClick={(date) => {
+                                handleDateSelect(date);
+                                setDateTypeMenuDate(null);
+                              }}
+                            />
+
+                            {/* Date Type Menu (Full Day / Half Day) - Smaller Size */}
+                            {dateTypeMenuDate && (
+                              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-3 min-w-[200px]">
+                                <div className="flex justify-between items-center mb-2">
+                                  <h4 className="text-xs font-semibold text-black text-center flex-1">
+                                    {new Date(dateTypeMenuDate).toLocaleDateString()}
+                                  </h4>
+                                  <button
+                                    onClick={() => {
+                                      setDateTypeMenuDate(null);
+                                      setShowTimeMenu(false);
+                                    }}
+                                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                    aria-label="Close"
+                                  >
+                                    <X className="h-4 w-4 text-gray-600" />
+                                  </button>
+                                </div>
+                                {!showTimeMenu ? (
+                                  <div className="space-y-1.5">
+                                    <button
+                                      onClick={() => {
+                                        handleDateTypeChange(dateTypeMenuDate, 'full-day');
+                                        setDateTypeMenuDate(null);
+                                        setShowTimeMenu(false);
+                                      }}
+                                      className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+                                    >
+                                      Full Day
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setShowTimeMenu(true);
+                                      }}
+                                      className="w-full px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
+                                    >
+                                      Half Day
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setDateTypeMenuDate(null);
+                                        setShowTimeMenu(false);
+                                      }}
+                                      className="w-full px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    <h4 className="text-xs font-semibold text-black mb-1.5 text-center">
+                                      Select Time
+                                    </h4>
+                                    <button
+                                      onClick={() => {
+                                        handleDateTypeChange(dateTypeMenuDate, 'half-day');
+                                        setHalfDayTimes(prev => ({
+                                          ...prev,
+                                          [dateTypeMenuDate]: 'morning'
+                                        }));
+                                        setDateTypeMenuDate(null);
+                                        setShowTimeMenu(false);
+                                      }}
+                                      className="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition-colors"
+                                    >
+                                      Morning
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        handleDateTypeChange(dateTypeMenuDate, 'half-day');
+                                        setHalfDayTimes(prev => ({
+                                          ...prev,
+                                          [dateTypeMenuDate]: 'evening'
+                                        }));
+                                        setDateTypeMenuDate(null);
+                                        setShowTimeMenu(false);
+                                      }}
+                                      className="w-full px-3 py-1.5 bg-yellow-700 hover:bg-yellow-800 text-white rounded text-xs font-medium transition-colors"
+                                    >
+                                      Evening
+                                    </button>
+                                    <button
+                                      onClick={() => setShowTimeMenu(false)}
+                                      className="w-full px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+                                    >
+                                      Back
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1850,81 +2144,84 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                           <h3 className="font-semibold text-black mb-2 sm:mb-3 text-xs sm:text-sm md:text-base">Booking Summary</h3>
 
                           {selectedDates.length === 0 ? (
-                            <p className="text-gray-600 text-center py-3 sm:py-4 text-xs sm:text-sm">
-                              Select dates to see booking details
-                            </p>
+                            <div className="flex flex-col items-center justify-center py-6 sm:py-8 text-center">
+                              <CalendarIcon className="h-10 w-10 text-gray-300 mb-2" />
+                              <p className="text-gray-500 text-xs sm:text-sm">
+                                Select dates to see booking details
+                              </p>
+                            </div>
                           ) : (
-                            <div className="space-y-3">
-                              {/* Package Info Badge */}
+                            <div className="space-y-2 sm:space-y-3">
+                              {/* Package Information */}
                               {selectedPackage && (
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                                  <div className="flex items-center gap-2 text-emerald-700 mb-1">
-                                    <Package className="h-4 w-4" />
-                                    <span className="font-semibold text-sm">Package Booking</span>
+                                <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2 sm:p-2.5 mb-3">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Package className="h-4 w-4 text-emerald-600" />
+                                    <span className="text-emerald-800 font-semibold text-xs sm:text-sm">Package Booking</span>
                                   </div>
-                                  <p className="text-emerald-800 font-medium text-xs">{selectedPackage.title}</p>
+                                  <p className="text-emerald-700 text-xs font-medium">{selectedPackage.title}</p>
                                 </div>
                               )}
 
-                              {/* Selected Dates Header */}
-                              <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                                <span className="text-gray-700 text-xs sm:text-sm font-medium">Selected dates:</span>
-                                <span className="font-semibold text-black text-xs sm:text-sm">{selectedDates.length} day(s)</span>
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-700 text-xs sm:text-sm">Selected dates:</span>
+                                <span className="font-medium text-black text-xs sm:text-sm">{selectedDates.length} day(s)</span>
                               </div>
 
-                              {/* Date List with Types and Prices */}
-                              <div className="space-y-2">
+                              {/* Show breakdown of dates and their types */}
+                              <div className="space-y-1.5 sm:space-y-2 bg-gray-50 p-2 sm:p-2.5 rounded-lg border border-gray-300 max-h-[150px] sm:max-h-[180px] md:max-h-[200px] overflow-y-auto custom-scrollbar">
                                 {selectedDates.sort((a, b) => a - b).map((date, index) => {
-                                  const dateKey = date.toDateString();
-                                  const dayType = dateBookingTypes[dateKey];
-                                  const price = selectedPackage
-                                    ? (dayType === 'fullDay' ? selectedPackage.fullDayPrice : selectedPackage.halfDayPrice)
-                                    : (guide?.dailyRate || guide?.hourlyRate * 8 || 0);
+                                  const dateString = date.toDateString();
+                                  const dateType = selectedDatesWithType[dateString] || 'full-day';
+                                  const timeOfDay = halfDayTimes[dateString] || '';
+
+                                  // Calculate price based on booking type
+                                  const dayPrice = dateType === 'half-day'
+                                    ? (selectedPackage ? (selectedPackage.halfDayPrice || 0) : (guide.priceHalfDayStandard || (guide.dailyRate || 0) * 0.6))
+                                    : (selectedPackage ? (selectedPackage.fullDayPrice || 0) : (guide.priceFullDayStandard || guide.dailyRate || 0));
 
                                   return (
-                                    <div key={index} className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded border border-gray-200">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-gray-700">{date.toLocaleDateString('en-US', { month: '1/2-digit', day: '2-digit', year: 'numeric' })}</span>
-                                        {selectedPackage && dayType && (
-                                          <span className={`px-2 py-0.5 rounded text-xs font-medium text-white ${dayType === 'fullDay' ? 'bg-red-500' : 'bg-yellow-500'}`}>
-                                            {dayType === 'fullDay' ? 'Full Day' : 'Half Day'}
+                                    <div key={index} className="flex justify-between items-center text-xs">
+                                      <span className="text-gray-700 flex-1 min-w-0 pr-2">
+                                        {date.toLocaleDateString()}
+                                        <span className={`ml-1 px-2 py-0.5 rounded text-[10px] font-semibold ${dateType === 'half-day' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                                          {dateType === 'half-day' ? 'Half Day' : 'Full Day'}
+                                        </span>
+                                        {timeOfDay && (
+                                          <span className="ml-1 text-[10px] text-gray-500">
+                                            ({timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening'})
                                           </span>
                                         )}
-                                      </div>
-                                      <span className="font-semibold text-black">LKR {price?.toLocaleString()}</span>
+                                      </span>
+                                      <span className="font-medium text-black shrink-0">
+                                        LKR {dayPrice.toLocaleString()}
+                                      </span>
                                     </div>
                                   );
                                 })}
                               </div>
 
-                              {/* Price per day (for non-package bookings) */}
-                              {!selectedPackage && (
-                                <div className="flex justify-between items-center text-xs border-t border-gray-200 pt-2">
-                                  <span className="text-gray-700">Price per day:</span>
-                                  <span className="font-medium text-black">LKR {(guide?.dailyRate || guide?.hourlyRate * 8 || 0).toLocaleString()}</span>
-                                </div>
-                              )}
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-700 text-xs sm:text-sm">Price per day (Avg):</span>
+                                <span className="font-medium text-black text-xs sm:text-sm">LKR {guide.priceFullDayStandard?.toLocaleString() || guide.dailyRate?.toLocaleString() || '0'}</span>
+                              </div>
 
-                              {/* Total */}
-                              <div className="border-t-2 border-gray-300 pt-3">
+                              <div className="border-t border-gray-300 pt-2">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-base sm:text-lg font-bold text-black">Total:</span>
-                                  <span className="text-xl sm:text-2xl font-black text-black">
+                                  <span className="text-sm sm:text-base md:text-lg font-semibold text-black">Total:</span>
+                                  <span className="text-xl sm:text-2xl text-black font-black">
                                     LKR {calculateTotal().toLocaleString()}
                                   </span>
                                 </div>
                               </div>
 
-                              {/* Continue Button */}
                               <button
-                                onClick={handleBooking}
-                                disabled={isBooking || selectedDates.length === 0}
-                                className={`w-full bg-black text-white py-3 px-4 rounded-lg font-semibold text-sm transition-colors ${isBooking || selectedDates.length === 0
-                                  ? 'opacity-50 cursor-not-allowed'
-                                  : 'hover:bg-gray-800'
-                                  }`}
+                                onClick={() => setShowBookingForm(true)}
+                                className="w-full bg-black text-white py-3 px-4 rounded-xl font-bold mt-2 hover:bg-gray-800 transition-all flex items-center justify-center gap-2 group active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={selectedDates.length === 0}
                               >
-                                {isBooking ? 'Processing...' : 'Continue to Booking Details'}
+                                <span>Continue to Booking Details</span>
+                                <CheckCircle className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                               </button>
                             </div>
                           )}
@@ -1994,6 +2291,26 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
           </div>
         </div>
       </div>
+
+      <BookingFormModal
+        isOpen={showBookingForm}
+        onClose={() => setShowBookingForm(false)}
+        formData={bookingFormData}
+        setFormData={setBookingFormData}
+        formErrors={formErrors}
+        setFormErrors={setFormErrors}
+        currentStep={currentStep}
+        setCurrentStep={setCurrentStep}
+        onSubmit={handleBookingFormSubmit}
+        guide={guide}
+        selectedDates={selectedDates}
+        selectedDatesWithType={selectedDatesWithType}
+        onDateTypeChange={handleDateTypeChange}
+        selectedPackage={selectedPackage}
+        halfDayTimes={halfDayTimes}
+        emergencyCountryCode={emergencyCountryCode}
+        setEmergencyCountryCode={setEmergencyCountryCode}
+      />
     </div>
   );
 };

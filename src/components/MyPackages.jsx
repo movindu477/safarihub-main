@@ -333,7 +333,7 @@ const MyPackages = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+      <div className="min-h-screen bg-linear-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
@@ -344,7 +344,7 @@ const MyPackages = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+    <div className="min-h-screen bg-linear-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -374,8 +374,8 @@ const MyPackages = () => {
         {/* Message Display */}
         {message.text && (
           <div className={`mb-6 p-4 rounded-lg border ${message.type === 'success' ? 'bg-emerald-900/20 border-emerald-700 text-emerald-300' :
-              message.type === 'error' ? 'bg-red-900/20 border-red-700 text-red-300' :
-                'bg-blue-900/20 border-blue-700 text-blue-300'
+            message.type === 'error' ? 'bg-red-900/20 border-red-700 text-red-300' :
+              'bg-blue-900/20 border-blue-700 text-blue-300'
             }`}>
             <div className="flex items-center gap-2">
               {message.type === 'success' && <CheckCircle className="h-5 w-5" />}
@@ -713,7 +713,7 @@ const MyPackages = () => {
                     <div className="flex-1">
                       {/* Package Header */}
                       <div className="flex items-start gap-4 mb-4">
-                        <div className="flex-shrink-0 w-12 h-12 bg-emerald-600/20 rounded-lg flex items-center justify-center">
+                        <div className="shrink-0 w-12 h-12 bg-emerald-600/20 rounded-lg flex items-center justify-center">
                           <Package className="h-6 w-6 text-emerald-400" />
                         </div>
                         <div className="flex-1">
