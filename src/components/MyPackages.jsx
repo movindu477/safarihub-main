@@ -21,6 +21,7 @@ const MyPackages = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [saving, setSaving] = useState(false);
   const [expandedPackage, setExpandedPackage] = useState(null); // For expand/collapse functionality
+  const [serviceType, setServiceType] = useState(null); // User's service type
 
   // Form state
   const [formData, setFormData] = useState({
@@ -43,12 +44,26 @@ const MyPackages = () => {
     facilities: ''
   });
 
-  // Fetch packages
+  // Fetch user service type and packages
   useEffect(() => {
     if (!currentUser) {
       setLoading(false);
       return;
     }
+
+    // Fetch service type
+    const fetchServiceType = async () => {
+      try {
+        const providerDoc = await getDoc(doc(db, 'serviceProviders', currentUser.uid));
+        if (providerDoc.exists()) {
+          const providerData = providerDoc.data();
+          setServiceType(providerData?.serviceType || 'Jeep Driver');
+        }
+      } catch (error) {
+        console.error('Error fetching service type:', error);
+      }
+    };
+    fetchServiceType();
 
     const packagesQuery = query(
       collection(db, 'servicePackages'),
@@ -62,7 +77,7 @@ const MyPackages = () => {
           id: doc.id,
           ...doc.data()
         }));
-        
+
         // Sort by creation date (newest first)
         packagesData.sort((a, b) => {
           const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
@@ -116,7 +131,7 @@ const MyPackages = () => {
   // Handle create/edit package
   const handleSavePackage = async (e) => {
     e.preventDefault();
-    
+
     // Validation
     if (!formData.title.trim()) {
       setMessage({ type: 'error', text: 'Package title is required' });
@@ -127,14 +142,33 @@ const MyPackages = () => {
       return;
     }
 
-    // Vehicle type validation
-    if (!formData.hasStandardJeep && !formData.hasLuxuryJeep) {
+    // Vehicle type validation (only for Jeep Drivers)
+    const isTourGuide = serviceType === 'Tour Guide';
+    if (!isTourGuide && !formData.hasStandardJeep && !formData.hasLuxuryJeep) {
       setMessage({ type: 'error', text: '❌ Please select at least one vehicle type' });
       return;
     }
 
-    // Standard Safari Jeep validation
-    if (formData.hasStandardJeep) {
+    // Tour Guide: Simple validation (just Full Day and Half Day)
+    if (isTourGuide) {
+      if (!formData.fullDayPrice || parseFloat(formData.fullDayPrice) <= 0) {
+        setMessage({ type: 'error', text: '❌ Valid full-day price is required' });
+        return;
+      }
+      if (!formData.halfDayPrice || parseFloat(formData.halfDayPrice) <= 0) {
+        setMessage({ type: 'error', text: '❌ Valid half-day price is required' });
+        return;
+      }
+      const fullDay = parseFloat(formData.fullDayPrice);
+      const halfDay = parseFloat(formData.halfDayPrice);
+      if (fullDay <= halfDay) {
+        setMessage({ type: 'error', text: '❌ Full day price must be greater than half day price' });
+        return;
+      }
+    }
+
+    // Jeep Driver: Standard Safari Jeep validation
+    if (!isTourGuide && formData.hasStandardJeep) {
       if (!formData.fullDayPriceStandard || parseFloat(formData.fullDayPriceStandard) <= 0) {
         setMessage({ type: 'error', text: '❌ Valid Standard full-day price is required' });
         return;
@@ -151,8 +185,8 @@ const MyPackages = () => {
       }
     }
 
-    // Luxury Safari Jeep validation
-    if (formData.hasLuxuryJeep) {
+    // Jeep Driver: Luxury Safari Jeep validation
+    if (!isTourGuide && formData.hasLuxuryJeep) {
       if (!formData.fullDayPriceLuxury || parseFloat(formData.fullDayPriceLuxury) <= 0) {
         setMessage({ type: 'error', text: '❌ Valid Luxury full-day price is required' });
         return;
@@ -178,7 +212,21 @@ const MyPackages = () => {
       const providerData = providerDoc.data();
       const serviceType = providerData?.serviceType || 'Unknown';
 
-      const packageData = {
+      const packageData = isTourGuide ? {
+        // Tour Guide package data - simplified
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        fullDayPrice: parseFloat(formData.fullDayPrice),
+        halfDayPrice: parseFloat(formData.halfDayPrice),
+        rules: formData.rules.trim(),
+        benefits: formData.benefits.trim(),
+        facilities: formData.facilities.trim(),
+        providerId: currentUser.uid,
+        providerName: providerData?.fullName || 'Unknown',
+        serviceType: serviceType,
+        updatedAt: serverTimestamp()
+      } : {
+        // Jeep Driver package data - with vehicle types
         title: formData.title.trim(),
         description: formData.description.trim(),
         // Vehicle types
@@ -218,7 +266,7 @@ const MyPackages = () => {
       }
 
       resetForm();
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => {
         setMessage({ type: '', text: '' });
@@ -263,7 +311,7 @@ const MyPackages = () => {
     try {
       await deleteDoc(doc(db, 'servicePackages', pkg.id));
       setMessage({ type: 'success', text: 'Package deleted successfully!' });
-      
+
       setTimeout(() => {
         setMessage({ type: '', text: '' });
       }, 3000);
@@ -310,7 +358,7 @@ const MyPackages = () => {
                 Create and manage your service packages for customers to book
               </p>
             </div>
-            
+
             {!showForm && (
               <button
                 onClick={() => setShowForm(true)}
@@ -325,11 +373,10 @@ const MyPackages = () => {
 
         {/* Message Display */}
         {message.text && (
-          <div className={`mb-6 p-4 rounded-lg border ${
-            message.type === 'success' ? 'bg-emerald-900/20 border-emerald-700 text-emerald-300' :
-            message.type === 'error' ? 'bg-red-900/20 border-red-700 text-red-300' :
-            'bg-blue-900/20 border-blue-700 text-blue-300'
-          }`}>
+          <div className={`mb-6 p-4 rounded-lg border ${message.type === 'success' ? 'bg-emerald-900/20 border-emerald-700 text-emerald-300' :
+              message.type === 'error' ? 'bg-red-900/20 border-red-700 text-red-300' :
+                'bg-blue-900/20 border-blue-700 text-blue-300'
+            }`}>
             <div className="flex items-center gap-2">
               {message.type === 'success' && <CheckCircle className="h-5 w-5" />}
               {message.type === 'error' && <X className="h-5 w-5" />}
@@ -389,37 +436,88 @@ const MyPackages = () => {
                 />
               </div>
 
-              {/* Vehicle Type Selection */}
-              <div className="border border-gray-600 rounded-lg p-4 bg-gray-900/30">
-                <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Select Vehicle Types for This Package *
-                </label>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.hasStandardJeep}
-                      onChange={(e) => setFormData(prev => ({ ...prev, hasStandardJeep: e.target.checked }))}
-                      className="w-5 h-5 text-emerald-600 bg-gray-900 border-gray-600 rounded focus:ring-emerald-500 focus:ring-offset-gray-900"
-                      disabled={saving}
-                    />
-                    <span className="text-gray-200 font-medium">Standard Safari Jeep</span>
+              {/* Vehicle Type Selection - Only for Jeep Drivers */}
+              {serviceType !== 'Tour Guide' && (
+                <div className="border border-gray-600 rounded-lg p-4 bg-gray-900/30">
+                  <label className="block text-sm font-medium text-gray-300 mb-3">
+                    Select Vehicle Types for This Package *
                   </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.hasLuxuryJeep}
-                      onChange={(e) => setFormData(prev => ({ ...prev, hasLuxuryJeep: e.target.checked }))}
-                      className="w-5 h-5 text-emerald-600 bg-gray-900 border-gray-600 rounded focus:ring-emerald-500 focus:ring-offset-gray-900"
-                      disabled={saving}
-                    />
-                    <span className="text-gray-200 font-medium">Luxury Safari Jeep</span>
-                  </label>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasStandardJeep}
+                        onChange={(e) => setFormData(prev => ({ ...prev, hasStandardJeep: e.target.checked }))}
+                        className="w-5 h-5 text-emerald-600 bg-gray-900 border-gray-600 rounded focus:ring-emerald-500 focus:ring-offset-gray-900"
+                        disabled={saving}
+                      />
+                      <span className="text-gray-200 font-medium">Standard Safari Jeep</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.hasLuxuryJeep}
+                        onChange={(e) => setFormData(prev => ({ ...prev, hasLuxuryJeep: e.target.checked }))}
+                        className="w-5 h-5 text-emerald-600 bg-gray-900 border-gray-600 rounded focus:ring-emerald-500 focus:ring-offset-gray-900"
+                        disabled={saving}
+                      />
+                      <span className="text-gray-200 font-medium">Luxury Safari Jeep</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Standard Safari Jeep Pricing */}
-              {formData.hasStandardJeep && (
+              {/* Tour Guide Simple Pricing */}
+              {serviceType === 'Tour Guide' && (
+                <div className="border border-emerald-500/50 rounded-lg p-4 bg-emerald-900/10">
+                  <h3 className="text-lg font-semibold text-emerald-300 mb-4 flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Package Pricing
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Full Day Price (LKR) *
+                      </label>
+                      <input
+                        type="number"
+                        name="fullDayPrice"
+                        value={formData.fullDayPrice}
+                        onChange={handleInputChange}
+                        placeholder="e.g., 20000"
+                        min="1"
+                        step="1"
+                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                        required
+                        disabled={saving}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Half Day Price (LKR) *
+                      </label>
+                      <input
+                        type="number"
+                        name="halfDayPrice"
+                        value={formData.halfDayPrice}
+                        onChange={handleInputChange}
+                        placeholder="e.g., 12000"
+                        min="1"
+                        step="1"
+                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                        required
+                        disabled={saving}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Must be less than full day price
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Jeep Driver: Standard Safari Jeep Pricing */}
+              {serviceType !== 'Tour Guide' && formData.hasStandardJeep && (
                 <div className="border border-blue-500/50 rounded-lg p-4 bg-blue-900/10">
                   <h3 className="text-lg font-semibold text-blue-300 mb-4 flex items-center gap-2">
                     <DollarSign className="h-5 w-5" />
@@ -467,8 +565,8 @@ const MyPackages = () => {
                 </div>
               )}
 
-              {/* Luxury Safari Jeep Pricing */}
-              {formData.hasLuxuryJeep && (
+              {/* Jeep Driver: Luxury Safari Jeep Pricing */}
+              {serviceType !== 'Tour Guide' && formData.hasLuxuryJeep && (
                 <div className="border border-amber-500/50 rounded-lg p-4 bg-amber-900/10">
                   <h3 className="text-lg font-semibold text-amber-300 mb-4 flex items-center gap-2">
                     <DollarSign className="h-5 w-5" />
