@@ -535,6 +535,12 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           certifications: formData.certifications || [],
         };
       } else if (serviceType === 'Tour Guide') {
+        // Parse prices
+        const parsePrice = (priceStr) => {
+          if (!priceStr) return 0;
+          return parseInt(priceStr.toString().replace(/,/g, '')) || 0;
+        };
+
         updateData = {
           ...updateData,
           destinations: formData.destinations ? [formData.destinations] : [],
@@ -543,10 +549,46 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           verificationDocuments: formData.verificationDocuments || [],
           hourlyRate: formData.hourlyRate ? parseInt(formData.hourlyRate) : 0,
           dailyRate: formData.dailyRate ? parseInt(formData.dailyRate) : 0,
+          priceFullDayStandard: parsePrice(formData.priceFullDayStandard),
+          priceHalfDayStandard: parsePrice(formData.priceHalfDayStandard),
           specialPackageRates: formData.specialPackageRates || '',
           currencyPreference: formData.currencyPreference || 'LKR',
           languages: formData.languages || [],
         };
+      }
+
+      // ✅ VALIDATION: Full day price must be greater than half day price
+      if (serviceType === 'Jeep Driver') {
+        const fullStd = updateData.priceFullDayStandard || 0;
+        const halfStd = updateData.priceHalfDayStandard || 0;
+        const fullLux = updateData.priceFullDayLuxury || 0;
+        const halfLux = updateData.priceHalfDayLuxury || 0;
+
+        // Check Standard Jeep prices
+        if (fullStd > 0 && halfStd > 0 && fullStd <= halfStd) {
+          setSaving(false);
+          setMessage({ type: 'error', text: '❌ Full Day Standard price must be greater than Half Day Standard price' });
+          setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+          return;
+        }
+
+        // Check Luxury Jeep prices
+        if (fullLux > 0 && halfLux > 0 && fullLux <= halfLux) {
+          setSaving(false);
+          setMessage({ type: 'error', text: '❌ Full Day Luxury price must be greater than Half Day Luxury price' });
+          setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+          return;
+        }
+      } else if (serviceType === 'Tour Guide') {
+        const fullDay = updateData.priceFullDayStandard || 0;
+        const halfDay = updateData.priceHalfDayStandard || 0;
+
+        if (fullDay > 0 && halfDay > 0 && fullDay <= halfDay) {
+          setSaving(false);
+          setMessage({ type: 'error', text: '❌ Full Day price must be greater than Half Day price' });
+          setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+          return;
+        }
       }
 
       // Handle profile picture upload - Using Supabase

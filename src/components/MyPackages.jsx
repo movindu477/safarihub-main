@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, collection, query, where, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, query, where, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { Package, Plus, Edit, Trash2, Eye, DollarSign, FileText, CheckCircle, X, Save } from 'lucide-react';
 
 /**
@@ -115,6 +115,14 @@ const MyPackages = () => {
     }
     if (!formData.halfDayPrice || parseFloat(formData.halfDayPrice) <= 0) {
       setMessage({ type: 'error', text: 'Valid half-day price is required' });
+      return;
+    }
+
+    // ✅ VALIDATION: Full day price must be greater than half day price
+    const fullDay = parseFloat(formData.fullDayPrice);
+    const halfDay = parseFloat(formData.halfDayPrice);
+    if (fullDay <= halfDay) {
+      setMessage({ type: 'error', text: '❌ Full day price must be greater than half day price' });
       return;
     }
 
@@ -527,8 +535,5 @@ const MyPackages = () => {
     </div>
   );
 };
-
-// Add missing import for getDoc
-import { getDoc } from 'firebase/firestore';
 
 export default MyPackages;

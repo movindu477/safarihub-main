@@ -2829,7 +2829,26 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         }
       }
 
-      // Price validation removed - users can set any price they want
+      // ✅ NEW: Full day price must be greater than half day price
+      if (serviceType === "Jeep Driver" || serviceType === "Tour Guide") {
+        // For Standard Safari Jeep
+        if (hasStandardJeep && fullDayStd <= halfDayStd) {
+          setMsg("❌ Full Day Standard price must be greater than Half Day Standard price");
+          return;
+        }
+        
+        // For Luxury Safari Jeep
+        if (hasLuxuryJeep && fullDayLux <= halfDayLux) {
+          setMsg("❌ Full Day Luxury price must be greater than Half Day Luxury price");
+          return;
+        }
+        
+        // For Tour Guide (uses priceFullDayStandard and priceHalfDayStandard)
+        if (serviceType === "Tour Guide" && fullDayStd > 0 && halfDayStd > 0 && fullDayStd <= halfDayStd) {
+          setMsg("❌ Full Day price must be greater than Half Day price");
+          return;
+        }
+      }
     }
 
     setBusy(true);
