@@ -481,6 +481,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
             totalReviews: guideData.totalReviews || 0,
             hourlyRate: guideData.hourlyRate || 0,
             dailyRate: guideData.dailyRate || 0,
+            priceFullDayStandard: guideData.priceFullDayStandard || guideData.dailyRate || 0,
+            priceHalfDayStandard: guideData.priceHalfDayStandard || Math.round((guideData.dailyRate || 0) * 0.6),
             specialPackageRates: guideData.specialPackageRates || '',
             currencyPreference: guideData.currencyPreference || 'LKR',
             experience: guideData.experienceYears || guideData.experience || 0,
@@ -488,6 +490,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
               guideData.specialQualifications ? [guideData.specialQualifications] : [],
             areasOfExpertise: Array.isArray(guideData.areasOfExpertise) ? guideData.areasOfExpertise :
               guideData.areasOfExpertise ? [guideData.areasOfExpertise] : [],
+            destinations: Array.isArray(guideData.destinations) ? guideData.destinations :
+              guideData.destinations ? [guideData.destinations] : [],
+            certifications: Array.isArray(guideData.certifications) ? guideData.certifications :
+              guideData.certifications ? [guideData.certifications] : [],
+            certificationStatus: guideData.certificationStatus || 'non-certified',
             verificationDocuments: Array.isArray(guideData.verificationDocuments) ? guideData.verificationDocuments :
               guideData.verificationDocuments ? [guideData.verificationDocuments] : [],
             languages: Array.isArray(guideData.languages) ? guideData.languages :
@@ -509,6 +516,27 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
           };
 
           setGuide(transformedGuide);
+
+          // Fetch certification documents if guide is certified
+          if (guideData.certificationStatus === 'certified') {
+            try {
+              const certDocRef = doc(db, 'guideCertifications', guideId);
+              const certDocSnap = await getDoc(certDocRef);
+              
+              if (certDocSnap.exists()) {
+                const certData = certDocSnap.data();
+                console.log('✅ Certification documents found:', certData);
+                
+                // Set certification documents with URLs
+                if (certData.documents && Array.isArray(certData.documents)) {
+                  transformedGuide.certificationDocuments = certData.documents;
+                  setGuide({...transformedGuide, certificationDocuments: certData.documents});
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching certification documents:', err);
+            }
+          }
         } else {
           console.log('❌ Guide not found for ID:', guideId);
           setError("Tour guide not found");
@@ -869,6 +897,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
             guideData.specialQualifications ? [guideData.specialQualifications] : [],
           areasOfExpertise: Array.isArray(guideData.areasOfExpertise) ? guideData.areasOfExpertise :
             guideData.areasOfExpertise ? [guideData.areasOfExpertise] : [],
+          destinations: Array.isArray(guideData.destinations) ? guideData.destinations :
+            guideData.destinations ? [guideData.destinations] : [],
+          certifications: Array.isArray(guideData.certifications) ? guideData.certifications :
+            guideData.certifications ? [guideData.certifications] : [],
+          certificationStatus: guideData.certificationStatus || 'non-certified',
           verificationDocuments: Array.isArray(guideData.verificationDocuments) ? guideData.verificationDocuments :
             guideData.verificationDocuments ? [guideData.verificationDocuments] : [],
           languages: Array.isArray(guideData.languages) ? guideData.languages :
@@ -882,8 +915,30 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
           featured: guideData.featured || false,
           availability: guideData.availability !== false,
           availableDates: guideData.availableDates || [],
+          priceFullDayStandard: guideData.priceFullDayStandard || guideData.dailyRate || 0,
+          priceHalfDayStandard: guideData.priceHalfDayStandard || Math.round((guideData.dailyRate || 0) * 0.6),
           isCurrentUser: currentUser && currentUser.uid === guideId
         };
+        
+        // Fetch certification documents if guide is certified
+        if (guideData.certificationStatus === 'certified') {
+          try {
+            const certDocRef = doc(db, 'guideCertifications', guideId);
+            const certDocSnap = await getDoc(certDocRef);
+            
+            if (certDocSnap.exists()) {
+              const certData = certDocSnap.data();
+              console.log('✅ Certification documents found (refresh):', certData);
+              
+              if (certData.documents && Array.isArray(certData.documents)) {
+                transformedGuide.certificationDocuments = certData.documents;
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching certification documents (refresh):', err);
+          }
+        }
+        
         setGuide(transformedGuide);
       }
     }
@@ -1093,15 +1148,6 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{guide.contactEmail}</span>
                   </div>
                 )}
-
-                {guide.location && (
-                  <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-gray-50 border border-gray-300">
-                    <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
-                      <MapPin size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
-                    </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{guide.location}</span>
-                  </div>
-                )}
               </div>
 
               {/* Action Buttons */}
@@ -1165,8 +1211,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       : 'border-transparent text-gray-600 hover:text-black'
                       }`}
                   >
-                    <span className="hidden sm:inline">Services & Rates</span>
-                    <span className="sm:hidden">Services</span>
+                    <span className="hidden sm:inline">Service Packages</span>
+                    <span className="sm:hidden">Packages</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('reviews')}
@@ -1217,6 +1263,16 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <div className="space-y-2 sm:space-y-2.5 md:space-y-3 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
+                    {/* About - Moved to top */}
+                    {guide.description && (
+                      <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <h3 className="font-bold text-black mb-1 text-xs sm:text-sm md:text-base">About</h3>
+                        <p className="text-gray-700 leading-relaxed text-xs sm:text-sm line-clamp-3">
+                          {guide.description}
+                        </p>
+                      </div>
+                    )}
+
                     {/* Experience */}
                     <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                       <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
@@ -1230,13 +1286,110 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       </div>
                     </div>
 
-                    {/* Description */}
-                    {guide.description && (
+                    {/* Pricing - Full Day and Half Day Rates */}
+                    {(guide.priceFullDayStandard > 0 || guide.priceHalfDayStandard > 0) && (
                       <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <h3 className="font-bold text-black mb-1 text-xs sm:text-sm md:text-base">About</h3>
-                        <p className="text-gray-700 leading-relaxed text-xs sm:text-sm line-clamp-3">
-                          {guide.description}
-                        </p>
+                        <h3 className="font-bold text-black mb-2 sm:mb-2.5 flex items-center text-xs sm:text-sm md:text-base">
+                          <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
+                            <DollarSign className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
+                          </div>
+                          Rates
+                          {guide.certificationStatus === 'certified' && guide.certificationApproved && (
+                            <span className="ml-2 text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium border border-yellow-300">
+                              Certified Rates
+                            </span>
+                          )}
+                        </h3>
+                        <div className="space-y-1.5 sm:space-y-2">
+                          {/* Full Day Price */}
+                          {guide.priceFullDayStandard > 0 && (
+                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Full Day Tour:</span>
+                                <p className="text-xs text-emerald-600 mt-0.5">Full day guided tour</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
+                                  LKR {guide.priceFullDayStandard.toLocaleString()}
+                                </span>
+                                <span className="text-xs font-semibold text-emerald-600 block">/day</span>
+                              </div>
+                            </div>
+                          )}
+                          {/* Half Day Price */}
+                          {guide.priceHalfDayStandard > 0 && (
+                            <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Half Day Tour:</span>
+                                <p className="text-xs text-emerald-600 mt-0.5">Half day guided tour</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
+                                  LKR {guide.priceHalfDayStandard.toLocaleString()}
+                                </span>
+                                <span className="text-xs font-semibold text-emerald-600 block">/half day</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Destination Covered */}
+                    {guide.destinations && guide.destinations.length > 0 && (
+                      <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                          <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Destination Covered</h3>
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                            {guide.destinations.map((dest, index) => (
+                              <span
+                                key={index}
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold"
+                              >
+                                {dest}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Certifications - Only for certified guides */}
+                    {guide.certificationStatus === 'certified' && guide.certificationDocuments && guide.certificationDocuments.length > 0 && (
+                      <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                          <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Certifications</h3>
+                          <div className="space-y-1.5">
+                            {guide.certificationDocuments.map((doc, index) => (
+                              <div
+                                key={index}
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm border border-gray-300 flex items-center justify-between gap-2"
+                              >
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <FileText size={14} className="text-gray-600 flex-shrink-0" />
+                                  <span className="font-semibold truncate">{doc.certificationName || 'Certification'}</span>
+                                </div>
+                                {doc.fileUrl && (
+                                  <a
+                                    href={doc.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-shrink-0 text-blue-600 hover:text-blue-800 underline text-xs"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    View
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
 

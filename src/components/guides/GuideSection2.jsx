@@ -92,8 +92,8 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
   const [filters, setFilters] = useState({
     expertise: '',
     rating: '',
-    priceRange: '',
     qualification: '',
+    certification: '', // Changed from array to single value
     languages: [],
     sortBy: '',
   });
@@ -102,15 +102,14 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
   const filterOptions = {
     expertiseAreas: [
       'National Parks',
-      'Beaches & Coastal Areas',
+      'Campsites',
+      'Wetlands',
+      'Beaches',
       'Forest Reserves',
-      'Camping Sites',
-      'Wildlife Sanctuaries',
+      'Mountain Regions',
       'Cultural Heritage Sites',
-      'Adventure Tourism',
-      'Bird Watching Areas',
       'Historical Sites',
-      'Mountain Regions'
+      'Knowledgeable about animal behavior'
     ],
     ratings: [
       { value: '1', label: '1★ and above' },
@@ -145,6 +144,10 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
       'First Aid & CPR Certified',
       'English-Speaking Guide',
       'Multilingual Guide'
+    ],
+    certifications: [
+      'Certified',
+      'Uncertified'
     ],
     languages: [
       'English', 'Sinhala', 'Tamil', 'Hindi',
@@ -294,15 +297,6 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
       );
     }
 
-    // Price range filter (hourly rate)
-    if (filters.priceRange) {
-      const [minPrice, maxPrice] = filters.priceRange.split('-').map(Number);
-      filtered = filtered.filter(guide => {
-        const price = guide.hourlyRate || 0;
-        return price >= minPrice && price <= maxPrice;
-      });
-    }
-
     // Qualification filter
     if (filters.qualification) {
       filtered = filtered.filter(guide =>
@@ -310,6 +304,15 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
           qual.toLowerCase().includes(filters.qualification.toLowerCase())
         )
       );
+    }
+
+    // Certification filter - based on certification status (single selection)
+    if (filters.certification) {
+      if (filters.certification === 'Certified') {
+        filtered = filtered.filter(guide => guide.certificationStatus === 'certified');
+      } else if (filters.certification === 'Uncertified') {
+        filtered = filtered.filter(guide => guide.certificationStatus !== 'certified');
+      }
     }
 
     // Languages filter
@@ -514,8 +517,8 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     setFilters({
       expertise: '',
       rating: '',
-      priceRange: '',
       qualification: '',
+      certification: '',
       languages: [],
       sortBy: ''
     });
@@ -668,107 +671,81 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
         </div>
 
         {/* Filter Section */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-3">
-            <h2 className="text-lg font-semibold text-gray-800">Filters</h2>
+        <div className="bg-white/90 backdrop-blur rounded-2xl shadow-2xl border border-emerald-100 p-6 mb-10">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-emerald-900">Filter Tour Guides</h2>
+              <p className="text-emerald-700 text-sm mt-1">
+                Refine your search to find the perfect match
+              </p>
+            </div>
             <button
               onClick={clearFilters}
-              className="px-4 py-1.5 bg-white text-gray-700 rounded text-sm font-medium border border-gray-300"
+              className="px-6 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-medium shadow-lg shadow-emerald-500/30"
             >
-              Clear All
+              Clear All Filters
             </button>
           </div>
 
-          {/* Filter Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Area of Expertise */}
+          {/* Single Row Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Sort By Filter */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Area of Expertise
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Sort By
               </label>
               <select
-                value={filters.expertise}
-                onChange={(e) => handleFilterChange('expertise', e.target.value)}
-                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
+                value={filters.sortBy}
+                onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
               >
-                <option value="">All Areas</option>
-                {filterOptions.expertiseAreas.map(area => (
-                  <option key={area} value={area}>{area}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Rating */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Rating
-              </label>
-              <select
-                value={filters.rating}
-                onChange={(e) => handleFilterChange('rating', e.target.value)}
-                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
-              >
-                <option value="">All Ratings</option>
-                {filterOptions.ratings.map(rating => (
-                  <option key={rating.value} value={rating.value}>
-                    {rating.label}
+                <option value="">Default (Certified First)</option>
+                {filterOptions.sortBy.map(sort => (
+                  <option key={sort.value} value={sort.value}>
+                    {sort.label}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Price */}
+            {/* Certification Filter - Moved to top row */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Price (Hourly)
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Certification
               </label>
               <select
-                value={filters.priceRange}
-                onChange={(e) => handleFilterChange('priceRange', e.target.value)}
-                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
+                value={filters.certification}
+                onChange={(e) => handleFilterChange('certification', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
               >
-                <option value="">All Prices</option>
-                {filterOptions.priceRanges.map(range => (
-                  <option key={range.value} value={range.value}>
-                    {range.label}
+                <option value="" disabled hidden>Select Certification</option>
+                {filterOptions.certifications.map(cert => (
+                  <option key={cert} value={cert}>
+                    {cert}
                   </option>
                 ))}
               </select>
             </div>
+          </div>
 
-            {/* Certifications */}
+          {/* Multi-select Filters */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            {/* Languages Filter */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Certifications
-              </label>
-              <select
-                value={filters.qualification}
-                onChange={(e) => handleFilterChange('qualification', e.target.value)}
-                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
-              >
-                <option value="">All Certifications</option>
-                {filterOptions.qualifications.map(qual => (
-                  <option key={qual} value={qual}>{qual}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Languages */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Languages
               </label>
-              <div className="max-h-32 overflow-y-auto border border-gray-300 rounded bg-white p-2">
+              <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-white">
                 {filterOptions.languages.map(language => (
-                  <div key={language} className="flex items-center mb-1.5">
+                  <div key={language} className="flex items-center mb-2">
                     <input
                       type="checkbox"
                       id={`lang-${language}`}
                       checked={filters.languages.includes(language)}
                       onChange={() => handleMultiSelectChange('languages', language)}
-                      className="mr-2 h-3.5 w-3.5 text-blue-600 border-gray-300 rounded"
+                      className="mr-3 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
                     />
-                    <label htmlFor={`lang-${language}`} className="text-xs text-gray-700">
+                    <label htmlFor={`lang-${language}`} className="text-sm text-gray-700 cursor-pointer">
                       {language}
                     </label>
                   </div>
@@ -776,23 +753,33 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
               </div>
             </div>
 
-            {/* Sort By */}
+            {/* Area of Expertise Filter - Renamed to "Services" */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Sort By
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Services
               </label>
-              <select
-                value={filters.sortBy}
-                onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                className="w-full p-2.5 text-sm border border-gray-300 rounded bg-white"
-              >
-                <option value="">Default</option>
-                {filterOptions.sortBy.map(sort => (
-                  <option key={sort.value} value={sort.value}>
-                    {sort.label}
-                  </option>
+              <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-white">
+                {filterOptions.expertiseAreas.map(area => (
+                  <div key={area} className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      id={`area-${area}`}
+                      checked={filters.expertise === area}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          handleFilterChange('expertise', area);
+                        } else {
+                          handleFilterChange('expertise', '');
+                        }
+                      }}
+                      className="mr-3 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor={`area-${area}`} className="text-sm text-gray-700 cursor-pointer">
+                      {area}
+                    </label>
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
           </div>
         </div>
@@ -962,7 +949,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
                     <Clock className="h-6 w-6 text-yellow-600 flex-shrink-0" />
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900">
-                        Other Guides
+                        Uncertified Guides
                       </h2>
                       <p className="text-sm text-gray-600 mt-1">
                         Guides pending certification review
@@ -1078,7 +1065,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
               ) : (
                 <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
                   <Clock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">No pending guides</p>
+                  <p className="text-gray-500 font-medium">No uncertified guides</p>
                   <p className="text-sm text-gray-400 mt-1">All guides have been certified</p>
                 </div>
               )}

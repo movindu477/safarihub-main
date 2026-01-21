@@ -2944,6 +2944,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             destinations: destinationsArray,
             specialQualifications: specialQualifications || [],
             areasOfExpertise: areasOfExpertise || [],
+            certifications: certifications || [], // Add certifications field
             verificationDocuments: verificationDocuments || [],
             verificationDocumentUrls: {}, // Will be populated after file uploads
             hourlyRate: hourlyRate ? parseInt(hourlyRate) : 0,

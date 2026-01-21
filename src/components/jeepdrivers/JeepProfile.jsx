@@ -2091,7 +2091,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
         if (driverDoc.exists()) {
           const driverData = driverDoc.data();
-          setDriver({
+          const driverInfo = {
             id: driverDoc.id,
             ...driverData,
             // Ensure availability is an object, not array
@@ -2099,7 +2099,28 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
               ? driverData.availability
               : {}, // Object mapping dates to status
             availableDates: driverData.availableDates || [] // Keep for backward compatibility
-          });
+          };
+
+          // Fetch certification documents if driver is certified
+          if (driverData.certificationStatus === 'certified') {
+            try {
+              const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
+              const certDocSnap = await getDoc(certDocRef);
+              
+              if (certDocSnap.exists()) {
+                const certData = certDocSnap.data();
+                console.log('✅ Certification documents found:', certData);
+                
+                if (certData.documents && Array.isArray(certData.documents)) {
+                  driverInfo.certificationDocuments = certData.documents;
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching certification documents:', err);
+            }
+          }
+
+          setDriver(driverInfo);
 
           // Fetch document URLs if verification documents exist
           if (driverData.verificationDocuments && Array.isArray(driverData.verificationDocuments)) {
@@ -2287,20 +2308,60 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         // Refresh driver data to update rating display
         const driverDoc = await getDoc(doc(db, 'serviceProviders', driverId));
         if (driverDoc.exists()) {
-          setDriver({
+          const driverData = driverDoc.data();
+          const driverInfo = {
             id: driverDoc.id,
-            ...driverDoc.data()
-          });
+            ...driverData
+          };
+
+          // Fetch certification documents if driver is certified
+          if (driverData.certificationStatus === 'certified') {
+            try {
+              const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
+              const certDocSnap = await getDoc(certDocRef);
+              
+              if (certDocSnap.exists()) {
+                const certData = certDocSnap.data();
+                if (certData.documents && Array.isArray(certData.documents)) {
+                  driverInfo.certificationDocuments = certData.documents;
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching certification documents (refresh):', err);
+            }
+          }
+
+          setDriver(driverInfo);
         }
       } catch (error) {
         console.error('Error updating driver rating:', error);
         // Still refresh driver data even if rating update fails
         const driverDoc = await getDoc(doc(db, 'serviceProviders', driverId));
         if (driverDoc.exists()) {
-          setDriver({
+          const driverData = driverDoc.data();
+          const driverInfo = {
             id: driverDoc.id,
-            ...driverDoc.data()
-          });
+            ...driverData
+          };
+
+          // Fetch certification documents if driver is certified
+          if (driverData.certificationStatus === 'certified') {
+            try {
+              const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
+              const certDocSnap = await getDoc(certDocRef);
+              
+              if (certDocSnap.exists()) {
+                const certData = certDocSnap.data();
+                if (certData.documents && Array.isArray(certData.documents)) {
+                  driverInfo.certificationDocuments = certData.documents;
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching certification documents (refresh error):', err);
+            }
+          }
+
+          setDriver(driverInfo);
         }
       }
     }
@@ -2722,7 +2783,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 {/* Standard Half Day */}
                                 {driver.priceHalfDayStandard > 0 && (
                                   <div className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                                    <div className="text-right shrink-0">
+                                    <div className="flex-1 min-w-0 pr-2">
+                                      <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Standard Half Day:</span>
+                                      <p className="text-xs text-emerald-600 mt-0.5">Half day safari (Standard Jeep)</p>
+                                    </div>
+                                    <div className="text-right flex-shrink-0">
                                       <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
                                         LKR {driver.priceHalfDayStandard.toLocaleString()}
                                       </span>
@@ -2846,26 +2911,36 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                       </div>
                     )}
 
-                    {/* Certifications */}
-                    {/* Certifications - Clickable */}
-                    {driver.certifications && driver.certifications.length > 0 && (
+                    {/* Certifications - Only for certified drivers */}
+                    {driver.certificationStatus === 'certified' && driver.certificationDocuments && driver.certificationDocuments.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Certifications</h3>
-                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                            {driver.certifications.map((cert, index) => (
-                              <button
+                          <div className="space-y-1.5">
+                            {driver.certificationDocuments.map((doc, index) => (
+                              <div
                                 key={index}
-                                onClick={() => handleViewDocument(cert)}
-                                className="bg-gray-100 hover:bg-gray-200 text-black px-1.5 sm:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-md text-xs sm:text-sm border border-gray-300 font-semibold transition-colors flex items-center gap-1 group"
-                                title="Click to view certificate"
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm border border-gray-300 flex items-center justify-between gap-2"
                               >
-                                {cert}
-                                <FileText className="w-3 h-3 text-gray-500 group-hover:text-black" />
-                              </button>
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <FileText size={14} className="text-gray-600 flex-shrink-0" />
+                                  <span className="font-semibold truncate">{doc.certificationName || 'Certification'}</span>
+                                </div>
+                                {doc.fileUrl && (
+                                  <a
+                                    href={doc.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-shrink-0 text-blue-600 hover:text-blue-800 underline text-xs"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    View
+                                  </a>
+                                )}
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -2932,19 +3007,60 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     {pkg.description}
                                   </p>
                                 </div>
-                                <div className="flex-shrink-0 ml-4">
-                                  <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2 text-right">
-                                    <p className="text-xs text-emerald-700 font-medium">Full Day</p>
-                                    <p className="text-lg font-bold text-emerald-800">
-                                      LKR {pkg.fullDayPrice?.toLocaleString() || 0}
-                                    </p>
-                                  </div>
-                                  <div className="bg-blue-100 border border-blue-300 rounded-lg px-3 py-2 text-right mt-2">
-                                    <p className="text-xs text-blue-700 font-medium">Half Day</p>
-                                    <p className="text-lg font-bold text-blue-800">
-                                      LKR {pkg.halfDayPrice?.toLocaleString() || 0}
-                                    </p>
-                                  </div>
+                                <div className="flex-shrink-0 ml-4 space-y-2">
+                                  {/* Standard Safari Jeep Prices */}
+                                  {pkg.hasStandardJeep && (
+                                    <div className="space-y-2">
+                                      <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2 text-right">
+                                        <p className="text-xs text-emerald-700 font-medium">🚙 Standard Full Day</p>
+                                        <p className="text-lg font-bold text-emerald-800">
+                                          LKR {pkg.fullDayPriceStandard?.toLocaleString() || 0}
+                                        </p>
+                                      </div>
+                                      <div className="bg-emerald-50 border border-emerald-300 rounded-lg px-3 py-2 text-right">
+                                        <p className="text-xs text-emerald-700 font-medium">🚙 Standard Half Day</p>
+                                        <p className="text-base font-bold text-emerald-800">
+                                          LKR {pkg.halfDayPriceStandard?.toLocaleString() || 0}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Luxury Safari Jeep Prices */}
+                                  {pkg.hasLuxuryJeep && (
+                                    <div className="space-y-2">
+                                      <div className="bg-yellow-100 border border-yellow-300 rounded-lg px-3 py-2 text-right">
+                                        <p className="text-xs text-yellow-700 font-medium">✨ Luxury Full Day</p>
+                                        <p className="text-lg font-bold text-yellow-800">
+                                          LKR {pkg.fullDayPriceLuxury?.toLocaleString() || 0}
+                                        </p>
+                                      </div>
+                                      <div className="bg-yellow-50 border border-yellow-300 rounded-lg px-3 py-2 text-right">
+                                        <p className="text-xs text-yellow-700 font-medium">✨ Luxury Half Day</p>
+                                        <p className="text-base font-bold text-yellow-800">
+                                          LKR {pkg.halfDayPriceLuxury?.toLocaleString() || 0}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Legacy packages (backward compatibility) */}
+                                  {!pkg.hasStandardJeep && !pkg.hasLuxuryJeep && (
+                                    <>
+                                      <div className="bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-2 text-right">
+                                        <p className="text-xs text-emerald-700 font-medium">Full Day</p>
+                                        <p className="text-lg font-bold text-emerald-800">
+                                          LKR {pkg.fullDayPrice?.toLocaleString() || 0}
+                                        </p>
+                                      </div>
+                                      <div className="bg-blue-100 border border-blue-300 rounded-lg px-3 py-2 text-right">
+                                        <p className="text-xs text-blue-700 font-medium">Half Day</p>
+                                        <p className="text-lg font-bold text-blue-800">
+                                          LKR {pkg.halfDayPrice?.toLocaleString() || 0}
+                                        </p>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               </div>
 
@@ -3006,12 +3122,20 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     setDateTypeMenuDate(null);
                                     setShowTimeMenu(false);
                                     
-                                    // Store selected package in session storage
+                                    // Store selected package in session storage with all vehicle-specific fields
                                     sessionStorage.setItem('selectedPackage', JSON.stringify({
                                       id: pkg.id,
                                       title: pkg.title,
+                                      // Legacy fields for backward compatibility
                                       fullDayPrice: pkg.fullDayPrice,
                                       halfDayPrice: pkg.halfDayPrice,
+                                      // Vehicle-specific fields
+                                      hasStandardJeep: pkg.hasStandardJeep || false,
+                                      hasLuxuryJeep: pkg.hasLuxuryJeep || false,
+                                      fullDayPriceStandard: pkg.fullDayPriceStandard,
+                                      halfDayPriceStandard: pkg.halfDayPriceStandard,
+                                      fullDayPriceLuxury: pkg.fullDayPriceLuxury,
+                                      halfDayPriceLuxury: pkg.halfDayPriceLuxury,
                                       providerId: driverId
                                     }));
                                     
