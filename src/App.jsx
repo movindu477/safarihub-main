@@ -41,7 +41,6 @@ import Section4 from "./components/home/Section4";
 import Section5 from "./components/home/Section5";
 import Section6 from "./components/home/Section6";
 import Footer from "./components/home/Footer";
-import UpcomingTripBanner from "./components/UpcomingTripBanner";
 import JeepDriversPage from "./components/jeepdrivers/JeepMain";
 import JeepProfile from "./components/jeepdrivers/JeepProfile";
 import NotificationPanel from "./components/NotificationPanel";
@@ -1597,9 +1596,6 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
 
       {/* Home Content with All Sections */}
       <div className="pt--1 space-y-1">
-        {/* Upcoming Trip Banner - Shows for both clients and service providers */}
-        {user && <UpcomingTripBanner user={user} />}
-
         <Section1>
           {/* Booking Panel - Only show for tourists, not for service providers */}
           {/* BookingSection component handles its own visibility based on user role */}

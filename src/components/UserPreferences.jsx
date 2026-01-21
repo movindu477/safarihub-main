@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import {
   Settings,
@@ -9,9 +10,9 @@ import {
   CheckCircle,
   X,
   MapPin,
-  DollarSign,
   Tag,
-  Calendar
+  Calendar,
+  ArrowLeft
 } from 'lucide-react';
 import {
   getUserPreferences,
@@ -19,14 +20,53 @@ import {
   clearPersonalizationData
 } from '../services/personalizationService';
 
+// All 25 districts of Sri Lanka
+const SRI_LANKA_DISTRICTS = [
+  'Ampara',
+  'Anuradhapura',
+  'Badulla',
+  'Batticaloa',
+  'Colombo',
+  'Galle',
+  'Gampaha',
+  'Hambantota',
+  'Jaffna',
+  'Kalutara',
+  'Kandy',
+  'Kegalle',
+  'Kilinochchi',
+  'Kurunegala',
+  'Mannar',
+  'Matale',
+  'Matara',
+  'Monaragala',
+  'Mullaitivu',
+  'Nuwara Eliya',
+  'Polonnaruwa',
+  'Puttalam',
+  'Ratnapura',
+  'Trincomalee',
+  'Vavuniya'
+];
+
 const UserPreferences = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [preferences, setPreferences] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Location dropdown state
+  const [locationInput, setLocationInput] = useState('');
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [filteredDistricts, setFilteredDistricts] = useState(SRI_LANKA_DISTRICTS);
+  const locationDropdownRef = React.useRef(null);
 
   const auth = getAuth();
+  const saveTimeoutRef = React.useRef(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -44,6 +84,7 @@ const UserPreferences = () => {
     try {
       const prefs = await getUserPreferences(userId);
       setPreferences(prefs);
+      setLocationInput(prefs.preferredLocation || '');
       setLoading(false);
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -51,34 +92,65 @@ const UserPreferences = () => {
     }
   };
 
+  // Auto-save function with debounce
+  const autoSave = async (updatedPreferences) => {
+    if (!user) return;
+
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    setHasUnsavedChanges(true);
+
+    // Set new timeout for auto-save (1 second after last change)
+    saveTimeoutRef.current = setTimeout(async () => {
+      setAutoSaving(true);
+      const success = await updateUserPreferences(user.uid, updatedPreferences);
+      
+      setAutoSaving(false);
+      setHasUnsavedChanges(false);
+
+      if (success) {
+        setMessage({ type: 'success', text: 'Auto-saved ✓' });
+        setTimeout(() => setMessage({ type: '', text: '' }), 2000);
+      }
+    }, 1000);
+  };
+
   const handleChange = (key, value) => {
-    setPreferences(prev => ({
-      ...prev,
+    const updatedPreferences = {
+      ...preferences,
       [key]: value
-    }));
+    };
+    setPreferences(updatedPreferences);
+    autoSave(updatedPreferences);
   };
 
   const handleNestedChange = (parent, key, value) => {
-    setPreferences(prev => ({
-      ...prev,
+    const updatedPreferences = {
+      ...preferences,
       [parent]: {
-        ...prev[parent],
+        ...preferences[parent],
         [key]: value
       }
-    }));
+    };
+    setPreferences(updatedPreferences);
+    autoSave(updatedPreferences);
   };
 
   const handleArrayToggle = (key, value) => {
-    setPreferences(prev => {
-      const array = prev[key] || [];
-      const newArray = array.includes(value)
-        ? array.filter(item => item !== value)
-        : [...array, value];
-      return {
-        ...prev,
-        [key]: newArray
-      };
-    });
+    const array = preferences[key] || [];
+    const newArray = array.includes(value)
+      ? array.filter(item => item !== value)
+      : [...array, value];
+    
+    const updatedPreferences = {
+      ...preferences,
+      [key]: newArray
+    };
+    setPreferences(updatedPreferences);
+    autoSave(updatedPreferences);
   };
 
   const handleSave = async () => {
@@ -118,6 +190,53 @@ const UserPreferences = () => {
     setTimeout(() => setMessage({ type: '', text: '' }), 3000);
   };
 
+  // Handle location input change with filtering
+  const handleLocationInputChange = (value) => {
+    setLocationInput(value);
+    
+    // Filter districts based on input
+    const filtered = SRI_LANKA_DISTRICTS.filter(district =>
+      district.toLowerCase().includes(value.toLowerCase())
+    );
+    setFilteredDistricts(filtered);
+    setShowLocationDropdown(true);
+    
+    // Update preferences if input is empty or matches a district
+    if (value === '' || SRI_LANKA_DISTRICTS.includes(value)) {
+      handleChange('preferredLocation', value);
+    }
+  };
+
+  // Handle district selection from dropdown
+  const handleDistrictSelect = (district) => {
+    setLocationInput(district);
+    setShowLocationDropdown(false);
+    handleChange('preferredLocation', district);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (locationDropdownRef.current && !locationDropdownRef.current.contains(event.target)) {
+        setShowLocationDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
@@ -144,11 +263,40 @@ const UserPreferences = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3 mb-2">
-            <Settings className="h-8 w-8 text-emerald-500" />
-            User Preferences
-          </h1>
-          <p className="text-gray-400">Customize your experience and manage your data</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white flex items-center gap-3 mb-2">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                  title="Go back"
+                >
+                  <ArrowLeft className="h-6 w-6 text-emerald-500" />
+                </button>
+                <Settings className="h-8 w-8 text-emerald-500" />
+                User Preferences
+              </h1>
+              <p className="text-gray-400">Customize your experience and manage your data</p>
+            </div>
+            {/* Auto-save indicator */}
+            <div className="flex items-center gap-2">
+              {autoSaving && (
+                <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500"></div>
+                  <span>Saving...</span>
+                </div>
+              )}
+              {hasUnsavedChanges && !autoSaving && (
+                <span className="text-yellow-400 text-sm">Unsaved changes</span>
+              )}
+              {!hasUnsavedChanges && !autoSaving && message.type === 'success' && (
+                <div className="flex items-center gap-1 text-emerald-400 text-sm">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Saved</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Message Display */}
@@ -176,42 +324,51 @@ const UserPreferences = () => {
             </h2>
 
             <div className="space-y-6">
-              {/* Preferred Location */}
-              <div>
+              {/* Preferred Location - Autocomplete Dropdown */}
+              <div className="relative" ref={locationDropdownRef}>
                 <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  Preferred Location
+                  Preferred District
                 </label>
-                <input
-                  type="text"
-                  value={preferences.preferredLocation || ''}
-                  onChange={(e) => handleChange('preferredLocation', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
-                  placeholder="e.g., Colombo, Kandy, Galle"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={locationInput}
+                    onChange={(e) => handleLocationInputChange(e.target.value)}
+                    onFocus={() => setShowLocationDropdown(true)}
+                    className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                    placeholder="Type to search districts... (e.g., Colombo, Kandy, Galle)"
+                  />
+                  
+                  {/* Dropdown list */}
+                  {showLocationDropdown && filteredDistricts.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                      {filteredDistricts.map((district) => (
+                        <button
+                          key={district}
+                          onClick={() => handleDistrictSelect(district)}
+                          className="w-full px-4 py-3 text-left text-white hover:bg-emerald-600/20 hover:text-emerald-400 transition-colors flex items-center gap-2 border-b border-gray-700 last:border-b-0"
+                        >
+                          <MapPin className="h-4 w-4 text-emerald-500" />
+                          <span>{district}</span>
+                          {preferences.preferredLocation === district && (
+                            <CheckCircle className="h-4 w-4 text-emerald-500 ml-auto" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* No results message */}
+                  {showLocationDropdown && locationInput && filteredDistricts.length === 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-4 text-center text-gray-400">
+                      No districts found matching "{locationInput}"
+                    </div>
+                  )}
+                </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  We'll use this to pre-fill location filters and show relevant results
+                  Select your preferred district from all 25 districts in Sri Lanka
                 </p>
-              </div>
-
-              {/* Preferred Price Range */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Preferred Price Range
-                </label>
-                <select
-                  value={preferences.preferredPriceRange || ''}
-                  onChange={(e) => handleChange('preferredPriceRange', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="">Any price range</option>
-                  <option value="0-5000">Under LKR 5,000</option>
-                  <option value="5000-10000">LKR 5,000 - 10,000</option>
-                  <option value="10000-20000">LKR 10,000 - 20,000</option>
-                  <option value="20000-50000">LKR 20,000 - 50,000</option>
-                  <option value="50000-999999">Over LKR 50,000</option>
-                </select>
               </div>
 
               {/* Preferred Service Types */}
@@ -288,8 +445,7 @@ const UserPreferences = () => {
                 { key: 'bookingUpdates', label: 'Booking Status Updates', description: 'Get notified when your booking status changes' },
                 { key: 'priceDrops', label: 'Price Drop Alerts', description: 'Notify me when prices drop on favorited items' },
                 { key: 'availabilityAlerts', label: 'Availability Alerts', description: 'Get notified when favorited items become available' },
-                { key: 'newPackages', label: 'New Packages & Products', description: 'Notify me about new packages matching my preferences' },
-                { key: 'promotions', label: 'Promotions & Special Offers', description: 'Receive promotional notifications' }
+                { key: 'newPackages', label: 'New Packages & Products', description: 'Notify me about new packages matching my preferences' }
               ].map(notif => (
                 <label
                   key={notif.key}
@@ -383,15 +539,26 @@ const UserPreferences = () => {
             </div>
           </div>
 
-          {/* Save Button */}
+          {/* Save Info */}
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-6">
+            <div className="flex items-center gap-3 text-gray-400">
+              <CheckCircle className="h-5 w-5 text-emerald-500" />
+              <div>
+                <p className="font-medium text-white">Auto-save Enabled</p>
+                <p className="text-sm">Your preferences are automatically saved as you make changes</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Manual Save Button (Backup) */}
           <div className="flex gap-4">
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || autoSaving}
               className="flex-1 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
             >
               <Save className="h-5 w-5" />
-              {saving ? 'Saving...' : 'Save Preferences'}
+              {saving ? 'Saving...' : 'Save Now (Manual)'}
             </button>
           </div>
         </div>

@@ -64,6 +64,9 @@ import { getDocumentUrl } from "../../lib/supabase";
 // Import rating update function
 import { updateDriverRating } from "../../reviewservice";
 
+// Import personalization service
+import { trackActivity } from "../../services/personalizationService";
+
 // Import Firebase functions from App
 import {
   // createOrGetConversation, // Removed - using Chat component instead
@@ -410,16 +413,16 @@ const BookingFormModal = ({
     }
 
     setFormErrors(errors);
-    
+
     // If there are errors, show an alert with details and scroll to first error
     if (Object.keys(errors).length > 0) {
       const firstErrorField = Object.keys(errors)[0];
       const errorMessages = Object.entries(errors).map(([field, msg]) => {
         return `${field}: ${msg}`;
       }).join('\n');
-      
+
       alert(`Please fill in:\n\n${errorMessages}\n\nNavigating to the required field...`);
-      
+
       // Scroll to and focus the first error field
       setTimeout(() => {
         const element = document.getElementById(firstErrorField);
@@ -428,10 +431,10 @@ const BookingFormModal = ({
           element.focus();
         }
       }, 200);
-      
+
       return false; // Prevent form submission
     }
-    
+
     return true; // Allow form submission
   };
 
@@ -695,7 +698,7 @@ const BookingFormModal = ({
                     <Package className="h-5 w-5 text-emerald-600" />
                     Booking Summary
                   </h3>
-                  
+
                   {/* Package Information (if booking a package) */}
                   {selectedPackage && (
                     <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
@@ -730,7 +733,7 @@ const BookingFormModal = ({
                       <p className="text-xs text-emerald-600 mt-2">📦 All package amenities included • {selectedVehicleType || 'Select jeep type'}</p>
                     </div>
                   )}
-                  
+
                   <div className="space-y-3">
                     <p className="text-sm text-gray-700">
                       You have selected <strong>{selectedDates.length}</strong> date{selectedDates.length > 1 ? 's' : ''}.
@@ -920,7 +923,6 @@ const BookingFormModal = ({
               )}
             </div>
           )}
-
         </div>
 
         {/* Navigation Buttons */}
@@ -1102,6 +1104,18 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
   // Old scrollToBottom and messages useEffect removed - using Chat component instead
 
+  // Track recently viewed when profile is loaded
+  useEffect(() => {
+    if (driverId && currentUser && driver) {
+      trackActivity(currentUser.uid, 'view', driverId, 'jeep-driver', {
+        fullName: driver.fullName || '',
+        location: driver.location || '',
+        rating: driver.rating || 0,
+        pricePerDay: driver.pricePerDay || 0
+      });
+    }
+  }, [driverId, currentUser, driver]);
+
   // Handle opening chat from URL parameter
   useEffect(() => {
     if (openChat === 'true' && driverId && currentUser && driver) {
@@ -1208,7 +1222,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       selectedDates.forEach(date => {
         const dateString = date.toDateString();
         const dateType = selectedDatesWithType[dateString] || 'full-day';
-        
+
         // Use vehicle-specific pricing
         let fullDayPrice, halfDayPrice;
         if (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep) {
@@ -1219,7 +1233,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           fullDayPrice = selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice;
           halfDayPrice = selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice;
         }
-        
+
         total += dateType === 'half-day' ? halfDayPrice : fullDayPrice;
       });
       // No add-ons for package bookings
@@ -1475,7 +1489,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         selectedDates.forEach(date => {
           const dateString = date.toDateString();
           const dateType = selectedDatesWithType[dateString] || 'full-day';
-          
+
           // Use vehicle-specific pricing
           let fullDayPrice, halfDayPrice;
           if (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep) {
@@ -1486,7 +1500,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             fullDayPrice = selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice;
             halfDayPrice = selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice;
           }
-          
+
           totalPrice += dateType === 'half-day' ? halfDayPrice : fullDayPrice;
         });
       } else {
@@ -1538,7 +1552,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
       const datesString = selectedDates.map(d => {
         const dateType = selectedDatesWithType[d.toDateString()] || 'full-day';
-        return `${d.toLocaleDateString()} (${dateType === 'half-day' ? 'Half Day' : 'Full Day'})`;
+        return `${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${dateType === 'half-day' ? 'Half Day' : 'Full Day'})`;
       }).join(', ');
 
       const datesWithTypes = selectedDates.map(d => {
@@ -1995,11 +2009,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             try {
               const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
               const certDocSnap = await getDoc(certDocRef);
-              
+
               if (certDocSnap.exists()) {
                 const certData = certDocSnap.data();
                 console.log('✅ Certification documents found:', certData);
-                
+
                 if (certData.documents && Array.isArray(certData.documents)) {
                   driverInfo.certificationDocuments = certData.documents;
                 }
@@ -2208,7 +2222,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             try {
               const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
               const certDocSnap = await getDoc(certDocRef);
-              
+
               if (certDocSnap.exists()) {
                 const certData = certDocSnap.data();
                 if (certData.documents && Array.isArray(certData.documents)) {
@@ -2238,7 +2252,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             try {
               const certDocRef = doc(db, 'jeepDriverCertifications', driverId);
               const certDocSnap = await getDoc(certDocRef);
-              
+
               if (certDocSnap.exists()) {
                 const certData = certDocSnap.data();
                 if (certData.documents && Array.isArray(certData.documents)) {
@@ -2912,7 +2926,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       </div>
                                     </div>
                                   )}
-                                  
+
                                   {/* Luxury Safari Jeep Prices */}
                                   {pkg.hasLuxuryJeep && (
                                     <div className="space-y-2">
@@ -2930,7 +2944,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       </div>
                                     </div>
                                   )}
-                                  
+
                                   {/* Legacy packages (backward compatibility) */}
                                   {!pkg.hasStandardJeep && !pkg.hasLuxuryJeep && (
                                     <>
@@ -3000,7 +3014,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    
+
                                     // Clear all existing booking selections to start fresh
                                     setSelectedDates([]);
                                     setSelectedDatesWithType({});
@@ -3008,7 +3022,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     setHalfDayTimes({});
                                     setDateTypeMenuDate(null);
                                     setShowTimeMenu(false);
-                                    
+
                                     // Store selected package in session storage with all vehicle-specific fields
                                     sessionStorage.setItem('selectedPackage', JSON.stringify({
                                       id: pkg.id,
@@ -3025,7 +3039,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       halfDayPriceLuxury: pkg.halfDayPriceLuxury,
                                       providerId: driverId
                                     }));
-                                    
+
                                     // Switch to booking tab
                                     setActiveTab('booking');
                                   }}
@@ -3084,12 +3098,12 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         >
                           <X className="h-5 w-5" />
                         </button>
-                        
+
                         <div className="flex items-center gap-2 mb-2">
                           <Package className="h-6 w-6 text-emerald-600" />
                           <h3 className="text-lg font-bold text-emerald-900 pr-8">{selectedPackage.title}</h3>
                         </div>
-                        
+
                         {/* Show vehicle-specific prices if vehicle type is selected */}
                         {selectedVehicleType ? (
                           <div className="space-y-2">
@@ -3145,7 +3159,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                             )}
                           </div>
                         )}
-                        
+
                         <p className="text-xs text-emerald-600 mt-2 italic">
                           📦 Package booking mode active - Click X to return to regular booking
                         </p>
@@ -3220,137 +3234,137 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 }
                                 setDateTypeMenuDate(date);
                               }}
-                            selectedDatesWithType={selectedDatesWithType}
-                            availabilityCalendar={driver?.availabilityCalendar}
-                            availableDates={driver?.availableDates}
-                            onDateTypeChange={handleDateTypeChange}
-                            onDateDoubleClick={(date) => {
-                              handleDateSelect(date);
-                              setDateTypeMenuDate(null);
-                            }}
-                          />
+                              selectedDatesWithType={selectedDatesWithType}
+                              availabilityCalendar={driver?.availabilityCalendar}
+                              availableDates={driver?.availableDates}
+                              onDateTypeChange={handleDateTypeChange}
+                              onDateDoubleClick={(date) => {
+                                handleDateSelect(date);
+                                setDateTypeMenuDate(null);
+                              }}
+                            />
 
-                          {/* Date Type Menu (Full Day / Half Day) - Smaller Size */}
-                          {dateTypeMenuDate && (
-                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-3 min-w-[200px]">
-                              <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-xs font-semibold text-black text-center flex-1">
-                                  {dateTypeMenuDate.toLocaleDateString()}
-                                </h4>
-                                <button
-                                  onClick={() => {
-                                    setDateTypeMenuDate(null);
-                                    setShowTimeMenu(false);
-                                  }}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                  aria-label="Close"
-                                >
-                                  <X className="h-4 w-4 text-gray-600" />
-                                </button>
-                              </div>
-                              {!showTimeMenu ? (
-                                <div className="space-y-1.5">
-                                  {/* Only show Full Day if the day is not partially booked */}
-                                  {dateTypeMenuDate && !(getAvailabilityStatus(dateTypeMenuDate) === 'halfday-morning' || getAvailabilityStatus(dateTypeMenuDate) === 'halfday-evening') && (
-                                    <button
-                                      onClick={() => {
-                                        try {
-                                          handleDateSelect(dateTypeMenuDate);
-                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'full-day');
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        } catch (error) {
-                                          console.error('Error selecting full day:', error);
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        }
-                                      }}
-                                      className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
-                                    >
-                                      Full Day
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => {
-                                      setShowTimeMenu(true);
-                                    }}
-                                    className="w-full px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
-                                  >
-                                    Half Day
-                                  </button>
+                            {/* Date Type Menu (Full Day / Half Day) - Smaller Size */}
+                            {dateTypeMenuDate && (
+                              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-3 min-w-[200px]">
+                                <div className="flex justify-between items-center mb-2">
+                                  <h4 className="text-xs font-semibold text-black text-center flex-1">
+                                    {dateTypeMenuDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                  </h4>
                                   <button
                                     onClick={() => {
                                       setDateTypeMenuDate(null);
                                       setShowTimeMenu(false);
                                     }}
-                                    className="w-full px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs transition-colors"
+                                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                    aria-label="Close"
                                   >
-                                    Cancel
+                                    <X className="h-4 w-4 text-gray-600" />
                                   </button>
                                 </div>
-                              ) : (
-                                <div className="space-y-1.5">
-                                  <h4 className="text-xs font-semibold text-black mb-1.5 text-center">
-                                    Select Time
-                                  </h4>
-                                  {/* Only show Morning if not already booked as halfday-morning */}
-                                  {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-morning' && (
+                                {!showTimeMenu ? (
+                                  <div className="space-y-1.5">
+                                    {/* Only show Full Day if the day is not partially booked */}
+                                    {dateTypeMenuDate && !(getAvailabilityStatus(dateTypeMenuDate) === 'halfday-morning' || getAvailabilityStatus(dateTypeMenuDate) === 'halfday-evening') && (
+                                      <button
+                                        onClick={() => {
+                                          try {
+                                            handleDateSelect(dateTypeMenuDate);
+                                            handleDateTypeChange(dateTypeMenuDate.toDateString(), 'full-day');
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          } catch (error) {
+                                            console.error('Error selecting full day:', error);
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          }
+                                        }}
+                                        className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+                                      >
+                                        Full Day
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => {
-                                        try {
-                                          handleDateSelect(dateTypeMenuDate, 'half-day');
-                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
-                                          setHalfDayTimes(prev => ({
-                                            ...prev,
-                                            [dateTypeMenuDate.toDateString()]: 'morning'
-                                          }));
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        } catch (error) {
-                                          console.error('Error selecting morning:', error);
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        }
+                                        setShowTimeMenu(true);
                                       }}
-                                      className="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition-colors"
+                                      className="w-full px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
                                     >
-                                      Morning
+                                      Half Day
                                     </button>
-                                  )}
-                                  {/* Only show Evening if not already booked as halfday-evening */}
-                                  {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-evening' && (
                                     <button
                                       onClick={() => {
-                                        try {
-                                          handleDateSelect(dateTypeMenuDate, 'half-day');
-                                          handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
-                                          setHalfDayTimes(prev => ({
-                                            ...prev,
-                                            [dateTypeMenuDate.toDateString()]: 'evening'
-                                          }));
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        } catch (error) {
-                                          console.error('Error selecting evening:', error);
-                                          setDateTypeMenuDate(null);
-                                          setShowTimeMenu(false);
-                                        }
+                                        setDateTypeMenuDate(null);
+                                        setShowTimeMenu(false);
                                       }}
-                                      className="w-full px-3 py-1.5 bg-yellow-700 hover:bg-yellow-800 text-white rounded text-xs font-medium transition-colors"
+                                      className="w-full px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs transition-colors"
                                     >
-                                      Evening
+                                      Cancel
                                     </button>
-                                  )}
-                                  <button
-                                    onClick={() => setShowTimeMenu(false)}
-                                    className="w-full px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
-                                  >
-                                    Back
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    <h4 className="text-xs font-semibold text-black mb-1.5 text-center">
+                                      Select Time
+                                    </h4>
+                                    {/* Only show Morning if not already booked as halfday-morning */}
+                                    {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-morning' && (
+                                      <button
+                                        onClick={() => {
+                                          try {
+                                            handleDateSelect(dateTypeMenuDate, 'half-day');
+                                            handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
+                                            setHalfDayTimes(prev => ({
+                                              ...prev,
+                                              [dateTypeMenuDate.toDateString()]: 'morning'
+                                            }));
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          } catch (error) {
+                                            console.error('Error selecting morning:', error);
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          }
+                                        }}
+                                        className="w-full px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition-colors"
+                                      >
+                                        Morning
+                                      </button>
+                                    )}
+                                    {/* Only show Evening if not already booked as halfday-evening */}
+                                    {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-evening' && (
+                                      <button
+                                        onClick={() => {
+                                          try {
+                                            handleDateSelect(dateTypeMenuDate, 'half-day');
+                                            handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
+                                            setHalfDayTimes(prev => ({
+                                              ...prev,
+                                              [dateTypeMenuDate.toDateString()]: 'evening'
+                                            }));
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          } catch (error) {
+                                            console.error('Error selecting evening:', error);
+                                            setDateTypeMenuDate(null);
+                                            setShowTimeMenu(false);
+                                          }
+                                        }}
+                                        className="w-full px-3 py-1.5 bg-yellow-700 hover:bg-yellow-800 text-white rounded text-xs font-medium transition-colors"
+                                      >
+                                        Evening
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => setShowTimeMenu(false)}
+                                      className="w-full px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+                                    >
+                                      Back
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           {/* Show message if vehicle type not selected */}
                           {!selectedVehicleType && (
@@ -3442,7 +3456,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                   return (
                                     <div key={index} className="flex justify-between items-center text-xs">
                                       <span className="text-gray-700 flex-1 min-w-0 pr-2">
-                                        {date.toLocaleDateString()}
+                                        {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                         <span className={`ml-1 px-2 py-0.5 rounded text-[10px] font-semibold ${dateType === 'half-day' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                                           }`}>
                                           {dateType === 'half-day' ? 'Half Day' : 'Full Day'}

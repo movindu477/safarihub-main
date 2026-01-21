@@ -333,7 +333,7 @@ const MyPackages = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+      <div className="min-h-screen bg-linear-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
@@ -344,7 +344,7 @@ const MyPackages = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+    <div className="min-h-screen bg-linear-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -374,8 +374,8 @@ const MyPackages = () => {
         {/* Message Display */}
         {message.text && (
           <div className={`mb-6 p-4 rounded-lg border ${message.type === 'success' ? 'bg-emerald-900/20 border-emerald-700 text-emerald-300' :
-              message.type === 'error' ? 'bg-red-900/20 border-red-700 text-red-300' :
-                'bg-blue-900/20 border-blue-700 text-blue-300'
+            message.type === 'error' ? 'bg-red-900/20 border-red-700 text-red-300' :
+              'bg-blue-900/20 border-blue-700 text-blue-300'
             }`}>
             <div className="flex items-center gap-2">
               {message.type === 'success' && <CheckCircle className="h-5 w-5" />}
@@ -706,41 +706,34 @@ const MyPackages = () => {
               return (
                 <div
                   key={pkg.id}
-                  className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-emerald-500/50 transition-all cursor-pointer"
+                  className="bg-gray-800 border border-gray-700 rounded-lg p-6 hover:border-emerald-500/50 transition-colors cursor-pointer"
                   onClick={() => setExpandedPackage(isExpanded ? null : pkg.id)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       {/* Package Header */}
-                      <div className="flex items-start gap-4 mb-4">
-                        <div className="flex-shrink-0 w-12 h-12 bg-emerald-600/20 rounded-lg flex items-center justify-center">
-                          <Package className="h-6 w-6 text-emerald-400" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-white mb-2">{pkg.title}</h3>
-                          <p className={`text-gray-400 text-sm leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
-                            {pkg.description}
-                          </p>
-                        </div>
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-white mb-2">{pkg.title}</h3>
+                        <p className={`text-gray-400 text-sm leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
+                          {pkg.description}
+                        </p>
                       </div>
 
                       {/* Vehicle Types & Pricing */}
-                      <div className="space-y-3 mb-4">
+                      <div className="space-y-2 mb-3">
                         {/* Standard Safari Jeep */}
                         {pkg.hasStandardJeep && (
-                          <div className="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3">
+                          <div className="bg-blue-900/20 border border-blue-500/40 rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-sm font-semibold text-blue-300">🚙 Standard Safari Jeep</span>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 text-sm">
                               <div className="flex items-center gap-2">
-                                <DollarSign className="h-4 w-4 text-emerald-400" />
-                                <span className="text-xs text-gray-400">Full Day:</span>
+                                <span className="text-gray-400">Full Day:</span>
                                 <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPriceStandard)}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <DollarSign className="h-4 w-4 text-yellow-400" />
-                                <span className="text-xs text-gray-400">Half Day:</span>
+                                <span className="text-gray-400">Half Day:</span>
                                 <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPriceStandard)}</span>
                               </div>
                             </div>
@@ -749,19 +742,17 @@ const MyPackages = () => {
 
                         {/* Luxury Safari Jeep */}
                         {pkg.hasLuxuryJeep && (
-                          <div className="bg-amber-900/10 border border-amber-500/30 rounded-lg p-3">
+                          <div className="bg-amber-900/20 border border-amber-500/40 rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-sm font-semibold text-amber-300">✨ Luxury Safari Jeep</span>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 text-sm">
                               <div className="flex items-center gap-2">
-                                <DollarSign className="h-4 w-4 text-emerald-400" />
-                                <span className="text-xs text-gray-400">Full Day:</span>
+                                <span className="text-gray-400">Full Day:</span>
                                 <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPriceLuxury)}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <DollarSign className="h-4 w-4 text-yellow-400" />
-                                <span className="text-xs text-gray-400">Half Day:</span>
+                                <span className="text-gray-400">Half Day:</span>
                                 <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPriceLuxury)}</span>
                               </div>
                             </div>
@@ -770,15 +761,13 @@ const MyPackages = () => {
 
                         {/* Legacy packages (without vehicle type selection) */}
                         {!pkg.hasStandardJeep && !pkg.hasLuxuryJeep && pkg.fullDayPrice && (
-                          <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-6 text-sm py-2">
                             <div className="flex items-center gap-2">
-                              <DollarSign className="h-4 w-4 text-emerald-400" />
-                              <span className="text-sm text-gray-400">Full Day:</span>
+                              <span className="text-gray-400">Full Day:</span>
                               <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPrice)}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <DollarSign className="h-4 w-4 text-yellow-400" />
-                              <span className="text-sm text-gray-400">Half Day:</span>
+                              <span className="text-gray-400">Half Day:</span>
                               <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPrice)}</span>
                             </div>
                           </div>
@@ -839,11 +828,13 @@ const MyPackages = () => {
                   </div>
 
                   {/* Expand/Collapse Indicator */}
-                  <div className="mt-3 text-center">
-                    <span className="text-xs text-gray-500">
-                      {isExpanded ? 'Click to collapse' : 'Click to see more details'}
-                    </span>
-                  </div>
+                  {(pkg.benefits || pkg.facilities || pkg.rules) && (
+                    <div className="mt-2 pt-2 border-t border-gray-700 text-center">
+                      <span className="text-xs text-gray-500">
+                        {isExpanded ? 'Click to collapse' : 'Click to see more details'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}

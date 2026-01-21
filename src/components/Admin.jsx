@@ -4,11 +4,14 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 // Supabase Storage imports (replacing Firebase Storage)
 import { uploadProfileImage, uploadDocument, deleteDocument, getDocumentUrl, uploadDocumentClientSide, deleteDocumentClientSide } from '../lib/supabase';
-import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X } from 'lucide-react';
+import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X, Bell, Package } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
 import { updateBookingStatus, GlobalNotificationBell } from '../App';
 import AvailabilityCalendar from './AvailabilityCalendar';
+import TripCountdown from './TripCountdown';
+import ManageProducts from './ManageProducts';
+import MyPackages from './MyPackages';
 
 // Helper function to format dates with month as text
 const formatDate = (date) => {
@@ -37,7 +40,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   const [profilePreview, setProfilePreview] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'availability'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'bookings', 'packages', 'availability'
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [uploadedCertifications, setUploadedCertifications] = useState([]);
@@ -46,13 +49,14 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   const [isEditingCalendar, setIsEditingCalendar] = useState(false); // For calendar edit mode
   const [tempAvailabilityCalendar, setTempAvailabilityCalendar] = useState({}); // Temp calendar state for editing
   const [bookingFilter, setBookingFilter] = useState('all'); // 'all', 'pending', 'accepted', 'completed', 'declined'
+  const [nextBooking, setNextBooking] = useState(null); // Next upcoming booking for countdown
 
   // Form state - will be populated from userData
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
-    location: '',
+    address: '',
     experience: '',
     description: '',
     // Jeep Driver fields
@@ -162,12 +166,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
     "GBP - British Pound"
   ];
 
-  // Check auth and fetch user data
+  // Check auth and set up real-time listener for user data
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+    const authUnsubscribe = onAuthStateChanged(auth, async (authUser) => {
       if (authUser) {
         setCurrentUser(authUser);
-        await fetchUserData(authUser.uid);
       } else {
         setCurrentUser(null);
         setUserData(null);
@@ -177,30 +180,23 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
       }
     });
 
-    return () => unsubscribe();
+    return () => authUnsubscribe();
   }, [auth, navigate]);
 
-  // Handle URL tab parameter (e.g., /admin?tab=bookings)
+  // Set up real-time listener for user data and availability
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam && ['profile', 'bookings', 'availability'].includes(tabParam)) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
+    if (!currentUser) return;
 
-  const fetchUserData = async (uid) => {
-    try {
-      setLoading(true);
-      // Try serviceProviders collection first (for jeep drivers and guides)
-      let userDocRef = doc(db, "serviceProviders", uid);
-      let userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const data = userDoc.data();
+    const userDocRef = doc(db, "serviceProviders", currentUser.uid);
+    
+    const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
         setUserData(data);
 
-        // Load availability calendar
+        // Load availability calendar - REAL-TIME UPDATE
         if (data.availability && typeof data.availability === 'object' && !Array.isArray(data.availability)) {
+          console.log('📅 Real-time availability update:', data.availability);
           setAvailabilityCalendar(data.availability);
         } else {
           setAvailabilityCalendar({});
@@ -213,7 +209,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             fullName: data.fullName || '',
             email: data.email || data.contactEmail || '',
             phone: data.phone || data.contactPhone || '',
-            location: data.location || data.baseLocation || '',
+            address: data.address || data.location || data.baseLocation || '',
             experience: data.experienceYears || data.experience || '',
             certificationStatus: data.certificationStatus || 'non-certified',
             description: data.description || data.bio || '',
@@ -249,17 +245,30 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           // Not a service provider, redirect
           navigate('/');
         }
+        setLoading(false);
       } else {
         // User not found in serviceProviders, redirect
         navigate('/');
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching user data:', error);
+    }, (error) => {
+      console.error('Error listening to user data:', error);
       setMessage({ type: 'error', text: 'Failed to load your data. Please try again.' });
-    } finally {
       setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser, db, navigate]);
+
+  // Handle URL tab parameter (e.g., /admin?tab=bookings)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['profile', 'bookings', 'packages', 'availability'].includes(tabParam)) {
+      setActiveTab(tabParam);
     }
-  };
+  }, [searchParams]);
+
+  // Note: fetchUserData removed - now using real-time listener above
 
   // Fetch bookings for the provider
   useEffect(() => {
@@ -293,6 +302,46 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           return dateB - dateA;
         });
         setBookings(bookingsList);
+        
+        // Find next upcoming booking for countdown
+        const now = new Date();
+        const upcomingBookings = bookingsList
+          .filter(booking => {
+            if (booking.status !== 'accepted' && booking.status !== 'confirmed') {
+              return false;
+            }
+            
+            let bookingDate;
+            if (booking.startDate?.toDate) {
+              bookingDate = booking.startDate.toDate();
+            } else if (booking.startDate) {
+              bookingDate = new Date(booking.startDate);
+            } else if (booking.dates && booking.dates.length > 0) {
+              const firstDate = booking.dates[0];
+              bookingDate = firstDate.toDate ? firstDate.toDate() : new Date(firstDate);
+            } else {
+              return false;
+            }
+            
+            return bookingDate > now;
+          })
+          .sort((a, b) => {
+            const dateA = a.startDate?.toDate ? a.startDate.toDate() : new Date(a.startDate || a.dates[0]);
+            const dateB = b.startDate?.toDate ? b.startDate.toDate() : new Date(b.startDate || b.dates[0]);
+            return dateA - dateB;
+          });
+        
+        if (upcomingBookings.length > 0) {
+          const nextTrip = upcomingBookings[0];
+          setNextBooking({
+            ...nextTrip,
+            customerName: nextTrip.customerName || nextTrip.fullName || 'Customer',
+            destination: nextTrip.nationalPark || nextTrip.destination || nextTrip.location || ''
+          });
+        } else {
+          setNextBooking(null);
+        }
+        
         setBookingsLoading(false);
       },
       (error) => {
@@ -430,6 +479,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
       const booking = bookings.find(b => b.id === bookingId);
       if (!booking) return;
 
+      // Update booking status
       await updateBookingStatus(
         bookingId,
         status,
@@ -439,12 +489,164 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
         booking.customerName || 'Customer'
       );
 
+      // If booking is accepted, update availability calendar
+      if (status === 'accepted' || status === 'confirmed') {
+        await updateAvailabilityForAcceptedBooking(booking);
+      }
+
       setMessage({ type: 'success', text: `Booking ${status} successfully!` });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
       console.error('Error updating booking status:', error);
       setMessage({ type: 'error', text: 'Failed to update booking status. Please try again.' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    }
+  };
+
+  // Update availability calendar when booking is accepted
+  const updateAvailabilityForAcceptedBooking = async (booking) => {
+    if (!currentUser) return;
+
+    try {
+      console.log('📅 Updating availability for accepted booking:', booking);
+
+      // Get the service provider document from serviceProviders collection
+      const providerDocRef = doc(db, 'serviceProviders', currentUser.uid);
+
+      // Get current availability calendar
+      const providerDoc = await getDoc(providerDocRef);
+      const currentAvailability = providerDoc.exists() 
+        ? (providerDoc.data().availability || {})
+        : {};
+
+      // Get booking dates - handle ALL possible formats
+      const updatedAvailability = { ...currentAvailability };
+      let datesProcessed = false;
+      
+      console.log('📅 Full booking object:', JSON.stringify(booking, null, 2));
+      
+      // Check if booking has datesWithTypes (new format with individual date types)
+      if (booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0) {
+        console.log('📅 Processing datesWithTypes:', booking.datesWithTypes);
+        
+        booking.datesWithTypes.forEach(item => {
+          try {
+            const date = item.date?.toDate ? item.date.toDate() : new Date(item.date);
+            const dateKey = date.toISOString().split('T')[0];
+            const type = item.type || 'full-day';
+            const isFullDay = type === 'full-day' || type === 'full' || type === 'fullday';
+            const isHalfDay = type === 'half-day' || type === 'half' || type === 'halfday';
+            
+            if (isFullDay) {
+              updatedAvailability[dateKey] = 'busy';
+              console.log(`✅ Marked ${dateKey} as BUSY (full day)`);
+              datesProcessed = true;
+            } else if (isHalfDay) {
+              const currentStatus = updatedAvailability[dateKey];
+              if (currentStatus === 'halfday') {
+                updatedAvailability[dateKey] = 'busy';
+                console.log(`✅ Marked ${dateKey} as BUSY (both halves booked)`);
+              } else {
+                updatedAvailability[dateKey] = 'halfday';
+                console.log(`✅ Marked ${dateKey} as HALFDAY (one half available)`);
+              }
+              datesProcessed = true;
+            }
+          } catch (error) {
+            console.error('Error processing date from datesWithTypes:', error);
+          }
+        });
+      }
+      
+      // Try other date formats if datesWithTypes didn't work
+      if (!datesProcessed) {
+        let bookingDates = [];
+        
+        // Try multiple date field formats
+        if (booking.dates && Array.isArray(booking.dates) && booking.dates.length > 0) {
+          console.log('📅 Found dates array:', booking.dates);
+          bookingDates = booking.dates.map(date => {
+            if (date?.toDate) return date.toDate();
+            else if (date instanceof Date) return date;
+            else return new Date(date);
+          });
+        } else if (booking.startDate) {
+          console.log('📅 Found startDate:', booking.startDate);
+          const date = booking.startDate?.toDate 
+            ? booking.startDate.toDate() 
+            : new Date(booking.startDate);
+          bookingDates = [date];
+        } else if (booking.selectedDates) {
+          console.log('📅 Found selectedDates:', booking.selectedDates);
+          const dates = Array.isArray(booking.selectedDates) 
+            ? booking.selectedDates 
+            : [booking.selectedDates];
+          bookingDates = dates.map(d => new Date(d));
+        } else if (booking.date) {
+          console.log('📅 Found single date field:', booking.date);
+          const date = booking.date?.toDate 
+            ? booking.date.toDate() 
+            : new Date(booking.date);
+          bookingDates = [date];
+        }
+
+        if (bookingDates.length > 0) {
+          console.log('📅 Booking dates to mark:', bookingDates);
+
+          // Determine booking type
+          const bookingType = booking.bookingType || booking.type || 'full-day';
+          const isFullDay = bookingType === 'full-day' || bookingType === 'fullday' || bookingType === 'full';
+          const isHalfDay = bookingType === 'half-day' || bookingType === 'halfday' || bookingType === 'half';
+
+          console.log('📅 Booking type:', bookingType, '| Full day:', isFullDay, '| Half day:', isHalfDay);
+
+          bookingDates.forEach(date => {
+            try {
+              const dateKey = date.toISOString().split('T')[0];
+              
+              if (isFullDay) {
+                updatedAvailability[dateKey] = 'busy';
+                console.log(`✅ Marked ${dateKey} as BUSY (full day)`);
+                datesProcessed = true;
+              } else if (isHalfDay) {
+                const currentStatus = updatedAvailability[dateKey];
+                if (currentStatus === 'halfday') {
+                  updatedAvailability[dateKey] = 'busy';
+                  console.log(`✅ Marked ${dateKey} as BUSY (both halves booked)`);
+                } else {
+                  updatedAvailability[dateKey] = 'halfday';
+                  console.log(`✅ Marked ${dateKey} as HALFDAY (one half available)`);
+                }
+                datesProcessed = true;
+              }
+            } catch (error) {
+              console.error('Error processing date:', error);
+            }
+          });
+        } else {
+          console.error('⚠️ No booking dates found in booking object!');
+          console.error('Available fields:', Object.keys(booking));
+        }
+      }
+      
+      if (!datesProcessed) {
+        console.error('❌ Failed to process any dates from booking');
+        throw new Error('Could not extract dates from booking');
+      }
+
+      // Save updated availability to Firestore
+      await updateDoc(providerDocRef, {
+        availability: updatedAvailability,
+        updatedAt: serverTimestamp()
+      });
+
+      // Update local state
+      setAvailabilityCalendar(updatedAvailability);
+
+      console.log('✅ Availability calendar updated successfully');
+    } catch (error) {
+      console.error('❌ Error updating availability calendar:', error);
+      // Don't throw error - booking status was already updated
     }
   };
 
@@ -501,7 +703,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
       let updateData = {
         fullName: formData.fullName.trim(),
         phone: formData.phone.trim(),
-        location: formData.location.trim(),
+        address: formData.address.trim(),
         experienceYears: formData.experience ? parseInt(formData.experience) : 0,
         description: formData.description.trim(),
         contactEmail: formData.email.trim(),
@@ -615,8 +817,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
       setMessage({ type: 'success', text: 'Your profile has been updated successfully!' });
       setIsEditing(false); // Exit edit mode after successful save
 
-      // Refresh user data
-      await fetchUserData(uid);
+      // Note: No need to manually refresh - real-time listener will update automatically
 
       // Clear message after 5 seconds
       setTimeout(() => {
@@ -718,16 +919,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
               My Bookings
             </button>
             
-            {/* My Products Tab - Only for Renting Shops */}
-            {isRenting && (
-              <button
-                type="button"
-                onClick={() => navigate('/manage-products')}
-                className="flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-700"
-              >
-                My Products
-              </button>
-            )}
+            {/* My Packages Tab - For all service providers */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('packages')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'packages'
+                ? 'bg-emerald-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+            >
+              My Packages
+            </button>
             
             <button
               type="button"
@@ -740,6 +942,48 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
               Availability
             </button>
           </div>
+
+          {/* Dashboard Widgets - Only show on profile tab */}
+          {activeTab === 'profile' && (
+            <div className="space-y-4 mb-4">
+              {/* Trip Countdown Widget */}
+              {nextBooking && <TripCountdown nextBooking={nextBooking} />}
+              
+              {/* Orders Widget - Full Width */}
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-6 shadow-xl">
+                <h3 className="text-white font-bold text-sm uppercase tracking-wide mb-4 flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-emerald-500" />
+                  Orders
+                </h3>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-gray-900/50 rounded-lg">
+                    <div className="text-3xl font-bold text-emerald-400">
+                      {bookings.filter(b => b.status === 'pending').length}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">Pending</div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-900/50 rounded-lg">
+                    <div className="text-3xl font-bold text-blue-400">
+                      {bookings.filter(b => b.status === 'accepted' || b.status === 'confirmed').length}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">Confirmed</div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-900/50 rounded-lg">
+                    <div className="text-3xl font-bold text-purple-400">
+                      {bookings.filter(b => b.status === 'completed').length}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">Completed</div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-900/50 rounded-lg">
+                    <div className="text-3xl font-bold text-gray-400">
+                      {bookings.length}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">Total</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Profile Tab */}
           {activeTab === 'profile' && (
@@ -928,25 +1172,25 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       </div>
                     </div>
 
-                    {/* Location and Experience */}
+                    {/* Address and Experience */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          Location *
+                          Address *
                         </label>
                         {isEditing ? (
                           <input
                             type="text"
-                            value={formData.location}
-                            onChange={(e) => handleInputChange('location', e.target.value)}
+                            value={formData.address}
+                            onChange={(e) => handleInputChange('address', e.target.value)}
                             required
                             className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            placeholder="Base location"
+                            placeholder="Full address"
                           />
                         ) : (
                           <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
-                            {formData.location || 'Not provided'}
+                            {formData.address || 'Not provided'}
                           </div>
                         )}
                       </div>
@@ -973,43 +1217,49 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         )}
                       </div>
 
-                      {/* Certification Status - VIEW ONLY (Admin-controlled approval status) */}
+                      {/* Certification Status - READ ONLY (Based on Registration) */}
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
                           <Award className="h-3 w-3" />
                           Certification Status
                         </label>
-                        {/* Always View-Only - Shows admin approval status */}
+                        {/* Always View-Only - Status from registration/database */}
                         <div>
                           {formData.certificationStatus === 'certified' ? (
                             <div className="space-y-2">
                               {userData?.certificationApproved ? (
-                                <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-green-500/20 border-2 border-green-500/50 text-green-300 flex items-center gap-2">
-                                  <CheckCircle className="h-4 w-4" />
-                                  Certified Provider (Admin Approved)
+                                <div className="w-full px-4 py-3 text-sm rounded-lg font-semibold bg-green-500/20 border-2 border-green-500 text-green-300 flex items-center gap-2">
+                                  <CheckCircle className="h-5 w-5" />
+                                  ✓ Certified Provider (Approved)
                                 </div>
                               ) : userData?.certificationRejected ? (
-                                <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-red-500/20 border-2 border-red-500/50 text-red-300 flex items-center gap-2">
-                                  <AlertCircle className="h-4 w-4" />
-                                  Certification Request Rejected
+                                <div className="w-full px-4 py-3 text-sm rounded-lg font-semibold bg-red-500/20 border-2 border-red-500 text-red-300 flex items-center gap-2">
+                                  <X className="h-5 w-5" />
+                                  Certification Rejected
                                 </div>
                               ) : (
-                                <div className="w-full px-3 py-2 text-sm rounded-lg font-medium bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-300 flex items-center gap-2 animate-pulse">
-                                  <AlertCircle className="h-4 w-4" />
-                                  Pending Admin Approval
+                                <div className="w-full px-4 py-3 text-sm rounded-lg font-semibold bg-yellow-500/20 border-2 border-yellow-500 text-yellow-300 flex items-center gap-2 animate-pulse">
+                                  <AlertCircle className="h-5 w-5" />
+                                  ⏳ Pending Admin Approval
                                 </div>
                               )}
-                              <p className="text-xs text-gray-400">
+                              <p className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded">
                                 {userData?.certificationApproved
-                                  ? `Approved by ${userData.certificationApprovedByName || 'Admin'} on ${userData.certificationApprovedAt?.toDate?.().toLocaleDateString() || 'N/A'}`
+                                  ? `✓ Approved by ${userData.certificationApprovedByName || 'Admin'} on ${userData.certificationApprovedAt?.toDate?.().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) || 'N/A'}`
                                   : userData?.certificationRejected
-                                    ? `Rejected: ${userData.certificationRejectionReason || 'Please contact admin for more details'}`
-                                    : 'Your certification request is being reviewed by an admin. You will be notified once approved.'}
+                                    ? `✗ Reason: ${userData.certificationRejectionReason || 'Please contact admin for details'}`
+                                    : 'ℹ️ Your certification request is being reviewed. You will be notified once approved.'}
                               </p>
                             </div>
                           ) : (
-                            <div className="w-full px-3 py-1.5 text-sm rounded-lg font-medium bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
-                              Non-Certified Provider
+                            <div className="space-y-2">
+                              <div className="w-full px-4 py-3 text-sm rounded-lg font-semibold bg-gray-600/20 border-2 border-gray-500 text-gray-300 flex items-center gap-2">
+                                <Award className="h-5 w-5" />
+                                Non-Certified Provider
+                              </div>
+                              <p className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded">
+                                ℹ️ You are registered as a non-certified service provider. Standard rates apply.
+                              </p>
                             </div>
                           )}
                         </div>
@@ -1047,45 +1297,6 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                     </h2>
 
                     <div className="space-y-3">
-                      {/* Certification Status Toggle - EDIT MODE ONLY */}
-                      {isEditing && (
-                        <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
-                            <Award className="h-3 w-3" />
-                            Certification Status
-                          </label>
-                          <div className="space-y-2">
-                            {/* Editable Toggle */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <button
-                                type="button"
-                                onClick={() => handleInputChange('certificationStatus', 'non-certified')}
-                                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'non-certified'
-                                    ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
-                                    : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                                  }`}
-                              >
-                                Non-Certified Service Provider
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleInputChange('certificationStatus', 'certified')}
-                                className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'certified'
-                                    ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
-                                    : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                                  }`}
-                              >
-                                Certified Service Provider
-                              </button>
-                            </div>
-                            <p className="text-xs text-gray-400">
-                              {formData.certificationStatus === 'certified' 
-                                ? 'Selecting certified status requires admin approval before premium pricing applies'
-                                : 'Non-certified providers have standard rate limits'}
-                            </p>
-                          </div>
-                        </div>
-                      )}
 
                       {/* Vehicle Type(s) */}
                       <div>
@@ -1524,10 +1735,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           )}
                         </div>
                       )}
-                    </div>
                   </div>
+                </div>
 
-                  {/* Jeep Driver Certifications */}
+                  {/* Jeep Driver Certifications - Only show if certified */}
+                  {userData.certificationStatus === 'certified' && (
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <div className="flex items-center justify-between mb-3">
                       <label className="block text-sm font-semibold text-white flex items-center gap-2">
@@ -1669,10 +1881,21 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2 mb-1">
                                         <FileText className="h-4 w-4 text-emerald-400" />
-                                        <span className="text-sm text-white font-medium">{cert.name || cert.certificationName || 'Document'}</span>
+                                        <span className="text-sm text-white font-medium">{cert.certificationName || cert.fileName || 'Document'}</span>
                                       </div>
-                                      {cert.size && (
-                                        <p className="text-xs text-gray-400 ml-6">{cert.size}</p>
+                                      {(cert.fileSize || cert.size) && (
+                                        <p className="text-xs text-gray-400 ml-6">
+                                          {cert.fileSize 
+                                            ? `${(cert.fileSize / 1024).toFixed(2)} KB` 
+                                            : cert.size}
+                                        </p>
+                                      )}
+                                      {cert.uploadedAt && (
+                                        <p className="text-xs text-gray-500 ml-6">
+                                          Uploaded: {cert.uploadedAt.toDate 
+                                            ? cert.uploadedAt.toDate().toLocaleDateString() 
+                                            : new Date(cert.uploadedAt).toLocaleDateString()}
+                                        </p>
                                       )}
                                     </div>
                                     <button
@@ -1832,6 +2055,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       </>
                     )}
                   </div>
+                  )}
                 </div>
               )}
 
@@ -1911,7 +2135,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                     </div>
                   </div>
 
-                  {/* Verification Documents Box */}
+                  {/* Verification Documents Box - Only show if certified */}
+                  {userData.certificationStatus === 'certified' && (
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-1">
                       <FileText className="h-4 w-4 text-emerald-400" />
@@ -1979,6 +2204,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                       )}
                     </div>
                   </div>
+                  )}
 
                   {/* Languages Box */}
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
@@ -2247,19 +2473,27 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                         const type = item.type || 'full-day';
                                         const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
                                         const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
-                                        // Calculate price for this day
-                                        const isFullDay = type === 'full' || type === 'full-day';
-                                        const dayPrice = isFullDay
-                                          ? booking.priceFullDay || booking.pricePerDay
-                                          : booking.priceHalfDay || (booking.pricePerDay * 0.6);
+                                        
+                                        // Calculate price per date
+                                        const isFullDay = type === 'full-day' || type === 'full' || type === 'fullday';
+                                        let datePrice = null;
+                                        
+                                        if (booking.datesWithTypes.length > 0 && booking.totalPrice) {
+                                          // Try to calculate per-date price from total
+                                          datePrice = booking.totalPrice / booking.datesWithTypes.length;
+                                        } else if (item.price) {
+                                          // Use item-specific price if available
+                                          datePrice = item.price;
+                                        }
+                                        
                                         if (!date) return null;
                                         return (
                                           <div key={index} className="flex items-center justify-between text-xs">
                                             <span className="text-gray-300">{formatDate(date)}</span>
                                             <div className="flex items-center gap-2">
                                               <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
-                                              {dayPrice && (
-                                                <span className="text-gray-300 font-medium">LKR {dayPrice.toLocaleString()}</span>
+                                              {datePrice && (
+                                                <span className="text-gray-300 font-medium">LKR {Math.round(datePrice).toLocaleString()}</span>
                                               )}
                                             </div>
                                           </div>
@@ -2363,6 +2597,13 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             </div>
           )}
 
+          {/* My Packages Tab - For all service providers */}
+          {activeTab === 'packages' && (
+            <div>
+              {isRenting ? <ManageProducts /> : <MyPackages />}
+            </div>
+          )}
+
           {/* Availability Tab */}
           {activeTab === 'availability' && (
             <div className="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700 relative overflow-visible">
@@ -2437,10 +2678,36 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   </p>
                 </div>
               ) : (
-                <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3 mb-6">
-                  <p className="text-blue-300 text-sm font-medium">
-                    View Mode: Click the "Edit Calendar" button above to mark or change dates.
-                  </p>
+                <div className="space-y-3 mb-6">
+                  <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3">
+                    <p className="text-blue-300 text-sm font-medium">
+                      📅 View Mode: Busy dates from accepted bookings are shown in <span className="font-bold text-red-400">RED</span> and <span className="font-bold text-blue-400">BLUE</span>. Click "Edit Calendar" to manually set availability.
+                    </p>
+                  </div>
+                  {(() => {
+                    const acceptedCount = bookings.filter(b => b.status === 'accepted' || b.status === 'confirmed').length;
+                    const busyDatesCount = Object.keys(availabilityCalendar).filter(key => 
+                      availabilityCalendar[key] === 'busy' || availabilityCalendar[key] === 'halfday'
+                    ).length;
+                    
+                    if (acceptedCount === 0 && busyDatesCount === 0) {
+                      return (
+                        <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3">
+                          <p className="text-gray-400 text-sm">
+                            ℹ️ No busy dates yet. Accept bookings from "My Bookings" tab to automatically mark dates as busy, or use "Edit Calendar" to manually set availability.
+                          </p>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="bg-emerald-900/20 border border-emerald-700 rounded-lg p-3">
+                          <p className="text-emerald-300 text-sm font-medium">
+                            ✅ {acceptedCount} accepted booking(s) • {busyDatesCount} busy date(s) marked
+                          </p>
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
               )}
               <AvailabilityCalendar
@@ -2451,6 +2718,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   }
                 }}
                 readOnly={!isEditingCalendar}
+                acceptedBookings={bookings.filter(b => b.status === 'accepted' || b.status === 'confirmed')}
               />
             </div>
           )}

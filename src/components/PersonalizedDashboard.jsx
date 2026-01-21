@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, updateDoc, arrayRemove } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -15,7 +15,8 @@ import {
   Camera,
   Tent,
   X,
-  ChevronRight
+  ChevronRight,
+  ArrowLeft
 } from 'lucide-react';
 import {
   getFavorites,
@@ -32,6 +33,8 @@ const PersonalizedDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('favorites'); // favorites, recently-viewed, recommendations
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [favoritesFilter, setFavoritesFilter] = useState('all'); // all, jeep-driver, tour-guide, renting-shop
+  const [recentlyViewedFilter, setRecentlyViewedFilter] = useState('all'); // all, jeep-driver, tour-guide, renting-shop
 
   const auth = getAuth();
   const db = getFirestore();
@@ -51,8 +54,24 @@ const PersonalizedDashboard = () => {
 
   const loadData = async (userId) => {
     try {
-      const [favs, recent, recs] = await Promise.all([
-        getFavorites(userId),
+      // Fetch from tourists collection (where favorites are actually stored)
+      const touristDocRef = doc(db, 'tourists', userId);
+      const touristDoc = await getDoc(touristDocRef);
+      
+      let favs = [];
+      if (touristDoc.exists()) {
+        const data = touristDoc.data();
+        const jeepDriverIds = data.favoriteJeepDrivers || [];
+        const guideIds = data.favoriteGuides || [];
+        
+        // Convert to the format expected by enrichItems
+        favs = [
+          ...jeepDriverIds.map(id => ({ itemId: id, itemType: 'jeep-driver' })),
+          ...guideIds.map(id => ({ itemId: id, itemType: 'tour-guide' }))
+        ];
+      }
+
+      const [recent, recs] = await Promise.all([
         getRecentlyViewed(userId),
         getRecommendations(userId, 'all', 6)
       ]);
@@ -108,15 +127,22 @@ const PersonalizedDashboard = () => {
     return enriched.filter(item => item.data); // Only return items that still exist
   };
 
-  const handleRemoveFavorite = async (itemId) => {
+  const handleRemoveFavorite = async (itemId, itemType) => {
     if (!user) return;
     
-    const result = await removeFromFavorites(user.uid, itemId);
-    if (result.success) {
+    try {
+      const touristDocRef = doc(db, 'tourists', user.uid);
+      const fieldName = itemType === 'jeep-driver' ? 'favoriteJeepDrivers' : 'favoriteGuides';
+      
+      await updateDoc(touristDocRef, {
+        [fieldName]: arrayRemove(itemId)
+      });
+      
       setFavorites(prev => prev.filter(item => item.itemId !== itemId));
       setMessage({ type: 'success', text: 'Removed from favorites' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    } else {
+    } catch (error) {
+      console.error('Error removing favorite:', error);
       setMessage({ type: 'error', text: 'Failed to remove favorite' });
     }
   };
@@ -186,7 +212,7 @@ const PersonalizedDashboard = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleRemoveFavorite(item.itemId);
+                handleRemoveFavorite(item.itemId, item.itemType);
               }}
               className="absolute top-3 right-3 p-2 bg-red-600 hover:bg-red-700 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
             >
@@ -255,6 +281,71 @@ const PersonalizedDashboard = () => {
     return allRecommendations;
   };
 
+  // Filter items by service type
+  const filterItemsByType = (items, filterType) => {
+    if (filterType === 'all') return items;
+    return items.filter(item => item.itemType === filterType);
+  };
+
+  // Get counts for each service type
+  const getServiceTypeCounts = (items) => {
+    return {
+      jeepDrivers: items.filter(item => item.itemType === 'jeep-driver').length,
+      tourGuides: items.filter(item => item.itemType === 'tour-guide').length,
+      rentingShops: items.filter(item => item.itemType === 'renting-shop').length
+    };
+  };
+
+  // Render service provider sections
+  const renderServiceProviderSections = (items, showRemove = false) => {
+    const jeepDrivers = items.filter(item => item.itemType === 'jeep-driver');
+    const tourGuides = items.filter(item => item.itemType === 'tour-guide');
+    const rentingShops = items.filter(item => item.itemType === 'renting-shop');
+
+    return (
+      <div className="space-y-8">
+        {/* Jeep Drivers Section */}
+        {jeepDrivers.length > 0 && (
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Star className="h-5 w-5 text-emerald-500" />
+              Jeep Drivers ({jeepDrivers.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {jeepDrivers.map(item => renderItemCard(item, showRemove))}
+            </div>
+          </div>
+        )}
+
+        {/* Tour Guides Section */}
+        {tourGuides.length > 0 && (
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Star className="h-5 w-5 text-emerald-500" />
+              Tour Guides ({tourGuides.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {tourGuides.map(item => renderItemCard(item, showRemove))}
+            </div>
+          </div>
+        )}
+
+        {/* Renting Stores Section */}
+        {rentingShops.length > 0 && (
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Package className="h-5 w-5 text-emerald-500" />
+              Renting Stores ({rentingShops.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {rentingShops.map(item => renderItemCard(item, showRemove))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
@@ -279,6 +370,15 @@ const PersonalizedDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button */}
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors group"
+        >
+          <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="font-medium">Back</span>
+        </button>
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white flex items-center gap-3 mb-2">
@@ -339,7 +439,56 @@ const PersonalizedDashboard = () => {
         {/* Content */}
         {activeTab === 'favorites' && (
           <div>
-            <h2 className="text-2xl font-bold text-white mb-6">Your Favorites</h2>
+            <div className="flex flex-wrap items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Your Favorites</h2>
+              
+              {/* Service Type Filters */}
+              {favorites.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+                  <button
+                    onClick={() => setFavoritesFilter('all')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      favoritesFilter === 'all'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    All ({favorites.length})
+                  </button>
+                  <button
+                    onClick={() => setFavoritesFilter('jeep-driver')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      favoritesFilter === 'jeep-driver'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Jeep Drivers ({getServiceTypeCounts(favorites).jeepDrivers})
+                  </button>
+                  <button
+                    onClick={() => setFavoritesFilter('tour-guide')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      favoritesFilter === 'tour-guide'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Tour Guides ({getServiceTypeCounts(favorites).tourGuides})
+                  </button>
+                  <button
+                    onClick={() => setFavoritesFilter('renting-shop')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      favoritesFilter === 'renting-shop'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Renting Stores ({getServiceTypeCounts(favorites).rentingShops})
+                  </button>
+                </div>
+              )}
+            </div>
+
             {favorites.length === 0 ? (
               <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-12 text-center">
                 <Heart className="h-16 w-16 text-gray-600 mx-auto mb-4" />
@@ -348,9 +497,11 @@ const PersonalizedDashboard = () => {
                   Start exploring and save your favorite services and products
                 </p>
               </div>
+            ) : favoritesFilter === 'all' ? (
+              renderServiceProviderSections(favorites, true)
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {favorites.map(item => renderItemCard(item, true))}
+                {filterItemsByType(favorites, favoritesFilter).map(item => renderItemCard(item, true))}
               </div>
             )}
           </div>
@@ -358,7 +509,56 @@ const PersonalizedDashboard = () => {
 
         {activeTab === 'recently-viewed' && (
           <div>
-            <h2 className="text-2xl font-bold text-white mb-6">Recently Viewed</h2>
+            <div className="flex flex-wrap items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Recently Viewed</h2>
+              
+              {/* Service Type Filters */}
+              {recentlyViewed.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+                  <button
+                    onClick={() => setRecentlyViewedFilter('all')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      recentlyViewedFilter === 'all'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    All ({recentlyViewed.length})
+                  </button>
+                  <button
+                    onClick={() => setRecentlyViewedFilter('jeep-driver')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      recentlyViewedFilter === 'jeep-driver'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Jeep Drivers ({getServiceTypeCounts(recentlyViewed).jeepDrivers})
+                  </button>
+                  <button
+                    onClick={() => setRecentlyViewedFilter('tour-guide')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      recentlyViewedFilter === 'tour-guide'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Tour Guides ({getServiceTypeCounts(recentlyViewed).tourGuides})
+                  </button>
+                  <button
+                    onClick={() => setRecentlyViewedFilter('renting-shop')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      recentlyViewedFilter === 'renting-shop'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    Renting Stores ({getServiceTypeCounts(recentlyViewed).rentingShops})
+                  </button>
+                </div>
+              )}
+            </div>
+
             {recentlyViewed.length === 0 ? (
               <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-12 text-center">
                 <Clock className="h-16 w-16 text-gray-600 mx-auto mb-4" />
@@ -367,9 +567,11 @@ const PersonalizedDashboard = () => {
                   Items you view will appear here for quick access
                 </p>
               </div>
+            ) : recentlyViewedFilter === 'all' ? (
+              renderServiceProviderSections(recentlyViewed, false)
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {recentlyViewed.map(item => renderItemCard(item, false))}
+                {filterItemsByType(recentlyViewed, recentlyViewedFilter).map(item => renderItemCard(item, false))}
               </div>
             )}
           </div>

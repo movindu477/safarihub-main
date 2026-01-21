@@ -29,7 +29,6 @@ const db = getFirestore();
 export const DEFAULT_PREFERENCES = {
   // Search & Filter Preferences
   preferredLocation: '',
-  preferredPriceRange: '',
   preferredServiceTypes: [], // ['Jeep Driver', 'Tour Guide', 'Renting']
   preferredCategories: [], // For equipment: ['Camera', 'Camping']
   lastUsedFilters: {},
@@ -43,8 +42,7 @@ export const DEFAULT_PREFERENCES = {
     bookingUpdates: true,
     priceDrops: true,
     availabilityAlerts: true,
-    newPackages: true,
-    promotions: false
+    newPackages: true
   },
   
   // Privacy
@@ -424,7 +422,11 @@ export const getRecommendations = async (userId, type = 'all', limitCount = 10) 
     const bookingHistory = await getUserBookingHistory(userId);
     const rentalHistory = await getUserRentalHistory(userId);
     const recentlyViewed = await getRecentlyViewed(userId);
-    const favorites = await getFavorites(userId);
+    
+    // Get favorites from tourists collection
+    const touristDoc = await getDoc(doc(db, 'tourists', userId));
+    const favoriteJeepDrivers = touristDoc.exists() ? (touristDoc.data().favoriteJeepDrivers || []) : [];
+    const favoriteGuides = touristDoc.exists() ? (touristDoc.data().favoriteGuides || []) : [];
     
     const recommendations = {
       jeepDrivers: [],
@@ -434,107 +436,180 @@ export const getRecommendations = async (userId, type = 'all', limitCount = 10) 
       rentingShops: []
     };
     
-    // 1. Recommend based on booking history
-    if (bookingHistory.length > 0) {
-      const providerIds = [...new Set(bookingHistory.map(b => b.driverId || b.guideId).filter(Boolean))];
-      const serviceTypes = [...new Set(bookingHistory.map(b => b.serviceType).filter(Boolean))];
-      
-      // Get similar providers
-      for (const serviceType of serviceTypes) {
-        const providersRef = collection(db, 'serviceProviders');
-        const q = query(
-          providersRef,
-          where('serviceType', '==', serviceType),
-          where('rating', '>=', 4.0),
-          limit(5)
-        );
-        
-        const snapshot = await getDocs(q);
-        const providers = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(p => !providerIds.includes(p.id)); // Exclude already booked
-        
-        if (serviceType === 'Jeep Driver') {
-          recommendations.jeepDrivers.push(...providers);
-        } else if (serviceType === 'Tour Guide') {
-          recommendations.tourGuides.push(...providers);
-        }
-      }
-    }
+    // Analyze booking patterns for smart recommendations
+    const nationalParks = bookingHistory
+      .map(b => b.nationalPark || b.destination)
+      .filter(Boolean);
+    const parkFrequency = {};
+    nationalParks.forEach(park => {
+      parkFrequency[park] = (parkFrequency[park] || 0) + 1;
+    });
     
-    // 2. Recommend based on rental history
-    if (rentalHistory.length > 0) {
-      const categories = [...new Set(rentalHistory.map(r => r.productCategory).filter(Boolean))];
-      
-      for (const category of categories) {
-        const productsRef = collection(db, 'rentalProducts');
-        const q = query(
-          productsRef,
-          where('category', '==', category),
-          where('available', '==', true),
-          limit(5)
-        );
-        
-        const snapshot = await getDocs(q);
-        const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        recommendations.products.push(...products);
-      }
-    }
+    // Get most frequented park
+    const mostVisitedPark = Object.keys(parkFrequency).length > 0
+      ? Object.entries(parkFrequency).sort((a, b) => b[1] - a[1])[0][0]
+      : null;
     
-    // 3. Recommend based on recently viewed
-    if (recentlyViewed.length > 0) {
-      const viewedTypes = [...new Set(recentlyViewed.map(item => item.itemType))];
+    // List of all major national parks in Sri Lanka
+    const allNationalParks = [
+      'Yala National Park',
+      'Udawalawe National Park',
+      'Wilpattu National Park',
+      'Minneriya National Park',
+      'Kaudulla National Park',
+      'Bundala National Park',
+      'Wasgamuwa National Park',
+      'Kumana National Park',
+      'Gal Oya National Park',
+      'Horton Plains National Park'
+    ];
+    
+    // Smart recommendation: If user frequently visits one park, suggest others
+    const otherParks = mostVisitedPark
+      ? allNationalParks.filter(park => park !== mostVisitedPark)
+      : allNationalParks;
+    
+    // 1. Recommend jeep drivers from other national parks
+    if (otherParks.length > 0) {
+      const jeepDriversRef = collection(db, 'serviceProviders');
+      const jeepQuery = query(
+        jeepDriversRef,
+        where('serviceType', '==', 'Jeep Driver'),
+        where('rating', '>=', 4.0),
+        limit(20)
+      );
       
-      for (const itemType of viewedTypes) {
-        let collectionName = '';
-        let categoryKey = '';
-        
-        if (itemType === 'jeep-driver' || itemType === 'tour-guide') {
-          collectionName = 'serviceProviders';
-        } else if (itemType === 'product') {
-          collectionName = 'rentalProducts';
-        } else if (itemType === 'package') {
-          collectionName = 'servicePackages';
-        }
-        
-        if (collectionName) {
-          const ref = collection(db, collectionName);
-          const q = query(ref, limit(5));
-          const snapshot = await getDocs(q);
-          const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const jeepSnapshot = await getDocs(jeepQuery);
+      const jeepDrivers = jeepSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(driver => {
+          // Exclude already booked or favorited
+          if (favoriteJeepDrivers.includes(driver.id)) return false;
           
-          if (itemType === 'product') {
-            recommendations.products.push(...items);
-          } else if (itemType === 'package') {
-            recommendations.packages.push(...items);
-          }
-        }
+          // Prefer drivers from other parks
+          const driverDestinations = driver.destinations || [];
+          return driverDestinations.some(dest => otherParks.includes(dest));
+        });
+      
+      recommendations.jeepDrivers.push(...jeepDrivers);
+    }
+    
+    // 2. Recommend tour guides from other destinations
+    if (otherParks.length > 0) {
+      const guidesRef = collection(db, 'serviceProviders');
+      const guideQuery = query(
+        guidesRef,
+        where('serviceType', '==', 'Tour Guide'),
+        where('rating', '>=', 4.0),
+        limit(20)
+      );
+      
+      const guideSnapshot = await getDocs(guideQuery);
+      const guides = guideSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(guide => {
+          // Exclude already booked or favorited
+          if (favoriteGuides.includes(guide.id)) return false;
+          
+          // Prefer guides from other parks
+          const guideDestinations = guide.destinations || [];
+          return guideDestinations.some(dest => otherParks.includes(dest));
+        });
+      
+      recommendations.tourGuides.push(...guides);
+    }
+    
+    // 3. If no booking history, suggest top-rated providers
+    if (bookingHistory.length === 0) {
+      // Get top jeep drivers
+      const topJeepsRef = collection(db, 'serviceProviders');
+      const topJeepsQuery = query(
+        topJeepsRef,
+        where('serviceType', '==', 'Jeep Driver'),
+        orderBy('rating', 'desc'),
+        limit(10)
+      );
+      const topJeepsSnapshot = await getDocs(topJeepsQuery);
+      const topJeeps = topJeepsSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(driver => !favoriteJeepDrivers.includes(driver.id));
+      recommendations.jeepDrivers.push(...topJeeps);
+      
+      // Get top tour guides
+      const topGuidesRef = collection(db, 'serviceProviders');
+      const topGuidesQuery = query(
+        topGuidesRef,
+        where('serviceType', '==', 'Tour Guide'),
+        orderBy('rating', 'desc'),
+        limit(10)
+      );
+      const topGuidesSnapshot = await getDocs(topGuidesQuery);
+      const topGuides = topGuidesSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(guide => !favoriteGuides.includes(guide.id));
+      recommendations.tourGuides.push(...topGuides);
+    }
+    
+    // 4. Recommend based on recently viewed (similar services)
+    if (recentlyViewed.length > 0) {
+      const viewedJeeps = recentlyViewed.filter(item => item.itemType === 'jeep-driver');
+      const viewedGuides = recentlyViewed.filter(item => item.itemType === 'tour-guide');
+      
+      if (viewedJeeps.length > 0 && recommendations.jeepDrivers.length < limitCount) {
+        const jeepsRef = collection(db, 'serviceProviders');
+        const similarJeepsQuery = query(
+          jeepsRef,
+          where('serviceType', '==', 'Jeep Driver'),
+          where('rating', '>=', 3.5),
+          limit(10)
+        );
+        const similarJeepsSnapshot = await getDocs(similarJeepsQuery);
+        const similarJeeps = similarJeepsSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(driver => 
+            !viewedJeeps.some(v => v.itemId === driver.id) &&
+            !favoriteJeepDrivers.includes(driver.id)
+          );
+        recommendations.jeepDrivers.push(...similarJeeps);
+      }
+      
+      if (viewedGuides.length > 0 && recommendations.tourGuides.length < limitCount) {
+        const guidesRef = collection(db, 'serviceProviders');
+        const similarGuidesQuery = query(
+          guidesRef,
+          where('serviceType', '==', 'Tour Guide'),
+          where('rating', '>=', 3.5),
+          limit(10)
+        );
+        const similarGuidesSnapshot = await getDocs(similarGuidesQuery);
+        const similarGuides = similarGuidesSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(guide => 
+            !viewedGuides.some(v => v.itemId === guide.id) &&
+            !favoriteGuides.includes(guide.id)
+          );
+        recommendations.tourGuides.push(...similarGuides);
       }
     }
     
-    // 4. Recommend based on preferences
-    if (preferences.preferredServiceTypes.length > 0) {
-      for (const serviceType of preferences.preferredServiceTypes) {
-        const providersRef = collection(db, 'serviceProviders');
-        const q = query(
-          providersRef,
-          where('serviceType', '==', serviceType),
-          orderBy('rating', 'desc'),
-          limit(5)
-        );
-        
-        const snapshot = await getDocs(q);
-        const providers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        if (serviceType === 'Jeep Driver') {
-          recommendations.jeepDrivers.push(...providers);
-        } else if (serviceType === 'Tour Guide') {
-          recommendations.tourGuides.push(...providers);
-        } else if (serviceType === 'Renting') {
-          recommendations.rentingShops.push(...providers);
-        }
-      }
-    }
+    // 5. Recommend renting shops
+    const rentingRef = collection(db, 'serviceProviders');
+    const rentingQuery = query(
+      rentingRef,
+      where('serviceType', '==', 'Renting'),
+      orderBy('rating', 'desc'),
+      limit(10)
+    );
+    const rentingSnapshot = await getDocs(rentingQuery);
+    const rentingShops = rentingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    recommendations.rentingShops.push(...rentingShops);
+    
+    // 6. Recommend service packages
+    const packagesRef = collection(db, 'servicePackages');
+    const packagesQuery = query(packagesRef, limit(10));
+    const packagesSnapshot = await getDocs(packagesQuery);
+    const packages = packagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    recommendations.packages.push(...packages);
     
     // Remove duplicates and limit
     Object.keys(recommendations).forEach(key => {
