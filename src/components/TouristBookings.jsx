@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, collection, query, where, onSnapshot, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Calendar, Star, CheckCircle, AlertCircle, X as CloseIcon, ChevronLeft } from 'lucide-react';
+import { Calendar, Star, CheckCircle, AlertCircle, X as CloseIcon, ChevronLeft, Download } from 'lucide-react';
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
 import { createNotification } from '../App';
@@ -122,6 +122,329 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
     } finally {
       setSubmittingReview(false);
     }
+  };
+
+  // Handle download receipt as PDF
+  const handleDownloadReceipt = (booking, e) => {
+    e.stopPropagation(); // Prevent opening booking details
+
+    // Create receipt HTML
+    const receiptWindow = window.open('', '', 'width=800,height=600');
+    
+    // Calculate total days
+    const daysCount = booking.datesWithTypes?.length || 1;
+    
+    // Format dates
+    const formatReceiptDate = (date) => {
+      if (!date) return 'N/A';
+      const dateObj = date instanceof Date ? date : new Date(date);
+      return dateObj.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+
+    const receiptHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Booking Receipt - ${booking.id}</title>
+        <style>
+          @media print {
+            @page { margin: 0.5in; }
+            body { margin: 0; }
+          }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px;
+            background: #ffffff;
+            color: #000000;
+          }
+          .receipt-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            padding: 40px;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px solid #10b981;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .header h1 {
+            color: #10b981;
+            font-size: 32px;
+            margin-bottom: 5px;
+          }
+          .header p {
+            color: #6b7280;
+            font-size: 14px;
+          }
+          .receipt-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 6px;
+          }
+          .info-block h3 {
+            color: #10b981;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+          }
+          .info-block p {
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.6;
+          }
+          .booking-details {
+            margin: 30px 0;
+          }
+          .section-title {
+            color: #10b981;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e5e7eb;
+          }
+          .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+          }
+          .detail-item {
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 4px;
+          }
+          .detail-label {
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+          }
+          .detail-value {
+            color: #111827;
+            font-size: 14px;
+            font-weight: 500;
+          }
+          .dates-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+          }
+          .dates-table th {
+            background: #10b981;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+          }
+          .dates-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+          }
+          .dates-table tr:nth-child(even) {
+            background: #f9fafb;
+          }
+          .pricing-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0fdf4;
+            border: 2px dashed #10b981;
+            border-radius: 6px;
+          }
+          .price-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+          }
+          .price-row.total {
+            border-top: 2px solid #10b981;
+            margin-top: 10px;
+            padding-top: 15px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #10b981;
+          }
+          .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+          }
+          .status-confirmed { background: #d1fae5; color: #065f46; }
+          .status-pending { background: #fef3c7; color: #92400e; }
+          .status-accepted { background: #d1fae5; color: #065f46; }
+          .footer {
+            margin-top: 40px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 2px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 12px;
+          }
+          .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          }
+          .print-btn:hover {
+            background: #059669;
+          }
+          @media print {
+            .print-btn { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <button class="print-btn" onclick="window.print()">Download / Print PDF</button>
+        
+        <div class="receipt-container">
+          <div class="header">
+            <h1>🌴 SafariHub</h1>
+            <p>Booking Receipt & Confirmation</p>
+          </div>
+
+          <div class="receipt-info">
+            <div class="info-block">
+              <h3>Receipt Information</h3>
+              <p><strong>Receipt #:</strong> ${booking.id.substring(0, 8).toUpperCase()}</p>
+              <p><strong>Booking Date:</strong> ${formatReceiptDate(booking.createdAt?.toDate?.() || booking.createdAt)}</p>
+              <p><strong>Status:</strong> <span class="status-badge status-${booking.paymentStatus === 'paid' ? 'confirmed' : booking.status}">${booking.paymentStatus === 'paid' ? 'CONFIRMED' : booking.status?.toUpperCase()}</span></p>
+            </div>
+            <div class="info-block">
+              <h3>Customer Details</h3>
+              <p><strong>${booking.customerName || 'Guest'}</strong></p>
+              <p>${booking.customerEmail || 'N/A'}</p>
+              <p>${booking.customerPhone || 'N/A'}</p>
+            </div>
+          </div>
+
+          <div class="booking-details">
+            <h2 class="section-title">Service Details</h2>
+            <div class="details-grid">
+              <div class="detail-item">
+                <div class="detail-label">Service Provider</div>
+                <div class="detail-value">${booking.providerName || 'N/A'}</div>
+              </div>
+              <div class="detail-item">
+                <div class="detail-label">Service Type</div>
+                <div class="detail-value">${booking.serviceType || 'N/A'}</div>
+              </div>
+              ${booking.vehicleType ? `
+              <div class="detail-item">
+                <div class="detail-label">Vehicle Type</div>
+                <div class="detail-value">${booking.vehicleType}</div>
+              </div>
+              ` : ''}
+              ${booking.packageName ? `
+              <div class="detail-item">
+                <div class="detail-label">Package</div>
+                <div class="detail-value">${booking.packageName}</div>
+              </div>
+              ` : ''}
+            </div>
+
+            ${booking.datesWithTypes && booking.datesWithTypes.length > 0 ? `
+              <h2 class="section-title">Booking Dates</h2>
+              <table class="dates-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th style="text-align: right">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${booking.datesWithTypes.map(item => {
+                    const date = item.date ? new Date(item.date) : null;
+                    const type = item.type || 'full-day';
+                    const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                    const datePrice = booking.totalPrice / booking.datesWithTypes.length;
+                    return date ? `
+                      <tr>
+                        <td>${formatReceiptDate(date)}</td>
+                        <td>${typeLabel}</td>
+                        <td style="text-align: right">LKR ${Math.round(datePrice).toLocaleString()}</td>
+                      </tr>
+                    ` : '';
+                  }).join('')}
+                </tbody>
+              </table>
+            ` : ''}
+          </div>
+
+          <div class="pricing-section">
+            <div class="price-row">
+              <span>Number of Days:</span>
+              <span><strong>${daysCount}</strong></span>
+            </div>
+            ${booking.pricePerDay ? `
+              <div class="price-row">
+                <span>Price per Day:</span>
+                <span>LKR ${booking.pricePerDay.toLocaleString()}</span>
+              </div>
+            ` : ''}
+            <div class="price-row total">
+              <span>Total Amount:</span>
+              <span>LKR ${(booking.totalPrice || 0).toLocaleString()}</span>
+            </div>
+            ${booking.paymentStatus === 'paid' ? `
+              <div class="price-row" style="color: #059669; margin-top: 10px;">
+                <span>Payment Status:</span>
+                <span><strong>✓ PAID</strong></span>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="footer">
+            <p><strong>SafariHub</strong> - Your Gateway to Sri Lankan Adventures</p>
+            <p>Contact: support@safarihub.lk | +94 XX XXX XXXX</p>
+            <p style="margin-top: 10px;">Thank you for choosing SafariHub!</p>
+            <p style="margin-top: 5px; font-size: 10px;">This is an electronically generated receipt and is valid without signature.</p>
+          </div>
+        </div>
+
+        <script>
+          // Auto-print dialog after page loads
+          window.onload = function() {
+            setTimeout(function() {
+              // window.print(); // Uncomment to auto-open print dialog
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    receiptWindow.document.write(receiptHTML);
+    receiptWindow.document.close();
   };
 
   const statusColors = {
@@ -379,6 +702,17 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                             >
                               <CheckCircle className="h-4 w-4" />
                               PAY NOW
+                            </button>
+                          )}
+
+                          {/* Download Receipt Button - Show for accepted, confirmed, completed, and reviewed bookings */}
+                          {(booking.status === 'accepted' || booking.status === 'confirmed' || booking.status === 'completed' || booking.status === 'reviewed' || booking.paymentStatus === 'paid') && (
+                            <button
+                              onClick={(e) => handleDownloadReceipt(booking, e)}
+                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                            >
+                              <Download className="h-4 w-4" />
+                              Download Receipt
                             </button>
                           )}
 
