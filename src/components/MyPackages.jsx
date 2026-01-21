@@ -26,6 +26,16 @@ const MyPackages = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    // Vehicle types
+    hasStandardJeep: false,
+    hasLuxuryJeep: false,
+    // Standard Safari Jeep prices
+    fullDayPriceStandard: '',
+    halfDayPriceStandard: '',
+    // Luxury Safari Jeep prices
+    fullDayPriceLuxury: '',
+    halfDayPriceLuxury: '',
+    // Legacy fields (for backwards compatibility)
     fullDayPrice: '',
     halfDayPrice: '',
     rules: '',
@@ -87,6 +97,12 @@ const MyPackages = () => {
     setFormData({
       title: '',
       description: '',
+      hasStandardJeep: false,
+      hasLuxuryJeep: false,
+      fullDayPriceStandard: '',
+      halfDayPriceStandard: '',
+      fullDayPriceLuxury: '',
+      halfDayPriceLuxury: '',
       fullDayPrice: '',
       halfDayPrice: '',
       rules: '',
@@ -110,21 +126,47 @@ const MyPackages = () => {
       setMessage({ type: 'error', text: 'Description is required' });
       return;
     }
-    if (!formData.fullDayPrice || parseFloat(formData.fullDayPrice) <= 0) {
-      setMessage({ type: 'error', text: 'Valid full-day price is required' });
-      return;
-    }
-    if (!formData.halfDayPrice || parseFloat(formData.halfDayPrice) <= 0) {
-      setMessage({ type: 'error', text: 'Valid half-day price is required' });
+
+    // Vehicle type validation
+    if (!formData.hasStandardJeep && !formData.hasLuxuryJeep) {
+      setMessage({ type: 'error', text: '❌ Please select at least one vehicle type' });
       return;
     }
 
-    // ✅ VALIDATION: Full day price must be greater than half day price
-    const fullDay = parseFloat(formData.fullDayPrice);
-    const halfDay = parseFloat(formData.halfDayPrice);
-    if (fullDay <= halfDay) {
-      setMessage({ type: 'error', text: '❌ Full day price must be greater than half day price' });
-      return;
+    // Standard Safari Jeep validation
+    if (formData.hasStandardJeep) {
+      if (!formData.fullDayPriceStandard || parseFloat(formData.fullDayPriceStandard) <= 0) {
+        setMessage({ type: 'error', text: '❌ Valid Standard full-day price is required' });
+        return;
+      }
+      if (!formData.halfDayPriceStandard || parseFloat(formData.halfDayPriceStandard) <= 0) {
+        setMessage({ type: 'error', text: '❌ Valid Standard half-day price is required' });
+        return;
+      }
+      const fullDayStd = parseFloat(formData.fullDayPriceStandard);
+      const halfDayStd = parseFloat(formData.halfDayPriceStandard);
+      if (fullDayStd <= halfDayStd) {
+        setMessage({ type: 'error', text: '❌ Standard full day price must be greater than half day price' });
+        return;
+      }
+    }
+
+    // Luxury Safari Jeep validation
+    if (formData.hasLuxuryJeep) {
+      if (!formData.fullDayPriceLuxury || parseFloat(formData.fullDayPriceLuxury) <= 0) {
+        setMessage({ type: 'error', text: '❌ Valid Luxury full-day price is required' });
+        return;
+      }
+      if (!formData.halfDayPriceLuxury || parseFloat(formData.halfDayPriceLuxury) <= 0) {
+        setMessage({ type: 'error', text: '❌ Valid Luxury half-day price is required' });
+        return;
+      }
+      const fullDayLux = parseFloat(formData.fullDayPriceLuxury);
+      const halfDayLux = parseFloat(formData.halfDayPriceLuxury);
+      if (fullDayLux <= halfDayLux) {
+        setMessage({ type: 'error', text: '❌ Luxury full day price must be greater than half day price' });
+        return;
+      }
     }
 
     setSaving(true);
@@ -139,8 +181,18 @@ const MyPackages = () => {
       const packageData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
-        fullDayPrice: parseFloat(formData.fullDayPrice),
-        halfDayPrice: parseFloat(formData.halfDayPrice),
+        // Vehicle types
+        hasStandardJeep: formData.hasStandardJeep,
+        hasLuxuryJeep: formData.hasLuxuryJeep,
+        // Standard Safari Jeep prices
+        fullDayPriceStandard: formData.hasStandardJeep ? parseFloat(formData.fullDayPriceStandard) : null,
+        halfDayPriceStandard: formData.hasStandardJeep ? parseFloat(formData.halfDayPriceStandard) : null,
+        // Luxury Safari Jeep prices
+        fullDayPriceLuxury: formData.hasLuxuryJeep ? parseFloat(formData.fullDayPriceLuxury) : null,
+        halfDayPriceLuxury: formData.hasLuxuryJeep ? parseFloat(formData.halfDayPriceLuxury) : null,
+        // Legacy fields (for backwards compatibility) - use Standard prices if available, otherwise Luxury
+        fullDayPrice: formData.hasStandardJeep ? parseFloat(formData.fullDayPriceStandard) : parseFloat(formData.fullDayPriceLuxury),
+        halfDayPrice: formData.hasStandardJeep ? parseFloat(formData.halfDayPriceStandard) : parseFloat(formData.halfDayPriceLuxury),
         rules: formData.rules.trim(),
         benefits: formData.benefits.trim(),
         facilities: formData.facilities.trim(),
@@ -184,8 +236,15 @@ const MyPackages = () => {
     setFormData({
       title: pkg.title,
       description: pkg.description,
-      fullDayPrice: pkg.fullDayPrice.toString(),
-      halfDayPrice: pkg.halfDayPrice.toString(),
+      // Check if new format exists, otherwise use legacy
+      hasStandardJeep: pkg.hasStandardJeep !== undefined ? pkg.hasStandardJeep : true,
+      hasLuxuryJeep: pkg.hasLuxuryJeep !== undefined ? pkg.hasLuxuryJeep : false,
+      fullDayPriceStandard: pkg.fullDayPriceStandard ? pkg.fullDayPriceStandard.toString() : (pkg.fullDayPrice ? pkg.fullDayPrice.toString() : ''),
+      halfDayPriceStandard: pkg.halfDayPriceStandard ? pkg.halfDayPriceStandard.toString() : (pkg.halfDayPrice ? pkg.halfDayPrice.toString() : ''),
+      fullDayPriceLuxury: pkg.fullDayPriceLuxury ? pkg.fullDayPriceLuxury.toString() : '',
+      halfDayPriceLuxury: pkg.halfDayPriceLuxury ? pkg.halfDayPriceLuxury.toString() : '',
+      fullDayPrice: pkg.fullDayPrice ? pkg.fullDayPrice.toString() : '',
+      halfDayPrice: pkg.halfDayPrice ? pkg.halfDayPrice.toString() : '',
       rules: pkg.rules || '',
       benefits: pkg.benefits || '',
       facilities: pkg.facilities || ''
@@ -330,43 +389,132 @@ const MyPackages = () => {
                 />
               </div>
 
-              {/* Pricing */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Full Day Price (LKR) *
+              {/* Vehicle Type Selection */}
+              <div className="border border-gray-600 rounded-lg p-4 bg-gray-900/30">
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Select Vehicle Types for This Package *
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.hasStandardJeep}
+                      onChange={(e) => setFormData(prev => ({ ...prev, hasStandardJeep: e.target.checked }))}
+                      className="w-5 h-5 text-emerald-600 bg-gray-900 border-gray-600 rounded focus:ring-emerald-500 focus:ring-offset-gray-900"
+                      disabled={saving}
+                    />
+                    <span className="text-gray-200 font-medium">Standard Safari Jeep</span>
                   </label>
-                  <input
-                    type="number"
-                    name="fullDayPrice"
-                    value={formData.fullDayPrice}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 25000"
-                    min="1"
-                    step="1"
-                    className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
-                    required
-                    disabled={saving}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Half Day Price (LKR) *
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.hasLuxuryJeep}
+                      onChange={(e) => setFormData(prev => ({ ...prev, hasLuxuryJeep: e.target.checked }))}
+                      className="w-5 h-5 text-emerald-600 bg-gray-900 border-gray-600 rounded focus:ring-emerald-500 focus:ring-offset-gray-900"
+                      disabled={saving}
+                    />
+                    <span className="text-gray-200 font-medium">Luxury Safari Jeep</span>
                   </label>
-                  <input
-                    type="number"
-                    name="halfDayPrice"
-                    value={formData.halfDayPrice}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 15000"
-                    min="1"
-                    step="1"
-                    className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
-                    required
-                    disabled={saving}
-                  />
                 </div>
               </div>
+
+              {/* Standard Safari Jeep Pricing */}
+              {formData.hasStandardJeep && (
+                <div className="border border-blue-500/50 rounded-lg p-4 bg-blue-900/10">
+                  <h3 className="text-lg font-semibold text-blue-300 mb-4 flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Standard Safari Jeep Pricing
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Full Day Price (LKR) *
+                      </label>
+                      <input
+                        type="number"
+                        name="fullDayPriceStandard"
+                        value={formData.fullDayPriceStandard}
+                        onChange={handleInputChange}
+                        placeholder="e.g., 20000"
+                        min="1"
+                        step="1"
+                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                        required={formData.hasStandardJeep}
+                        disabled={saving}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Half Day Price (LKR) *
+                      </label>
+                      <input
+                        type="number"
+                        name="halfDayPriceStandard"
+                        value={formData.halfDayPriceStandard}
+                        onChange={handleInputChange}
+                        placeholder="e.g., 12000"
+                        min="1"
+                        step="1"
+                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                        required={formData.hasStandardJeep}
+                        disabled={saving}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Must be less than full day price
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Luxury Safari Jeep Pricing */}
+              {formData.hasLuxuryJeep && (
+                <div className="border border-amber-500/50 rounded-lg p-4 bg-amber-900/10">
+                  <h3 className="text-lg font-semibold text-amber-300 mb-4 flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Luxury Safari Jeep Pricing
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Full Day Price (LKR) *
+                      </label>
+                      <input
+                        type="number"
+                        name="fullDayPriceLuxury"
+                        value={formData.fullDayPriceLuxury}
+                        onChange={handleInputChange}
+                        placeholder="e.g., 35000"
+                        min="1"
+                        step="1"
+                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                        required={formData.hasLuxuryJeep}
+                        disabled={saving}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Half Day Price (LKR) *
+                      </label>
+                      <input
+                        type="number"
+                        name="halfDayPriceLuxury"
+                        value={formData.halfDayPriceLuxury}
+                        onChange={handleInputChange}
+                        placeholder="e.g., 22000"
+                        min="1"
+                        step="1"
+                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                        required={formData.hasLuxuryJeep}
+                        disabled={saving}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Must be less than full day price
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Benefits */}
               <div>
@@ -478,18 +626,65 @@ const MyPackages = () => {
                         </div>
                       </div>
 
-                      {/* Pricing */}
-                      <div className="flex items-center gap-6 mb-4">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-emerald-400" />
-                          <span className="text-sm text-gray-400">Full Day:</span>
-                          <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPrice)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-yellow-400" />
-                          <span className="text-sm text-gray-400">Half Day:</span>
-                          <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPrice)}</span>
-                        </div>
+                      {/* Vehicle Types & Pricing */}
+                      <div className="space-y-3 mb-4">
+                        {/* Standard Safari Jeep */}
+                        {pkg.hasStandardJeep && (
+                          <div className="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-semibold text-blue-300">🚙 Standard Safari Jeep</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-emerald-400" />
+                                <span className="text-xs text-gray-400">Full Day:</span>
+                                <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPriceStandard)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-yellow-400" />
+                                <span className="text-xs text-gray-400">Half Day:</span>
+                                <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPriceStandard)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Luxury Safari Jeep */}
+                        {pkg.hasLuxuryJeep && (
+                          <div className="bg-amber-900/10 border border-amber-500/30 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-semibold text-amber-300">✨ Luxury Safari Jeep</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-emerald-400" />
+                                <span className="text-xs text-gray-400">Full Day:</span>
+                                <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPriceLuxury)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-yellow-400" />
+                                <span className="text-xs text-gray-400">Half Day:</span>
+                                <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPriceLuxury)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Legacy packages (without vehicle type selection) */}
+                        {!pkg.hasStandardJeep && !pkg.hasLuxuryJeep && pkg.fullDayPrice && (
+                          <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-emerald-400" />
+                              <span className="text-sm text-gray-400">Full Day:</span>
+                              <span className="text-emerald-400 font-semibold">{formatPrice(pkg.fullDayPrice)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-yellow-400" />
+                              <span className="text-sm text-gray-400">Half Day:</span>
+                              <span className="text-yellow-400 font-semibold">{formatPrice(pkg.halfDayPrice)}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Expanded Content - Benefits, Facilities, Rules */}

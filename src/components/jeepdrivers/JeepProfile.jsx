@@ -338,7 +338,11 @@ const BookingFormModal = ({
   selectedDates,
   selectedDatesWithType,
   onDateTypeChange,
-  selectedPackage
+  selectedPackage,
+  selectedVehicleType,
+  halfDayTimes,
+  emergencyCountryCode,
+  setEmergencyCountryCode
 }) => {
   // Filter out step 4 (Additional Requests) if booking a package
   const allSteps = [
@@ -355,6 +359,13 @@ const BookingFormModal = ({
       number: index + 1 // Re-number steps
     }))
     : allSteps;
+  
+  console.log('📊 Modal State - currentStep:', currentStep, '| stepsLength:', steps.length, '| hasPackage:', !!selectedPackage, 
+    '| emergencyStepShouldRender:', ((currentStep === 5 && !selectedPackage) || (currentStep === 4 && selectedPackage) || currentStep === steps.length),
+    '| formData:', {
+      emergencyContactName: formData.emergencyContactName,
+      emergencyContactPhone: formData.emergencyContactPhone
+    });
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -398,26 +409,64 @@ const BookingFormModal = ({
         if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
         if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
       }
-    } else if (currentStep === 4) {
+    } else if (currentStep === 4 && !selectedPackage) {
+      // Step 4: Additional Requests (only for non-package bookings)
       if (formData.needsSnacks && (!formData.selectedSnacks || formData.selectedSnacks.length === 0)) {
         errors.selectedSnacks = 'Please select at least one snack/meal';
       }
-    } else if (currentStep === 5) {
-      if (!formData.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required';
-      if (!formData.emergencyContactPhone.trim()) {
+    } else if ((currentStep === 5 && !selectedPackage) || (currentStep === 4 && selectedPackage)) {
+      // Emergency Contact: Step 5 for regular bookings, Step 4 for package bookings
+      console.log('🔍 Validating Emergency Contact:', {
+        currentStep,
+        selectedPackage: !!selectedPackage,
+        emergencyContactName: formData.emergencyContactName,
+        emergencyContactPhone: formData.emergencyContactPhone,
+        phoneLength: formData.emergencyContactPhone?.length
+      });
+      
+      if (!formData.emergencyContactName || !formData.emergencyContactName.trim()) {
+        errors.emergencyContactName = 'Emergency contact name is required';
+      }
+      
+      // Check phone number - ensure it's a string and has exactly 9 digits
+      const phoneValue = String(formData.emergencyContactPhone || '').trim();
+      if (!phoneValue || phoneValue.length === 0) {
         errors.emergencyContactPhone = 'Emergency contact phone is required';
-      } else {
-        // Check for +94 followed by exactly 9 digits
-        const digitsOnly = formData.emergencyContactPhone.replace(/\D/g, '');
-        // +94... means it starts with 94. Total digits should be 11 (94 + 9 digits)
-        if (digitsOnly.length !== 11 || !formData.emergencyContactPhone.startsWith('+94')) {
-          errors.emergencyContactPhone = 'Phone number must range +94 followed by 9 digits';
-        }
+      } else if (phoneValue.length !== 9) {
+        errors.emergencyContactPhone = `Phone number must be exactly 9 digits (you entered ${phoneValue.length} digits)`;
+      } else if (!/^\d{9}$/.test(phoneValue)) {
+        errors.emergencyContactPhone = 'Phone number must contain only digits';
       }
     }
 
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    
+    // If there are errors, show an alert with details and scroll to first error
+    if (Object.keys(errors).length > 0) {
+      const firstErrorField = Object.keys(errors)[0];
+      const errorMessages = Object.entries(errors).map(([field, msg]) => {
+        const fieldLabels = {
+          emergencyContactName: 'Emergency Contact Name',
+          emergencyContactPhone: 'Emergency Contact Phone'
+        };
+        return `${fieldLabels[field] || field}: ${msg}`;
+      }).join('\n');
+      
+      alert(`Please fill in:\n\n${errorMessages}\n\nNavigating to the required field...`);
+      
+      // Scroll to and focus the first error field
+      setTimeout(() => {
+        const element = document.getElementById(firstErrorField);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        }
+      }, 200);
+      
+      return false; // Prevent form submission
+    }
+    
+    return true; // Allow form submission
   };
 
   if (!isOpen) return null;
@@ -676,7 +725,46 @@ const BookingFormModal = ({
               {/* Selected Dates Summary */}
               {selectedDates.length > 0 && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h3 className="font-semibold text-gray-900 mb-3">Booking Summary</h3>
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Package className="h-5 w-5 text-emerald-600" />
+                    Booking Summary
+                  </h3>
+                  
+                  {/* Package Information (if booking a package) */}
+                  {selectedPackage && (
+                    <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package className="h-4 w-4 text-emerald-600" />
+                        <span className="font-semibold text-emerald-900">Package Booking</span>
+                      </div>
+                      <p className="text-sm font-medium text-emerald-800 mb-1">{selectedPackage.title}</p>
+                      <div className="flex gap-3 text-xs text-emerald-700">
+                        {selectedVehicleType ? (
+                          <>
+                            <span>Full Day: LKR {
+                              (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep
+                                ? (selectedPackage.fullDayPriceLuxury || selectedPackage.fullDayPrice)
+                                : (selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice)
+                              )?.toLocaleString()
+                            }</span>
+                            <span>Half Day: LKR {
+                              (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep
+                                ? (selectedPackage.halfDayPriceLuxury || selectedPackage.halfDayPrice)
+                                : (selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice)
+                              )?.toLocaleString()
+                            }</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Full Day: LKR {selectedPackage.fullDayPrice?.toLocaleString()}</span>
+                            <span>Half Day: LKR {selectedPackage.halfDayPrice?.toLocaleString()}</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-xs text-emerald-600 mt-2">📦 All package amenities included • {selectedVehicleType || 'Select jeep type'}</p>
+                    </div>
+                  )}
+                  
                   <div className="space-y-3">
                     <p className="text-sm text-gray-700">
                       You have selected <strong>{selectedDates.length}</strong> date{selectedDates.length > 1 ? 's' : ''}.
@@ -685,13 +773,15 @@ const BookingFormModal = ({
                       const dateString = date.toDateString();
                       const dateType = selectedDatesWithType[dateString] || 'full-day';
                       const safariType = formData.dateSafariTypes?.[dateString] || formData.safariType || 'Morning Safari';
+                      const timeOfDay = halfDayTimes[dateString];
                       return (
                         <div key={index} className="text-sm text-gray-700 flex items-start gap-2">
                           <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-black shrink-0"></span>
                           <div>
                             <p className="font-medium">{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                             <p className="text-gray-600">
-                              {dateType === 'half-day' ? 'Half Day' : 'Full Day'} - {safariType}
+                              {dateType === 'half-day' ? 'Half Day' : 'Full Day'}{timeOfDay ? ` (${timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening'})` : ''} - {safariType}
+                              {selectedPackage && <span className="text-emerald-600 ml-1">📦</span>}
                             </p>
                           </div>
                         </div>
@@ -865,8 +955,20 @@ const BookingFormModal = ({
             </div>
           )}
 
-          {/* Step 5: Emergency Contact */}
-          {currentStep === 5 && (
+          {/* Step 5: Emergency Contact (Step 4 for package bookings) */}
+          {(() => {
+            const shouldRender = ((currentStep === 5 && !selectedPackage) || (currentStep === 4 && selectedPackage) || currentStep === steps.length);
+            console.log('🔍 Emergency Contact Render Check:', {
+              currentStep,
+              stepsLength: steps.length,
+              hasPackage: !!selectedPackage,
+              condition1: currentStep === 5 && !selectedPackage,
+              condition2: currentStep === 4 && selectedPackage,
+              condition3: currentStep === steps.length,
+              shouldRender
+            });
+            return shouldRender;
+          })() && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Phone className="h-5 w-5 text-black" />
@@ -892,52 +994,59 @@ const BookingFormModal = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Contact Phone <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="tel"
-                    name="emergencyContactPhone"
-                    id="emergencyContactPhone"
-                    value={formData.emergencyContactPhone}
-                    onChange={(e) => {
-                      let value = e.target.value.replace(/[^0-9+]/g, '');
-
-                      // Format: +94 XX XXX XXXX
-                      if (value.startsWith('+94')) {
-                        const digits = value.slice(3);
-                        const limitedDigits = digits.slice(0, 9);
-                        let formatted = '+94';
-                        if (limitedDigits.length > 0) {
-                          formatted += ' ' + limitedDigits.slice(0, 2);
-                        }
-                        if (limitedDigits.length > 2) {
-                          formatted += ' ' + limitedDigits.slice(2, 5);
-                        }
-                        if (limitedDigits.length > 5) {
-                          formatted += ' ' + limitedDigits.slice(5, 9);
-                        }
-                        value = formatted;
-                      } else if (value.startsWith('0')) {
-                        const digits = value.slice(1);
-                        const limitedDigits = digits.slice(0, 9);
-                        let formatted = '+94';
-                        if (limitedDigits.length > 0) {
-                          formatted += ' ' + limitedDigits.slice(0, 2);
-                        }
-                        if (limitedDigits.length > 2) {
-                          formatted += ' ' + limitedDigits.slice(2, 5);
-                        }
-                        if (limitedDigits.length > 5) {
-                          formatted += ' ' + limitedDigits.slice(5, 9);
-                        }
-                        value = formatted;
-                      }
-
-                      updateFormData('emergencyContactPhone', value);
-                    }}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                    placeholder="+94 77 123 4567"
-                  />
+                  <div className="flex gap-2">
+                    {/* Country Code Dropdown */}
+                    <select
+                      value={emergencyCountryCode}
+                      onChange={(e) => {
+                        setEmergencyCountryCode(e.target.value);
+                        // Reset phone number when country code changes
+                        updateFormData('emergencyContactPhone', '');
+                      }}
+                      className="w-28 px-2 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
+                    >
+                      <option value="+94">🇱🇰 +94</option>
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+44">🇬🇧 +44</option>
+                      <option value="+91">🇮🇳 +91</option>
+                      <option value="+61">🇦🇺 +61</option>
+                      <option value="+86">🇨🇳 +86</option>
+                      <option value="+81">🇯🇵 +81</option>
+                      <option value="+82">🇰🇷 +82</option>
+                      <option value="+65">🇸🇬 +65</option>
+                      <option value="+60">🇲🇾 +60</option>
+                      <option value="+66">🇹🇭 +66</option>
+                      <option value="+971">🇦🇪 +971</option>
+                      <option value="+966">🇸🇦 +966</option>
+                      <option value="+33">🇫🇷 +33</option>
+                      <option value="+49">🇩🇪 +49</option>
+                      <option value="+39">🇮🇹 +39</option>
+                      <option value="+34">🇪🇸 +34</option>
+                      <option value="+7">🇷🇺 +7</option>
+                      <option value="+55">🇧🇷 +55</option>
+                      <option value="+27">🇿🇦 +27</option>
+                    </select>
+                    
+                    {/* Phone Number Input (9 digits) */}
+                    <input
+                      type="tel"
+                      name="emergencyContactPhone"
+                      id="emergencyContactPhone"
+                      value={formData.emergencyContactPhone}
+                      onChange={(e) => {
+                        // Only allow numbers, limit to 9 digits
+                        let value = e.target.value.replace(/\D/g, '');
+                        value = value.slice(0, 9);
+                        updateFormData('emergencyContactPhone', value);
+                      }}
+                      className={`flex-1 px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.emergencyContactPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
+                        }`}
+                      placeholder="123456789 (9 digits)"
+                      maxLength="9"
+                    />
+                  </div>
                   {formErrors.emergencyContactPhone && <p className="text-red-500 text-xs mt-1">{formErrors.emergencyContactPhone}</p>}
+                  <p className="text-xs text-gray-500 mt-1">Enter 9 digits after country code</p>
                 </div>
               </div>
             </div>
@@ -1043,6 +1152,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [dateTypeMenuDate, setDateTypeMenuDate] = useState(null);
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [halfDayTimes, setHalfDayTimes] = useState({}); // {dateString: 'morning' | 'evening'}
+  const [emergencyCountryCode, setEmergencyCountryCode] = useState('+94'); // Default to Sri Lanka
   
   // Reset showTimeMenu when dateTypeMenuDate changes
   useEffect(() => {
@@ -1227,12 +1337,24 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
     let total = 0;
 
-    // If package is selected, use package prices
+    // If package is selected, use package prices based on vehicle type
     if (selectedPackage) {
       selectedDates.forEach(date => {
         const dateString = date.toDateString();
         const dateType = selectedDatesWithType[dateString] || 'full-day';
-        total += dateType === 'half-day' ? selectedPackage.halfDayPrice : selectedPackage.fullDayPrice;
+        
+        // Use vehicle-specific pricing
+        let fullDayPrice, halfDayPrice;
+        if (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep) {
+          fullDayPrice = selectedPackage.fullDayPriceLuxury || selectedPackage.fullDayPrice;
+          halfDayPrice = selectedPackage.halfDayPriceLuxury || selectedPackage.halfDayPrice;
+        } else {
+          // Default to Standard or legacy prices
+          fullDayPrice = selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice;
+          halfDayPrice = selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice;
+        }
+        
+        total += dateType === 'half-day' ? halfDayPrice : fullDayPrice;
       });
       // No add-ons for package bookings
       return total;
@@ -1491,12 +1613,24 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       // Calculate total price based on half-day/full-day
       let totalPrice = 0;
 
-      // If package booking, use package prices
+      // If package booking, use package prices based on vehicle type
       if (selectedPackage) {
         selectedDates.forEach(date => {
           const dateString = date.toDateString();
           const dateType = selectedDatesWithType[dateString] || 'full-day';
-          totalPrice += dateType === 'half-day' ? selectedPackage.halfDayPrice : selectedPackage.fullDayPrice;
+          
+          // Use vehicle-specific pricing
+          let fullDayPrice, halfDayPrice;
+          if (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep) {
+            fullDayPrice = selectedPackage.fullDayPriceLuxury || selectedPackage.fullDayPrice;
+            halfDayPrice = selectedPackage.halfDayPriceLuxury || selectedPackage.halfDayPrice;
+          } else {
+            // Default to Standard or legacy prices
+            fullDayPrice = selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice;
+            halfDayPrice = selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice;
+          }
+          
+          totalPrice += dateType === 'half-day' ? halfDayPrice : fullDayPrice;
         });
       } else {
         // Regular booking - use driver's regular prices
@@ -1563,6 +1697,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         packagePriceHalfDay: selectedPackage?.halfDayPrice || null,
         // Include all booking form data
         ...bookingFormData,
+        // Combine country code with phone number for emergency contact
+        emergencyContactPhone: emergencyCountryCode + bookingFormData.emergencyContactPhone,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -2311,6 +2447,10 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         selectedDatesWithType={selectedDatesWithType}
         onDateTypeChange={handleDateTypeChange}
         selectedPackage={selectedPackage}
+        selectedVehicleType={selectedVehicleType}
+        halfDayTimes={halfDayTimes}
+        emergencyCountryCode={emergencyCountryCode}
+        setEmergencyCountryCode={setEmergencyCountryCode}
       />
 
       <GlobalNotificationBell
@@ -2938,16 +3078,63 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                           <Package className="h-6 w-6 text-emerald-600" />
                           <h3 className="text-lg font-bold text-emerald-900 pr-8">{selectedPackage.title}</h3>
                         </div>
-                        <div className="flex gap-4 text-sm">
-                          <div className="flex items-center gap-1 text-emerald-700">
-                            <span className="font-semibold">Full Day:</span>
-                            <span>LKR {selectedPackage.fullDayPrice?.toLocaleString()}</span>
+                        
+                        {/* Show vehicle-specific prices if vehicle type is selected */}
+                        {selectedVehicleType ? (
+                          <div className="space-y-2">
+                            <div className="text-sm font-medium text-emerald-800">
+                              {selectedVehicleType} Pricing:
+                            </div>
+                            <div className="flex gap-4 text-sm">
+                              <div className="flex items-center gap-1 text-emerald-700">
+                                <span className="font-semibold">Full Day:</span>
+                                <span>LKR {
+                                  (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep
+                                    ? (selectedPackage.fullDayPriceLuxury || selectedPackage.fullDayPrice)
+                                    : (selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice)
+                                  )?.toLocaleString()
+                                }</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-emerald-700">
+                                <span className="font-semibold">Half Day:</span>
+                                <span>LKR {
+                                  (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep
+                                    ? (selectedPackage.halfDayPriceLuxury || selectedPackage.halfDayPrice)
+                                    : (selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice)
+                                  )?.toLocaleString()
+                                }</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 text-emerald-700">
-                            <span className="font-semibold">Half Day:</span>
-                            <span>LKR {selectedPackage.halfDayPrice?.toLocaleString()}</span>
+                        ) : (
+                          /* Show all available vehicle types before selection */
+                          <div className="space-y-2">
+                            {selectedPackage.hasStandardJeep && (
+                              <div className="text-xs text-emerald-700">
+                                <span className="font-semibold">🚙 Standard:</span> Full Day: LKR {selectedPackage.fullDayPriceStandard?.toLocaleString()} | Half Day: LKR {selectedPackage.halfDayPriceStandard?.toLocaleString()}
+                              </div>
+                            )}
+                            {selectedPackage.hasLuxuryJeep && (
+                              <div className="text-xs text-emerald-700">
+                                <span className="font-semibold">✨ Luxury:</span> Full Day: LKR {selectedPackage.fullDayPriceLuxury?.toLocaleString()} | Half Day: LKR {selectedPackage.halfDayPriceLuxury?.toLocaleString()}
+                              </div>
+                            )}
+                            {/* Legacy packages */}
+                            {!selectedPackage.hasStandardJeep && !selectedPackage.hasLuxuryJeep && (
+                              <div className="flex gap-4 text-sm">
+                                <div className="flex items-center gap-1 text-emerald-700">
+                                  <span className="font-semibold">Full Day:</span>
+                                  <span>LKR {selectedPackage.fullDayPrice?.toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-emerald-700">
+                                  <span className="font-semibold">Half Day:</span>
+                                  <span>LKR {selectedPackage.halfDayPrice?.toLocaleString()}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
+                        )}
+                        
                         <p className="text-xs text-emerald-600 mt-2 italic">
                           📦 Package booking mode active - Click X to return to regular booking
                         </p>
@@ -2968,8 +3155,23 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                         className="w-full px-4 py-3 bg-white border-2 border-emerald-400 rounded-lg text-black font-medium focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200"
                       >
                         <option value="" disabled hidden>Choose a vehicle type</option>
-                        <option value="Standard Safari Jeep">Standard Safari Jeep</option>
-                        <option value="Luxury Safari Jeep">Luxury Safari Jeep</option>
+                        {/* For package bookings, only show vehicle types available in package */}
+                        {selectedPackage ? (
+                          <>
+                            {(selectedPackage.hasStandardJeep || (!selectedPackage.hasStandardJeep && !selectedPackage.hasLuxuryJeep)) && (
+                              <option value="Standard Safari Jeep">Standard Safari Jeep</option>
+                            )}
+                            {selectedPackage.hasLuxuryJeep && (
+                              <option value="Luxury Safari Jeep">Luxury Safari Jeep</option>
+                            )}
+                          </>
+                        ) : (
+                          /* For regular bookings, show all types */
+                          <>
+                            <option value="Standard Safari Jeep">Standard Safari Jeep</option>
+                            <option value="Luxury Safari Jeep">Luxury Safari Jeep</option>
+                          </>
+                        )}
                       </select>
                       {selectedVehicleType && (
                         <div className="mt-2 flex items-center gap-2 text-emerald-700">
@@ -3204,7 +3406,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                   // Calculate price based on booking type
                                   let dayPrice;
                                   if (selectedPackage) {
-                                    dayPrice = dateType === 'half-day' ? selectedPackage.halfDayPrice : selectedPackage.fullDayPrice;
+                                    // Use vehicle-specific pricing for packages
+                                    let fullDayPrice, halfDayPrice;
+                                    if (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep) {
+                                      fullDayPrice = selectedPackage.fullDayPriceLuxury || selectedPackage.fullDayPrice;
+                                      halfDayPrice = selectedPackage.halfDayPriceLuxury || selectedPackage.halfDayPrice;
+                                    } else {
+                                      fullDayPrice = selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice;
+                                      halfDayPrice = selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice;
+                                    }
+                                    dayPrice = dateType === 'half-day' ? halfDayPrice : fullDayPrice;
                                   } else if (selectedVehicleType === 'Standard Safari Jeep') {
                                     dayPrice = dateType === 'half-day'
                                       ? (driver.priceHalfDayStandard || driver.pricePerDay * 0.6 || 0)
