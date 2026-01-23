@@ -10,6 +10,48 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    function isOwner(ownerId) {
+      return request.auth != null && request.auth.uid == ownerId;
+    }
+
+    // =========================
+    // 📅 Availability Calendar Helpers
+    // =========================
+    function isValidAvailabilityStatusList(values) {
+      // Firestore Rules can't iterate keys, but we *can* ensure values are only from this set.
+      return values.hasOnly([
+        // Explicit available statuses
+        'available',
+        'available-fullday',
+        'available-halfday-morning',
+        'available-halfday-evening',
+
+        // Manual unavailable statuses
+        'unavailable',
+        'unavailable-fullday',
+        'unavailable-halfday-morning',
+        'unavailable-halfday-evening',
+
+        // Booking-driven statuses (and legacy)
+        'busy',
+        'halfday',
+        'halfday-morning',
+        'halfday-evening',
+
+        // Mixed state used in UI
+        'halfbooked-halfunavailable-morning',
+        'halfbooked-halfunavailable-evening'
+      ]);
+    }
+
+    function isValidAvailabilityMap(m) {
+      // Expected shape: { "YYYY-MM-DD": "<status>" }
+      // NOTE: We validate type/size and allowed values; key-format validation isn't possible in rules.
+      return m is map
+        && m.size() <= 5000
+        && isValidAvailabilityStatusList(m.values());
+    }
+
     // =========================
     // Conversations (chat) - Legacy
     // =========================
@@ -317,10 +359,12 @@ service cloud.firestore {
       // Provider or admin can create/update
       // Supports all field variations: destinations, destinationsCovered, certifications, etc.
       // Supports all service types: Jeep Driver, Tour Guide, Renting
-      allow create, update: if request.auth != null && (
-        request.auth.uid == providerId
-        || isAdmin()
-      );
+      allow create, update: if request.auth != null
+        && (isOwner(providerId) || isAdmin())
+        // If availability fields are being written, validate their structure/values.
+        && (!('availability' in request.resource.data) || isValidAvailabilityMap(request.resource.data.availability))
+        && (!('availabilityStandard' in request.resource.data) || isValidAvailabilityMap(request.resource.data.availabilityStandard))
+        && (!('availabilityLuxury' in request.resource.data) || isValidAvailabilityMap(request.resource.data.availabilityLuxury));
 
       // Provider or admin can delete
       allow delete: if request.auth != null && (

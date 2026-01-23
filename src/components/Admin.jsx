@@ -3128,7 +3128,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         <h3 className="text-lg font-semibold text-emerald-400 mb-4">🚙 Standard Jeep - Calendar</h3>
                         <AvailabilityCalendar
                           availability={isEditingCalendar ? tempAvailabilityStandard : availabilityStandard}
-                          onChange={(newAvail) => isEditingCalendar && setTempAvailabilityStandard(newAvail)}
+                          onChange={(newAvail) => setTempAvailabilityStandard(newAvail)}
                           readOnly={!isEditingCalendar}
                           acceptedBookings={bookings.filter(b => {
                             if (b.status !== 'accepted' && b.status !== 'confirmed') return false;
@@ -3144,7 +3144,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         <h3 className="text-lg font-semibold text-purple-400 mb-4">🚙 Luxury Jeep - Calendar</h3>
                         <AvailabilityCalendar
                           availability={isEditingCalendar ? tempAvailabilityLuxury : availabilityLuxury}
-                          onChange={(newAvail) => isEditingCalendar && setTempAvailabilityLuxury(newAvail)}
+                          onChange={(newAvail) => setTempAvailabilityLuxury(newAvail)}
                           readOnly={!isEditingCalendar}
                           acceptedBookings={bookings.filter(b => {
                             if (b.status !== 'accepted' && b.status !== 'confirmed') return false;

@@ -126,6 +126,26 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     if (!date) return null;
     const dateKey = getDateKey(date);
 
+    // 0. Use explicit statuses saved in serviceProviders availability calendar (driver dashboard)
+    // This is the source of truth for "Full day booked" and the special case
+    // "Half booked + other half unavailable".
+    if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
+      const savedStatus = availabilityCalendar[dateKey];
+      if (savedStatus && [
+        'busy',
+        'unavailable',
+        'unavailable-fullday',
+        'halfday-morning',
+        'halfday-evening',
+        'unavailable-halfday-morning',
+        'unavailable-halfday-evening',
+        'halfbooked-halfunavailable-morning',
+        'halfbooked-halfunavailable-evening'
+      ].includes(savedStatus)) {
+        return savedStatus;
+      }
+    }
+
     // Track booking status
     let bookedMorning = false;
     let bookedEvening = false;
@@ -192,6 +212,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     let manualUnavailableMorning = false;
     let manualUnavailableEvening = false;
     let manualUnavailableFull = false;
+    let manualUnavailableFullType = null; // e.g. 'unavailable-fullday'
 
     if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
       const manualStatus = availabilityCalendar[dateKey];
@@ -199,6 +220,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
       if (manualStatus) {
         if (manualStatus === 'unavailable' || manualStatus === 'busy' || manualStatus === 'unavailable-fullday') {
           manualUnavailableFull = true;
+          if (manualStatus === 'unavailable-fullday') manualUnavailableFullType = 'unavailable-fullday';
         } else if (manualStatus === 'unavailable-halfday-morning' || manualStatus === 'halfday-morning') {
           manualUnavailableMorning = true;
         } else if (manualStatus === 'unavailable-halfday-evening' || manualStatus === 'halfday-evening') {
@@ -211,14 +233,23 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     const morningOccupied = bookedMorning || manualUnavailableMorning;
     const eveningOccupied = bookedEvening || manualUnavailableEvening;
 
-    // If both half-day slots are occupied, the entire day is unavailable
+    // If both half-day slots are occupied, the entire day is unavailable.
+    // Keep the reason so we can render correct colors in the tourist booking calendar:
+    // - busy: both halves booked (red)
+    // - halfbooked-halfunavailable-*: one half booked and the other half manually unavailable (orange)
+    // - unavailable-fullday: both halves manually unavailable (gray)
+    // - unavailable: fallback (gray)
     if (morningOccupied && eveningOccupied) {
+      if (bookedMorning && bookedEvening) return 'busy';
+      if (bookedMorning && manualUnavailableEvening) return 'halfbooked-halfunavailable-morning';
+      if (bookedEvening && manualUnavailableMorning) return 'halfbooked-halfunavailable-evening';
+      if (manualUnavailableMorning && manualUnavailableEvening) return 'unavailable-fullday';
       return 'unavailable';
     }
 
     // If full day is manually unavailable
     if (manualUnavailableFull) {
-      return 'unavailable';
+      return manualUnavailableFullType || 'unavailable';
     }
 
     // If only one half-day slot is occupied, return the specific status
@@ -228,7 +259,9 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     if (manualUnavailableEvening && !morningOccupied) return 'unavailable-halfday-evening';
 
     // Fallback to old availableDates array format
-    if (availableDates && Array.isArray(availableDates)) {
+    // IMPORTANT: if availableDates is present but empty ([]), do NOT mark all dates unavailable.
+    // Treat empty list as "no restriction" and fall back to default available.
+    if (availableDates && Array.isArray(availableDates) && availableDates.length > 0) {
       const dateString = getDateKey(date);
       const isInArray = availableDates.some(availableDate => {
         const d = new Date(availableDate);
@@ -251,14 +284,26 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     // NOT available if:
     // - 'unavailable' (both slots occupied)
     // - 'busy' (full day booked)
-    if (status === 'unavailable' || status === 'busy' || !status) return false;
+    // Block fully unavailable days
+    if (
+      status === 'unavailable' ||
+      status === 'unavailable-fullday' ||
+      status === 'busy' ||
+      status === 'halfbooked-halfunavailable-morning' ||
+      status === 'halfbooked-halfunavailable-evening'
+    ) return false;
+
+    // Default (no status) = available
+    if (!status) return true;
 
     // Allow partial availability (one slot free) or explicitly available
-    return status === 'available' ||
+    return (
+      status === 'available' ||
       status === 'halfday-morning' ||
       status === 'halfday-evening' ||
       status === 'unavailable-halfday-morning' ||
-      status === 'unavailable-halfday-evening';
+      status === 'unavailable-halfday-evening'
+    );
   };
 
   const isDateSelected = (date) => {
@@ -330,18 +375,24 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     // - Yellow (halfday-morning/evening) = One slot booked, other available → Partially Booked (Yellow/Orange - CAN book)
     // - Gray (no status/unavailable-fullday) = Not available → Unavailable (Gray)
 
-    if (status === 'busy' || status === 'unavailable' || status === 'unavailable-fullday') {
-      // Red/Orange in admin = UNAVAILABLE in tourist view
+    if (status === 'busy') {
+      // Full day booked -> show as fully unavailable (gray) in tourist booking calendar
+      return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-80`;
+    } else if (status === 'halfbooked-halfunavailable-morning' || status === 'halfbooked-halfunavailable-evening') {
+      // Half booked + other half unavailable -> also fully unavailable (gray) in tourist booking calendar
+      return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-85`;
+    } else if (status === 'unavailable' || status === 'unavailable-fullday') {
+      // Unavailable (gray) - not clickable
       return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
     } else if (status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening') {
-      // Yellow in admin = PARTIALLY BOOKED in tourist view (can still book the other half)
-      return `${baseClasses} bg-orange-500 text-white hover:bg-orange-600`;
+      // Half-day occupied/unavailable but the other half is still bookable
+      return `${baseClasses} bg-yellow-500 text-white hover:bg-yellow-600`;
     } else if (status === 'available') {
       // Explicitly marked as available (green)
       return `${baseClasses} ${isToday ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300' : 'bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30'}`;
     } else {
-      // No status = UNAVAILABLE by default (gray)
-      return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
+      // No status = AVAILABLE by default (green)
+      return `${baseClasses} ${isToday ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300' : 'bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30'}`;
     }
   };
 
@@ -428,8 +479,9 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
               className={getDateClassName(day)}
               title={(() => {
                 if (isPast) return 'Past date';
-                if (status === 'busy') return 'Busy - Not available';
-                if (status === 'halfday') return 'Half day available';
+                if (status === 'busy') return 'Full day booked - Not available';
+                if (status === 'halfbooked-halfunavailable-morning') return 'AM booked / PM unavailable - Not available';
+                if (status === 'halfbooked-halfunavailable-evening') return 'PM booked / AM unavailable - Not available';
                 if (status === 'halfday-morning' || status === 'unavailable-halfday-morning') return 'Morning booked/unavailable - Evening available';
                 if (status === 'halfday-evening' || status === 'unavailable-halfday-evening') return 'Evening booked/unavailable - Morning available';
                 if (status === 'unavailable' || status === 'unavailable-fullday') return 'Unavailable';
@@ -437,6 +489,12 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
               })()}
             >
               <span className="z-10 relative">{day.getDate()}</span>
+              {(status === 'halfbooked-halfunavailable-morning') && (
+                <span className="absolute bottom-0.5 text-[8px] sm:text-[9px] leading-none opacity-95 font-bold tracking-tighter">AM Booked / PM Unavailable</span>
+              )}
+              {(status === 'halfbooked-halfunavailable-evening') && (
+                <span className="absolute bottom-0.5 text-[8px] sm:text-[9px] leading-none opacity-95 font-bold tracking-tighter">PM Booked / AM Unavailable</span>
+              )}
               {(status === 'halfday-morning' || status === 'unavailable-halfday-morning') && (
                 <span className="absolute bottom-0.5 text-[8px] sm:text-[9px] leading-none opacity-90 font-bold tracking-tighter">AM Booked</span>
               )}

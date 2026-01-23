@@ -15,11 +15,26 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
 
 
   // Get dates from accepted bookings
+  // IMPORTANT: Multiple half-day bookings can exist on the same date (AM + PM).
+  // We must MERGE them so the calendar correctly blocks fully booked days.
   const getAcceptedBookingDates = useCallback(() => {
-    const datesMap = new Map(); // Store detailed info: dateKey -> { type, booking }
+    const datesMap = new Map();
+
+    const ensureEntry = (dateKey) => {
+      if (!datesMap.has(dateKey)) {
+        datesMap.set(dateKey, {
+          isFullDay: false,
+          bookedMorning: false,
+          bookedEvening: false,
+          bookingIds: new Set()
+        });
+      }
+      return datesMap.get(dateKey);
+    };
+
+    const normalizeSlot = (time) => (String(time || '').toLowerCase().includes('evening') ? 'evening' : 'morning');
 
     acceptedBookings.forEach(booking => {
-      // Determine default time based on safariType if available
       const defaultTime = booking.safariType?.toLowerCase().includes('evening') ? 'evening' : 'morning';
 
       // Priority 1: datesWithTypes (contains specific half/full day info)
@@ -30,21 +45,23 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
           else if (item.date instanceof Date) date = item.date;
           else if (item.date) date = new Date(item.date);
 
-          if (date && !isNaN(date.getTime())) {
-            const dateKey = date.toISOString().split('T')[0];
-            const type = item.type || 'full-day';
-            const time = item.time || (booking.halfDayTimes && booking.halfDayTimes[dateKey]) || defaultTime;
+          if (!date || isNaN(date.getTime())) return;
 
-            datesMap.set(dateKey, {
-              type: type,
-              time: time,
-              isHalfDay: type.includes('half'),
-              bookingId: booking.id
-            });
+          const dateKey = date.toISOString().split('T')[0];
+          const entry = ensureEntry(dateKey);
+          entry.bookingIds.add(booking.id);
+
+          const type = String(item.type || 'full-day').toLowerCase();
+          if (type.includes('half')) {
+            const slot = normalizeSlot(item.time || (booking.halfDayTimes && booking.halfDayTimes[dateKey]) || defaultTime);
+            if (slot === 'evening') entry.bookedEvening = true;
+            else entry.bookedMorning = true;
+          } else {
+            entry.isFullDay = true;
           }
         });
       }
-      // Priority 2: selectedDates (legacy array of dates)
+      // Priority 2: selectedDates (legacy array of dates) -> treat as full day
       else if (booking.selectedDates && Array.isArray(booking.selectedDates)) {
         booking.selectedDates.forEach(d => {
           let date;
@@ -52,41 +69,64 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
           else if (d instanceof Date) date = d;
           else if (d) date = new Date(d);
 
-          if (date && !isNaN(date.getTime())) {
-            const dateKey = date.toISOString().split('T')[0];
-            // Try to infer type if not explicit
-            const type = 'full-day'; // Default to full day for legacy
-            datesMap.set(dateKey, { type, isHalfDay: false, bookingId: booking.id });
-          }
+          if (!date || isNaN(date.getTime())) return;
+          const dateKey = date.toISOString().split('T')[0];
+          const entry = ensureEntry(dateKey);
+          entry.isFullDay = true;
+          entry.bookingIds.add(booking.id);
         });
       }
-      // Priority 3: dates (older legacy)
+      // Priority 3: dates (older legacy) -> treat as full day
       else if (booking.dates && Array.isArray(booking.dates)) {
         booking.dates.forEach(d => {
-          // ... similar parsing
           let date;
           if (d && d.toDate) date = d.toDate();
           else if (d instanceof Date) date = d;
           else if (d) date = new Date(d);
 
-          if (date && !isNaN(date.getTime())) {
-            const dateKey = date.toISOString().split('T')[0];
-            datesMap.set(dateKey, { type: 'full-day', isHalfDay: false, bookingId: booking.id });
-          }
+          if (!date || isNaN(date.getTime())) return;
+          const dateKey = date.toISOString().split('T')[0];
+          const entry = ensureEntry(dateKey);
+          entry.isFullDay = true;
+          entry.bookingIds.add(booking.id);
         });
       }
-      // Priority 4: startDate (single date legacy)
+      // Priority 4: startDate (single date legacy) -> treat as full day
       else if (booking.startDate) {
         let date;
         if (booking.startDate.toDate) date = booking.startDate.toDate();
         else date = new Date(booking.startDate);
 
-        if (date && !isNaN(date.getTime())) {
-          const dateKey = date.toISOString().split('T')[0];
-          datesMap.set(dateKey, { type: 'full-day', isHalfDay: false, bookingId: booking.id });
-        }
+        if (!date || isNaN(date.getTime())) return;
+        const dateKey = date.toISOString().split('T')[0];
+        const entry = ensureEntry(dateKey);
+        entry.isFullDay = true;
+        entry.bookingIds.add(booking.id);
       }
     });
+
+    // Convert Set to Array + add legacy fields used by the existing popup menus
+    // (menus expect: isHalfDay + time)
+    for (const [k, v] of datesMap.entries()) {
+      const bookingIds = Array.from(v.bookingIds);
+
+      // A date is "full day booked" if:
+      // - any booking explicitly marked it full day, OR
+      // - both half-day slots are booked (AM + PM) via two half-day bookings
+      const isFullDay = !!v.isFullDay || (v.bookedMorning && v.bookedEvening);
+      const isHalfDay = !isFullDay && (v.bookedMorning || v.bookedEvening);
+      const time = isHalfDay ? (v.bookedEvening ? 'evening' : 'morning') : undefined;
+
+      datesMap.set(k, {
+        ...v,
+        bookingIds,
+        bookingId: bookingIds[0], // keep a simple primary id for existing UI
+        isFullDay,
+        isHalfDay,
+        time,
+        type: isHalfDay ? 'half-day' : 'full-day'
+      });
+    }
 
     return datesMap;
   }, [acceptedBookings]);
@@ -101,11 +141,13 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
   }, [acceptedDatesMap]);
 
   // Helper to determine if a date should be blocked from interaction
-  // We block Full Day bookings, but allow interaction for Half Day bookings
+  // - Block full-day bookings
+  // - Block dates where BOTH halves are booked (AM + PM from two half-day bookings)
+  // - Allow interaction for single half-day booking so provider can edit the OTHER half
   const isBlockedDate = useCallback((date) => {
     const info = getAcceptedBookingInfo(date);
     if (!info) return false;
-    return !info.isHalfDay; // Block only if it is NOT a half day (i.e. it is full day)
+    return !!info.isFullDay || (info.bookedMorning && info.bookedEvening);
   }, [getAcceptedBookingInfo]);
 
   // Backward compatibility alias if needed, though we use isBlockedDate in handleDateClick
@@ -188,7 +230,7 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
     setPopupDate(date);
     setShowPopup(true);
     setMenuLevel('main');
-  }, [readOnly, isPastDate, isAcceptedBookingDate]);
+  }, [readOnly, isPastDate, isBlockedDate]);
 
   const handleStatusSelect = useCallback((status) => {
     // ... same implementation as before ...
@@ -230,8 +272,9 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
 
     if (acceptedInfo) {
       // Differentiate Half/Full for accepted bookings
-      if (acceptedInfo.isHalfDay) {
-        const bookedTime = acceptedInfo.time === 'evening' ? 'evening' : 'morning';
+      const isFullyBookedByBookings = !!acceptedInfo.isFullDay || (acceptedInfo.bookedMorning && acceptedInfo.bookedEvening);
+      if (!isFullyBookedByBookings && (acceptedInfo.bookedMorning || acceptedInfo.bookedEvening)) {
+        const bookedTime = acceptedInfo.bookedEvening ? 'evening' : 'morning';
         const otherHalf = bookedTime === 'morning' ? 'evening' : 'morning';
 
         // Check if the OTHER half is marked unavailable manually
@@ -289,8 +332,9 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
     }
 
     if (acceptedInfo) {
-      if (acceptedInfo.isHalfDay) {
-        const bookedTime = acceptedInfo.time === 'evening' ? 'evening' : 'morning';
+      const isFullyBookedByBookings = !!acceptedInfo.isFullDay || (acceptedInfo.bookedMorning && acceptedInfo.bookedEvening);
+      if (!isFullyBookedByBookings && (acceptedInfo.bookedMorning || acceptedInfo.bookedEvening)) {
+        const bookedTime = acceptedInfo.bookedEvening ? 'evening' : 'morning';
         const isAmBooked = bookedTime === 'morning';
 
         // Context aware label for mixed state
@@ -505,11 +549,15 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
             />
             {/* Popup Box */}
             <div
-              className="absolute z-50 bg-gray-800 border-2 border-gray-600 rounded-xl shadow-2xl p-3 sm:p-4 w-[200px] sm:w-[250px] animate-fadeIn"
+              className="absolute z-50 bg-gray-800 border-2 border-gray-600 rounded-xl shadow-2xl p-3 sm:p-4 w-[200px] sm:w-[250px] animate-fadeIn pointer-events-auto"
               style={{
                 top: `${popupPosition.top}px`,
                 left: `${popupPosition.left}px`
               }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
             >
               <div className="text-xs sm:text-sm text-gray-300 mb-2 sm:mb-3 font-medium text-center border-b border-gray-600 pb-2">
                 {popupDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
@@ -528,7 +576,11 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                     <>
                       <button
                         type="button"
-                        onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-fullday' ? 'available' : 'unavailable-fullday')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-fullday' ? 'available' : 'unavailable-fullday');
+                        }}
                         className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-fullday'
                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                           : 'bg-gray-600 hover:bg-gray-700 text-white'
@@ -538,7 +590,11 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleMenuNavigation('unavailable-halfday')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleMenuNavigation('unavailable-halfday');
+                        }}
                         className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium flex items-center justify-between"
                       >
                         <span>Unavailable (Half Day)</span>
@@ -553,7 +609,11 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                       {getAcceptedBookingInfo(popupDate).time !== 'morning' && (
                         <button
                           type="button"
-                          onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'available' : 'unavailable-halfday-morning')}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'available' : 'unavailable-halfday-morning');
+                          }}
                           className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning'
                               ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                               : 'bg-gray-600 hover:bg-gray-700 text-white'
@@ -565,7 +625,11 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                       {getAcceptedBookingInfo(popupDate).time !== 'evening' && (
                         <button
                           type="button"
-                          onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'available' : 'unavailable-halfday-evening')}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'available' : 'unavailable-halfday-evening');
+                          }}
                           className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening'
                               ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                               : 'bg-gray-600 hover:bg-gray-700 text-white'
@@ -587,14 +651,22 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                 <div className="space-y-2">
                   <button
                     type="button"
-                    onClick={() => handleMenuNavigation('main')}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleMenuNavigation('main');
+                    }}
                     className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-xs font-medium"
                   >
                     ← Back
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'available' : 'unavailable-halfday-morning')}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'available' : 'unavailable-halfday-morning');
+                    }}
                     className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning'
                       ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                       : 'bg-gray-500 hover:bg-gray-600 text-white'
@@ -604,7 +676,11 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'available' : 'unavailable-halfday-evening')}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'available' : 'unavailable-halfday-evening');
+                    }}
                     className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening'
                       ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                       : 'bg-gray-500 hover:bg-gray-600 text-white'
