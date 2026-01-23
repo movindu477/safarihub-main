@@ -214,7 +214,10 @@ const BookingSection = ({ user }) => {
       return booking.datesWithTypes.map(item => {
         const date = item.date ? new Date(item.date) : null;
         const type = item.type || 'full-day';
-        const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+        const time = item.time || (booking.safariType?.toLowerCase().includes('evening') ? 'evening' : 'morning');
+        const typeLabel = type === 'half-day'
+          ? `Half Day (${time.charAt(0).toUpperCase() + time.slice(1)})`
+          : 'Full Day';
         if (date) {
           return `${date.toLocaleDateString()} (${typeLabel})`;
         }
@@ -290,7 +293,7 @@ const BookingSection = ({ user }) => {
       <section className="absolute top-28 right-4 z-40 w-96 h-[calc(100vh-180px)] bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4 flex items-center justify-between border-b border-green-800 flex-shrink-0">
+          <div className="bg-linear-to-r from-green-600 to-green-700 text-white p-4 flex items-center justify-between border-b border-green-800 shrink-0">
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
               <h2 className="font-bold text-lg">My Bookings</h2>
@@ -298,7 +301,7 @@ const BookingSection = ({ user }) => {
           </div>
 
           {/* Status Filter Tabs */}
-          <div className="bg-gray-50 border-b border-gray-200 p-2 flex gap-1 flex-shrink-0">
+          <div className="bg-gray-50 border-b border-gray-200 p-2 flex gap-1 shrink-0">
             <button
               onClick={() => setSelectedStatus('all')}
               className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors ${selectedStatus === 'all'
@@ -392,12 +395,12 @@ const BookingSection = ({ user }) => {
 
                       {/* Dates */}
                       <div className="flex items-center gap-2 mb-2 text-xs text-gray-600">
-                        <Calendar className="h-3 w-3 flex-shrink-0" />
+                        <Calendar className="h-3 w-3 shrink-0" />
                         <span className="truncate">
                           {formatDatesWithTypes(booking)}
                         </span>
                         {booking.numberOfDays && (
-                          <span className="text-gray-500 flex-shrink-0">({booking.numberOfDays} day{booking.numberOfDays > 1 ? 's' : ''})</span>
+                          <span className="text-gray-500 shrink-0">({booking.numberOfDays} day{booking.numberOfDays > 1 ? 's' : ''})</span>
                         )}
                       </div>
 
@@ -452,18 +455,17 @@ const BookingSection = ({ user }) => {
                                 booking.datesWithTypes.map((item, index) => {
                                   const date = item.date ? new Date(item.date) : null;
                                   const type = item.type || 'full-day';
-                                  const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                                  const time = item.time || (booking.safariType?.toLowerCase().includes('evening') ? 'evening' : 'morning');
+                                  const typeLabel = type === 'half-day'
+                                    ? `Half Day (${time.charAt(0).toUpperCase() + time.slice(1)})`
+                                    : 'Full Day';
                                   const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
                                   if (!date) return null;
                                   return (
                                     <div key={index} className="flex items-center justify-between text-xs">
                                       <span className="text-gray-300">{date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                       <span className={`font-medium ${typeColor}`}>
-                                        {typeLabel}
-                                        {((type === 'full-day' || type === 'full') && booking.priceFullDay) && ` - LKR ${booking.priceFullDay.toLocaleString()}`}
-                                        {type === 'half-day' && booking.priceHalfDay && ` - LKR ${booking.priceHalfDay.toLocaleString()}`}
-                                        {/* Fallback to pricePerDay if specific prices not available */}
-                                        {!booking.priceFullDay && !booking.priceHalfDay && booking.pricePerDay && ` - LKR ${(type === 'half-day' ? booking.pricePerDay * 0.5 : booking.pricePerDay).toLocaleString()}`}
+                                        {typeLabel} {booking.totalPrice && booking.datesWithTypes?.length > 0 ? `- LKR ${Math.round(booking.totalPrice / booking.datesWithTypes.length).toLocaleString()}` : ''}
                                       </span>
                                     </div>
                                   );
@@ -485,6 +487,17 @@ const BookingSection = ({ user }) => {
                                 Destination
                               </h4>
                               <p className="text-xs text-gray-300">{booking.nationalPark}</p>
+                            </div>
+                          )}
+
+                          {/* Vehicle Type Details */}
+                          {(booking.selectedVehicleType || booking.vehicleType) && (
+                            <div className="bg-gray-900 rounded p-2 border border-gray-700">
+                              <h4 className="font-semibold text-white mb-1 flex items-center gap-1 text-xs">
+                                <Car className="h-3 w-3 text-green-400" />
+                                Vehicle Type
+                              </h4>
+                              <p className="text-xs text-gray-300">{booking.selectedVehicleType || booking.vehicleType}</p>
                             </div>
                           )}
 
@@ -564,7 +577,7 @@ const BookingSection = ({ user }) => {
                                     }));
                                     navigate(`/${serviceType}?destination=${encodeURIComponent(destination)}&rebook=true`);
                                   }}
-                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all text-xs font-semibold shadow-lg"
+                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all text-xs font-semibold shadow-lg"
                                 >
                                   <User className="h-4 w-4" />
                                   {booking.driverId ? 'Book Another Driver' : booking.guideId ? 'Book Another Guide' : 'Book Another Provider'}
@@ -657,7 +670,7 @@ const SuggestedProviders = ({ booking, navigate }) => {
             }}
             className="flex items-center gap-3 p-2 bg-white rounded border border-emerald-100 hover:border-emerald-300 hover:shadow-sm transition-all cursor-pointer group"
           >
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex-shrink-0 overflow-hidden border border-emerald-200">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 shrink-0 overflow-hidden border border-emerald-200">
               {provider.profilePicture || provider.imageUrl ? (
                 <img src={provider.profilePicture || provider.imageUrl} alt="" className="w-full h-full object-cover" />
               ) : (

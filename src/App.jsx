@@ -829,6 +829,118 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
       });
     }
 
+    // Update availability calendar logic when booking is ACCEPTED
+    if (status === 'accepted') {
+      try {
+        console.log('📅 Updating availability for accepted booking:', bookingId);
+        const providerDocRef = doc(db, 'serviceProviders', providerId);
+        const providerDoc = await getDoc(providerDocRef);
+
+        if (providerDoc.exists()) {
+          const providerData = providerDoc.data();
+          const providerServiceType = providerData.serviceType;
+
+          // Determine target field
+          let targetField = 'availability'; // Default for guides
+          if (providerServiceType === 'Jeep Driver') {
+            const vehicleType = bookingData.selectedVehicleType || '';
+            // Update the specific calendar based on vehicle type
+            if (vehicleType.includes('Luxury')) {
+              targetField = 'availabilityLuxury';
+            } else {
+              targetField = 'availabilityStandard';
+            }
+          }
+
+          const currentAvailability = providerData[targetField] || {};
+          const updatedAvailability = { ...currentAvailability };
+          let datesProcessed = false;
+
+          // Process datesWithTypes (preferred)
+          if (bookingData.datesWithTypes && Array.isArray(bookingData.datesWithTypes) && bookingData.datesWithTypes.length > 0) {
+            bookingData.datesWithTypes.forEach(item => {
+              try {
+                // Handle item.date which might be a string (ISO) or Timestamp
+                let date;
+                if (item.date && typeof item.date.toDate === 'function') {
+                  date = item.date.toDate();
+                } else {
+                  date = new Date(item.date);
+                }
+
+                // Validate date
+                if (isNaN(date.getTime())) return;
+
+                const dateKey = date.toISOString().split('T')[0];
+                const type = (item.type || 'full-day').toLowerCase().trim();
+
+                const isFullDay = type === 'full-day' || type === 'full' || type === 'fullday';
+                const isHalfDay = type === 'half-day' || type === 'half' || type === 'halfday' || type === 'half day';
+
+                if (isFullDay) {
+                  updatedAvailability[dateKey] = 'busy';
+                  datesProcessed = true;
+                } else if (isHalfDay) {
+                  const currentStatus = updatedAvailability[dateKey];
+                  // If already half-day booked, mark as fully busy
+                  if (currentStatus === 'halfday' || currentStatus === 'halfday-morning' || currentStatus === 'halfday-evening') {
+                    updatedAvailability[dateKey] = 'busy';
+                  } else {
+                    updatedAvailability[dateKey] = 'halfday';
+                  }
+                  datesProcessed = true;
+                }
+              } catch (e) {
+                console.error('Error processing date for availability:', e);
+              }
+            });
+          }
+          // Fallback to legacy selectedDates array
+          else if (bookingData.selectedDates && Array.isArray(bookingData.selectedDates)) {
+            bookingData.selectedDates.forEach(d => {
+              try {
+                let date;
+                if (d && typeof d.toDate === 'function') {
+                  date = d.toDate();
+                } else {
+                  date = new Date(d);
+                }
+
+                if (!isNaN(date.getTime())) {
+                  const dateKey = date.toISOString().split('T')[0];
+                  updatedAvailability[dateKey] = 'busy';
+                  datesProcessed = true;
+                }
+              } catch (e) { }
+            });
+          }
+
+          if (datesProcessed) {
+            const updatePayload = {
+              [targetField]: updatedAvailability,
+              updatedAt: serverTimestamp()
+            };
+
+            // Sync legacy 'availability' field for backward compatibility/general view
+            // But only if we aren't using separated vehicle calendars or if we want to reflect total busyness
+            if (targetField !== 'availability') {
+              // For Jeep Drivers with split calendars, we might want to also update the main availability 
+              // if we want a unified view, but usually we keep them separate.
+              // However, the original code in Admin.jsx was syncing it, so we'll keep that behavior for safety.
+              // Logic: simply update the generic one too so it shows as busy in generic views.
+              updatePayload.availability = updatedAvailability;
+            }
+
+            await updateDoc(providerDocRef, updatePayload);
+            console.log(`✅ Availability (${targetField}) updated for provider ${providerId}`);
+          }
+        }
+      } catch (availError) {
+        console.error('❌ Error updating availability calendar:', availError);
+        // Don't throw error here, so we don't fail the booking update status
+      }
+    }
+
     console.log(`✅ Booking ${bookingId} status updated to ${status} (${serviceType})`);
   } catch (error) {
     console.error('Error updating booking status:', error);
@@ -2935,13 +3047,13 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         if (serviceType === "Tour Guide") {
           // Convert single destination to array format for Firestore compatibility
           const destinationsArray = destinations ? [destinations] : [];
-          
+
           // Parse pricing - Remove commas and convert to numbers
           const parsePrice = (priceString) => {
             if (!priceString) return 0;
             return parseInt(String(priceString).replace(/,/g, '')) || 0;
           };
-          
+
           userData = {
             ...userData,
             destinations: destinationsArray,
@@ -4002,8 +4114,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                     type="button"
                     onClick={() => handlers.setCertificationStatus('non-certified')}
                     className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'non-certified'
-                        ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
-                        : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                      ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                      : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
                       }`}
                   >
                     Non-Certified Service Provider
@@ -4012,8 +4124,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                     type="button"
                     onClick={() => handlers.setCertificationStatus('certified')}
                     className={`px-4 py-3 rounded-lg border-2 transition-all text-xs font-medium ${formData.certificationStatus === 'certified'
-                        ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
-                        : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                      ? 'border-yellow-500 bg-yellow-500/20 text-yellow-300'
+                      : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
                       }`}
                   >
                     Certified Service Provider
@@ -4188,10 +4300,10 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       required={!isTourist}
                       maxLength={countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.maxLength || 10}
                       className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-white placeholder-gray-400 focus:outline-none text-xs ${formData.phone && isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
-                          ? 'border-green-400 focus:border-green-400'
-                          : formData.phone
-                            ? 'border-red-400 focus:border-red-400'
-                            : 'border-white/10 focus:border-yellow-400'
+                        ? 'border-green-400 focus:border-green-400'
+                        : formData.phone
+                          ? 'border-red-400 focus:border-red-400'
+                          : 'border-white/10 focus:border-yellow-400'
                         }`}
                       placeholder={formData.phoneCountryCode === '+94' ? '743090367' : 'Enter phone number'}
                     />
@@ -4199,8 +4311,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 </div>
                 {formData.phone && (
                   <p className={`text-xs mt-1 ${isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
-                      ? 'text-green-400'
-                      : 'text-red-400'
+                    ? 'text-green-400'
+                    : 'text-red-400'
                     }`}>
                     {isValidPhone(formData.phone, formData.phoneCountryCode || '+94')
                       ? `Valid ${countryCodes.find(c => c.code === (formData.phoneCountryCode || '+94'))?.country || 'phone'} number`

@@ -1078,30 +1078,45 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   // }, [conversationId, currentUser]);
 
   const handleDateSelect = (date, type = 'full-day') => {
+    if (!date) return;
+    const dateString = date.toDateString();
+
     setSelectedDates(prev => {
       const isSelected = prev.some(selectedDate =>
-        selectedDate.toDateString() === date.toDateString()
+        selectedDate.toDateString() === dateString
       );
 
       if (isSelected) {
-        // Remove date and its type
+        // If we're providing a type AND it's different from current, just update the type
+        const currentType = selectedDatesWithType[dateString];
+        if (type !== 'full-day' && currentType !== type) {
+          setSelectedDatesWithType(prevTypes => ({
+            ...prevTypes,
+            [dateString]: type
+          }));
+          return prev; // Don't remove from selectedDates
+        }
+
+        // Toggle OFF
         const newTypes = { ...selectedDatesWithType };
-        delete newTypes[date.toDateString()];
+        delete newTypes[dateString];
         setSelectedDatesWithType(newTypes);
 
         // Also remove half day time if exists
-        const newTimes = { ...halfDayTimes };
-        delete newTimes[date.toDateString()];
-        setHalfDayTimes(newTimes);
+        setHalfDayTimes(prevTimes => {
+          const newTimes = { ...prevTimes };
+          delete newTimes[dateString];
+          return newTimes;
+        });
 
         return prev.filter(selectedDate =>
-          selectedDate.toDateString() !== date.toDateString()
+          selectedDate.toDateString() !== dateString
         );
       } else {
-        // Add date with specified type (default 'full-day')
+        // Add date
         setSelectedDatesWithType(prev => ({
           ...prev,
-          [date.toDateString()]: type
+          [dateString]: type
         }));
         return [...prev, date].sort((a, b) => a - b);
       }
@@ -1257,13 +1272,25 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
       const datesWithTypes = selectedDates.map(d => {
         const dString = d.toDateString();
+        const dateType = selectedDatesWithType[dString] || 'full-day';
+        const timeSelection = halfDayTimes[dString];
+
+        // Determine safariType for consistency with JeepProfile
+        let safariType = 'Morning Safari';
+        if (dateType === 'half-day' && timeSelection === 'evening') {
+          safariType = 'Evening Safari';
+        } else if (dateType === 'full-day') {
+          safariType = 'Full Day Safari';
+        }
+
         return {
           date: d.toISOString(),
-          type: selectedDatesWithType[dString] || 'full-day',
-          price: selectedDatesWithType[dString] === 'half-day'
+          type: dateType,
+          time: timeSelection || (dateType === 'full-day' ? 'full' : 'morning'),
+          safariType: safariType,
+          price: dateType === 'half-day'
             ? (selectedPackage ? (selectedPackage.halfDayPrice || 0) : (guide.priceHalfDayStandard || (guide.dailyRate || 0) * 0.6))
-            : (selectedPackage ? (selectedPackage.fullDayPrice || 0) : (guide.priceFullDayStandard || guide.dailyRate || 0)),
-          timeOfDay: halfDayTimes[dString] || ''
+            : (selectedPackage ? (selectedPackage.fullDayPrice || 0) : (guide.priceFullDayStandard || guide.dailyRate || 0))
         };
       });
 
@@ -1548,89 +1575,105 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
       {/* Booking Success Message */}
       {showSuccessMessage && successMessageData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 sm:p-8">
-          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-10 max-w-lg w-full mx-auto max-h-[85vh] overflow-y-auto scrollbar-hide flex flex-col">
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-10 h-10 text-gray-600" />
+          <div className="bg-white rounded-3xl shadow-2xl p-4 sm:p-6 max-w-2xl w-full mx-auto max-h-[90vh] overflow-y-auto scrollbar-hide flex flex-col">
+            <div className="text-center space-y-3">
+              <div className="flex justify-center -mb-2">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-black" />
                 </div>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                Booking Successful!
-              </h2>
-              <p className="text-gray-600 mb-2">
-                Your booking request has been successfully submitted.
-              </p>
-              <p className="text-sm text-gray-700 font-semibold mb-6">
-                Please wait for the service provider's acceptance.
-              </p>
-              {successMessageData.bookingId && (
-                <p className="text-xs text-gray-500 mb-4">
-                  Booking ID: {successMessageData.bookingId.substring(0, 8)}...
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Booking Successful!
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  Your booking request has been successfully submitted.
                 </p>
-              )}
+                <p className="text-xs text-black font-semibold">
+                  Please wait for the service provider's acceptance.
+                </p>
+              </div>
 
-              {/* Booking Details */}
-              <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left space-y-2 border border-gray-300">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Guide:</span>
-                  <span className="text-gray-900 font-semibold">{successMessageData.guideName}</span>
-                </div>
-
-                {/* Dates - Vertical List with Individual Prices */}
-                <div className="border-t border-gray-200 pt-2 mt-2">
-                  <span className="text-gray-600 font-medium block mb-2">Dates:</span>
-                  <div className="space-y-2">
-                    {successMessageData.datesWithTypes?.map((dateInfo, index) => {
-                      const date = new Date(dateInfo.date);
-                      const formattedDate = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-                      const dayType = dateInfo.type === 'half-day' ? 'Half Day' : 'Full Day';
-                      const timeOfDay = dateInfo.timeOfDay ? ` (${dateInfo.timeOfDay === 'morning' ? 'Morning' : 'Evening'})` : '';
-
-                      return (
-                        <div key={index} className="flex justify-between items-start bg-white p-2 rounded border border-gray-200">
-                          <span className="text-gray-700 text-sm flex-1">
-                            {formattedDate}
-                            <span className="block text-xs text-gray-500">{dayType}{timeOfDay}</span>
-                          </span>
-                          <span className="text-gray-900 font-semibold text-sm ml-2">
-                            LKR {dateInfo.price?.toLocaleString() || '0'}
-                          </span>
-                        </div>
-                      );
-                    })}
+              {/* Enhanced Summary View - Receipt Style */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-left">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mb-3 pb-3 border-b border-gray-200">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Guide:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.guideName}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Destination:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.nationalPark || 'Selected Destination'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Passengers:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.numberOfPassengers} Person(s)</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Total Days:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.numberOfDays} Day(s)</span>
                   </div>
                 </div>
 
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Days:</span>
-                  <span className="text-gray-900 font-semibold">{successMessageData.numberOfDays} day(s)</span>
+                {/* Individual Dates Breakdown */}
+                <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                  <h4 className="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-1">Detailed Breakdown</h4>
+                  {successMessageData.datesWithTypes?.map((dateInfo, index) => {
+                    const dateObj = new Date(dateInfo.date);
+                    const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    const isHalf = dateInfo.type === 'half-day';
+                    const timeLabel = isHalf ? (dateInfo.time === 'morning' ? '☀️ Morning' : '🌙 Evening') : '🌕 Full Day';
+
+                    return (
+                      <div key={index} className="flex justify-between items-center py-1.5 px-3 bg-white rounded-lg border border-gray-100 shadow-sm">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-gray-800">{formattedDate}</span>
+                          <span className={`text-[10px] ${isHalf ? 'text-amber-600' : 'text-emerald-600'} font-medium`}>
+                            {timeLabel}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-black">
+                          LKR {dateInfo.price?.toLocaleString()}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                  <span className="text-gray-600 font-bold">Total:</span>
-                  <span className="text-black font-bold text-lg">LKR {successMessageData.totalPrice.toLocaleString()}</span>
+
+                <div className="flex justify-between items-center bg-gray-900 text-white p-3 rounded-xl mt-4 shadow-lg">
+                  <span className="text-sm font-bold">Grand Total:</span>
+                  <div className="text-right">
+                    <span className="text-lg font-black block leading-none">LKR {successMessageData.totalPrice.toLocaleString()}</span>
+                    <span className="text-[9px] text-gray-400">Includes all service charges</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Close Button */}
-              <button
-                onClick={() => {
-                  setShowSuccessMessage(false);
-                  setSuccessMessageData(null);
-                  if (guideId) {
-                    navigate(`/guide-profile/${guideId}`, { replace: true });
-                  } else if (guide?.id) {
-                    navigate(`/guide-profile/${guide.id}`, { replace: true });
-                  } else {
-                    navigate('/guide', { replace: true });
-                  }
-                }}
-                className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold shadow-lg cursor-pointer hover:bg-gray-800 transition-colors"
-              >
-                Got it!
-              </button>
+              {successMessageData.bookingId && (
+                <p className="text-[10px] text-gray-400">
+                  Booking ID: <span className="font-mono">{successMessageData.bookingId}</span>
+                </p>
+              )}
             </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowSuccessMessage(false);
+                setSuccessMessageData(null);
+                if (guideId) {
+                  navigate(`/guide-profile/${guideId}`, { replace: true });
+                } else if (guide?.id) {
+                  navigate(`/guide-profile/${guide.id}`, { replace: true });
+                } else {
+                  navigate('/guide', { replace: true });
+                }
+              }}
+              className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold shadow-lg cursor-pointer hover:bg-gray-800 transition-colors"
+            >
+              Got it!
+            </button>
           </div>
         </div>
       )}
@@ -2357,10 +2400,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                       onClick={() => {
                                         // Add the date with 'half-day' type and morning time
                                         const date = new Date(dateTypeMenuDate);
+                                        const dateString = date.toDateString();
                                         handleDateSelect(date, 'half-day');
                                         setHalfDayTimes(prev => ({
                                           ...prev,
-                                          [dateTypeMenuDate]: 'morning'
+                                          [dateString]: 'morning'
                                         }));
                                         setDateTypeMenuDate(null);
                                         setShowTimeMenu(false);
@@ -2373,10 +2417,11 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                       onClick={() => {
                                         // Add the date with 'half-day' type and evening time
                                         const date = new Date(dateTypeMenuDate);
+                                        const dateString = date.toDateString();
                                         handleDateSelect(date, 'half-day');
                                         setHalfDayTimes(prev => ({
                                           ...prev,
-                                          [dateTypeMenuDate]: 'evening'
+                                          [dateString]: 'evening'
                                         }));
                                         setDateTypeMenuDate(null);
                                         setShowTimeMenu(false);
@@ -2565,7 +2610,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
         selectedPackage={selectedPackage}
         halfDayTimes={halfDayTimes}
       />
-    </div>
+    </div >
   );
 };
 

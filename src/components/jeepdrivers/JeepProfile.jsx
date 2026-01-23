@@ -82,7 +82,7 @@ import {
 } from "../../App";
 
 // Calendar Component for Date Selection with Availability Display
-const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType, onDateTypeChange, availabilityCalendar, availableDates, onDateDoubleClick }) => {
+const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType, onDateTypeChange, availabilityCalendar, acceptedBookings, availableDates, onDateDoubleClick }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const getDaysInMonth = (date) => {
@@ -126,25 +126,106 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     if (!date) return null;
     const dateKey = getDateKey(date);
 
-    // Check new availability calendar format (object)
-    if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
-      const status = availabilityCalendar[dateKey];
-      // Return status if it exists, otherwise return null (which means available)
-      if (status && [
-        'busy',
-        'halfday',
-        'unavailable',
-        'halfday-morning',
-        'halfday-evening',
-        'unavailable-fullday', // consistent with admin
-        'unavailable-halfday-morning',
-        'unavailable-halfday-evening'
-      ].includes(status)) {
-        return status;
+    // Track booking status
+    let bookedMorning = false;
+    let bookedEvening = false;
+    let bookedFullDay = false;
+
+    // 1. Check Accepted Bookings
+    if (acceptedBookings && Array.isArray(acceptedBookings)) {
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      const checkTime = checkDate.getTime();
+
+      for (const booking of acceptedBookings) {
+        // Check datesWithTypes (New format)
+        if (booking.datesWithTypes && Array.isArray(booking.datesWithTypes)) {
+          const match = booking.datesWithTypes.find(dt => {
+            const d = new Date(dt.date);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === checkTime;
+          });
+
+          if (match) {
+            if (match.type === 'half-day') {
+              const isEvening = match.safariType && match.safariType.toLowerCase().includes('evening');
+              if (isEvening) {
+                bookedEvening = true;
+              } else {
+                bookedMorning = true;
+              }
+            } else {
+              bookedFullDay = true;
+            }
+          }
+        }
+
+        // Check legacy selectedDates
+        if (booking.selectedDates && Array.isArray(booking.selectedDates)) {
+          const match = booking.selectedDates.some(sd => {
+            const d = new Date(sd);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === checkTime;
+          });
+          if (match) bookedFullDay = true;
+        }
+
+        // Check generic 'dates' array
+        if (booking.dates && Array.isArray(booking.dates)) {
+          const match = booking.dates.some(sd => {
+            let d;
+            if (sd && sd.toDate) d = sd.toDate();
+            else d = new Date(sd);
+            if (isNaN(d.getTime())) return false;
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === checkTime;
+          });
+          if (match) bookedFullDay = true;
+        }
       }
-      // If no status marked, return null (available by default)
-      return null;
     }
+
+    // If full day is booked, return busy
+    if (bookedFullDay) return 'busy';
+
+    // 2. Check Manual Availability
+    let manualUnavailableMorning = false;
+    let manualUnavailableEvening = false;
+    let manualUnavailableFull = false;
+
+    if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
+      const manualStatus = availabilityCalendar[dateKey];
+
+      if (manualStatus) {
+        if (manualStatus === 'unavailable' || manualStatus === 'busy' || manualStatus === 'unavailable-fullday') {
+          manualUnavailableFull = true;
+        } else if (manualStatus === 'unavailable-halfday-morning' || manualStatus === 'halfday-morning') {
+          manualUnavailableMorning = true;
+        } else if (manualStatus === 'unavailable-halfday-evening' || manualStatus === 'halfday-evening') {
+          manualUnavailableEvening = true;
+        }
+      }
+    }
+
+    // 3. Combine booking and manual availability logic
+    const morningOccupied = bookedMorning || manualUnavailableMorning;
+    const eveningOccupied = bookedEvening || manualUnavailableEvening;
+
+    // If both half-day slots are occupied, the entire day is unavailable
+    if (morningOccupied && eveningOccupied) {
+      return 'unavailable';
+    }
+
+    // If full day is manually unavailable
+    if (manualUnavailableFull) {
+      return 'unavailable';
+    }
+
+    // If only one half-day slot is occupied, return the specific status
+    if (bookedMorning && !eveningOccupied) return 'halfday-morning';
+    if (bookedEvening && !morningOccupied) return 'halfday-evening';
+    if (manualUnavailableMorning && !eveningOccupied) return 'unavailable-halfday-morning';
+    if (manualUnavailableEvening && !morningOccupied) return 'unavailable-halfday-evening';
 
     // Fallback to old availableDates array format
     if (availableDates && Array.isArray(availableDates)) {
@@ -154,7 +235,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
         const availableDateString = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return availableDateString === dateString;
       });
-      return isInArray ? null : 'unavailable'; // If in array = available, if not = unavailable
+      return isInArray ? null : 'unavailable';
     }
 
     // Default: no status means available
@@ -163,9 +244,21 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
 
   const isDateAvailable = (date) => {
     const status = getAvailabilityStatus(date);
-    // Available if status is null/undefined or 'available' (not marked as busy/unavailable)
-    // Also available if it's partially booked (half-day)
-    return status === null || status === 'available' || status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening';
+    // Available if:
+    // - No status (null/undefined)
+    // - Explicitly marked as 'available'
+    // - Only ONE half-day slot is occupied (allowing booking of the other slot)
+    // NOT available if:
+    // - 'unavailable' (both slots occupied)
+    // - 'busy' (full day booked)
+    if (status === 'unavailable' || status === 'busy' || !status) return false;
+
+    // Allow partial availability (one slot free) or explicitly available
+    return status === 'available' ||
+      status === 'halfday-morning' ||
+      status === 'halfday-evening' ||
+      status === 'unavailable-halfday-morning' ||
+      status === 'unavailable-halfday-evening';
   };
 
   const isDateSelected = (date) => {
@@ -231,15 +324,24 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     }
 
     // Handle availability statuses
-    if (status === 'busy') {
-      return `${baseClasses} bg-red-600 text-white hover:bg-red-700`; // Full Day = Red
-    } else if (status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening') {
-      return `${baseClasses} bg-orange-500 text-white hover:bg-orange-600`; // Half Day = Orange
-    } else if (status === 'unavailable' || status === 'unavailable-fullday') {
+    // Match the driver's admin calendar EXACTLY:
+    // - Red (busy) = Full day booked → Unavailable (Gray)
+    // - Orange (unavailable) = Both slots occupied → Unavailable (Gray)
+    // - Yellow (halfday-morning/evening) = One slot booked, other available → Partially Booked (Yellow/Orange - CAN book)
+    // - Gray (no status/unavailable-fullday) = Not available → Unavailable (Gray)
+
+    if (status === 'busy' || status === 'unavailable' || status === 'unavailable-fullday') {
+      // Red/Orange in admin = UNAVAILABLE in tourist view
       return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
-    } else {
-      // No status or null means available (green)
+    } else if (status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening') {
+      // Yellow in admin = PARTIALLY BOOKED in tourist view (can still book the other half)
+      return `${baseClasses} bg-orange-500 text-white hover:bg-orange-600`;
+    } else if (status === 'available') {
+      // Explicitly marked as available (green)
       return `${baseClasses} ${isToday ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300' : 'bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30'}`;
+    } else {
+      // No status = UNAVAILABLE by default (gray)
+      return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
     }
   };
 
@@ -267,7 +369,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
       </div>
 
       {/* Legend */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2 bg-gray-800/30 rounded-lg border border-gray-700/40">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4 p-2 bg-gray-800/30 rounded-lg border border-gray-700/40">
         <div className="flex items-center gap-2 text-xs">
           <div className="w-3 h-3 bg-green-500/20 border border-green-500/30 rounded"></div>
           <span className="text-gray-300">Available</span>
@@ -277,11 +379,15 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
           <span className="text-gray-300">Full Day</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
+          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+          <span className="text-gray-300">Half Day</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
           <div className="w-3 h-3 bg-orange-500 rounded"></div>
           <span className="text-gray-300">Partially Booked</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-gray-600 rounded"></div>
+          <div className="w-3 h-3 bg-gray-500 border border-gray-400 rounded"></div>
           <span className="text-gray-300">Unavailable</span>
         </div>
       </div>
@@ -768,7 +874,9 @@ const BookingFormModal = ({
                           <div>
                             <p className="font-medium">{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                             <p className="text-gray-600">
-                              {dateType === 'half-day' ? 'Half Day' : 'Full Day'}{timeOfDay ? ` (${timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening'})` : ''} - {safariType}
+                              {dateType === 'half-day' ? 'Half Day' : 'Full Day'}
+                              {timeOfDay ? ` (${timeOfDay === 'morning' ? '☀️ Morning' : '🌙 Evening'})` : ''}
+                              - {timeOfDay ? (timeOfDay === 'morning' ? 'Morning Safari' : 'Evening Safari') : safariType}
                               {selectedPackage && <span className="text-emerald-600 ml-1">📦</span>}
                             </p>
                           </div>
@@ -1126,6 +1234,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [dateTypeMenuDate, setDateTypeMenuDate] = useState(null);
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [halfDayTimes, setHalfDayTimes] = useState({}); // {dateString: 'morning' | 'evening'}
+  const [acceptedBookings, setAcceptedBookings] = useState([]); // Store accepted bookings
 
   // Reset showTimeMenu when dateTypeMenuDate changes
   useEffect(() => {
@@ -1176,6 +1285,37 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const searchParams = new URLSearchParams(location.search);
   const driverId = jeepId || searchParams.get('driverId'); // Use jeepId from URL params, fallback to query params
   const openChat = searchParams.get('openChat');
+
+  // Fetch accepted bookings for this driver
+  useEffect(() => {
+    if (!driverId) return;
+
+    const fetchAcceptedBookings = async () => {
+      const db = getFirestore();
+      try {
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(
+          bookingsRef,
+          where('driverId', '==', driverId)
+        );
+        const querySnapshot = await getDocs(q);
+        const bookings = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          // Include both accepted and confirmed bookings
+          if (data.status === 'accepted' || data.status === 'confirmed') {
+            bookings.push({ id: doc.id, ...data });
+          }
+        });
+        console.log("Fetched Bookings for Calendar:", bookings);
+        setAcceptedBookings(bookings);
+      } catch (error) {
+        console.error("Error fetching accepted bookings:", error);
+      }
+    };
+
+    fetchAcceptedBookings();
+  }, [driverId]);
 
   // Scroll to top when page loads or navigates (including back button)
   useEffect(() => {
@@ -1259,24 +1399,52 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   };
 
   const handleDateSelect = (date, type = 'full-day') => {
+    if (!date) return;
+    const dateString = date.toDateString();
+
     setSelectedDates(prev => {
       const isSelected = prev.some(selectedDate =>
-        selectedDate.toDateString() === date.toDateString()
+        selectedDate.toDateString() === dateString
       );
 
       if (isSelected) {
-        // Remove date and its type
+        // If we're providing a type AND it's different from current, just update the type
+        const currentType = selectedDatesWithType[dateString];
+        if (type !== 'full-day' && currentType !== type) {
+          setSelectedDatesWithType(prevTypes => ({
+            ...prevTypes,
+            [dateString]: type
+          }));
+          return prev; // Don't remove from selectedDates
+        }
+
+        // Otherwise (regular click or same type), toggle OFF
         const newTypes = { ...selectedDatesWithType };
-        delete newTypes[date.toDateString()];
+        delete newTypes[dateString];
         setSelectedDatesWithType(newTypes);
+
+        // Also clear half day time
+        setHalfDayTimes(prevTimes => {
+          const newTimes = { ...prevTimes };
+          delete newTimes[dateString];
+          return newTimes;
+        });
+
+        // Also clear safari type if specific
+        setBookingFormData(prev => {
+          const newSafariTypes = { ...prev.dateSafariTypes };
+          delete newSafariTypes[dateString];
+          return { ...prev, dateSafariTypes: newSafariTypes };
+        });
+
         return prev.filter(selectedDate =>
-          selectedDate.toDateString() !== date.toDateString()
+          selectedDate.toDateString() !== dateString
         );
       } else {
-        // Add date with specified type (default 'full-day')
+        // Add date
         setSelectedDatesWithType(prev => ({
           ...prev,
-          [date.toDateString()]: type
+          [dateString]: type
         }));
         return [...prev, date].sort((a, b) => a - b);
       }
@@ -1291,7 +1459,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   };
 
   // Helper function to get availability status for a date
-  // Helper function to get availability status for a date
   const getAvailabilityStatus = (date) => {
     if (!date) return null;
     // Use local time for date key
@@ -1302,27 +1469,123 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
     // 1. Determine which availability source to use based on selected vehicle type
     let availabilitySource = {};
-
-    // Default to standard or generic if nothing selected yet
     if (selectedVehicleType === 'Luxury Safari Jeep') {
       availabilitySource = driver?.availabilityLuxury || driver?.availability || {};
     } else {
-      // Standard or fallback
       availabilitySource = driver?.availabilityStandard || driver?.availability || {};
     }
 
-    // If availabilitySource is empty but we have legacy 'availabilityCalendar' (from older loads), check that
+    // If availabilitySource is empty but we have legacy 'availabilityCalendar', check that
     if (Object.keys(availabilitySource).length === 0 && driver?.availabilityCalendar && !Array.isArray(driver.availabilityCalendar)) {
       availabilitySource = driver.availabilityCalendar;
     }
 
-    // 2. Check status in the determined source
-    const status = availabilitySource[dateKey];
+    // 2. Check Accepted Bookings (Filter by vehicle type)
+    let bookedMorning = false;
+    let bookedEvening = false;
+    let bookedFullDay = false;
 
-    // Return status if it's a known busy/halfday status
-    if (status && ['busy', 'halfday', 'unavailable', 'halfday-morning', 'halfday-evening', 'unavailable-halfday-morning', 'unavailable-halfday-evening'].includes(status)) {
-      return status;
+    if (acceptedBookings && Array.isArray(acceptedBookings)) {
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      const checkTime = checkDate.getTime();
+
+      for (const booking of acceptedBookings) {
+        // Filter bookings by vehicle type
+        const bookingVehicleType = booking.vehicleType || booking.selectedVehicleType;
+        const isMatchingVehicleType = !bookingVehicleType ||
+          (selectedVehicleType && bookingVehicleType.includes(selectedVehicleType.includes('Luxury') ? 'Luxury' : 'Standard'));
+
+        if (!isMatchingVehicleType) continue;
+
+        // Check datesWithTypes (New format)
+        if (booking.datesWithTypes && Array.isArray(booking.datesWithTypes)) {
+          const match = booking.datesWithTypes.find(dt => {
+            const d = new Date(dt.date);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === checkTime;
+          });
+
+          if (match) {
+            if (match.type === 'half-day') {
+              const isEvening = match.safariType && match.safariType.toLowerCase().includes('evening');
+              if (isEvening) {
+                bookedEvening = true;
+              } else {
+                bookedMorning = true;
+              }
+            } else {
+              bookedFullDay = true;
+            }
+          }
+        }
+
+        // Check legacy selectedDates
+        if (booking.selectedDates && Array.isArray(booking.selectedDates)) {
+          const match = booking.selectedDates.some(sd => {
+            const d = new Date(sd);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === checkTime;
+          });
+          if (match) bookedFullDay = true;
+        }
+
+        // Check generic 'dates' array (legacy/admin format)
+        if (booking.dates && Array.isArray(booking.dates)) {
+          const match = booking.dates.some(sd => {
+            let d;
+            if (sd && sd.toDate) d = sd.toDate();
+            else d = new Date(sd);
+            if (isNaN(d.getTime())) return false;
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === checkTime;
+          });
+          if (match) bookedFullDay = true;
+        }
+      }
     }
+
+    // If full day is booked, return busy
+    if (bookedFullDay) return 'busy';
+
+    // 3. Check manual availability settings
+    const manualStatus = availabilitySource[dateKey];
+
+    // Track manual unavailability
+    let manualUnavailableMorning = false;
+    let manualUnavailableEvening = false;
+    let manualUnavailableFull = false;
+
+    if (manualStatus) {
+      if (manualStatus === 'unavailable' || manualStatus === 'busy') {
+        manualUnavailableFull = true;
+      } else if (manualStatus === 'unavailable-halfday-morning' || manualStatus === 'halfday-morning') {
+        manualUnavailableMorning = true;
+      } else if (manualStatus === 'unavailable-halfday-evening' || manualStatus === 'halfday-evening') {
+        manualUnavailableEvening = true;
+      }
+    }
+
+    // 4. Combine booking and manual availability logic
+    // If BOTH morning slots are occupied (booked OR manually unavailable), mark as unavailable
+    const morningOccupied = bookedMorning || manualUnavailableMorning;
+    const eveningOccupied = bookedEvening || manualUnavailableEvening;
+
+    // If both half-day slots are occupied, the entire day is unavailable
+    if (morningOccupied && eveningOccupied) {
+      return 'unavailable';
+    }
+
+    // If full day is manually unavailable
+    if (manualUnavailableFull) {
+      return 'unavailable';
+    }
+
+    // If only one half-day slot is occupied, return the specific status
+    if (bookedMorning && !eveningOccupied) return 'halfday-morning';
+    if (bookedEvening && !morningOccupied) return 'halfday-evening';
+    if (manualUnavailableMorning && !eveningOccupied) return 'unavailable-halfday-morning';
+    if (manualUnavailableEvening && !morningOccupied) return 'unavailable-halfday-evening';
 
     // Fallback to old availableDates array format (Legacy)
     if (driver?.availableDates && Array.isArray(driver.availableDates)) {
@@ -1698,16 +1961,29 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
 
       const datesString = selectedDates.map(d => {
         const dateType = selectedDatesWithType[d.toDateString()] || 'full-day';
-        return `${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${dateType === 'half-day' ? 'Half Day' : 'Full Day'})`;
+        const timeSelection = halfDayTimes[d.toDateString()];
+        let typeLabel = dateType === 'half-day' ? 'Half Day' : 'Full Day';
+        if (dateType === 'half-day' && timeSelection) {
+          typeLabel += ` (${timeSelection.charAt(0).toUpperCase() + timeSelection.slice(1)})`;
+        }
+        return `${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} (${typeLabel})`;
       }).join(', ');
 
       const datesWithTypes = selectedDates.map(d => {
         const dateString = d.toDateString();
         const dateType = selectedDatesWithType[dateString] || 'full-day';
-        const safariType = bookingFormData.dateSafariTypes?.[dateString] || bookingFormData.safariType || 'Morning Safari';
+        const timeSelection = halfDayTimes[dateString];
+
+        // If it's a half-day, safariType should reflect the morning/evening selection
+        let safariType = bookingFormData.dateSafariTypes?.[dateString] || bookingFormData.safariType || 'Morning Safari';
+        if (dateType === 'half-day' && timeSelection) {
+          safariType = timeSelection === 'morning' ? 'Morning Safari' : 'Evening Safari';
+        }
+
         return {
           date: d.toISOString(),
           type: dateType,
+          time: timeSelection || (dateType === 'full-day' ? 'full' : 'morning'),
           safariType: safariType
         };
       });
@@ -1742,6 +2018,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         status: 'pending',
         // Vehicle type information (if applicable)
         selectedVehicleType: selectedVehicleType || null,
+        vehicleType: selectedVehicleType || null, // Double up for compatibility with Admin/Receipts
         halfDayTimes: halfDayTimes || {},
         // Package booking information (if applicable)
         isPackageBooking: !!selectedPackage,
@@ -1951,7 +2228,14 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       const datesWithTypesAndSafari = selectedDates.map(d => {
         const dateString = d.toDateString();
         const dateType = selectedDatesWithType[dateString] || 'full-day';
-        const safariType = bookingFormData.dateSafariTypes?.[dateString] || bookingFormData.safariType || 'Morning Safari';
+        const timeSelection = halfDayTimes[dateString];
+
+        // If it's a half-day, safariType should reflect the morning/evening selection
+        let safariType = bookingFormData.dateSafariTypes?.[dateString] || bookingFormData.safariType || 'Morning Safari';
+        if (dateType === 'half-day' && timeSelection) {
+          safariType = timeSelection === 'morning' ? 'Morning Safari' : 'Evening Safari';
+        }
+
         // Calculate specific price for this day
         let dayPrice = 0;
         if (selectedVehicleType === 'Standard Safari Jeep') {
@@ -1969,6 +2253,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         return {
           date: d.toISOString(),
           type: dateType,
+          time: timeSelection || (dateType === 'full-day' ? 'full' : 'morning'),
           safariType: safariType,
           price: dayPrice
         };
@@ -1999,6 +2284,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
       // Reset selected dates and form
       setSelectedDates([]);
       setSelectedDatesWithType({});
+      setHalfDayTimes({});
       setBookingFormData({
         fullName: '',
         email: '',
@@ -2461,36 +2747,91 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     <div className="min-h-screen lg:h-screen bg-gray-50 flex flex-col lg:overflow-hidden lg:max-h-screen">
       {/* Booking Success Message */}
       {showSuccessMessage && successMessageData && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 sm:p-8">
-          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-10 max-w-lg w-full mx-auto max-h-[85vh] overflow-y-auto scrollbar-hide flex flex-col">
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-10 h-10 text-black" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 sm:p-8">
+          <div className="bg-white rounded-3xl shadow-2xl p-4 sm:p-6 max-w-2xl w-full mx-auto max-h-[90vh] overflow-y-auto scrollbar-hide flex flex-col">
+            <div className="text-center space-y-3">
+              <div className="flex justify-center -mb-2">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-black" />
                 </div>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                Booking Successful!
-              </h2>
-              <p className="text-gray-600 mb-2">
-                Your booking request has been successfully submitted.
-              </p>
-              <p className="text-sm text-black font-semibold mb-6">
-                Please wait for the service provider's acceptance.
-              </p>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Booking Successful!
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  Your booking request has been successfully submitted.
+                </p>
+                <p className="text-xs text-black font-semibold">
+                  Please wait for the service provider's acceptance.
+                </p>
+              </div>
+
+              {/* Enhanced Summary View */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-left">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mb-3 pb-3 border-b border-gray-200">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Driver:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.driverName}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Vehicle Type:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.selectedVehicleType}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Destination:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.nationalPark}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Passengers:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.numberOfPassengers} Person(s)</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-medium">Total Days:</span>
+                    <span className="text-gray-900 font-bold">{successMessageData.numberOfDays} Day(s)</span>
+                  </div>
+                </div>
+
+                {/* Individual Dates Table */}
+                <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                  <h4 className="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-1">Detailed Breakdown</h4>
+                  {successMessageData.datesWithTypes?.map((dateInfo, index) => {
+                    const dateObj = new Date(dateInfo.date);
+                    const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    const isHalf = dateInfo.type === 'half-day';
+                    const timeLabel = isHalf ? (dateInfo.time === 'morning' ? '☀️ Morning' : '🌙 Evening') : '🌕 Full Day';
+
+                    return (
+                      <div key={index} className="flex justify-between items-center py-1.5 px-3 bg-white rounded-lg border border-gray-100 shadow-sm">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-gray-800">{formattedDate}</span>
+                          <span className={`text-[10px] ${isHalf ? 'text-amber-600' : 'text-emerald-600'} font-medium`}>
+                            {timeLabel}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-black">
+                          LKR {dateInfo.price?.toLocaleString()}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-between items-center bg-gray-900 text-white p-3 rounded-xl mt-4 shadow-lg">
+                  <span className="text-sm font-bold">Grand Total:</span>
+                  <div className="text-right">
+                    <span className="text-lg font-black block leading-none">LKR {successMessageData.totalPrice.toLocaleString()}</span>
+                    <span className="text-[9px] text-gray-400">Includes all taxes & fees</span>
+                  </div>
+                </div>
+              </div>
+
               {successMessageData.bookingId && (
-                <p className="text-xs text-gray-500 mb-4">
-                  Booking ID: {successMessageData.bookingId.substring(0, 8)}...
+                <p className="text-[10px] text-gray-400">
+                  Booking ID: <span className="font-mono">{successMessageData.bookingId}</span>
                 </p>
               )}
-
-              <div className="space-y-1 border-t border-gray-200 pt-3 mt-2">
-                <div className="flex justify-between items-center bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
-                  <span className="text-emerald-900 font-bold">Total Price:</span>
-                  <span className="text-black font-bold text-xl">LKR {successMessageData.totalPrice.toLocaleString()}</span>
-                </div>
-              </div>
             </div>
 
             {/* Close Button */}
@@ -3373,6 +3714,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                   ? (driver?.availabilityLuxury || driver?.availabilityCalendar || {})
                                   : (driver?.availabilityStandard || driver?.availabilityCalendar || {})
                               }
+                              acceptedBookings={acceptedBookings}
                               availableDates={driver?.availableDates}
                               onDateTypeChange={handleDateTypeChange}
                               onDateDoubleClick={(date) => {
@@ -3453,9 +3795,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                           try {
                                             handleDateSelect(dateTypeMenuDate, 'half-day');
                                             handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
+                                            const dateStr = dateTypeMenuDate.toDateString();
                                             setHalfDayTimes(prev => ({
                                               ...prev,
-                                              [dateTypeMenuDate.toDateString()]: 'morning'
+                                              [dateStr]: 'morning'
+                                            }));
+                                            setBookingFormData(prev => ({
+                                              ...prev,
+                                              dateSafariTypes: {
+                                                ...prev.dateSafariTypes,
+                                                [dateStr]: 'Morning Safari'
+                                              }
                                             }));
                                             setDateTypeMenuDate(null);
                                             setShowTimeMenu(false);
@@ -3477,9 +3827,17 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                           try {
                                             handleDateSelect(dateTypeMenuDate, 'half-day');
                                             handleDateTypeChange(dateTypeMenuDate.toDateString(), 'half-day');
+                                            const dateStr = dateTypeMenuDate.toDateString();
                                             setHalfDayTimes(prev => ({
                                               ...prev,
-                                              [dateTypeMenuDate.toDateString()]: 'evening'
+                                              [dateStr]: 'evening'
+                                            }));
+                                            setBookingFormData(prev => ({
+                                              ...prev,
+                                              dateSafariTypes: {
+                                                ...prev.dateSafariTypes,
+                                                [dateStr]: 'Evening Safari'
+                                              }
                                             }));
                                             setDateTypeMenuDate(null);
                                             setShowTimeMenu(false);

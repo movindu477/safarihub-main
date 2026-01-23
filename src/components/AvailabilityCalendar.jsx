@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Calendar, X, Lock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, X } from "lucide-react";
 
 // Availability Calendar Component for Service Providers
 const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, acceptedBookings = [] }) => {
@@ -16,51 +16,104 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
 
   // Get dates from accepted bookings
   const getAcceptedBookingDates = useCallback(() => {
-    const dates = new Set();
+    const datesMap = new Map(); // Store detailed info: dateKey -> { type, booking }
 
     acceptedBookings.forEach(booking => {
-      let bookingDates = [];
+      // Determine default time based on safariType if available
+      const defaultTime = booking.safariType?.toLowerCase().includes('evening') ? 'evening' : 'morning';
 
-      if (booking.dates && Array.isArray(booking.dates)) {
-        // Multiple dates booking
-        bookingDates = booking.dates.map(date => {
-          if (date.toDate) {
-            return date.toDate();
-          } else if (date instanceof Date) {
-            return date;
-          } else {
-            return new Date(date);
+      // Priority 1: datesWithTypes (contains specific half/full day info)
+      if (booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0) {
+        booking.datesWithTypes.forEach(item => {
+          let date;
+          if (item.date && item.date.toDate) date = item.date.toDate();
+          else if (item.date instanceof Date) date = item.date;
+          else if (item.date) date = new Date(item.date);
+
+          if (date && !isNaN(date.getTime())) {
+            const dateKey = date.toISOString().split('T')[0];
+            const type = item.type || 'full-day';
+            const time = item.time || (booking.halfDayTimes && booking.halfDayTimes[dateKey]) || defaultTime;
+
+            datesMap.set(dateKey, {
+              type: type,
+              time: time,
+              isHalfDay: type.includes('half'),
+              bookingId: booking.id
+            });
           }
         });
-      } else if (booking.startDate) {
-        // Single date booking
-        const date = booking.startDate.toDate
-          ? booking.startDate.toDate()
-          : new Date(booking.startDate);
-        bookingDates = [date];
       }
+      // Priority 2: selectedDates (legacy array of dates)
+      else if (booking.selectedDates && Array.isArray(booking.selectedDates)) {
+        booking.selectedDates.forEach(d => {
+          let date;
+          if (d && d.toDate) date = d.toDate();
+          else if (d instanceof Date) date = d;
+          else if (d) date = new Date(d);
 
-      bookingDates.forEach(date => {
-        const dateKey = date.toISOString().split('T')[0];
-        dates.add(dateKey);
-      });
+          if (date && !isNaN(date.getTime())) {
+            const dateKey = date.toISOString().split('T')[0];
+            // Try to infer type if not explicit
+            const type = 'full-day'; // Default to full day for legacy
+            datesMap.set(dateKey, { type, isHalfDay: false, bookingId: booking.id });
+          }
+        });
+      }
+      // Priority 3: dates (older legacy)
+      else if (booking.dates && Array.isArray(booking.dates)) {
+        booking.dates.forEach(d => {
+          // ... similar parsing
+          let date;
+          if (d && d.toDate) date = d.toDate();
+          else if (d instanceof Date) date = d;
+          else if (d) date = new Date(d);
+
+          if (date && !isNaN(date.getTime())) {
+            const dateKey = date.toISOString().split('T')[0];
+            datesMap.set(dateKey, { type: 'full-day', isHalfDay: false, bookingId: booking.id });
+          }
+        });
+      }
+      // Priority 4: startDate (single date legacy)
+      else if (booking.startDate) {
+        let date;
+        if (booking.startDate.toDate) date = booking.startDate.toDate();
+        else date = new Date(booking.startDate);
+
+        if (date && !isNaN(date.getTime())) {
+          const dateKey = date.toISOString().split('T')[0];
+          datesMap.set(dateKey, { type: 'full-day', isHalfDay: false, bookingId: booking.id });
+        }
+      }
     });
 
-    return dates;
+    return datesMap;
   }, [acceptedBookings]);
 
-  const acceptedDates = getAcceptedBookingDates();
+  const acceptedDatesMap = getAcceptedBookingDates();
 
-  // Check if a date has an accepted booking
-  const isAcceptedBookingDate = useCallback((date) => {
-    if (!date) return false;
+  // Check if a date has an accepted booking - returns the info object or undefined
+  const getAcceptedBookingInfo = useCallback((date) => {
+    if (!date) return undefined;
     const dateKey = date.toISOString().split('T')[0];
-    return acceptedDates.has(dateKey);
-  }, [acceptedDates]);
+    return acceptedDatesMap.get(dateKey);
+  }, [acceptedDatesMap]);
 
-  // Update parent when availability changes - REMOVED internal state sync
+  // Helper to determine if a date should be blocked from interaction
+  // We block Full Day bookings, but allow interaction for Half Day bookings
+  const isBlockedDate = useCallback((date) => {
+    const info = getAcceptedBookingInfo(date);
+    if (!info) return false;
+    return !info.isHalfDay; // Block only if it is NOT a half day (i.e. it is full day)
+  }, [getAcceptedBookingInfo]);
 
-  // Initialize from props only on mount or when availability prop actually changes - REMOVED internal state sync
+  // Backward compatibility alias if needed, though we use isBlockedDate in handleDateClick
+  const isAcceptedBookingDate = useCallback((date) => {
+    return !!getAcceptedBookingInfo(date);
+  }, [getAcceptedBookingInfo]);
+
+  // ... (getDaysInMonth, navigateMonth, getDateKey, getAvailabilityStatus... match existing)
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -70,11 +123,9 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
     const startDay = firstDay.getDay();
 
     const days = [];
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < startDay; i++) {
       days.push(null);
     }
-    // Add all days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
     }
@@ -85,7 +136,6 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
     setCurrentMonth(prev => {
       const newMonth = new Date(prev);
       newMonth.setMonth(prev.getMonth() + direction);
-      console.log('📅 Month navigation:', direction, 'to', newMonth.toLocaleString('default', { month: 'long', year: 'numeric' }));
       return newMonth;
     });
   }, []);
@@ -101,7 +151,6 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
   const getAvailabilityStatus = (date) => {
     if (!date) return null;
     const dateKey = getDateKey(date);
-    // Use prop directly, fallback to empty object if undefined
     return (availability || {})[dateKey] || null;
   };
 
@@ -113,55 +162,27 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
   }, []);
 
   const handleDateClick = useCallback((date, event) => {
-    // Block editing if: readonly, no date, past date, or accepted booking date
-    if (readOnly || !date || isPastDate(date) || isAcceptedBookingDate(date)) {
-      console.log('📅 Date click blocked:', {
-        readOnly,
-        date: date?.toISOString(),
-        isPast: isPastDate(date),
-        isAcceptedBooking: isAcceptedBookingDate(date)
-      });
+    // Check if blocked (Full Day Accepted Booking)
+    if (readOnly || !date || isPastDate(date) || isBlockedDate(date)) {
       return;
     }
-
-    // Get the click position relative to the calendar container
+    // ... rest of handleDateClick popup logic ...
     const rect = event.target.getBoundingClientRect();
-    const container = event.target.closest('.bg-gray-900\\/50');
+    const container = event.target.closest('.bg-gray-900\\/50') || event.target.parentElement; // robust fallback
     const containerRect = container ? container.getBoundingClientRect() : rect;
-
     const viewportWidth = window.innerWidth;
-
-    // Popup dimensions (approximate)
     const popupWidth = viewportWidth < 640 ? 200 : 250;
     const popupHeight = viewportWidth < 640 ? 240 : 280;
-
-    // Calculate position relative to the container (for absolute positioning)
-    let left = rect.left - containerRect.left + rect.width + 10; // 10px offset from date
+    let left = rect.left - containerRect.left + rect.width + 10;
     let top = rect.top - containerRect.top;
 
-    // For mobile, center the popup horizontally
-    if (viewportWidth < 640) {
-      left = (containerRect.width - popupWidth) / 2;
-    } else {
-      // Desktop: position next to the clicked date
-      // Adjust if popup would go off container edge horizontally
-      if (left + popupWidth > containerRect.width - 10) {
-        left = rect.left - containerRect.left - popupWidth - 10; // Position on left side
-      }
-      // Ensure left doesn't go negative
-      if (left < 10) {
-        left = 10;
-      }
+    if (viewportWidth < 640) left = (containerRect.width - popupWidth) / 2;
+    else {
+      if (left + popupWidth > containerRect.width - 10) left = rect.left - containerRect.left - popupWidth - 10;
+      if (left < 10) left = 10;
     }
-
-    // Ensure popup stays within container bounds vertically
-    if (top + popupHeight > containerRect.height - 10) {
-      top = Math.max(10, containerRect.height - popupHeight - 10);
-    }
-    // Ensure top doesn't go negative
-    if (top < 10) {
-      top = 10;
-    }
+    if (top + popupHeight > containerRect.height - 10) top = Math.max(10, containerRect.height - popupHeight - 10);
+    if (top < 10) top = 10;
 
     setPopupPosition({ top, left });
     setPopupDate(date);
@@ -170,36 +191,25 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
   }, [readOnly, isPastDate, isAcceptedBookingDate]);
 
   const handleStatusSelect = useCallback((status) => {
+    // ... same implementation as before ...
     if (!popupDate || !onChange) return;
-
     const dateKey = getDateKey(popupDate);
-
-    // Create new state based on PROPS
     const newState = { ...(availability || {}) };
-
     if (!status || status === 'available') {
       delete newState[dateKey];
     } else {
       newState[dateKey] = status;
     }
-
-    console.log('📅 Date status update via prop:', dateKey, '→', status);
     onChange(newState);
-
-    // Close popup
     setShowPopup(false);
     setMenuLevel('main');
     setPopupDate(null);
   }, [popupDate, availability, onChange]);
 
-  const handleMenuNavigation = (level) => {
-    setMenuLevel(level);
-  };
-
+  const handleMenuNavigation = (level) => setMenuLevel(level);
   const clearDate = (dateKey, e) => {
     e?.stopPropagation();
     if (!onChange) return;
-
     const newState = { ...(availability || {}) };
     delete newState[dateKey];
     onChange(newState);
@@ -209,54 +219,100 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
     if (!date) return '';
     const status = getAvailabilityStatus(date);
     const isPast = isPastDate(date);
-    const isAcceptedBooking = isAcceptedBookingDate(date);
+    const acceptedInfo = getAcceptedBookingInfo(date);
     const isSelected = selectedDate && date.getTime() === selectedDate.getTime();
 
-    const baseClasses = 'relative w-full h-8 sm:h-10 text-xs sm:text-sm rounded-lg transition-all duration-200 font-medium flex items-center justify-center';
+    const baseClasses = 'relative w-full h-12 sm:h-16 text-xs sm:text-sm rounded-lg transition-all duration-200 font-medium flex items-center justify-center';
 
     if (isPast) {
       return `${baseClasses} bg-gray-800/50 text-gray-600 cursor-not-allowed`;
     }
 
-    if (isAcceptedBooking) {
-      return `${baseClasses} bg-blue-600/80 text-white cursor-not-allowed border-2 border-blue-400`;
+    if (acceptedInfo) {
+      // Differentiate Half/Full for accepted bookings
+      if (acceptedInfo.isHalfDay) {
+        const bookedTime = acceptedInfo.time === 'evening' ? 'evening' : 'morning';
+        const otherHalf = bookedTime === 'morning' ? 'evening' : 'morning';
+
+        // Check if the OTHER half is marked unavailable manually
+        const isManuallyUnavailable =
+          (otherHalf === 'evening' && status === 'unavailable-halfday-evening') ||
+          (otherHalf === 'morning' && status === 'unavailable-halfday-morning');
+
+        if (isManuallyUnavailable) {
+          // Mixed State: Full occupied (Half Booked / Half Manual Unavail) -> Orange
+          return `${baseClasses} bg-orange-600 text-white cursor-pointer border-2 border-blue-400 font-bold shadow-sm hover:bg-orange-700`;
+        }
+
+        // Yellow for Half Day Booked, with blue border (Available for edit of other half)
+        return `${baseClasses} bg-yellow-500 text-white cursor-pointer border-2 border-blue-400 font-bold shadow-sm hover:bg-yellow-600`;
+      } else {
+        // Red for Full Day, with blue border (Blocked)
+        return `${baseClasses} bg-red-600/90 text-white cursor-not-allowed border-2 border-blue-400 font-bold shadow-sm`;
+      }
     }
 
     // Handle different statuses
     switch (status) {
       case 'unavailable-fullday':
         return `${baseClasses} bg-gray-600 text-white hover:bg-gray-700 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
+      // ... other cases match existing but ensure correct mapping ...
       case 'unavailable-halfday-morning':
-        return `${baseClasses} bg-gray-500 text-white hover:bg-gray-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
       case 'unavailable-halfday-evening':
         return `${baseClasses} bg-gray-500 text-white hover:bg-gray-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
       case 'available-fullday':
         return `${baseClasses} bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
       case 'available-halfday-morning':
-        return `${baseClasses} bg-emerald-500 text-white hover:bg-emerald-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
       case 'available-halfday-evening':
         return `${baseClasses} bg-emerald-500 text-white hover:bg-emerald-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
-      // Legacy support
       case 'busy':
       case 'halfday':
       case 'unavailable':
         return `${baseClasses} bg-red-500 text-white hover:bg-red-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
-      case null:
-      case 'available':
       default:
-        // Unselected state
         return `${baseClasses} bg-transparent text-gray-400 border border-gray-600/30 hover:bg-gray-700/20 hover:border-gray-500/40 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
     }
   };
 
-  const getDateLabel = (status) => {
-    switch (status) {
+  const getDateLabel = (dateOrStatus) => {
+    // Determine input type (status string or date object) because structure changed
+    let status = typeof dateOrStatus === 'string' ? dateOrStatus : null;
+    let acceptedInfo = null;
+    let manualStatus = null;
+
+    if (typeof dateOrStatus === 'object' && dateOrStatus !== null) {
+      manualStatus = getAvailabilityStatus(dateOrStatus);
+      acceptedInfo = getAcceptedBookingInfo(dateOrStatus);
+    } else {
+      // Fallback for legend calls or simple status checking
+      status = dateOrStatus;
+    }
+
+    if (acceptedInfo) {
+      if (acceptedInfo.isHalfDay) {
+        const bookedTime = acceptedInfo.time === 'evening' ? 'evening' : 'morning';
+        const isAmBooked = bookedTime === 'morning';
+
+        // Context aware label for mixed state
+        if ((isAmBooked && manualStatus === 'unavailable-halfday-evening') ||
+          (!isAmBooked && manualStatus === 'unavailable-halfday-morning')) {
+          return isAmBooked ? 'AM Booked / PM Unavailable' : 'PM Booked / AM Unavailable';
+        }
+        return isAmBooked ? 'AM Booked' : 'PM Booked';
+      } else {
+        return 'Full Day Booked';
+      }
+    }
+
+    // Standard labels
+    const s = manualStatus || status;
+    switch (s) {
       case 'unavailable-fullday':
-        return 'Unavail Full';
+        return 'Unavailable Full';
       case 'unavailable-halfday-morning':
-        return 'Unavail AM';
+        return 'Unavailable AM';
       case 'unavailable-halfday-evening':
-        return 'Unavail PM';
+        return 'Unavailable PM';
       case 'available-fullday':
         return 'Avail Full';
       case 'available-halfday-morning':
@@ -266,7 +322,7 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
       // Legacy
       case 'busy':
       case 'halfday':
-        return 'Booked';
+        return 'Full Day Booked';
       case 'unavailable':
         return 'Unavailable';
       default:
@@ -328,7 +384,7 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
         <div className="grid grid-cols-7 gap-1">
           {days.map((date, index) => {
             if (!date) {
-              return <div key={`empty-${index}`} className="h-8 sm:h-10"></div>;
+              return <div key={`empty-${index}`} className="h-12 sm:h-16"></div>;
             }
 
             const dateKey = getDateKey(date);
@@ -336,7 +392,8 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
             const isPast = isPastDate(date);
             const isAcceptedBooking = isAcceptedBookingDate(date);
             const hasStatus = status && status !== 'available';
-            const label = getDateLabel(status);
+            // pass date object to get label context
+            const label = getDateLabel(date);
 
             return (
               <button
@@ -345,35 +402,39 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (!readOnly && !isPast && !isAcceptedBooking) {
+                  // Check blocked via function call now
+                  if (!readOnly && !isPast && !isBlockedDate(date)) {
                     handleDateClick(date, e);
                   }
                 }}
                 onTouchEnd={(e) => {
                   // Handle touch events for mobile devices
-                  if (!readOnly && !isPast && !isAcceptedBooking) {
+                  if (!readOnly && !isPast && !isBlockedDate(date)) {
                     e.preventDefault();
                     e.stopPropagation();
                     handleDateClick(date, e);
                   }
                 }}
-                disabled={readOnly || isPast || isAcceptedBooking}
+                disabled={readOnly || isPast || isBlockedDate(date)}
                 className={getDateClassName(date)}
-                style={{ touchAction: (readOnly || isPast || isAcceptedBooking) ? 'auto' : 'manipulation' }}
+                style={{ touchAction: (readOnly || isPast || isBlockedDate(date)) ? 'auto' : 'manipulation' }}
                 title={
                   isPast ? 'Past date' :
-                    isAcceptedBooking ? 'Accepted booking - cannot edit' :
+                    isBlockedDate(date) ? 'Accepted booking - cannot edit' :
                       readOnly ? 'Click "Edit Calendar" to make changes' :
                         (label || 'Click to set availability')
                 }
               >
                 <div className="flex flex-col items-center justify-center">
                   <span>{date.getDate()}</span>
-                  {isAcceptedBooking && (
-                    <Lock className="w-2 h-2 mt-0.5" />
-                  )}
                   {label && !isAcceptedBooking && (
                     <span className="text-[8px] sm:text-[9px] mt-0.5 font-normal opacity-90">
+                      {label}
+                    </span>
+                  )}
+                  {/* Show label for Half Day Accepted Bookings too if they have text */}
+                  {isAcceptedBooking && label && (
+                    <span className="text-[7px] sm:text-[8px] mt-0.5 font-bold opacity-100 leading-tight px-1">
                       {label}
                     </span>
                   )}
@@ -403,11 +464,15 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-red-500 rounded"></div>
-              <span className="text-gray-300">Busy (Booked)</span>
+              <span className="text-gray-300">Full Day Booked</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-              <span className="text-gray-300">Half Day Booked</span>
+              <span className="text-gray-300">Half Day Booked (Edit Other Half)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-orange-600 rounded"></div>
+              <span className="text-gray-300">Half Booked / Half Unavailable</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-600 border-2 border-blue-400 rounded"></div>
@@ -418,10 +483,6 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-gray-600 rounded"></div>
                   <span className="text-gray-300">Unavailable</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-800/50 rounded"></div>
-                  <span className="text-gray-300">Past Date</span>
                 </div>
               </>
             )}
@@ -452,28 +513,74 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
             >
               <div className="text-xs sm:text-sm text-gray-300 mb-2 sm:mb-3 font-medium text-center border-b border-gray-600 pb-2">
                 {popupDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                {getAcceptedBookingInfo(popupDate)?.isHalfDay && (
+                  <div className="text-yellow-500 text-xs mt-1">
+                    {getAcceptedBookingInfo(popupDate).time === 'evening' ? 'Evening is Booked' : 'Morning is Booked'}
+                  </div>
+                )}
               </div>
 
-              {/* Main Menu - Simplified: Only Unavailable options */}
+              {/* Main Menu */}
               {menuLevel === 'main' && (
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => handleStatusSelect('unavailable-fullday')}
-                    className="w-full px-3 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
-                  >
-                    Unavailable (Full Day)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMenuNavigation('unavailable-halfday')}
-                    className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium flex items-center justify-between"
-                  >
-                    <span>Unavailable (Half Day)</span>
-                    <span className="text-xs">→</span>
-                  </button>
+                  {/* If there's NO booking or a different kind, show standard options */}
+                  {!getAcceptedBookingInfo(popupDate) && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-fullday' ? 'available' : 'unavailable-fullday')}
+                        className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-fullday'
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-gray-600 hover:bg-gray-700 text-white'
+                          }`}
+                      >
+                        {getAvailabilityStatus(popupDate) === 'unavailable-fullday' ? 'Mark as Available' : 'Unavailable (Full Day)'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMenuNavigation('unavailable-halfday')}
+                        className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium flex items-center justify-between"
+                      >
+                        <span>Unavailable (Half Day)</span>
+                        <span className="text-xs">→</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* If there IS a half-day booking, show complementary option only */}
+                  {getAcceptedBookingInfo(popupDate)?.isHalfDay && (
+                    <>
+                      {getAcceptedBookingInfo(popupDate).time !== 'morning' && (
+                        <button
+                          type="button"
+                          onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'available' : 'unavailable-halfday-morning')}
+                          className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning'
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : 'bg-gray-600 hover:bg-gray-700 text-white'
+                            }`}
+                        >
+                          {getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'Mark Morning Available' : 'Mark Morning Unavailable'}
+                        </button>
+                      )}
+                      {getAcceptedBookingInfo(popupDate).time !== 'evening' && (
+                        <button
+                          type="button"
+                          onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'available' : 'unavailable-halfday-evening')}
+                          className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening'
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : 'bg-gray-600 hover:bg-gray-700 text-white'
+                            }`}
+                        >
+                          {getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'Mark Evening Available' : 'Mark Evening Unavailable'}
+                        </button>
+                      )}
+
+
+                    </>
+                  )}
                 </div>
               )}
+
 
               {/* Unavailable Half Day Sub-Menu */}
               {menuLevel === 'unavailable-halfday' && (
@@ -487,17 +594,23 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleStatusSelect('unavailable-halfday-morning')}
-                    className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                    onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'available' : 'unavailable-halfday-morning')}
+                    className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-gray-500 hover:bg-gray-600 text-white'
+                      }`}
                   >
-                    Unavailable Morning (AM)
+                    {getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'Mark Morning Available' : 'Unavailable Morning (AM)'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleStatusSelect('unavailable-halfday-evening')}
-                    className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                    onClick={() => handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'available' : 'unavailable-halfday-evening')}
+                    className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-gray-500 hover:bg-gray-600 text-white'
+                      }`}
                   >
-                    Unavailable Evening (PM)
+                    {getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'Mark Evening Available' : 'Unavailable Evening (PM)'}
                   </button>
                 </div>
               )}

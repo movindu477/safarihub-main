@@ -147,3 +147,9 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 } */
+
+/* Hide browser default password reveal button */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}

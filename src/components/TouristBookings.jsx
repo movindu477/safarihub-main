@@ -360,10 +360,10 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                 <div class="detail-label">Service Type</div>
                 <div class="detail-value">${booking.serviceType || 'N/A'}</div>
               </div>
-              ${booking.vehicleType ? `
+              ${(booking.vehicleType || booking.selectedVehicleType) ? `
               <div class="detail-item">
                 <div class="detail-label">Vehicle Type</div>
-                <div class="detail-value">${booking.vehicleType}</div>
+                <div class="detail-value">${booking.vehicleType || booking.selectedVehicleType}</div>
               </div>
               ` : ''}
               ${booking.packageName ? `
@@ -388,7 +388,10 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                   ${booking.datesWithTypes.map(item => {
       const date = item.date ? new Date(item.date) : null;
       const type = item.type || 'full-day';
-      const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+      const time = item.time || (booking.safariType?.toLowerCase().includes('evening') ? 'evening' : 'morning');
+      const typeLabel = type === 'half-day'
+        ? `Half Day (${time.charAt(0).toUpperCase() + time.slice(1)})`
+        : 'Full Day';
       const datePrice = booking.totalPrice / booking.datesWithTypes.length;
       return date ? `
                       <tr>
@@ -655,6 +658,9 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                           </div>
                           <div className="space-y-1 text-sm text-gray-300">
                             <p><span className="font-medium">Service Type:</span> {booking.serviceType || 'N/A'}</p>
+                            {(booking.selectedVehicleType || booking.vehicleType) && (
+                              <p><span className="font-medium">Vehicle Type:</span> {booking.selectedVehicleType || booking.vehicleType}</p>
+                            )}
                             {booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0 ? (
                               <div>
                                 <p className="font-medium mb-1">Dates:</p>
@@ -662,19 +668,30 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                                   {booking.datesWithTypes.map((item, index) => {
                                     const date = item.date ? new Date(item.date) : null;
                                     const type = item.type || 'full-day';
-                                    const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                                    const time = item.time || (booking.safariType?.toLowerCase().includes('evening') ? 'evening' : 'morning');
+                                    const typeLabel = type === 'half-day'
+                                      ? `Half Day (${time.charAt(0).toUpperCase() + time.slice(1)})`
+                                      : 'Full Day';
                                     const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
-                                    const isFullDay = type === 'full' || type === 'full-day';
-                                    const dayPrice = isFullDay
-                                      ? booking.priceFullDay || booking.pricePerDay
-                                      : booking.priceHalfDay || (booking.pricePerDay * 0.6);
+
+                                    // Calculate price for this day
+                                    let dayPrice = null;
+                                    if (booking.totalPrice && booking.datesWithTypes?.length > 0) {
+                                      dayPrice = booking.totalPrice / booking.datesWithTypes.length;
+                                    } else {
+                                      const isFullDay = type === 'full' || type === 'full-day';
+                                      dayPrice = isFullDay
+                                        ? booking.priceFullDay || booking.pricePerDay
+                                        : booking.priceHalfDay || (booking.pricePerDay * 0.6);
+                                    }
+
                                     if (!date) return null;
                                     return (
                                       <div key={index} className="flex items-center justify-between text-xs">
                                         <span className="text-gray-300">{date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                         <div className="flex items-center gap-2">
                                           <span className={`font-medium ${typeColor}`}>
-                                            {typeLabel} {dayPrice ? `- LKR ${dayPrice.toLocaleString()}` : ''}
+                                            {typeLabel} {dayPrice ? `- LKR ${Math.round(dayPrice).toLocaleString()}` : ''}
                                           </span>
                                         </div>
                                       </div>

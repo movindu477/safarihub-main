@@ -2804,7 +2804,10 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                       {booking.datesWithTypes.map((item, index) => {
                                         const date = item.date ? new Date(item.date) : null;
                                         const type = item.type || 'full-day';
-                                        const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                                        const time = item.time || (booking.safariType?.toLowerCase().includes('evening') ? 'evening' : 'morning');
+                                        const typeLabel = type === 'half-day'
+                                          ? `Half Day (${time.charAt(0).toUpperCase() + time.slice(1)})`
+                                          : 'Full Day';
                                         const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
 
                                         // Calculate price per date
@@ -3063,9 +3066,29 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                     const busyDatesCount = [
                       ...Object.values(availabilityStandard || {}),
                       ...Object.values(availabilityLuxury || {})
-                    ].filter(status => status === 'busy' || status === 'halfday').length;
+                    ].filter(status => [
+                      'busy',
+                      'halfday',
+                      'halfday-morning',
+                      'halfday-evening',
+                      'unavailable',
+                      'unavailable-fullday',
+                      'unavailable-halfday-morning',
+                      'unavailable-halfday-evening'
+                    ].includes(status)).length;
 
-                    if (acceptedCount === 0 && busyDatesCount === 0) {
+                    if (acceptedCount > 0 && busyDatesCount === 0) {
+                      return (
+                        <div className="bg-orange-900/20 border border-orange-700 rounded-lg p-3 flex flex-col gap-2">
+                          <p className="text-orange-300 text-sm font-medium">
+                            ⚠️ {acceptedCount} accepted booking(s) but 0 busy dates marked.
+                          </p>
+                          <p className="text-orange-200 text-xs">
+                            This may happen if bookings were accepted before the auto-sync feature was active. Please manually mark the dates as busy in the calendar below to prevent double bookings.
+                          </p>
+                        </div>
+                      );
+                    } else if (acceptedCount === 0 && busyDatesCount === 0) {
                       return (
                         <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3">
                           <p className="text-gray-400 text-sm">
@@ -3107,7 +3130,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           availability={isEditingCalendar ? tempAvailabilityStandard : availabilityStandard}
                           onChange={(newAvail) => isEditingCalendar && setTempAvailabilityStandard(newAvail)}
                           readOnly={!isEditingCalendar}
-                          acceptedBookings={bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && (!b.vehicleType || b.vehicleType.includes('Standard')))}
+                          acceptedBookings={bookings.filter(b => {
+                            if (b.status !== 'accepted' && b.status !== 'confirmed') return false;
+                            const type = b.vehicleType || b.selectedVehicleType;
+                            return !type || type.includes('Standard');
+                          })}
                         />
                       </div>
                     )}
@@ -3119,7 +3146,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           availability={isEditingCalendar ? tempAvailabilityLuxury : availabilityLuxury}
                           onChange={(newAvail) => isEditingCalendar && setTempAvailabilityLuxury(newAvail)}
                           readOnly={!isEditingCalendar}
-                          acceptedBookings={bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && b.vehicleType && b.vehicleType.includes('Luxury'))}
+                          acceptedBookings={bookings.filter(b => {
+                            if (b.status !== 'accepted' && b.status !== 'confirmed') return false;
+                            const type = b.vehicleType || b.selectedVehicleType;
+                            return type && type.includes('Luxury');
+                          })}
                         />
                       </div>
                     )}
@@ -3230,7 +3261,10 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           {selectedBooking.datesWithTypes.map((item, index) => {
                             const date = item.date ? new Date(item.date) : null;
                             const type = item.type || 'full-day';
-                            const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                            const time = item.time || (selectedBooking.safariType?.toLowerCase().includes('evening') ? 'evening' : 'morning');
+                            const typeLabel = type === 'half-day'
+                              ? `Half Day (${time.charAt(0).toUpperCase() + time.slice(1)})`
+                              : 'Full Day';
                             const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
                             // Calculate price for this day
                             const isFullDay = type === 'full' || type === 'full-day';
