@@ -6,6 +6,7 @@ import { Calendar, Star, CheckCircle, AlertCircle, X as CloseIcon, ChevronLeft, 
 import Navbar from './home/Navbar';
 import Footer from './home/Footer';
 import { createNotification } from '../App';
+import logo2 from '../assets/logo2.png';
 
 // Helper function to format dates with month as text
 const formatDate = (date) => {
@@ -130,10 +131,10 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
 
     // Create receipt HTML
     const receiptWindow = window.open('', '', 'width=800,height=600');
-    
+
     // Calculate total days
     const daysCount = booking.datesWithTypes?.length || 1;
-    
+
     // Format dates
     const formatReceiptDate = (date) => {
       if (!date) return 'N/A';
@@ -327,7 +328,9 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
         
         <div class="receipt-container">
           <div class="header">
-            <h1>🌴 SafariHub</h1>
+            <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+              <img src="${window.location.origin}${logo2}" alt="SafariHub Logo" style="height: 60px; object-fit: contain;" />
+            </div>
             <p>Booking Receipt & Confirmation</p>
           </div>
 
@@ -383,18 +386,18 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                 </thead>
                 <tbody>
                   ${booking.datesWithTypes.map(item => {
-                    const date = item.date ? new Date(item.date) : null;
-                    const type = item.type || 'full-day';
-                    const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
-                    const datePrice = booking.totalPrice / booking.datesWithTypes.length;
-                    return date ? `
+      const date = item.date ? new Date(item.date) : null;
+      const type = item.type || 'full-day';
+      const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+      const datePrice = booking.totalPrice / booking.datesWithTypes.length;
+      return date ? `
                       <tr>
                         <td>${formatReceiptDate(date)}</td>
                         <td>${typeLabel}</td>
                         <td style="text-align: right">LKR ${Math.round(datePrice).toLocaleString()}</td>
                       </tr>
                     ` : '';
-                  }).join('')}
+    }).join('')}
                 </tbody>
               </table>
             ` : ''}
@@ -524,7 +527,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
             >
-              Confirmed ({bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && b.paymentStatus === 'paid').length})
+              Paid ({bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && b.paymentStatus === 'paid').length})
             </button>
             <button
               onClick={() => setBookingFilter('completed')}
@@ -638,8 +641,17 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                               ? statusColors.confirmed
                               : statusColors[booking.status] || statusColors.pending
                               }`}>
-                              {booking.paymentStatus === 'paid' ? 'CONFIRMED' : (booking.status?.toUpperCase() || 'PENDING')}
+                              {booking.paymentStatus === 'paid' ? 'PAID' : (booking.status?.toUpperCase() || 'PENDING')}
                             </span>
+                            {booking.paymentStatus === 'paid' && (
+                              <button
+                                onClick={(e) => handleDownloadReceipt(booking, e)}
+                                className="p-1.5 hover:bg-gray-600 rounded-full transition-colors group"
+                                title="Download Slip"
+                              >
+                                <Download className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                              </button>
+                            )}
                           </div>
                           <div className="space-y-1 text-sm text-gray-300">
                             <p><span className="font-medium">Service Type:</span> {booking.serviceType || 'N/A'}</p>
@@ -709,10 +721,10 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                           {(booking.status === 'accepted' || booking.status === 'confirmed' || booking.status === 'completed' || booking.status === 'reviewed' || booking.paymentStatus === 'paid') && (
                             <button
                               onClick={(e) => handleDownloadReceipt(booking, e)}
-                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium"
                             >
                               <Download className="h-4 w-4" />
-                              Download Receipt
+                              Download Slip
                             </button>
                           )}
 

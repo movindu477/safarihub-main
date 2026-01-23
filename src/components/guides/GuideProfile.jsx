@@ -127,7 +127,17 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     // Priority 1: Check new availability calendar format (object)
     if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
       const status = availabilityCalendar[dateKey];
-      if (status && ['busy', 'halfday', 'unavailable', 'halfday-morning', 'halfday-evening'].includes(status)) {
+      // Check for both legacy and new status strings
+      if (status && [
+        'busy',
+        'halfday',
+        'unavailable',
+        'halfday-morning',
+        'halfday-evening',
+        'unavailable-fullday',
+        'unavailable-halfday-morning',
+        'unavailable-halfday-evening'
+      ].includes(status)) {
         return status;
       }
     }
@@ -164,11 +174,11 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
       }
     }
 
-    if (status === 'busy' || status === 'unavailable') {
+    if (status === 'busy' || status === 'unavailable' || status === 'unavailable-fullday') {
       return `${baseClasses} bg-gray-100 text-gray-400 cursor-not-allowed border-2 border-dashed border-gray-200`;
     }
 
-    if (status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening') {
+    if (status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening') {
       return `${baseClasses} bg-yellow-50 text-yellow-700 border-2 border-yellow-200 hover:bg-yellow-100 font-bold`;
     }
 
@@ -209,7 +219,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
           if (!day) return <div key={`empty-${index}`} className="h-10 w-10 sm:h-12 sm:w-12" />;
           const status = getAvailabilityStatus(day);
           const isPast = isDatePast(day);
-          const isAvailable = (status !== 'busy' && status !== 'unavailable' && !isPast);
+          const isAvailable = (status !== 'busy' && status !== 'unavailable' && status !== 'unavailable-fullday' && !isPast);
 
           return (
             <button
@@ -227,8 +237,8 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
               title={(() => {
                 if (isPast) return 'Past date';
                 if (status === 'busy') return 'Busy - Not available';
-                if (status === 'halfday') return 'Half day available';
-                if (status === 'unavailable') return 'Unavailable';
+                if (status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening') return 'Half day available';
+                if (status === 'unavailable' || status === 'unavailable-fullday') return 'Unavailable';
                 return 'Available - Click to select';
               })()}
             >
@@ -277,7 +287,8 @@ const BookingFormModal = ({
   const allSteps = [
     { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
     { number: 2, title: 'Tour Details', shortTitle: 'Tour', icon: Calendar },
-    { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation }
+    { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
+    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package }
   ];
 
   const steps = allSteps;
@@ -419,7 +430,7 @@ const BookingFormModal = ({
               {selectedDates.length > 0 && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><Package className="h-5 w-5 text-emerald-600" />Booking Summary</h3>
-                  
+
                   {/* Package Information */}
                   {selectedPackage && (
                     <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2.5 mb-3">
@@ -430,7 +441,7 @@ const BookingFormModal = ({
                       <p className="text-emerald-700 text-xs font-medium">{selectedPackage.title}</p>
                     </div>
                   )}
-                  
+
                   <div className="space-y-2">
                     {selectedDates.map((date, index) => {
                       const dateString = date.toDateString();
@@ -462,22 +473,22 @@ const BookingFormModal = ({
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Hotel Name <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      placeholder="Enter hotel name" 
-                      value={formData.hotelName} 
-                      onChange={(e) => updateFormData('hotelName', e.target.value)} 
+                    <input
+                      type="text"
+                      placeholder="Enter hotel name"
+                      value={formData.hotelName}
+                      onChange={(e) => updateFormData('hotelName', e.target.value)}
                       className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.hotelName ? 'border-red-500' : 'border-gray-300'}`}
                     />
                     {formErrors.hotelName && <p className="text-red-500 text-xs mt-1">{formErrors.hotelName}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Hotel Address <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      placeholder="Enter hotel address" 
-                      value={formData.hotelAddress} 
-                      onChange={(e) => updateFormData('hotelAddress', e.target.value)} 
+                    <input
+                      type="text"
+                      placeholder="Enter hotel address"
+                      value={formData.hotelAddress}
+                      onChange={(e) => updateFormData('hotelAddress', e.target.value)}
                       className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.hotelAddress ? 'border-red-500' : 'border-gray-300'}`}
                     />
                     {formErrors.hotelAddress && <p className="text-red-500 text-xs mt-1">{formErrors.hotelAddress}</p>}
@@ -487,25 +498,155 @@ const BookingFormModal = ({
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Pickup Location <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      placeholder="Enter pickup location" 
-                      value={formData.pickupLocation} 
-                      onChange={(e) => updateFormData('pickupLocation', e.target.value)} 
+                    <input
+                      type="text"
+                      placeholder="Enter pickup location"
+                      value={formData.pickupLocation}
+                      onChange={(e) => updateFormData('pickupLocation', e.target.value)}
                       className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.pickupLocation ? 'border-red-500' : 'border-gray-300'}`}
                     />
                     {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Drop-off Location <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      placeholder="Enter drop-off location" 
-                      value={formData.dropoffLocation} 
-                      onChange={(e) => updateFormData('dropoffLocation', e.target.value)} 
+                    <input
+                      type="text"
+                      placeholder="Enter drop-off location"
+                      value={formData.dropoffLocation}
+                      onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
                       className={`w-full px-4 py-2.5 border rounded-lg ${formErrors.dropoffLocation ? 'border-red-500' : 'border-gray-300'}`}
                     />
                     {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Package className="h-5 w-5 text-black" />
+                Additional Requests / Add-Ons
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {[
+                  { key: 'needsBinoculars', countKey: 'binocularsCount', label: 'Binoculars', price: 500, icon: '🔭' },
+                  { key: 'needsChildSeat', countKey: 'childSeatCount', label: 'Child Seat', price: 1000, icon: '👶' },
+                  { key: 'needsWater', countKey: 'waterBottleCount', label: 'Water Bottles', price: 300, icon: '💧' }
+                ].map(({ key, countKey, label, price, icon }) => {
+                  const count = formData[countKey] || 0;
+                  return (
+                    <div key={key} className={`border rounded-xl p-4 transition-all duration-200 ${count > 0 ? 'border-emerald-500 bg-emerald-50 shadow-md ring-1 ring-emerald-500/20' : 'border-gray-200 bg-gray-50/50'}`}>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{icon}</span>
+                          <div>
+                            <h3 className="text-sm font-bold text-gray-900">{label}</h3>
+                            <p className="text-xs text-gray-500 font-medium">+LKR {price.toLocaleString()} / item</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between bg-white rounded-lg p-1.5 border border-gray-200 shadow-sm">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); updateFormData(countKey, Math.max(0, count - 1)); }}
+                          className="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-bold text-gray-900">{count}</span>
+                          <span className="text-[10px] text-gray-400 font-bold uppercase">Qty</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); updateFormData(countKey, (count || 0) + 1); }}
+                          className="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className={`border rounded-xl p-4 transition-all duration-200 ${formData.needsSnacks ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-gray-300'}`}>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🍱</span>
+                    <span className="font-bold text-gray-900">Add Snacks / Meals</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formData.needsSnacks}
+                    onChange={(e) => updateFormData('needsSnacks', e.target.checked)}
+                    className="w-6 h-6 text-emerald-600 rounded-md focus:ring-emerald-500 border-gray-300"
+                  />
+                </label>
+              </div>
+
+              {formData.needsSnacks && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Available Snacks & Meals:</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { name: 'Biscuits', price: 200 }, { name: 'Chips', price: 250 }, { name: 'Fruits', price: 400 },
+                      { name: 'Sandwiches', price: 500 }, { name: 'Rice & Curry', price: 800 },
+                      { name: 'Fried Rice', price: 700 }, { name: 'Noodles', price: 600 }, { name: 'Soft Drinks', price: 150 }
+                    ].map(({ name, price }) => {
+                      const qty = formData.snackQuantities?.[name] || 0;
+                      return (
+                        <div key={name} className={`flex items-center justify-between p-3 bg-white rounded-lg border transition-colors ${qty > 0 ? 'border-emerald-500 shadow-sm' : 'border-gray-200'}`}>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 block">{name}</span>
+                            <span className="text-xs text-gray-500 font-semibold">+LKR {price}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {qty > 0 ? (
+                              <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 shadow-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newQtys = { ...(formData.snackQuantities || {}) };
+                                    newQtys[name] = Math.max(0, qty - 1);
+                                    updateFormData('snackQuantities', newQtys);
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                                <span className="w-8 text-center font-bold text-sm text-gray-900">{qty}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newQtys = { ...(formData.snackQuantities || {}) };
+                                    newQtys[name] = (qty || 0) + 1;
+                                    updateFormData('snackQuantities', newQtys);
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newQtys = { ...(formData.snackQuantities || {}) };
+                                  newQtys[name] = 1;
+                                  updateFormData('snackQuantities', newQtys);
+                                }}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all transform active:scale-95"
+                              >
+                                ADD
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -585,7 +726,16 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
     hotelAddress: '',
     roomNumber: '',
     dropoffLocation: '',
-    needsHotelPickup: true
+    needsHotelPickup: true,
+    needsBinoculars: false,
+    needsChildSeat: false,
+    needsWater: false,
+    needsSnacks: false,
+    binocularsCount: 0,
+    childSeatCount: 0,
+    waterBottleCount: 0,
+    snackQuantities: {},
+    selectedSnacks: []
   });
 
   // Reset showTimeMenu when dateTypeMenuDate changes
@@ -752,7 +902,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
         if (guideDoc.exists()) {
           const guideData = guideDoc.data();
           console.log('✅ Guide data found in Firestore:', guideData);
-          
+
           // Debug: Log pricing fields from database
           console.log('💰 Pricing fields from database:', {
             priceFullDayStandard: guideData.priceFullDayStandard,
@@ -877,6 +1027,19 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
     fetchGuideData();
   }, [guideId, currentUser]);
+
+  // Populate booking form when user/guide loads
+  useEffect(() => {
+    if (guide || currentUser) {
+      setBookingFormData(prev => ({
+        ...prev,
+        fullName: prev.fullName || currentUser?.displayName || userTouristData?.fullName || '',
+        email: prev.email || currentUser?.email || userTouristData?.email || '',
+        phone: prev.phone || userTouristData?.phone || '',
+        nationalPark: prev.nationalPark || guide?.location || guide?.destinations?.[0] || '',
+      }));
+    }
+  }, [guide, currentUser, userTouristData]);
 
   // Fetch packages for this guide
   useEffect(() => {
@@ -1013,6 +1176,23 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
       total += dayPrice;
     });
 
+    // Add add-ons (regular bookings only)
+    if (!selectedPackage) {
+      if (bookingFormData.binocularsCount > 0) total += bookingFormData.binocularsCount * 500;
+      if (bookingFormData.childSeatCount > 0) total += bookingFormData.childSeatCount * 1000;
+      if (bookingFormData.waterBottleCount > 0) total += bookingFormData.waterBottleCount * 300;
+
+      if (bookingFormData.needsSnacks && bookingFormData.snackQuantities) {
+        const snackPrices = {
+          'Biscuits': 200, 'Chips': 250, 'Fruits': 400, 'Sandwiches': 500,
+          'Rice & Curry': 800, 'Fried Rice': 700, 'Noodles': 600, 'Soft Drinks': 150
+        };
+        Object.entries(bookingFormData.snackQuantities).forEach(([name, qty]) => {
+          total += (snackPrices[name] || 0) * (qty || 0);
+        });
+      }
+    }
+
     return total;
   };
 
@@ -1117,6 +1297,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
         packageId: selectedPackage ? selectedPackage.id : null,
         packageName: selectedPackage ? selectedPackage.title : null,
         status: 'pending',
+        ...bookingFormData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -1366,8 +1547,8 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
     <div className="min-h-screen lg:h-screen bg-gray-50 flex flex-col lg:overflow-hidden lg:max-h-screen">
       {/* Booking Success Message */}
       {showSuccessMessage && successMessageData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 sm:p-8">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-10 max-w-lg w-full mx-auto max-h-[85vh] overflow-y-auto scrollbar-hide flex flex-col">
             <div className="text-center space-y-4">
               <div className="flex justify-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
@@ -1396,7 +1577,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                   <span className="text-gray-600 font-medium">Guide:</span>
                   <span className="text-gray-900 font-semibold">{successMessageData.guideName}</span>
                 </div>
-                
+
                 {/* Dates - Vertical List with Individual Prices */}
                 <div className="border-t border-gray-200 pt-2 mt-2">
                   <span className="text-gray-600 font-medium block mb-2">Dates:</span>
@@ -1406,7 +1587,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                       const formattedDate = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                       const dayType = dateInfo.type === 'half-day' ? 'Half Day' : 'Full Day';
                       const timeOfDay = dateInfo.timeOfDay ? ` (${dateInfo.timeOfDay === 'morning' ? 'Morning' : 'Evening'})` : '';
-                      
+
                       return (
                         <div key={index} className="flex justify-between items-start bg-white p-2 rounded border border-gray-200">
                           <span className="text-gray-700 text-sm flex-1">
@@ -1421,7 +1602,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     })}
                   </div>
                 </div>
-                
+
                 <div className="flex justify-between">
                   <span className="text-gray-600 font-medium">Days:</span>
                   <span className="text-gray-900 font-semibold">{successMessageData.numberOfDays} day(s)</span>
@@ -1475,7 +1656,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
       />
 
 
-      <div className="bg-gradient-to-r from-black via-gray-800 to-black border-b border-gray-300 shadow-lg">
+      <div className="bg-linear-to-r from-black via-gray-800 to-black border-b border-gray-300 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-5 md:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-18 md:h-20">
             <div className="flex items-center">
@@ -1578,7 +1759,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
           <div className="lg:col-span-2 flex flex-col min-h-0">
             {/* Tabs */}
             <div className="bg-gradient-to-b from-gray-100 to-gray-200 rounded-lg shadow-2xl border-2 border-gray-300 overflow-hidden flex flex-col lg:flex-1 min-h-0 w-full">
-              <div className="border-b border-gray-300 bg-gradient-to-r from-gray-200 to-gray-100">
+              <div className="border-b border-gray-300 bg-linear-to-r from-gray-200 to-gray-100">
                 <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
@@ -1673,7 +1854,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Pricing - Guide's Registered Rates (Always Visible) */}
                     <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                      <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                      <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                         <DollarSign className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1706,7 +1887,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                 <span className="text-gray-800 font-bold text-xs sm:text-sm block">Full Day Tour:</span>
                                 <p className="text-xs text-gray-600 mt-0.5">Full day guided tour</p>
                               </div>
-                              <div className="text-right flex-shrink-0">
+                              <div className="text-right shrink-0">
                                 <span className="text-xs sm:text-sm text-gray-500 italic">Not Set</span>
                               </div>
                             </div>
@@ -1731,7 +1912,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                 <span className="text-gray-800 font-bold text-xs sm:text-sm block">Half Day Tour:</span>
                                 <p className="text-xs text-gray-600 mt-0.5">Half day guided tour</p>
                               </div>
-                              <div className="text-right flex-shrink-0">
+                              <div className="text-right shrink-0">
                                 <span className="text-xs sm:text-sm text-gray-500 italic">Not Set</span>
                               </div>
                             </div>
@@ -1764,7 +1945,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
                     {/* Destination Covered (Always Visible) */}
                     <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                      <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                      <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                         <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                       </div>
                       <div className="flex-1 min-w-0">

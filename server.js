@@ -29,7 +29,13 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
 // Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Initialize Stripe
+let stripe;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+} else {
+  console.warn('⚠️ STRIPE_SECRET_KEY is missing from .env file. Payments will fail.');
+}
 
 // TEMPORARY TEST: Verify Stripe Secret Key is loaded
 console.log("Stripe Secret Key Loaded:", !!process.env.STRIPE_SECRET_KEY);
@@ -73,7 +79,7 @@ const FRONTEND_URL = process.env.VITE_URL || `http://localhost:${FRONTEND_PORT}`
 
 // CORS configuration - allow frontend to access API
 app.use(cors({
-  origin: [FRONTEND_URL, "http://localhost:3000", "http://localhost:5173"],
+  origin: [FRONTEND_URL, "http://localhost:3000", "http://localhost:5173", "http://localhost:3001", "http://localhost:3002"],
   credentials: true
 }));
 app.use(express.json());
@@ -84,7 +90,7 @@ app.use(express.urlencoded({ extended: true }));
 // Socket.io configuration
 const io = new Server(server, {
   cors: {
-    origin: [FRONTEND_URL, "http://localhost:3000", "http://localhost:5173"],
+    origin: [FRONTEND_URL, "http://localhost:3000", "http://localhost:5173", "http://localhost:3001", "http://localhost:3002"],
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -266,8 +272,8 @@ app.get('/api/health', (req, res) => {
 app.post('/api/upload-profile-image', upload.single('file'), async (req, res) => {
   try {
     if (!supabase) {
-      return res.status(500).json({ 
-        error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file' 
+      return res.status(500).json({
+        error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file'
       });
     }
 
@@ -326,8 +332,8 @@ app.post('/api/upload-profile-image', upload.single('file'), async (req, res) =>
 app.post('/api/upload-document', upload.single('file'), async (req, res) => {
   try {
     if (!supabase) {
-      return res.status(500).json({ 
-        error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file' 
+      return res.status(500).json({
+        error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file'
       });
     }
 
@@ -384,8 +390,8 @@ app.post('/api/upload-document', upload.single('file'), async (req, res) => {
 app.post('/api/get-document-url', async (req, res) => {
   try {
     if (!supabase) {
-      return res.status(500).json({ 
-        error: 'Supabase not configured' 
+      return res.status(500).json({
+        error: 'Supabase not configured'
       });
     }
 
@@ -393,15 +399,15 @@ app.post('/api/get-document-url', async (req, res) => {
 
     // 🔐 Safety check: Only accept path, reject URLs
     if (!path) {
-      return res.status(400).json({ 
-        error: 'path is required. Path must be relative (e.g., users/userId/documents/file.pdf)' 
+      return res.status(400).json({
+        error: 'path is required. Path must be relative (e.g., users/userId/documents/file.pdf)'
       });
     }
 
     // Reject full URLs immediately
     if (path.startsWith('http://') || path.startsWith('https://')) {
-      return res.status(400).json({ 
-        error: 'Path must be relative (e.g., users/userId/documents/file.pdf), not a full URL' 
+      return res.status(400).json({
+        error: 'Path must be relative (e.g., users/userId/documents/file.pdf), not a full URL'
       });
     }
 
@@ -420,7 +426,7 @@ app.post('/api/get-document-url', async (req, res) => {
     if (error) {
       console.error('❌ Signed URL error:', error);
       console.error(`   Attempted path: ${filePath}`);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: error.message,
         details: `Failed to generate signed URL for path: ${filePath}`
       });
@@ -448,8 +454,8 @@ app.post('/api/get-document-url', async (req, res) => {
 app.delete('/api/delete-document', async (req, res) => {
   try {
     if (!supabase) {
-      return res.status(500).json({ 
-        error: 'Supabase not configured' 
+      return res.status(500).json({
+        error: 'Supabase not configured'
       });
     }
 
@@ -469,7 +475,7 @@ app.delete('/api/delete-document', async (req, res) => {
         // We need: users/... (everything after the bucket name)
         const publicUrlMatch = url.match(/\/storage\/v1\/object\/public\/[^\/]+\/(.+?)(\?|$)/);
         const signedUrlMatch = url.match(/\/storage\/v1\/object\/sign\/[^\/]+\/(.+?)(\?|$)/);
-        
+
         if (publicUrlMatch) {
           filePath = decodeURIComponent(publicUrlMatch[1]);
         } else if (signedUrlMatch) {
@@ -986,6 +992,10 @@ app.post('/api/create-payment-intent', async (req, res) => {
   try {
     const { amount, bookingId } = req.body;
 
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe is not configured. Server missing STRIPE_SECRET_KEY.' });
+    }
+
     if (!amount || !bookingId) {
       return res.status(400).json({ error: 'Amount and bookingId are required' });
     }
@@ -1084,7 +1094,7 @@ app.post('/api/payment-methods', async (req, res) => {
 
     let touristData = touristSnap.data();
     let stripeCustomerId = touristData.stripeCustomerId;
-    
+
     console.log('📋 User data:', { userId, hasStripeId: !!stripeCustomerId });
 
     // Create Stripe customer if doesn't exist

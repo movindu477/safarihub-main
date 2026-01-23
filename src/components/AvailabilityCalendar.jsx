@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Calendar, X, Lock } from "lucide-react";
 
 // Availability Calendar Component for Service Providers
-const AvailabilityCalendar = ({ availability, onChange, readOnly = false, acceptedBookings = [] }) => {
+const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, acceptedBookings = [] }) => {
+  // Debug log to verify props
+  console.log('📅 AvailabilityCalendar Rendered. Availability entries:', Object.keys(availability || {}).length);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
@@ -10,21 +12,15 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
   const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
   const [popupDate, setPopupDate] = useState(null);
 
-  // Initialize availability state if not provided
-  const [dateAvailability, setDateAvailability] = useState(() => {
-    if (availability && typeof availability === 'object' && !Array.isArray(availability)) {
-      return { ...availability };
-    }
-    return {};
-  });
+
 
   // Get dates from accepted bookings
   const getAcceptedBookingDates = useCallback(() => {
     const dates = new Set();
-    
+
     acceptedBookings.forEach(booking => {
       let bookingDates = [];
-      
+
       if (booking.dates && Array.isArray(booking.dates)) {
         // Multiple dates booking
         bookingDates = booking.dates.map(date => {
@@ -38,18 +34,18 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
         });
       } else if (booking.startDate) {
         // Single date booking
-        const date = booking.startDate.toDate 
-          ? booking.startDate.toDate() 
+        const date = booking.startDate.toDate
+          ? booking.startDate.toDate()
           : new Date(booking.startDate);
         bookingDates = [date];
       }
-      
+
       bookingDates.forEach(date => {
         const dateKey = date.toISOString().split('T')[0];
         dates.add(dateKey);
       });
     });
-    
+
     return dates;
   }, [acceptedBookings]);
 
@@ -62,32 +58,9 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
     return acceptedDates.has(dateKey);
   }, [acceptedDates]);
 
-  // Update parent when availability changes
-  useEffect(() => {
-    if (onChange && typeof onChange === 'function') {
-      try {
-        onChange(dateAvailability);
-      } catch (error) {
-        console.error('Error calling onChange in AvailabilityCalendar:', error);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateAvailability]);
+  // Update parent when availability changes - REMOVED internal state sync
 
-  // Initialize from props only on mount or when availability prop actually changes
-  useEffect(() => {
-    if (availability && typeof availability === 'object' && !Array.isArray(availability)) {
-      setDateAvailability(prev => {
-        // Only update if it's actually different
-        const availStr = JSON.stringify(availability);
-        const prevStr = JSON.stringify(prev);
-        if (availStr !== prevStr) {
-          return { ...availability };
-        }
-        return prev;
-      });
-    }
-  }, [availability]);
+  // Initialize from props only on mount or when availability prop actually changes - REMOVED internal state sync
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -119,13 +92,17 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
 
   const getDateKey = (date) => {
     if (!date) return null;
-    return date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const getAvailabilityStatus = (date) => {
     if (!date) return null;
     const dateKey = getDateKey(date);
-    return dateAvailability[dateKey] || null;
+    // Use prop directly, fallback to empty object if undefined
+    return (availability || {})[dateKey] || null;
   };
 
   const isPastDate = useCallback((date) => {
@@ -138,9 +115,9 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
   const handleDateClick = useCallback((date, event) => {
     // Block editing if: readonly, no date, past date, or accepted booking date
     if (readOnly || !date || isPastDate(date) || isAcceptedBookingDate(date)) {
-      console.log('📅 Date click blocked:', { 
-        readOnly, 
-        date: date?.toISOString(), 
+      console.log('📅 Date click blocked:', {
+        readOnly,
+        date: date?.toISOString(),
         isPast: isPastDate(date),
         isAcceptedBooking: isAcceptedBookingDate(date)
       });
@@ -193,26 +170,27 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
   }, [readOnly, isPastDate, isAcceptedBookingDate]);
 
   const handleStatusSelect = useCallback((status) => {
-    if (!popupDate) return;
+    if (!popupDate || !onChange) return;
 
     const dateKey = getDateKey(popupDate);
 
-    setDateAvailability(prev => {
-      const newState = { ...prev };
-      if (!status || status === 'available') {
-        delete newState[dateKey]; // Remove if available (unselected)
-      } else {
-        newState[dateKey] = status;
-      }
-      console.log('📅 Date status set:', dateKey, '→', status);
-      return newState;
-    });
+    // Create new state based on PROPS
+    const newState = { ...(availability || {}) };
+
+    if (!status || status === 'available') {
+      delete newState[dateKey];
+    } else {
+      newState[dateKey] = status;
+    }
+
+    console.log('📅 Date status update via prop:', dateKey, '→', status);
+    onChange(newState);
 
     // Close popup
     setShowPopup(false);
     setMenuLevel('main');
     setPopupDate(null);
-  }, [popupDate]);
+  }, [popupDate, availability, onChange]);
 
   const handleMenuNavigation = (level) => {
     setMenuLevel(level);
@@ -220,11 +198,11 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
 
   const clearDate = (dateKey, e) => {
     e?.stopPropagation();
-    setDateAvailability(prev => {
-      const newState = { ...prev };
-      delete newState[dateKey];
-      return newState;
-    });
+    if (!onChange) return;
+
+    const newState = { ...(availability || {}) };
+    delete newState[dateKey];
+    onChange(newState);
   };
 
   const getDateClassName = (date) => {
@@ -360,62 +338,62 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
             const hasStatus = status && status !== 'available';
             const label = getDateLabel(status);
 
-          return (
-            <button
-              key={dateKey}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!readOnly && !isPast && !isAcceptedBooking) {
-                  handleDateClick(date, e);
-                }
-              }}
-              onTouchEnd={(e) => {
-                // Handle touch events for mobile devices
-                if (!readOnly && !isPast && !isAcceptedBooking) {
+            return (
+              <button
+                key={dateKey}
+                type="button"
+                onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleDateClick(date, e);
-                }
-              }}
-              disabled={readOnly || isPast || isAcceptedBooking}
-              className={getDateClassName(date)}
-              style={{ touchAction: (readOnly || isPast || isAcceptedBooking) ? 'auto' : 'manipulation' }}
-              title={
-                isPast ? 'Past date' : 
-                isAcceptedBooking ? 'Accepted booking - cannot edit' :
-                readOnly ? 'Click "Edit Calendar" to make changes' : 
-                (label || 'Click to set availability')
-              }
-            >
-              <div className="flex flex-col items-center justify-center">
-                <span>{date.getDate()}</span>
-                {isAcceptedBooking && (
-                  <Lock className="w-2 h-2 mt-0.5" />
-                )}
-                {label && !isAcceptedBooking && (
-                  <span className="text-[8px] sm:text-[9px] mt-0.5 font-normal opacity-90">
-                    {label}
-                  </span>
-                )}
-              </div>
-              {hasStatus && !readOnly && !isAcceptedBooking && (
-                <button
-                  type="button"
-                  onClick={(e) => {
+                  if (!readOnly && !isPast && !isAcceptedBooking) {
+                    handleDateClick(date, e);
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  // Handle touch events for mobile devices
+                  if (!readOnly && !isPast && !isAcceptedBooking) {
                     e.preventDefault();
                     e.stopPropagation();
-                    clearDate(dateKey, e);
-                  }}
-                  className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10"
-                  title="Clear"
-                >
-                  <X className="w-2 h-2 text-white" />
-                </button>
-              )}
-            </button>
-          );
+                    handleDateClick(date, e);
+                  }
+                }}
+                disabled={readOnly || isPast || isAcceptedBooking}
+                className={getDateClassName(date)}
+                style={{ touchAction: (readOnly || isPast || isAcceptedBooking) ? 'auto' : 'manipulation' }}
+                title={
+                  isPast ? 'Past date' :
+                    isAcceptedBooking ? 'Accepted booking - cannot edit' :
+                      readOnly ? 'Click "Edit Calendar" to make changes' :
+                        (label || 'Click to set availability')
+                }
+              >
+                <div className="flex flex-col items-center justify-center">
+                  <span>{date.getDate()}</span>
+                  {isAcceptedBooking && (
+                    <Lock className="w-2 h-2 mt-0.5" />
+                  )}
+                  {label && !isAcceptedBooking && (
+                    <span className="text-[8px] sm:text-[9px] mt-0.5 font-normal opacity-90">
+                      {label}
+                    </span>
+                  )}
+                </div>
+                {hasStatus && !readOnly && !isAcceptedBooking && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      clearDate(dateKey, e);
+                    }}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10"
+                    title="Clear"
+                  >
+                    <X className="w-2 h-2 text-white" />
+                  </button>
+                )}
+              </button>
+            );
           })}
         </div>
 
@@ -438,10 +416,6 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
             {!readOnly && (
               <>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-emerald-600 rounded"></div>
-                  <span className="text-gray-300">Available</span>
-                </div>
-                <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-gray-600 rounded"></div>
                   <span className="text-gray-300">Unavailable</span>
                 </div>
@@ -456,164 +430,82 @@ const AvailabilityCalendar = ({ availability, onChange, readOnly = false, accept
       </div>
 
       {/* Status Selection Popup */}
-      {showPopup && popupDate && !readOnly && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => {
-              setShowPopup(false);
-              setMenuLevel('main');
-              setPopupDate(null);
-            }}
-          />
-          {/* Popup Box */}
-          <div
-            className="absolute z-50 bg-gray-800 border-2 border-gray-600 rounded-xl shadow-2xl p-3 sm:p-4 w-[200px] sm:w-[250px] animate-fadeIn"
-            style={{
-              top: `${popupPosition.top}px`,
-              left: `${popupPosition.left}px`
-            }}
-          >
-            <div className="text-xs sm:text-sm text-gray-300 mb-2 sm:mb-3 font-medium text-center border-b border-gray-600 pb-2">
-              {popupDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+      {
+        showPopup && popupDate && !readOnly && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => {
+                setShowPopup(false);
+                setMenuLevel('main');
+                setPopupDate(null);
+              }}
+            />
+            {/* Popup Box */}
+            <div
+              className="absolute z-50 bg-gray-800 border-2 border-gray-600 rounded-xl shadow-2xl p-3 sm:p-4 w-[200px] sm:w-[250px] animate-fadeIn"
+              style={{
+                top: `${popupPosition.top}px`,
+                left: `${popupPosition.left}px`
+              }}
+            >
+              <div className="text-xs sm:text-sm text-gray-300 mb-2 sm:mb-3 font-medium text-center border-b border-gray-600 pb-2">
+                {popupDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </div>
+
+              {/* Main Menu - Simplified: Only Unavailable options */}
+              {menuLevel === 'main' && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleStatusSelect('unavailable-fullday')}
+                    className="w-full px-3 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
+                    Unavailable (Full Day)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMenuNavigation('unavailable-halfday')}
+                    className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium flex items-center justify-between"
+                  >
+                    <span>Unavailable (Half Day)</span>
+                    <span className="text-xs">→</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Unavailable Half Day Sub-Menu */}
+              {menuLevel === 'unavailable-halfday' && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMenuNavigation('main')}
+                    className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-xs font-medium"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStatusSelect('unavailable-halfday-morning')}
+                    className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                  >
+                    Unavailable Morning (AM)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStatusSelect('unavailable-halfday-evening')}
+                    className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                  >
+                    Unavailable Evening (PM)
+                  </button>
+                </div>
+              )}
             </div>
-
-            {/* Main Menu */}
-            {menuLevel === 'main' && (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handleMenuNavigation('available-sub')}
-                  className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium flex items-center justify-between"
-                >
-                  <span>Available</span>
-                  <span className="text-xs">→</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMenuNavigation('unavailable-sub')}
-                  className="w-full px-3 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium flex items-center justify-between"
-                >
-                  <span>Unavailable</span>
-                  <span className="text-xs">→</span>
-                </button>
-              </div>
-            )}
-
-            {/* Available Sub-Menu */}
-            {menuLevel === 'available-sub' && (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handleMenuNavigation('main')}
-                  className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-xs font-medium"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('available-fullday')}
-                  className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
-                >
-                  Full Day
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMenuNavigation('available-halfday')}
-                  className="w-full px-3 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium flex items-center justify-between"
-                >
-                  <span>Half Day</span>
-                  <span className="text-xs">→</span>
-                </button>
-              </div>
-            )}
-
-            {/* Available Half Day Sub-Menu */}
-            {menuLevel === 'available-halfday' && (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handleMenuNavigation('available-sub')}
-                  className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-xs font-medium"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('available-halfday-morning')}
-                  className="w-full px-3 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
-                >
-                  Morning
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('available-halfday-evening')}
-                  className="w-full px-3 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
-                >
-                  Evening
-                </button>
-              </div>
-            )}
-
-            {/* Unavailable Sub-Menu */}
-            {menuLevel === 'unavailable-sub' && (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handleMenuNavigation('main')}
-                  className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-xs font-medium"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('unavailable-fullday')}
-                  className="w-full px-3 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
-                >
-                  Full Day
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMenuNavigation('unavailable-halfday')}
-                  className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium flex items-center justify-between"
-                >
-                  <span>Half Day</span>
-                  <span className="text-xs">→</span>
-                </button>
-              </div>
-            )}
-
-            {/* Unavailable Half Day Sub-Menu */}
-            {menuLevel === 'unavailable-halfday' && (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handleMenuNavigation('unavailable-sub')}
-                  className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-xs font-medium"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('unavailable-halfday-morning')}
-                  className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
-                >
-                  Morning
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStatusSelect('unavailable-halfday-evening')}
-                  className="w-full px-3 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
-                >
-                  Evening
-                </button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+          </>
+        )
+      }
+    </div >
   );
 };
 

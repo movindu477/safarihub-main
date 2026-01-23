@@ -116,7 +116,10 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
 
   const getDateKey = (date) => {
     if (!date) return null;
-    return date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const getAvailabilityStatus = (date) => {
@@ -127,7 +130,16 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
       const status = availabilityCalendar[dateKey];
       // Return status if it exists, otherwise return null (which means available)
-      if (status && ['busy', 'halfday', 'unavailable', 'halfday-morning', 'halfday-evening'].includes(status)) {
+      if (status && [
+        'busy',
+        'halfday',
+        'unavailable',
+        'halfday-morning',
+        'halfday-evening',
+        'unavailable-fullday', // consistent with admin
+        'unavailable-halfday-morning',
+        'unavailable-halfday-evening'
+      ].includes(status)) {
         return status;
       }
       // If no status marked, return null (available by default)
@@ -136,9 +148,10 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
 
     // Fallback to old availableDates array format
     if (availableDates && Array.isArray(availableDates)) {
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = getDateKey(date);
       const isInArray = availableDates.some(availableDate => {
-        const availableDateString = new Date(availableDate).toISOString().split('T')[0];
+        const d = new Date(availableDate);
+        const availableDateString = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return availableDateString === dateString;
       });
       return isInArray ? null : 'unavailable'; // If in array = available, if not = unavailable
@@ -152,7 +165,7 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     const status = getAvailabilityStatus(date);
     // Available if status is null/undefined or 'available' (not marked as busy/unavailable)
     // Also available if it's partially booked (half-day)
-    return status === null || status === 'available' || status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening';
+    return status === null || status === 'available' || status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening';
   };
 
   const isDateSelected = (date) => {
@@ -220,9 +233,9 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
     // Handle availability statuses
     if (status === 'busy') {
       return `${baseClasses} bg-red-600 text-white hover:bg-red-700`; // Full Day = Red
-    } else if (status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening') {
-      return `${baseClasses} bg-yellow-500 text-white hover:bg-yellow-600`; // Half Day = Yellow
-    } else if (status === 'unavailable') {
+    } else if (status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening') {
+      return `${baseClasses} bg-orange-500 text-white hover:bg-orange-600`; // Half Day = Orange
+    } else if (status === 'unavailable' || status === 'unavailable-fullday') {
       return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
     } else {
       // No status or null means available (green)
@@ -264,8 +277,8 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
           <span className="text-gray-300">Full Day</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-          <span className="text-gray-300">Half Day</span>
+          <div className="w-3 h-3 bg-orange-500 rounded"></div>
+          <span className="text-gray-300">Partially Booked</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <div className="w-3 h-3 bg-gray-600 rounded"></div>
@@ -311,13 +324,19 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
                 if (isPast) return 'Past date';
                 if (status === 'busy') return 'Busy - Not available';
                 if (status === 'halfday') return 'Half day available';
-                if (status === 'halfday-morning') return 'Morning booked - Evening available';
-                if (status === 'halfday-evening') return 'Evening booked - Morning available';
-                if (status === 'unavailable') return 'Unavailable';
+                if (status === 'halfday-morning' || status === 'unavailable-halfday-morning') return 'Morning booked/unavailable - Evening available';
+                if (status === 'halfday-evening' || status === 'unavailable-halfday-evening') return 'Evening booked/unavailable - Morning available';
+                if (status === 'unavailable' || status === 'unavailable-fullday') return 'Unavailable';
                 return 'Available - Click to select';
               })()}
             >
-              {day.getDate()}
+              <span className="z-10 relative">{day.getDate()}</span>
+              {(status === 'halfday-morning' || status === 'unavailable-halfday-morning') && (
+                <span className="absolute bottom-0.5 text-[8px] sm:text-[9px] leading-none opacity-90 font-bold tracking-tighter">AM Booked</span>
+              )}
+              {(status === 'halfday-evening' || status === 'unavailable-halfday-evening') && (
+                <span className="absolute bottom-0.5 text-[8px] sm:text-[9px] leading-none opacity-90 font-bold tracking-tighter">PM Booked</span>
+              )}
             </button>
           );
         })}
@@ -360,7 +379,7 @@ const BookingFormModal = ({
       number: index + 1 // Re-number steps
     }))
     : allSteps;
-  
+
   console.log('📊 Modal State - currentStep:', currentStep, '| stepsLength:', steps.length, '| hasPackage:', !!selectedPackage);
 
   const updateFormData = (field, value) => {
@@ -853,41 +872,93 @@ const BookingFormModal = ({
 
           {/* Step 4: Additional Requests - Abbreviated (Hidden for package bookings) */}
           {currentStep === 4 && !selectedPackage && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Package className="h-5 w-5 text-black" />
-                Additional Requests / Add-Ons
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {[
-                  { key: 'needsBinoculars', label: 'Binoculars', price: 500 },
-                  { key: 'needsChildSeat', label: 'Child Seat', price: 1000 },
-                  { key: 'needsWater', label: 'Water Bottles', price: 300 },
-                  { key: 'needsSnacks', label: 'Snacks / Meals', price: 0 }
-                ].map(({ key, label, price }) => (
-                  <label key={key} className="flex items-center justify-between cursor-pointer p-3 border border-gray-300 rounded-none">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData[key]}
-                        onChange={(e) => updateFormData(key, e.target.checked)}
-                        className="w-5 h-5 text-black rounded focus:ring-black"
-                      />
-                      <span className="text-sm font-medium text-gray-700">{label}</span>
-                    </div>
-                    {price > 0 && (
-                      <span className="text-sm font-semibold text-black">+LKR {price.toLocaleString()}</span>
-                    )}
-                  </label>
-                ))}
+            <>
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Package className="h-5 w-5 text-black" />
+                  Additional Requests / Add-Ons
+                </h2>
+                {(() => {
+                  const addOns = [
+                    { key: 'needsBinoculars', countKey: 'binocularsCount', label: 'Binoculars', price: 500, icon: '🔭' },
+                    { key: 'needsChildSeat', countKey: 'childSeatCount', label: 'Child Seat', price: 1000, icon: '👶' },
+                    { key: 'needsWater', countKey: 'waterBottleCount', label: 'Water Bottles', price: 300, icon: '💧' }
+                  ];
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                        {addOns.map(({ key, countKey, label, price, icon }) => {
+                          const count = formData[countKey] || 0;
+                          return (
+                            <div key={key} className={`border rounded-xl p-4 transition-all duration-200 ${count > 0 ? 'border-emerald-500 bg-emerald-50 shadow-md ring-1 ring-emerald-500/20' : 'border-gray-200 bg-gray-50/50'}`}>
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-2xl">{icon}</span>
+                                  <div>
+                                    <h3 className="text-sm font-bold text-gray-900">{label}</h3>
+                                    <p className="text-xs text-gray-500 font-medium">+LKR {price.toLocaleString()} / item</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between bg-white rounded-lg p-1.5 border border-gray-200 shadow-sm">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    updateFormData(countKey, Math.max(0, count - 1));
+                                  }}
+                                  className="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                                <div className="flex flex-col items-center">
+                                  <span className="text-sm font-bold text-gray-900">{count}</span>
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase">Qty</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    updateFormData(countKey, (count || 0) + 1);
+                                  }}
+                                  className="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Snacks / Meals Toggle Section */}
+                      <div className={`border rounded-xl p-4 transition-all duration-200 ${formData.needsSnacks ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-gray-300'}`}>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">🍱</span>
+                            <span className="font-bold text-gray-900">Add Snacks / Meals</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={formData.needsSnacks}
+                            onChange={(e) => updateFormData('needsSnacks', e.target.checked)}
+                            className="w-6 h-6 text-emerald-600 rounded-md focus:ring-emerald-500 border-gray-300"
+                          />
+                        </label>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
+
               {formData.needsSnacks && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center justify-between">
                     Available Snacks & Meals:
-                    <span className="text-xs text-red-500 font-normal">* Select at least one</span>
+                    <span className="text-xs text-emerald-600 font-medium">* Use +/- to add items</span>
                   </h4>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
                       { name: 'Biscuits', price: 200 },
                       { name: 'Chips', price: 250 },
@@ -897,31 +968,62 @@ const BookingFormModal = ({
                       { name: 'Fried Rice', price: 700 },
                       { name: 'Noodles', price: 600 },
                       { name: 'Soft Drinks', price: 150 }
-                    ].map(({ name, price }) => (
-                      <label key={name} className="flex items-center justify-between cursor-pointer p-2 bg-white rounded border border-gray-200">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={formData.selectedSnacks?.includes(name) || false}
-                            onChange={(e) => {
-                              const currentSnacks = formData.selectedSnacks || [];
-                              const newSnacks = e.target.checked
-                                ? [...currentSnacks, name]
-                                : currentSnacks.filter(s => s !== name);
-                              updateFormData('selectedSnacks', newSnacks);
-                            }}
-                            className="w-4 h-4 text-emerald-500 rounded focus:ring-black"
-                          />
-                          <span className="text-xs text-gray-700">{name}</span>
+                    ].map(({ name, price }) => {
+                      const qty = formData.snackQuantities?.[name] || 0;
+                      return (
+                        <div key={name} className={`flex items-center justify-between p-3 bg-white rounded-lg border transition-colors ${qty > 0 ? 'border-emerald-500 shadow-sm' : 'border-gray-200'}`}>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 block">{name}</span>
+                            <span className="text-xs text-gray-500 font-semibold">+LKR {price}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {qty > 0 ? (
+                              <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 shadow-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newQtys = { ...(formData.snackQuantities || {}) };
+                                    newQtys[name] = Math.max(0, qty - 1);
+                                    updateFormData('snackQuantities', newQtys);
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                                <span className="w-8 text-center font-bold text-sm text-gray-900">{qty}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newQtys = { ...(formData.snackQuantities || {}) };
+                                    newQtys[name] = (qty || 0) + 1;
+                                    updateFormData('snackQuantities', newQtys);
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newQtys = { ...(formData.snackQuantities || {}) };
+                                  newQtys[name] = 1;
+                                  updateFormData('snackQuantities', newQtys);
+                                }}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all transform active:scale-95"
+                              >
+                                ADD
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-xs font-semibold text-black">+LKR {price}</span>
-                      </label>
-                    ))}
+                      );
+                    })}
                   </div>
-                  {formErrors.selectedSnacks && <p className="text-red-500 text-xs mt-2">{formErrors.selectedSnacks}</p>}
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
 
@@ -1024,7 +1126,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   const [dateTypeMenuDate, setDateTypeMenuDate] = useState(null);
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [halfDayTimes, setHalfDayTimes] = useState({}); // {dateString: 'morning' | 'evening'}
-  
+
   // Reset showTimeMenu when dateTypeMenuDate changes
   useEffect(() => {
     if (!dateTypeMenuDate) {
@@ -1054,8 +1156,15 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     needsBinoculars: false,
     needsChildSeat: false,
     needsWater: false,
+    needsWater: false,
     needsSnacks: false,
-    selectedSnacks: [],
+    // Add-on Counts
+    binocularsCount: 0,
+    childSeatCount: 0,
+    waterBottleCount: 0,
+    // Snack Quantities
+    selectedSnacks: [], // Keep for backward compatibility or simple check
+    snackQuantities: {}, // { 'Biscuits': 2, ... }
     dateSafariTypes: {}
   });
 
@@ -1182,29 +1291,48 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
   };
 
   // Helper function to get availability status for a date
+  // Helper function to get availability status for a date
   const getAvailabilityStatus = (date) => {
     if (!date) return null;
-    const dateKey = date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    // Use local time for date key
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateKey = `${year}-${month}-${day}`;
 
-    // Check new availability calendar format (object)
-    if (driver?.availabilityCalendar && typeof driver.availabilityCalendar === 'object' && !Array.isArray(driver.availabilityCalendar)) {
-      const status = driver.availabilityCalendar[dateKey];
-      // Return status if it exists, otherwise return null (which means available)
-      if (status && ['busy', 'halfday', 'unavailable', 'halfday-morning', 'halfday-evening'].includes(status)) {
-        return status;
-      }
-      // If no status marked, return null (available by default)
-      return null;
+    // 1. Determine which availability source to use based on selected vehicle type
+    let availabilitySource = {};
+
+    // Default to standard or generic if nothing selected yet
+    if (selectedVehicleType === 'Luxury Safari Jeep') {
+      availabilitySource = driver?.availabilityLuxury || driver?.availability || {};
+    } else {
+      // Standard or fallback
+      availabilitySource = driver?.availabilityStandard || driver?.availability || {};
     }
 
-    // Fallback to old availableDates array format
+    // If availabilitySource is empty but we have legacy 'availabilityCalendar' (from older loads), check that
+    if (Object.keys(availabilitySource).length === 0 && driver?.availabilityCalendar && !Array.isArray(driver.availabilityCalendar)) {
+      availabilitySource = driver.availabilityCalendar;
+    }
+
+    // 2. Check status in the determined source
+    const status = availabilitySource[dateKey];
+
+    // Return status if it's a known busy/halfday status
+    if (status && ['busy', 'halfday', 'unavailable', 'halfday-morning', 'halfday-evening', 'unavailable-halfday-morning', 'unavailable-halfday-evening'].includes(status)) {
+      return status;
+    }
+
+    // Fallback to old availableDates array format (Legacy)
     if (driver?.availableDates && Array.isArray(driver.availableDates)) {
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = dateKey;
       const isInArray = driver.availableDates.some(availableDate => {
-        const availableDateString = new Date(availableDate).toISOString().split('T')[0];
+        const d = new Date(availableDate);
+        const availableDateString = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return availableDateString === dateString;
       });
-      return isInArray ? null : 'unavailable'; // If in array = available, if not = unavailable
+      return isInArray ? null : 'unavailable';
     }
 
     // Default: no status means available
@@ -1264,12 +1392,19 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     });
 
     // Add add-ons prices (only for regular bookings)
-    if (bookingFormData.needsBinoculars) total += 500;
-    if (bookingFormData.needsChildSeat) total += 1000;
-    if (bookingFormData.needsWater) total += 300;
+    // Add add-ons prices (only for regular bookings)
+    if (bookingFormData.needsBinoculars || bookingFormData.binocularsCount > 0) {
+      total += (bookingFormData.binocularsCount || 1) * 500;
+    }
+    if (bookingFormData.needsChildSeat || bookingFormData.childSeatCount > 0) {
+      total += (bookingFormData.childSeatCount || 1) * 1000;
+    }
+    if (bookingFormData.needsWater || bookingFormData.waterBottleCount > 0) {
+      total += (bookingFormData.waterBottleCount || 1) * 300;
+    }
 
     // Add snacks prices
-    if (bookingFormData.needsSnacks && bookingFormData.selectedSnacks) {
+    if (bookingFormData.needsSnacks) {
       const snackPrices = {
         'Biscuits': 200,
         'Chips': 250,
@@ -1280,9 +1415,20 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         'Noodles': 600,
         'Soft Drinks': 150
       };
-      bookingFormData.selectedSnacks.forEach(snack => {
-        total += snackPrices[snack] || 0;
-      });
+
+      // Calculate based on quantities if available
+      if (bookingFormData.snackQuantities && Object.keys(bookingFormData.snackQuantities).length > 0) {
+        Object.entries(bookingFormData.snackQuantities).forEach(([snack, count]) => {
+          if (count > 0) {
+            total += (snackPrices[snack] || 0) * count;
+          }
+        });
+      } else if (bookingFormData.selectedSnacks) {
+        // Fallback to legacy checkbox logic (count=1)
+        bookingFormData.selectedSnacks.forEach(snack => {
+          total += snackPrices[snack] || 0;
+        });
+      }
     }
 
     return total;
@@ -2001,6 +2147,9 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             availabilityCalendar: (driverData.availability && typeof driverData.availability === 'object' && !Array.isArray(driverData.availability))
               ? driverData.availability
               : {}, // Object mapping dates to status
+            // Explicitly include dual calendars
+            availabilityStandard: driverData.availabilityStandard || {},
+            availabilityLuxury: driverData.availabilityLuxury || {},
             availableDates: driverData.availableDates || [] // Keep for backward compatibility
           };
 
@@ -2015,7 +2164,16 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 console.log('✅ Certification documents found:', certData);
 
                 if (certData.documents && Array.isArray(certData.documents)) {
-                  driverInfo.certificationDocuments = certData.documents;
+                  // Resolve URLs if needed
+                  const documentsWithUrls = await Promise.all(certData.documents.map(async (doc) => {
+                    if (doc.fileUrl) return doc; // URL already exists
+                    if (doc.supabasePath) {
+                      const { signedUrl } = await getDocumentUrl(doc.supabasePath);
+                      return { ...doc, fileUrl: signedUrl };
+                    }
+                    return doc;
+                  }));
+                  driverInfo.certificationDocuments = documentsWithUrls;
                 }
               }
             } catch (err) {
@@ -2303,8 +2461,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     <div className="min-h-screen lg:h-screen bg-gray-50 flex flex-col lg:overflow-hidden lg:max-h-screen">
       {/* Booking Success Message */}
       {showSuccessMessage && successMessageData && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 sm:p-8">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-10 max-w-lg w-full mx-auto max-h-[85vh] overflow-y-auto scrollbar-hide flex flex-col">
             <div className="text-center space-y-4">
               <div className="flex justify-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
@@ -2327,58 +2485,32 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                 </p>
               )}
 
-              {/* Booking Details */}
-              <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left space-y-3">
-                <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">Driver:</span>
-                  <span className="text-gray-900 font-semibold block">{successMessageData.driverName}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">Dates:</span>
-                  <div className="space-y-1">
-                    {successMessageData.datesWithTypes && Object.entries(successMessageData.datesWithTypes).map(([dateStr, dateInfo], idx) => (
-                      <div key={idx} className="text-gray-900 font-semibold text-sm">
-                        {new Date(dateInfo.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - {dateInfo.type === 'half-day' ? 'Half Day' : 'Full Day'} {dateInfo.safariType ? `(${dateInfo.safariType})` : ''} - LKR {dateInfo.price?.toLocaleString()}
-                      </div>
-                    ))}
-                    {!successMessageData.datesWithTypes && (
-                      <span className="text-gray-900 font-semibold block">{successMessageData.dates}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">Number of Passengers:</span>
-                  <span className="text-gray-900 font-semibold block">{successMessageData.numberOfPassengers || successMessageData.numberOfDays} {successMessageData.numberOfPassengers === 1 ? 'passenger' : 'passengers'}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">National Park:</span>
-                  <span className="text-gray-900 font-semibold block">{successMessageData.nationalPark}</span>
-                </div>
-                <div className="space-y-1 border-t border-gray-200 pt-2 mt-2">
-                  <span className="text-gray-600 font-bold block">Total:</span>
-                  <span className="text-black font-bold text-lg block">LKR {successMessageData.totalPrice.toLocaleString()}</span>
+              <div className="space-y-1 border-t border-gray-200 pt-3 mt-2">
+                <div className="flex justify-between items-center bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
+                  <span className="text-emerald-900 font-bold">Total Price:</span>
+                  <span className="text-black font-bold text-xl">LKR {successMessageData.totalPrice.toLocaleString()}</span>
                 </div>
               </div>
-
-              {/* Close Button */}
-              <button
-                onClick={() => {
-                  setShowSuccessMessage(false);
-                  setSuccessMessageData(null);
-                  // Ensure we're on the correct route
-                  if (driverId) {
-                    navigate(`/jeepprofile?driverId=${driverId}`, { replace: true });
-                  } else if (driver?.id) {
-                    navigate(`/jeepprofile?driverId=${driver.id}`, { replace: true });
-                  } else {
-                    navigate('/driver', { replace: true });
-                  }
-                }}
-                className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold shadow-lg hover:bg-gray-800 transition-colors"
-              >
-                Got it!
-              </button>
             </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowSuccessMessage(false);
+                setSuccessMessageData(null);
+                // Ensure we're on the correct route
+                if (driverId) {
+                  navigate(`/jeepprofile?driverId=${driverId}`, { replace: true });
+                } else if (driver?.id) {
+                  navigate(`/jeepprofile?driverId=${driver.id}`, { replace: true });
+                } else {
+                  navigate('/driver', { replace: true });
+                }
+              }}
+              className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold shadow-lg hover:bg-gray-800 transition-colors"
+            >
+              Got it!
+            </button>
           </div>
         </div>
       )}
@@ -2394,7 +2526,8 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
             setChatOtherUser(null);
           }}
         />
-      )}
+      )
+      }
 
       <BookingFormModal
         isOpen={showBookingForm}
@@ -2673,7 +2806,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Standard Full Day:</span>
                                       <p className="text-xs text-emerald-600 mt-0.5">Full day safari (Standard Jeep)</p>
                                     </div>
-                                    <div className="text-right flex-shrink-0">
+                                    <div className="text-right shrink-0">
                                       <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
                                         LKR {driver.priceFullDayStandard.toLocaleString()}
                                       </span>
@@ -2688,7 +2821,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       <span className="text-emerald-800 font-bold text-xs sm:text-sm block">Standard Half Day:</span>
                                       <p className="text-xs text-emerald-600 mt-0.5">Half day safari (Standard Jeep)</p>
                                     </div>
-                                    <div className="text-right flex-shrink-0">
+                                    <div className="text-right shrink-0">
                                       <span className="text-sm sm:text-base md:text-lg font-black text-emerald-700">
                                         LKR {driver.priceHalfDayStandard.toLocaleString()}
                                       </span>
@@ -2709,7 +2842,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       <span className="text-yellow-800 font-bold text-xs sm:text-sm block">Luxury Full Day:</span>
                                       <p className="text-xs text-yellow-600 mt-0.5">Full day safari (Luxury Jeep)</p>
                                     </div>
-                                    <div className="text-right flex-shrink-0">
+                                    <div className="text-right shrink-0">
                                       <span className="text-sm sm:text-base md:text-lg font-black text-yellow-700">
                                         LKR {driver.priceFullDayLuxury.toLocaleString()}
                                       </span>
@@ -2743,7 +2876,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     <span className="text-black font-bold text-xs sm:text-sm block">Full Day Safari:</span>
                                     <p className="text-xs text-gray-600 mt-0.5">Full day safari tours</p>
                                   </div>
-                                  <div className="text-right flex-shrink-0">
+                                  <div className="text-right shrink-0">
                                     <span className="text-sm sm:text-base md:text-lg font-black text-black">
                                       LKR {driver.pricePerDay.toLocaleString()}
                                     </span>
@@ -2827,7 +2960,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm border border-gray-300 flex items-center justify-between gap-2"
                               >
                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                  <FileText size={14} className="text-gray-600 flex-shrink-0" />
+                                  <FileText size={14} className="text-gray-600 shrink-0" />
                                   <span className="font-semibold truncate">{doc.certificationName || 'Certification'}</span>
                                 </div>
                                 {doc.fileUrl && (
@@ -2835,7 +2968,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     href={doc.fileUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex-shrink-0 text-blue-600 hover:text-blue-800 underline text-xs"
+                                    className="shrink-0 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors shadow-sm"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     View
@@ -2908,7 +3041,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                     {pkg.description}
                                   </p>
                                 </div>
-                                <div className="flex-shrink-0 ml-4 space-y-2">
+                                <div className="shrink-0 ml-4 space-y-2">
                                   {/* Standard Safari Jeep Prices */}
                                   {pkg.hasStandardJeep && (
                                     <div className="space-y-2">
@@ -3080,7 +3213,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                   <div className="space-y-2.5 sm:space-y-3 md:space-y-4 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
                     {/* Package Info Banner (if package is selected) */}
                     {selectedPackage && (
-                      <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 border-2 border-emerald-400 rounded-lg p-4 mb-4 relative">
+                      <div className="bg-linear-to-r from-emerald-50 to-emerald-100 border-2 border-emerald-400 rounded-lg p-4 mb-4 relative">
                         {/* Close/Unselect Button */}
                         <button
                           onClick={() => {
@@ -3235,7 +3368,11 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 setDateTypeMenuDate(date);
                               }}
                               selectedDatesWithType={selectedDatesWithType}
-                              availabilityCalendar={driver?.availabilityCalendar}
+                              availabilityCalendar={
+                                selectedVehicleType === 'Luxury Safari Jeep'
+                                  ? (driver?.availabilityLuxury || driver?.availabilityCalendar || {})
+                                  : (driver?.availabilityStandard || driver?.availabilityCalendar || {})
+                              }
                               availableDates={driver?.availableDates}
                               onDateTypeChange={handleDateTypeChange}
                               onDateDoubleClick={(date) => {
@@ -3265,25 +3402,27 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                 {!showTimeMenu ? (
                                   <div className="space-y-1.5">
                                     {/* Only show Full Day if the day is not partially booked */}
-                                    {dateTypeMenuDate && !(getAvailabilityStatus(dateTypeMenuDate) === 'halfday-morning' || getAvailabilityStatus(dateTypeMenuDate) === 'halfday-evening') && (
-                                      <button
-                                        onClick={() => {
-                                          try {
-                                            handleDateSelect(dateTypeMenuDate);
-                                            handleDateTypeChange(dateTypeMenuDate.toDateString(), 'full-day');
-                                            setDateTypeMenuDate(null);
-                                            setShowTimeMenu(false);
-                                          } catch (error) {
-                                            console.error('Error selecting full day:', error);
-                                            setDateTypeMenuDate(null);
-                                            setShowTimeMenu(false);
-                                          }
-                                        }}
-                                        className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
-                                      >
-                                        Full Day
-                                      </button>
-                                    )}
+                                    {dateTypeMenuDate && !(
+                                      ['halfday-morning', 'halfday-evening', 'unavailable-halfday-morning', 'unavailable-halfday-evening'].includes(getAvailabilityStatus(dateTypeMenuDate))
+                                    ) && (
+                                        <button
+                                          onClick={() => {
+                                            try {
+                                              handleDateSelect(dateTypeMenuDate);
+                                              handleDateTypeChange(dateTypeMenuDate.toDateString(), 'full-day');
+                                              setDateTypeMenuDate(null);
+                                              setShowTimeMenu(false);
+                                            } catch (error) {
+                                              console.error('Error selecting full day:', error);
+                                              setDateTypeMenuDate(null);
+                                              setShowTimeMenu(false);
+                                            }
+                                          }}
+                                          className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+                                        >
+                                          Full Day
+                                        </button>
+                                      )}
                                     <button
                                       onClick={() => {
                                         setShowTimeMenu(true);
@@ -3308,7 +3447,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       Select Time
                                     </h4>
                                     {/* Only show Morning if not already booked as halfday-morning */}
-                                    {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-morning' && (
+                                    {dateTypeMenuDate && !['halfday-morning', 'unavailable-halfday-morning'].includes(getAvailabilityStatus(dateTypeMenuDate)) && (
                                       <button
                                         onClick={() => {
                                           try {
@@ -3332,7 +3471,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
                                       </button>
                                     )}
                                     {/* Only show Evening if not already booked as halfday-evening */}
-                                    {dateTypeMenuDate && getAvailabilityStatus(dateTypeMenuDate) !== 'halfday-evening' && (
+                                    {dateTypeMenuDate && !['halfday-evening', 'unavailable-halfday-evening'].includes(getAvailabilityStatus(dateTypeMenuDate)) && (
                                       <button
                                         onClick={() => {
                                           try {
@@ -3571,7 +3710,7 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

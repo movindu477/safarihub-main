@@ -44,10 +44,23 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [uploadedCertifications, setUploadedCertifications] = useState([]);
-  const [availabilityCalendar, setAvailabilityCalendar] = useState({}); // Object: { "YYYY-MM-DD": "busy"|"halfday"|"unavailable" }
+  const [availabilityCalendar, setAvailabilityCalendar] = useState({}); // Legacy/General
+  const [availabilityStandard, setAvailabilityStandard] = useState({}); // Standard Jeep
+  const [availabilityLuxury, setAvailabilityLuxury] = useState({}); // Luxury Jeep
+
   const [isEditing, setIsEditing] = useState(false); // For profile edit mode
   const [isEditingCalendar, setIsEditingCalendar] = useState(false); // For calendar edit mode
-  const [tempAvailabilityCalendar, setTempAvailabilityCalendar] = useState({}); // Temp calendar state for editing
+  const [isSavingCalendar, setIsSavingCalendar] = useState(false); // Loading state for calendar save
+
+  // Independent editing states
+  const [isEditingStandard, setIsEditingStandard] = useState(false);
+  const [isEditingLuxury, setIsEditingLuxury] = useState(false);
+
+  // Temp states for editing
+  const [tempAvailabilityStandard, setTempAvailabilityStandard] = useState({});
+  const [tempAvailabilityLuxury, setTempAvailabilityLuxury] = useState({});
+
+  const [lastSaveAttempt, setLastSaveAttempt] = useState(null); // Debug: Track last save payload
   const [bookingFilter, setBookingFilter] = useState('all'); // 'all', 'pending', 'accepted', 'completed', 'declined'
   const [nextBooking, setNextBooking] = useState(null); // Next upcoming booking for countdown
 
@@ -80,6 +93,9 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
     dailyRate: '',
     specialPackageRates: '',
     currencyPreference: 'LKR',
+    storeName: '',
+    website: '',
+    rentingPolicies: '',
   });
 
   // Options for dropdowns/checkboxes
@@ -186,25 +202,38 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
     if (!currentUser) return;
 
     const userDocRef = doc(db, "serviceProviders", currentUser.uid);
-    
+
     const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
         const data = docSnapshot.data();
         setUserData(data);
 
         // Load availability calendar - REAL-TIME UPDATE
-        if (data.availability && typeof data.availability === 'object' && !Array.isArray(data.availability)) {
-          console.log('📅 Real-time availability update:', data.availability);
-          setAvailabilityCalendar(data.availability);
-        } else {
-          setAvailabilityCalendar({});
+        let loadedStandard = {};
+        let loadedLuxury = {};
+
+        if (data.availabilityStandard && typeof data.availabilityStandard === 'object') {
+          loadedStandard = data.availabilityStandard;
+        }
+        if (data.availabilityLuxury && typeof data.availabilityLuxury === 'object') {
+          loadedLuxury = data.availabilityLuxury;
         }
 
-        // Check if user is a service provider (jeep driver or guide)
-        if (data.serviceType === 'Jeep Driver' || data.serviceType === 'Tour Guide') {
+        // Legacy Support
+        if (data.availability && typeof data.availability === 'object' && !Array.isArray(data.availability) && Object.keys(loadedStandard).length === 0) {
+          loadedStandard = { ...data.availability };
+        }
+
+        setAvailabilityStandard(loadedStandard);
+        setAvailabilityLuxury(loadedLuxury);
+        setAvailabilityCalendar(data.availability || {});
+
+
+        // Check if user is a service provider (jeep driver, guide, or renting)
+        if (data.serviceType === 'Jeep Driver' || data.serviceType === 'Tour Guide' || data.serviceType === 'Renting') {
           // Populate form with existing data
           setFormData({
-            fullName: data.fullName || '',
+            fullName: data.fullName || data.storeName || '',
             email: data.email || data.contactEmail || '',
             phone: data.phone || data.contactPhone || '',
             address: data.address || data.location || data.baseLocation || '',
@@ -232,6 +261,10 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             dailyRate: data.dailyRate || '',
             specialPackageRates: data.specialPackageRates || '',
             currencyPreference: data.currencyPreference || 'LKR',
+            // Renting fields
+            storeName: data.storeName || data.fullName || '',
+            website: data.website || '',
+            rentingPolicies: data.rentingPolicies || '',
           });
 
           if (data.profilePicture) {
@@ -298,7 +331,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           return dateB - dateA;
         });
         setBookings(bookingsList);
-        
+
         // Find next upcoming booking for countdown
         const now = new Date();
         const upcomingBookings = bookingsList
@@ -306,7 +339,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             if (booking.status !== 'accepted' && booking.status !== 'confirmed') {
               return false;
             }
-            
+
             let bookingDate;
             if (booking.startDate?.toDate) {
               bookingDate = booking.startDate.toDate();
@@ -318,7 +351,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             } else {
               return false;
             }
-            
+
             return bookingDate > now;
           })
           .sort((a, b) => {
@@ -326,7 +359,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             const dateB = b.startDate?.toDate ? b.startDate.toDate() : new Date(b.startDate || b.dates[0]);
             return dateA - dateB;
           });
-        
+
         if (upcomingBookings.length > 0) {
           const nextTrip = upcomingBookings[0];
           setNextBooking({
@@ -337,7 +370,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
         } else {
           setNextBooking(null);
         }
-        
+
         setBookingsLoading(false);
       },
       (error) => {
@@ -511,141 +544,96 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
 
       // Get current availability calendar
       const providerDoc = await getDoc(providerDocRef);
-      const currentAvailability = providerDoc.exists() 
-        ? (providerDoc.data().availability || {})
-        : {};
+      if (!providerDoc.exists()) return;
 
-      // Get booking dates - handle ALL possible formats
+      const providerData = providerDoc.data();
+      const serviceType = providerData.serviceType;
+
+      // Determine which field to update
+      let targetField = 'availability'; // Default for guides
+      if (serviceType === 'Jeep Driver') {
+        const vehicleType = booking.selectedVehicleType || '';
+        if (vehicleType.includes('Luxury')) {
+          targetField = 'availabilityLuxury';
+        } else {
+          targetField = 'availabilityStandard';
+        }
+      }
+
+      const currentAvailability = providerData[targetField] || {};
       const updatedAvailability = { ...currentAvailability };
       let datesProcessed = false;
-      
-      console.log('📅 Full booking object:', JSON.stringify(booking, null, 2));
-      
-      // Check if booking has datesWithTypes (new format with individual date types)
+
+      // Process datesWithTypes
       if (booking.datesWithTypes && Array.isArray(booking.datesWithTypes) && booking.datesWithTypes.length > 0) {
-        console.log('📅 Processing datesWithTypes:', booking.datesWithTypes);
-        
         booking.datesWithTypes.forEach(item => {
           try {
             const date = item.date?.toDate ? item.date.toDate() : new Date(item.date);
             const dateKey = date.toISOString().split('T')[0];
-            const type = item.type || 'full-day';
+            const type = (item.type || 'full-day').toLowerCase().trim();
+
             const isFullDay = type === 'full-day' || type === 'full' || type === 'fullday';
-            const isHalfDay = type === 'half-day' || type === 'half' || type === 'halfday';
-            
+            const isHalfDay = type === 'half-day' || type === 'half' || type === 'halfday' || type === 'half day';
+
             if (isFullDay) {
               updatedAvailability[dateKey] = 'busy';
-              console.log(`✅ Marked ${dateKey} as BUSY (full day)`);
               datesProcessed = true;
             } else if (isHalfDay) {
               const currentStatus = updatedAvailability[dateKey];
-              if (currentStatus === 'halfday') {
+              if (currentStatus === 'halfday' || currentStatus === 'halfday-morning' || currentStatus === 'halfday-evening') {
                 updatedAvailability[dateKey] = 'busy';
-                console.log(`✅ Marked ${dateKey} as BUSY (both halves booked)`);
               } else {
                 updatedAvailability[dateKey] = 'halfday';
-                console.log(`✅ Marked ${dateKey} as HALFDAY (one half available)`);
               }
               datesProcessed = true;
             }
           } catch (error) {
-            console.error('Error processing date from datesWithTypes:', error);
+            console.error('Error processing date:', error);
           }
         });
       }
-      
-      // Try other date formats if datesWithTypes didn't work
-      if (!datesProcessed) {
-        let bookingDates = [];
-        
-        // Try multiple date field formats
-        if (booking.dates && Array.isArray(booking.dates) && booking.dates.length > 0) {
-          console.log('📅 Found dates array:', booking.dates);
-          bookingDates = booking.dates.map(date => {
-            if (date?.toDate) return date.toDate();
-            else if (date instanceof Date) return date;
-            else return new Date(date);
-          });
-        } else if (booking.startDate) {
-          console.log('📅 Found startDate:', booking.startDate);
-          const date = booking.startDate?.toDate 
-            ? booking.startDate.toDate() 
-            : new Date(booking.startDate);
-          bookingDates = [date];
-        } else if (booking.selectedDates) {
-          console.log('📅 Found selectedDates:', booking.selectedDates);
-          const dates = Array.isArray(booking.selectedDates) 
-            ? booking.selectedDates 
-            : [booking.selectedDates];
-          bookingDates = dates.map(d => new Date(d));
-        } else if (booking.date) {
-          console.log('📅 Found single date field:', booking.date);
-          const date = booking.date?.toDate 
-            ? booking.date.toDate() 
-            : new Date(booking.date);
-          bookingDates = [date];
-        }
 
-        if (bookingDates.length > 0) {
-          console.log('📅 Booking dates to mark:', bookingDates);
-
-          // Determine booking type
-          const bookingType = booking.bookingType || booking.type || 'full-day';
-          const isFullDay = bookingType === 'full-day' || bookingType === 'fullday' || bookingType === 'full';
-          const isHalfDay = bookingType === 'half-day' || bookingType === 'halfday' || bookingType === 'half';
-
-          console.log('📅 Booking type:', bookingType, '| Full day:', isFullDay, '| Half day:', isHalfDay);
-
-          bookingDates.forEach(date => {
-            try {
-              const dateKey = date.toISOString().split('T')[0];
-              
-              if (isFullDay) {
-                updatedAvailability[dateKey] = 'busy';
-                console.log(`✅ Marked ${dateKey} as BUSY (full day)`);
-                datesProcessed = true;
-              } else if (isHalfDay) {
-                const currentStatus = updatedAvailability[dateKey];
-                if (currentStatus === 'halfday') {
-                  updatedAvailability[dateKey] = 'busy';
-                  console.log(`✅ Marked ${dateKey} as BUSY (both halves booked)`);
-                } else {
-                  updatedAvailability[dateKey] = 'halfday';
-                  console.log(`✅ Marked ${dateKey} as HALFDAY (one half available)`);
-                }
-                datesProcessed = true;
-              }
-            } catch (error) {
-              console.error('Error processing date:', error);
-            }
-          });
-        } else {
-          console.error('⚠️ No booking dates found in booking object!');
-          console.error('Available fields:', Object.keys(booking));
-        }
-      }
-      
-      if (!datesProcessed) {
-        console.error('❌ Failed to process any dates from booking');
-        throw new Error('Could not extract dates from booking');
+      // Fallback to legacy dates array if datesWithTypes didn't work
+      if (!datesProcessed && booking.selectedDates && Array.isArray(booking.selectedDates)) {
+        booking.selectedDates.forEach(d => {
+          try {
+            const date = new Date(d);
+            const dateKey = date.toISOString().split('T')[0];
+            updatedAvailability[dateKey] = 'busy';
+            datesProcessed = true;
+          } catch (e) { }
+        });
       }
 
-      // Save updated availability to Firestore
-      await updateDoc(providerDocRef, {
-        availability: updatedAvailability,
-        updatedAt: serverTimestamp()
-      });
+      if (datesProcessed) {
+        // Save updated availability to Firestore
+        const updatePayload = {
+          [targetField]: updatedAvailability,
+          updatedAt: serverTimestamp()
+        };
 
-      // Update local state
-      setAvailabilityCalendar(updatedAvailability);
+        // Also sync standard 'availability' for compatibility
+        if (targetField !== 'availability') {
+          updatePayload.availability = updatedAvailability;
+        }
 
-      console.log('✅ Availability calendar updated successfully');
+        await updateDoc(providerDocRef, updatePayload);
+
+        // Update local state
+        if (targetField === 'availabilityStandard' || (targetField === 'availability' && serviceType !== 'Jeep Driver')) {
+          setAvailabilityStandard(updatedAvailability);
+        }
+        if (targetField === 'availabilityLuxury') {
+          setAvailabilityLuxury(updatedAvailability);
+        }
+        setAvailabilityCalendar(updatedAvailability);
+
+        console.log(`✅ ${targetField} updated successfully`);
+      }
     } catch (error) {
       console.error('❌ Error updating availability calendar:', error);
-      // Don't throw error - booking status was already updated
     }
   };
-
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -750,6 +738,13 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
           specialPackageRates: formData.specialPackageRates || '',
           currencyPreference: formData.currencyPreference || 'LKR',
           languages: formData.languages || [],
+        };
+      } else if (serviceType === 'Renting') {
+        updateData = {
+          ...updateData,
+          storeName: formData.storeName || formData.fullName,
+          website: formData.website || '',
+          rentingPolicies: formData.rentingPolicies || '',
         };
       }
 
@@ -912,19 +907,35 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             >
               My Bookings
             </button>
-            
-            {/* My Packages Tab - For all service providers */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('packages')}
-              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'packages'
-                ? 'bg-emerald-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                }`}
-            >
-              My Packages
-            </button>
-            
+
+            {/* My Packages Tab - For Jeep/Guide */}
+            {(isJeepDriver || isGuide) && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('packages')}
+                className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'packages'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                  }`}
+              >
+                My Packages
+              </button>
+            )}
+
+            {/* My Products Tab - Only for Renting */}
+            {isRenting && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('products')}
+                className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'products'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                  }`}
+              >
+                My Products
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setActiveTab('availability')}
@@ -942,7 +953,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
             <div className="space-y-4 mb-4">
               {/* Trip Countdown Widget */}
               {nextBooking && <TripCountdown nextBooking={nextBooking} />}
-              
+
               {/* Orders Widget - Full Width */}
               <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-6 shadow-xl">
                 <h3 className="text-white font-bold text-sm uppercase tracking-wide mb-4 flex items-center gap-2">
@@ -988,15 +999,14 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <h2 className="text-xl font-semibold text-white">Profile Information</h2>
                   {/* Certification Status Badge */}
                   {userData && (
-                    <span className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
-                      userData.certificationStatus === 'certified' && userData.certificationApproved === true
-                        ? 'bg-green-900/50 text-green-300 border border-green-500/30'
-                        : userData.certificationStatus === 'certified' && userData.certificationApproved !== true
+                    <span className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${userData.certificationStatus === 'certified' && userData.certificationApproved === true
+                      ? 'bg-green-900/50 text-green-300 border border-green-500/30'
+                      : userData.certificationStatus === 'certified' && userData.certificationApproved !== true
                         ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30'
                         : userData.certificationStatus === 'uncertified' || userData.certificationRejected
-                        ? 'bg-red-900/50 text-red-300 border border-red-500/30'
-                        : 'bg-gray-700/50 text-gray-300 border border-gray-600/30'
-                    }`}>
+                          ? 'bg-red-900/50 text-red-300 border border-red-500/30'
+                          : 'bg-gray-700/50 text-gray-300 border border-gray-600/30'
+                      }`}>
                       {userData.certificationStatus === 'certified' && userData.certificationApproved === true ? (
                         <>✓ Certified</>
                       ) : userData.certificationStatus === 'certified' && userData.certificationApproved !== true ? (
@@ -1085,7 +1095,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                     {/* Profile Picture and Full Name Row */}
                     <div className="flex gap-4 items-start">
                       {/* Profile Picture - Left */}
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <label className="block text-xs font-medium text-gray-300 mb-2 flex items-center gap-1">
                           <Upload className="h-3 w-3" />
                           Profile Picture
@@ -1293,7 +1303,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           onChange={(e) => handleInputChange('description', e.target.value)}
                           rows="2"
                           className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                          placeholder="Tell us about yourself..."
+                          placeholder={isRenting ? "Tell us about your rental shop..." : "Tell us about yourself..."}
                         />
                       ) : (
                         <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200 whitespace-pre-wrap">
@@ -1305,7 +1315,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                 </div>
 
                 {/* Right Box - Service Specific Details */}
-                {(isJeepDriver || isRenting) && (
+                {isJeepDriver && (
                   <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                     <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                       <Car className="h-4 w-4 text-emerald-400" />
@@ -1384,9 +1394,9 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                 <div>
                                   <label className="block text-xs font-medium text-gray-300 mb-1">
                                     Half Day Price (LKR) *
-                                      )
+                                    )
                                     ) : (
-                                      <span className="text-emerald-400 ml-1">(Max: 12,000)</span>
+                                    <span className="text-emerald-400 ml-1">(Max: 12,000)</span>
                                   </label>
                                   <input
                                     type="text"
@@ -1544,6 +1554,83 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         ) : (
                           <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
                             {formData.destinations || 'Not specified'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isRenting && (
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-emerald-400" />
+                      Shop Details
+                    </h2>
+
+                    <div className="space-y-3">
+                      {/* Store Name */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                          Store Name
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.storeName}
+                            onChange={(e) => handleInputChange('storeName', e.target.value)}
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="Store Name"
+                          />
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.storeName || formData.fullName || 'Not specified'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Website */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                          <Globe className="h-3 w-3" />
+                          Website
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="url"
+                            value={formData.website}
+                            onChange={(e) => handleInputChange('website', e.target.value)}
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="https://example.com"
+                          />
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200">
+                            {formData.website ? (
+                              <a href={formData.website} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">
+                                {formData.website}
+                              </a>
+                            ) : 'Not specified'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Renting Policies */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          Renting Policies
+                        </label>
+                        {isEditing ? (
+                          <textarea
+                            value={formData.rentingPolicies}
+                            onChange={(e) => handleInputChange('rentingPolicies', e.target.value)}
+                            rows="4"
+                            className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+                            placeholder="Enter your renting policies, terms, and conditions..."
+                          />
+                        ) : (
+                          <div className="w-full px-3 py-1.5 text-sm bg-gray-900/50 rounded-lg text-gray-200 whitespace-pre-wrap">
+                            {formData.rentingPolicies || 'No policies specified'}
                           </div>
                         )}
                       </div>
@@ -1751,326 +1838,351 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                           )}
                         </div>
                       )}
+                    </div>
                   </div>
-                </div>
 
                   {/* Jeep Driver Certifications - Only show if certified */}
                   {userData.certificationStatus === 'certified' && (
-                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="block text-sm font-semibold text-white flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-emerald-400" />
-                        Jeep Driver Certifications
-                      </label>
-                      {isEditing && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Trigger file input click
-                            document.getElementById('certification-upload-input')?.click();
-                          }}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-xs font-medium"
-                        >
-                          <Upload className="h-3.5 w-3.5" />
-                          Add Document
-                        </button>
-                      )}
-                      <input
-                        id="certification-upload-input"
-                        type="file"
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
+                    <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-semibold text-white flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-emerald-400" />
+                          Jeep Driver Certifications
+                        </label>
+                        {isEditing && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Trigger file input click
+                              document.getElementById('certification-upload-input')?.click();
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-xs font-medium"
+                          >
+                            <Upload className="h-3.5 w-3.5" />
+                            Add Document
+                          </button>
+                        )}
+                        <input
+                          id="certification-upload-input"
+                          type="file"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
 
-                          try {
-                            setMessage({ type: 'info', text: 'Uploading document...' });
-                            setSaving(true);
+                            try {
+                              setMessage({ type: 'info', text: 'Uploading document...' });
+                              setSaving(true);
 
-                            console.log('📤 Uploading document:', file.name);
+                              console.log('📤 Uploading document:', file.name);
 
-                            // Upload to Supabase using client-side method
-                            const { url, path, error } = await uploadDocumentClientSide(file, currentUser.uid, file.name);
+                              // Upload to Supabase using client-side method
+                              const { url, path, error } = await uploadDocumentClientSide(file, currentUser.uid, file.name);
 
-                            if (error) {
-                              console.error('Upload failed:', error);
-                              setMessage({ type: 'error', text: `Upload failed: ${error}` });
+                              if (error) {
+                                console.error('Upload failed:', error);
+                                setMessage({ type: 'error', text: `Upload failed: ${error}` });
+                                setSaving(false);
+                                return;
+                              }
+
+                              console.log('✅ Upload successful:', { url, path });
+
+                              // Create document metadata
+                              const newDocument = {
+                                certificationName: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+                                fileName: file.name,
+                                fileUrl: url,
+                                supabasePath: path,
+                                fileSize: file.size,
+                                fileType: file.type,
+                                uploadedAt: new Date(),
+                                documentId: `${currentUser.uid}_${Date.now()}`,
+                                uploadStatus: 'uploaded'
+                              };
+
+                              // Determine collection based on service type
+                              const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
+                              const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                              const userCertDocRef = doc(db, collectionName, currentUser.uid);
+
+                              // Get existing documents
+                              const existingDoc = await getDoc(userCertDocRef);
+                              const existingDocuments = existingDoc.exists() ? (existingDoc.data().documents || []) : [];
+
+                              // Add new document to array
+                              const updatedDocuments = [...existingDocuments, newDocument];
+
+                              // Save to Firestore
+                              await setDoc(userCertDocRef, {
+                                providerId: currentUser.uid,
+                                documents: updatedDocuments,
+                                updatedAt: serverTimestamp()
+                              }, { merge: true });
+
+                              console.log('✅ Document saved to Firestore');
+                              setMessage({ type: 'success', text: 'Document uploaded successfully!' });
                               setSaving(false);
-                              return;
+
+                              // Reset file input
+                              e.target.value = '';
+                            } catch (error) {
+                              console.error('❌ Upload error:', error);
+                              setMessage({ type: 'error', text: `Upload failed: ${error.message}` });
+                              setSaving(false);
                             }
+                          }}
+                          className="hidden"
+                        />
+                      </div>
 
-                            console.log('✅ Upload successful:', { url, path });
-
-                            // Create document metadata
-                            const newDocument = {
-                              certificationName: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
-                              fileName: file.name,
-                              fileUrl: url,
-                              supabasePath: path,
-                              fileSize: file.size,
-                              fileType: file.type,
-                              uploadedAt: new Date(),
-                              documentId: `${currentUser.uid}_${Date.now()}`,
-                              uploadStatus: 'uploaded'
-                            };
-
-                            // Determine collection based on service type
-                            const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
-                            const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
-                            const userCertDocRef = doc(db, collectionName, currentUser.uid);
-
-                            // Get existing documents
-                            const existingDoc = await getDoc(userCertDocRef);
-                            const existingDocuments = existingDoc.exists() ? (existingDoc.data().documents || []) : [];
-
-                            // Add new document to array
-                            const updatedDocuments = [...existingDocuments, newDocument];
-
-                            // Save to Firestore
-                            await setDoc(userCertDocRef, {
-                              providerId: currentUser.uid,
-                              documents: updatedDocuments,
-                              updatedAt: serverTimestamp()
-                            }, { merge: true });
-
-                            console.log('✅ Document saved to Firestore');
-                            setMessage({ type: 'success', text: 'Document uploaded successfully!' });
-                            setSaving(false);
-
-                            // Reset file input
-                            e.target.value = '';
-                          } catch (error) {
-                            console.error('❌ Upload error:', error);
-                            setMessage({ type: 'error', text: `Upload failed: ${error.message}` });
-                            setSaving(false);
-                          }
-                        }}
-                        className="hidden"
-                      />
-                    </div>
-
-                    {/* View Mode - Display Documents from Registration */}
-                    {!isEditing && (
-                      <>
-                        {/* Documents from Registration Info */}
-                        <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3 mb-3">
-                          <div className="flex items-start gap-2">
-                            <AlertCircle className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <h4 className="text-xs font-semibold text-blue-300 mb-1">Documents from Registration</h4>
-                              <p className="text-xs text-blue-200">
-                                The documents shown below were uploaded during your registration.
-                                Click "Edit Profile" to add or modify documents.
-                              </p>
+                      {/* View Mode - Display Documents from Registration */}
+                      {!isEditing && (
+                        <>
+                          {/* Documents from Registration Info */}
+                          <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3 mb-3">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <h4 className="text-xs font-semibold text-blue-300 mb-1">Documents from Registration</h4>
+                                <p className="text-xs text-blue-200">
+                                  The documents shown below were uploaded during your registration.
+                                  Click "Edit Profile" to add or modify documents.
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Uploaded Documents List */}
-                        <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-xs font-semibold text-white flex items-center gap-1">
-                              <FileText className="h-3 w-3 text-emerald-400" />
-                              Uploaded Documents
-                              {uploadedCertifications.length > 0 && (
-                                <span className="text-xs text-gray-400 font-normal">
-                                  ({uploadedCertifications.length})
-                                </span>
-                              )}
-                            </h4>
-                          </div>
-
-                          {uploadedCertifications.length === 0 ? (
-                            <div className="text-center py-6">
-                              <p className="text-gray-400 text-xs mb-1">No documents uploaded yet</p>
-                              <p className="text-gray-500 text-xs">
-                                Documents uploaded during registration will appear here automatically
-                              </p>
+                          {/* Uploaded Documents List */}
+                          <div className="border border-gray-600 rounded-lg p-3 bg-gray-900/50">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-xs font-semibold text-white flex items-center gap-1">
+                                <FileText className="h-3 w-3 text-emerald-400" />
+                                Uploaded Documents
+                                {uploadedCertifications.length > 0 && (
+                                  <span className="text-xs text-gray-400 font-normal">
+                                    ({uploadedCertifications.length})
+                                  </span>
+                                )}
+                              </h4>
                             </div>
-                          ) : (
-                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                              {uploadedCertifications.map((cert) => {
-                                const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
-                                const hasError = cert.uploadStatus === 'failed' || (!hasValidPath && cert.uploadStatus !== 'uploaded');
-                                return (
-                                  <div key={cert.id} className={`bg-gray-900/50 rounded-lg p-2 border ${hasError ? 'border-red-600' : 'border-gray-600'} flex items-center justify-between`}>
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <FileText className="h-4 w-4 text-emerald-400" />
-                                        <span className="text-sm text-white font-medium">{cert.certificationName || cert.fileName || 'Document'}</span>
+
+                            {uploadedCertifications.length === 0 ? (
+                              <div className="text-center py-6">
+                                <p className="text-gray-400 text-xs mb-1">No documents uploaded yet</p>
+                                <p className="text-gray-500 text-xs">
+                                  Documents uploaded during registration will appear here automatically
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {uploadedCertifications.map((cert) => {
+                                  // Improved path resolution
+                                  const getPathObj = (c) => {
+                                    const p = c.supabasePath || c.path; // Check both keys
+                                    const u = c.fileUrl || c.url;
+                                    return {
+                                      path: typeof p === 'string' && p.trim() ? p.trim() : null,
+                                      url: typeof u === 'string' && u.trim() ? u.trim() : null
+                                    };
+                                  };
+                                  const { path: docPath, url: docUrl } = getPathObj(cert);
+                                  const hasValidPath = !!docPath || !!docUrl;
+                                  const hasError = cert.uploadStatus === 'failed' || (!hasValidPath && cert.uploadStatus !== 'uploaded');
+
+                                  return (
+                                    <div key={cert.id} className={`bg-gray-900/50 rounded-lg p-2 border ${hasError ? 'border-red-600' : 'border-gray-600'} flex items-center justify-between`}>
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <FileText className="h-4 w-4 text-emerald-400" />
+                                          <span className="text-sm text-white font-medium">{cert.certificationName || cert.fileName || 'Document'}</span>
+                                        </div>
+                                        {(cert.fileSize || cert.size) && (
+                                          <p className="text-xs text-gray-400 ml-6">
+                                            {cert.fileSize
+                                              ? `${(cert.fileSize / 1024).toFixed(2)} KB`
+                                              : cert.size}
+                                          </p>
+                                        )}
+                                        {cert.uploadedAt && (
+                                          <p className="text-xs text-gray-500 ml-6">
+                                            Uploaded: {cert.uploadedAt.toDate
+                                              ? cert.uploadedAt.toDate().toLocaleDateString()
+                                              : new Date(cert.uploadedAt).toLocaleDateString()}
+                                          </p>
+                                        )}
                                       </div>
-                                      {(cert.fileSize || cert.size) && (
-                                        <p className="text-xs text-gray-400 ml-6">
-                                          {cert.fileSize 
-                                            ? `${(cert.fileSize / 1024).toFixed(2)} KB` 
-                                            : cert.size}
-                                        </p>
-                                      )}
-                                      {cert.uploadedAt && (
-                                        <p className="text-xs text-gray-500 ml-6">
-                                          Uploaded: {cert.uploadedAt.toDate 
-                                            ? cert.uploadedAt.toDate().toLocaleDateString() 
-                                            : new Date(cert.uploadedAt).toLocaleDateString()}
-                                        </p>
-                                      )}
-                                    </div>
-                                    <button
-                                      onClick={async () => {
-                                        if (!hasValidPath) {
-                                          console.error('No document path available:', cert);
-                                          setMessage({ type: 'error', text: 'Document path not found. Please re-upload the document.' });
-                                          return;
-                                        }
-                                        try {
-                                          const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
-                                          if (error) {
-                                            console.error('Error getting document URL:', error);
-                                            setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if (!hasValidPath) {
+                                            console.error('No document path available:', cert);
+                                            setMessage({ type: 'error', text: 'Document path not found.' });
                                             return;
                                           }
-                                          window.open(signedUrl, '_blank', 'noopener,noreferrer');
-                                        } catch (error) {
-                                          console.error('Error opening document:', error);
-                                          setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
-                                        }
-                                      }}
-                                      disabled={!hasValidPath}
-                                      className={`px-2 py-1 text-xs rounded transition-colors ${
-                                        hasValidPath 
-                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                                          try {
+                                            // Prefer path, then URL
+                                            let targetPath = docPath || docUrl;
+
+                                            // If we only have URL and it's from Supabase, try to extract path for better signing
+                                            if (!docPath && docUrl && docUrl.includes('/documents/')) {
+                                              const match = docUrl.match(/\/documents\/(.+)$/);
+                                              if (match) targetPath = match[1];
+                                            }
+
+                                            const { signedUrl, error } = await getDocumentUrl(targetPath);
+
+                                            if (error) {
+                                              console.error('Error getting document URL:', error);
+                                              // Fallback: if getDocumentUrl failed but we have a raw URL, try opening it directly
+                                              if (docUrl) {
+                                                window.open(docUrl, '_blank', 'noopener,noreferrer');
+                                                return;
+                                              }
+                                              setMessage({ type: 'error', text: 'Failed to open document.' });
+                                              return;
+                                            }
+                                            window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                                          } catch (error) {
+                                            console.error('Error opening document:', error);
+                                            setMessage({ type: 'error', text: 'Failed to open document.' });
+                                          }
+                                        }}
+                                        disabled={!hasValidPath}
+                                        className={`px-3 py-1.5 text-xs rounded transition-colors ${hasValidPath
+                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm font-medium'
                                           : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                                      }`}
-                                      title={hasValidPath ? 'View document' : 'Document path not available'}
-                                    >
-                                      View
-                                    </button>
+                                          }`}
+                                        title={hasValidPath ? 'View document' : 'Document path not available'}
+                                      >
+                                        View
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Edit Mode - Add/Manage Documents */}
+                      {isEditing && (
+                        <>
+                          {uploadedCertifications.length === 0 ? (
+                            <div className="text-center py-8">
+                              <FileText className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+                              <p className="text-gray-400 text-sm">No documents uploaded yet</p>
+                              <p className="text-gray-500 text-xs mt-1">Click "Add Document" to upload your certifications</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {uploadedCertifications.map((cert, index) => {
+                                const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
+                                return (
+                                  <div key={cert.id || index} className="bg-gray-900/50 rounded-lg p-3 border border-gray-600 flex items-center justify-between">
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <FileText className="h-5 w-5 text-emerald-400" />
+                                      <div>
+                                        <p className="text-white font-medium text-sm">{cert.name || cert.certificationName || 'Document'}</p>
+                                        {cert.size && (
+                                          <p className="text-gray-400 text-xs">{cert.size}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (!hasValidPath) {
+                                            console.error('No document path available:', cert);
+                                            setMessage({ type: 'error', text: 'Document path not found. Please re-upload the document.' });
+                                            return;
+                                          }
+                                          try {
+                                            const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
+                                            if (error) {
+                                              console.error('Error getting document URL:', error);
+                                              setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                              return;
+                                            }
+                                            window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                                          } catch (error) {
+                                            console.error('Error opening document:', error);
+                                            setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
+                                          }
+                                        }}
+                                        disabled={!hasValidPath}
+                                        className={`px-3 py-1.5 text-xs rounded transition-colors ${hasValidPath
+                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                          }`}
+                                        title={hasValidPath ? 'View document' : 'Document path not available'}
+                                      >
+                                        View
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (!confirm(`Are you sure you want to delete "${cert.certificationName || cert.fileName}"?`)) {
+                                            return;
+                                          }
+
+                                          try {
+                                            setSaving(true);
+                                            setMessage({ type: 'info', text: 'Deleting document...' });
+
+                                            console.log('🗑️ Deleting document:', cert);
+
+                                            // Delete from Supabase Storage if path exists
+                                            if (cert.supabasePath || cert.fileUrl) {
+                                              const { success, error } = await deleteDocumentClientSide(cert.supabasePath || cert.fileUrl);
+                                              if (error) {
+                                                console.warn('⚠️ Supabase delete warning:', error);
+                                                // Continue with Firestore deletion even if Storage delete fails
+                                              }
+                                            }
+
+                                            // Remove from Firestore
+                                            const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
+                                            const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
+                                            const userCertDocRef = doc(db, collectionName, currentUser.uid);
+
+                                            const existingDoc = await getDoc(userCertDocRef);
+                                            if (existingDoc.exists()) {
+                                              const existingDocuments = existingDoc.data().documents || [];
+                                              const updatedDocuments = existingDocuments.filter(d => d.documentId !== cert.documentId);
+
+                                              await setDoc(userCertDocRef, {
+                                                providerId: currentUser.uid,
+                                                documents: updatedDocuments,
+                                                updatedAt: serverTimestamp()
+                                              }, { merge: true });
+                                            }
+
+                                            console.log('✅ Document deleted');
+                                            setMessage({ type: 'success', text: 'Document deleted successfully!' });
+                                            setSaving(false);
+                                          } catch (error) {
+                                            console.error('❌ Delete error:', error);
+                                            setMessage({ type: 'error', text: `Delete failed: ${error.message}` });
+                                            setSaving(false);
+                                          }
+                                        }}
+                                        className="text-red-400 hover:text-red-300 transition-colors p-1.5"
+                                        title="Delete document"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               })}
                             </div>
                           )}
-                        </div>
-                      </>
-                    )}
-
-                    {/* Edit Mode - Add/Manage Documents */}
-                    {isEditing && (
-                      <>
-                        {uploadedCertifications.length === 0 ? (
-                          <div className="text-center py-8">
-                            <FileText className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-                            <p className="text-gray-400 text-sm">No documents uploaded yet</p>
-                            <p className="text-gray-500 text-xs mt-1">Click "Add Document" to upload your certifications</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {uploadedCertifications.map((cert, index) => {
-                              const hasValidPath = (cert.supabasePath && cert.supabasePath.trim()) || (cert.fileUrl && cert.fileUrl.trim());
-                              return (
-                                <div key={cert.id || index} className="bg-gray-900/50 rounded-lg p-3 border border-gray-600 flex items-center justify-between">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <FileText className="h-5 w-5 text-emerald-400" />
-                                    <div>
-                                      <p className="text-white font-medium text-sm">{cert.name || cert.certificationName || 'Document'}</p>
-                                      {cert.size && (
-                                        <p className="text-gray-400 text-xs">{cert.size}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        if (!hasValidPath) {
-                                          console.error('No document path available:', cert);
-                                          setMessage({ type: 'error', text: 'Document path not found. Please re-upload the document.' });
-                                          return;
-                                        }
-                                        try {
-                                          const { signedUrl, error } = await getDocumentUrl(cert.supabasePath || cert.fileUrl);
-                                          if (error) {
-                                            console.error('Error getting document URL:', error);
-                                            setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
-                                            return;
-                                          }
-                                          window.open(signedUrl, '_blank', 'noopener,noreferrer');
-                                        } catch (error) {
-                                          console.error('Error opening document:', error);
-                                          setMessage({ type: 'error', text: 'Failed to open document. Please try again.' });
-                                        }
-                                      }}
-                                      disabled={!hasValidPath}
-                                      className={`px-3 py-1.5 text-xs rounded transition-colors ${
-                                        hasValidPath 
-                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
-                                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                                      }`}
-                                      title={hasValidPath ? 'View document' : 'Document path not available'}
-                                    >
-                                      View
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        if (!confirm(`Are you sure you want to delete "${cert.certificationName || cert.fileName}"?`)) {
-                                          return;
-                                        }
-
-                                        try {
-                                          setSaving(true);
-                                          setMessage({ type: 'info', text: 'Deleting document...' });
-
-                                          console.log('🗑️ Deleting document:', cert);
-
-                                          // Delete from Supabase Storage if path exists
-                                          if (cert.supabasePath || cert.fileUrl) {
-                                            const { success, error } = await deleteDocumentClientSide(cert.supabasePath || cert.fileUrl);
-                                            if (error) {
-                                              console.warn('⚠️ Supabase delete warning:', error);
-                                              // Continue with Firestore deletion even if Storage delete fails
-                                            }
-                                          }
-
-                                          // Remove from Firestore
-                                          const isJeepDriver = userData.serviceType === 'Jeep Driver' || userData.serviceType === 'Renting';
-                                          const collectionName = isJeepDriver ? 'jeepDriverCertifications' : 'guideCertifications';
-                                          const userCertDocRef = doc(db, collectionName, currentUser.uid);
-
-                                          const existingDoc = await getDoc(userCertDocRef);
-                                          if (existingDoc.exists()) {
-                                            const existingDocuments = existingDoc.data().documents || [];
-                                            const updatedDocuments = existingDocuments.filter(d => d.documentId !== cert.documentId);
-
-                                            await setDoc(userCertDocRef, {
-                                              providerId: currentUser.uid,
-                                              documents: updatedDocuments,
-                                              updatedAt: serverTimestamp()
-                                            }, { merge: true });
-                                          }
-
-                                          console.log('✅ Document deleted');
-                                          setMessage({ type: 'success', text: 'Document deleted successfully!' });
-                                          setSaving(false);
-                                        } catch (error) {
-                                          console.error('❌ Delete error:', error);
-                                          setMessage({ type: 'error', text: `Delete failed: ${error.message}` });
-                                          setSaving(false);
-                                        }
-                                      }}
-                                      className="text-red-400 hover:text-red-300 transition-colors p-1.5"
-                                      title="Delete document"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -2301,15 +2413,15 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     </div>
                                     {(cert.fileSize || cert.size) && (
                                       <p className="text-xs text-gray-400 ml-6">
-                                        {cert.fileSize 
-                                          ? `${(cert.fileSize / 1024).toFixed(2)} KB` 
+                                        {cert.fileSize
+                                          ? `${(cert.fileSize / 1024).toFixed(2)} KB`
                                           : cert.size}
                                       </p>
                                     )}
                                     {cert.uploadedAt && (
                                       <p className="text-xs text-gray-500 ml-6">
-                                        Uploaded: {cert.uploadedAt.toDate 
-                                          ? cert.uploadedAt.toDate().toLocaleDateString() 
+                                        Uploaded: {cert.uploadedAt.toDate
+                                          ? cert.uploadedAt.toDate().toLocaleDateString()
                                           : new Date(cert.uploadedAt).toLocaleDateString()}
                                       </p>
                                     )}
@@ -2335,11 +2447,10 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                       }
                                     }}
                                     disabled={!hasValidPath}
-                                    className={`px-2 py-1 text-xs rounded transition-colors ${
-                                      hasValidPath 
-                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
-                                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                                    }`}
+                                    className={`px-2 py-1 text-xs rounded transition-colors ${hasValidPath
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                      }`}
                                     title={hasValidPath ? 'View document' : 'Document path not available'}
                                   >
                                     View
@@ -2400,11 +2511,10 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                       }
                                     }}
                                     disabled={!hasValidPath}
-                                    className={`px-3 py-1.5 text-xs rounded transition-colors ${
-                                      hasValidPath 
-                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
-                                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                                    }`}
+                                    className={`px-3 py-1.5 text-xs rounded transition-colors ${hasValidPath
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                      }`}
                                     title={hasValidPath ? 'View document' : 'Document path not available'}
                                   >
                                     View
@@ -2516,8 +2626,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <button
                     onClick={() => setBookingFilter('all')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'all'
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                   >
                     All ({bookings.length})
@@ -2525,8 +2635,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <button
                     onClick={() => setBookingFilter('pending')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'pending'
-                        ? 'bg-yellow-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      ? 'bg-yellow-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                   >
                     Pending ({bookings.filter(b => b.status === 'pending').length})
@@ -2534,8 +2644,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <button
                     onClick={() => setBookingFilter('accepted')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'accepted'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                   >
                     Accepted ({bookings.filter(b => b.status === 'accepted' && b.paymentStatus !== 'paid').length})
@@ -2543,17 +2653,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <button
                     onClick={() => setBookingFilter('confirmed')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'confirmed'
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                   >
-                    Confirmed ({bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && b.paymentStatus === 'paid').length})
+                    Paid ({bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && b.paymentStatus === 'paid').length})
                   </button>
                   <button
                     onClick={() => setBookingFilter('completed')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'completed'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                   >
                     Completed ({bookings.filter(b => b.status === 'completed').length})
@@ -2561,8 +2671,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   <button
                     onClick={() => setBookingFilter('declined')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${bookingFilter === 'declined'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                   >
                     Declined ({bookings.filter(b => b.status === 'declined').length})
@@ -2641,17 +2751,17 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                             setShowBookingDetails(true);
                           }}
                           className={`rounded-lg p-4 border cursor-pointer transition-colors hover:bg-gray-700 ${isPendingOver24Hours
-                              ? 'bg-red-900/30 border-red-500/50 ring-2 ring-red-500/50'
-                              : isPendingOver16Hours
-                                ? 'bg-orange-900/30 border-orange-500/50 ring-2 ring-orange-500/50'
-                                : 'bg-gray-700/50 border-gray-600'
+                            ? 'bg-red-900/30 border-red-500/50 ring-2 ring-red-500/50'
+                            : isPendingOver16Hours
+                              ? 'bg-orange-900/30 border-orange-500/50 ring-2 ring-orange-500/50'
+                              : 'bg-gray-700/50 border-gray-600'
                             }`}
                         >
                           {/* Urgent Alert Banner */}
                           {isPendingOver16Hours && (
                             <div className={`mb-3 px-3 py-2 rounded-lg border-2 ${isPendingOver24Hours
-                                ? 'bg-red-900/50 border-red-500 text-red-200'
-                                : 'bg-orange-900/50 border-orange-500 text-orange-200'
+                              ? 'bg-red-900/50 border-red-500 text-red-200'
+                              : 'bg-orange-900/50 border-orange-500 text-orange-200'
                               }`}>
                               <div className="flex items-center gap-2 mb-1">
                                 <AlertCircle className="h-4 w-4" />
@@ -2674,10 +2784,10 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                   {booking.customerName || 'Customer'}
                                 </h3>
                                 <span className={`px-2 py-1 rounded text-xs font-medium border ${booking.paymentStatus === 'paid'
-                                    ? statusColors.confirmed
-                                    : statusColors[booking.status] || statusColors.pending
+                                  ? statusColors.confirmed
+                                  : statusColors[booking.status] || statusColors.pending
                                   }`}>
-                                  {booking.paymentStatus === 'paid' ? 'CONFIRMED' : (booking.status?.toUpperCase() || 'PENDING')}
+                                  {booking.paymentStatus === 'paid' ? 'PAID' : (booking.status?.toUpperCase() || 'PENDING')}
                                 </span>
                                 {booking.status === 'pending' && (
                                   <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300 border border-gray-600">
@@ -2696,11 +2806,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                         const type = item.type || 'full-day';
                                         const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
                                         const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
-                                        
+
                                         // Calculate price per date
                                         const isFullDay = type === 'full-day' || type === 'full' || type === 'fullday';
                                         let datePrice = null;
-                                        
+
                                         if (booking.datesWithTypes.length > 0 && booking.totalPrice) {
                                           // Try to calculate per-date price from total
                                           datePrice = booking.totalPrice / booking.datesWithTypes.length;
@@ -2708,7 +2818,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                           // Use item-specific price if available
                                           datePrice = item.price;
                                         }
-                                        
+
                                         if (!date) return null;
                                         return (
                                           <div key={index} className="flex items-center justify-between text-xs">
@@ -2843,7 +2953,8 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         type="button"
                         onClick={() => {
                           // Revert to original availability
-                          setTempAvailabilityCalendar(availabilityCalendar);
+                          setTempAvailabilityStandard({});
+                          setTempAvailabilityLuxury({});
                           setIsEditingCalendar(false);
                         }}
                         className="px-4 py-2 text-sm border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
@@ -2854,13 +2965,37 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                         type="button"
                         onClick={async () => {
                           try {
+                            setIsSavingCalendar(true);
+                            console.log('📅 Saving calendar...');
+
                             // Save to database
-                            if (currentUser && userData) {
-                              await updateDoc(doc(db, 'serviceProviders', currentUser.uid), {
-                                availability: tempAvailabilityCalendar,
+                            if (currentUser) {
+                              // Determine primary availability for legacy sync
+                              const types = formData.vehicleTypes || [];
+                              const hasStandard = types.includes('Standard Safari Jeep') || formData.vehicleType === 'Standard Safari Jeep' || (!types.length && !formData.vehicleType);
+
+                              const savePayload = {
+                                availabilityStandard: tempAvailabilityStandard,
+                                availabilityLuxury: tempAvailabilityLuxury,
+                                // Sync legacy field: prioritize Standard, fallback to Luxury if Standard not present
+                                availability: hasStandard ? tempAvailabilityStandard : tempAvailabilityLuxury,
                                 updatedAt: serverTimestamp()
-                              });
-                              setAvailabilityCalendar(tempAvailabilityCalendar);
+                              };
+
+                              const userDocRef = doc(db, 'serviceProviders', currentUser.uid);
+
+                              console.log(`📅 Saving to user ${currentUser.uid}:`, savePayload);
+                              setLastSaveAttempt({ ...savePayload, _status: 'Attempting...' });
+
+                              await setDoc(userDocRef, savePayload, { merge: true });
+
+                              setLastSaveAttempt({ ...savePayload, _status: 'Success' });
+                              console.log('✅ Calendar saved to Firestore');
+
+                              // Optimistic update
+                              setAvailabilityStandard(tempAvailabilityStandard);
+                              setAvailabilityLuxury(tempAvailabilityLuxury);
+
                               setIsEditingCalendar(false);
                               setMessage({ type: 'success', text: 'Availability calendar updated successfully!' });
 
@@ -2868,23 +3003,39 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                               setTimeout(() => {
                                 setMessage({ type: '', text: '' });
                               }, 3000);
+                            } else {
+                              console.error('❌ No current user found when saving calendar');
+                              setMessage({ type: 'error', text: 'User session invalid. Please reload.' });
                             }
                           } catch (error) {
-                            console.error('Error updating availability:', error);
+                            console.error('❌ Error updating availability:', error);
                             setMessage({ type: 'error', text: 'Failed to update calendar. Please try again.' });
+                          } finally {
+                            setIsSavingCalendar(false);
                           }
                         }}
-                        className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                        disabled={isSavingCalendar}
+                        className={`px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2 ${isSavingCalendar ? 'opacity-75 cursor-wait' : ''}`}
                       >
-                        <Save className="h-4 w-4" />
-                        Save Calendar
+                        {isSavingCalendar ? (
+                          <>
+                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4" />
+                            Save Calendar
+                          </>
+                        )}
                       </button>
                     </>
                   ) : (
                     <button
                       type="button"
                       onClick={() => {
-                        setTempAvailabilityCalendar(availabilityCalendar);
+                        setTempAvailabilityStandard({ ...availabilityStandard });
+                        setTempAvailabilityLuxury({ ...availabilityLuxury });
                         setIsEditingCalendar(true);
                       }}
                       className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
@@ -2909,10 +3060,11 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   </div>
                   {(() => {
                     const acceptedCount = bookings.filter(b => b.status === 'accepted' || b.status === 'confirmed').length;
-                    const busyDatesCount = Object.keys(availabilityCalendar).filter(key => 
-                      availabilityCalendar[key] === 'busy' || availabilityCalendar[key] === 'halfday'
-                    ).length;
-                    
+                    const busyDatesCount = [
+                      ...Object.values(availabilityStandard || {}),
+                      ...Object.values(availabilityLuxury || {})
+                    ].filter(status => status === 'busy' || status === 'halfday').length;
+
                     if (acceptedCount === 0 && busyDatesCount === 0) {
                       return (
                         <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3">
@@ -2933,16 +3085,47 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                   })()}
                 </div>
               )}
-              <AvailabilityCalendar
-                availability={isEditingCalendar ? tempAvailabilityCalendar : availabilityCalendar}
-                onChange={(newAvailability) => {
-                  if (isEditingCalendar) {
-                    setTempAvailabilityCalendar(newAvailability);
-                  }
-                }}
-                readOnly={!isEditingCalendar}
-                acceptedBookings={bookings.filter(b => b.status === 'accepted' || b.status === 'confirmed')}
-              />
+
+
+              {/* Conditional Calendar Rendering */}
+              {(() => {
+                // Determine which calendars to show
+                const types = formData.vehicleTypes || [];
+                const legacyType = formData.vehicleType;
+
+                const showStandard = types.includes('Standard Safari Jeep') || legacyType === 'Standard Safari Jeep' || (!types.length && !legacyType);
+                const showLuxury = types.includes('Luxury Safari Jeep') || legacyType === 'Luxury Safari Jeep';
+
+                // If user has NO types selected but is a Jeep Driver, maybe default to Standard? handled above.
+
+                return (
+                  <div className="space-y-8">
+                    {showStandard && (
+                      <div className="p-4 bg-gray-900/30 rounded-xl border border-gray-800">
+                        <h3 className="text-lg font-semibold text-emerald-400 mb-4">🚙 Standard Jeep - Calendar</h3>
+                        <AvailabilityCalendar
+                          availability={isEditingCalendar ? tempAvailabilityStandard : availabilityStandard}
+                          onChange={(newAvail) => isEditingCalendar && setTempAvailabilityStandard(newAvail)}
+                          readOnly={!isEditingCalendar}
+                          acceptedBookings={bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && (!b.vehicleType || b.vehicleType.includes('Standard')))}
+                        />
+                      </div>
+                    )}
+
+                    {showLuxury && (
+                      <div className="p-4 bg-gray-900/30 rounded-xl border border-gray-800">
+                        <h3 className="text-lg font-semibold text-purple-400 mb-4">🚙 Luxury Jeep - Calendar</h3>
+                        <AvailabilityCalendar
+                          availability={isEditingCalendar ? tempAvailabilityLuxury : availabilityLuxury}
+                          onChange={(newAvail) => isEditingCalendar && setTempAvailabilityLuxury(newAvail)}
+                          readOnly={!isEditingCalendar}
+                          acceptedBookings={bookings.filter(b => (b.status === 'accepted' || b.status === 'confirmed') && b.vehicleType && b.vehicleType.includes('Luxury'))}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -2950,258 +3133,262 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
       </div>
 
       {/* Global Notification Bell */}
-      {currentUser && (
-        <GlobalNotificationBell
-          user={currentUser}
-          notifications={notifications}
-          onNotificationClick={onNotificationClick}
-          onMarkAsRead={onMarkAsRead}
-        />
-      )}
+      {
+        currentUser && (
+          <GlobalNotificationBell
+            user={currentUser}
+            notifications={notifications}
+            onNotificationClick={onNotificationClick}
+            onMarkAsRead={onMarkAsRead}
+          />
+        )
+      }
 
 
       {/* Booking Details Side Box */}
-      {showBookingDetails && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-end">
-          <div className="bg-gray-800 w-full max-w-md h-full overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-gray-900 border-b border-gray-700 p-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Booking Details</h2>
-              <button
-                onClick={() => {
-                  setShowBookingDetails(false);
-                  setSelectedBooking(null);
-                }}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
+      {
+        showBookingDetails && selectedBooking && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-end">
+            <div className="bg-gray-800 w-full max-w-md h-full overflow-y-auto shadow-2xl">
+              <div className="sticky top-0 bg-gray-900 border-b border-gray-700 p-4 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-white">Booking Details</h2>
+                <button
+                  onClick={() => {
+                    setShowBookingDetails(false);
+                    setSelectedBooking(null);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
 
-            <div className="p-6 space-y-6">
-              {/* Status Badge */}
-              <div>
-                <span className={`inline-block px-3 py-1 rounded text-sm font-medium border ${selectedBooking.paymentStatus === 'paid' ? 'bg-emerald-900/50 text-emerald-300 border-emerald-700' :
+              <div className="p-6 space-y-6">
+                {/* Status Badge */}
+                <div>
+                  <span className={`inline-block px-3 py-1 rounded text-sm font-medium border ${selectedBooking.paymentStatus === 'paid' ? 'bg-emerald-900/50 text-emerald-300 border-emerald-700' :
                     selectedBooking.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300 border-yellow-700' :
                       selectedBooking.status === 'accepted' ? 'bg-green-900/50 text-green-300 border-green-700' :
                         selectedBooking.status === 'declined' ? 'bg-red-900/50 text-red-300 border-red-700' :
                           selectedBooking.status === 'completed' ? 'bg-blue-900/50 text-blue-300 border-blue-700' :
                             'bg-gray-700/50 text-gray-300 border-gray-600'
-                  }`}>
-                  {selectedBooking.paymentStatus === 'paid' ? 'CONFIRMED' : (selectedBooking.status?.toUpperCase() || 'PENDING')}
-                </span>
-              </div>
-
-              {/* Customer Information */}
-              <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <User className="h-5 w-5 text-emerald-400" />
-                  Customer Information
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <span className="text-gray-400 font-medium">Name:</span>
-                    <p className="text-white">{selectedBooking.customerName || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-400 font-medium">Email:</span>
-                    <p className="text-white">{selectedBooking.customerEmail || 'N/A'}</p>
-                  </div>
-                  {selectedBooking.customerPhone && (
-                    <div>
-                      <span className="text-gray-400 font-medium">Phone:</span>
-                      <p className="text-white">{selectedBooking.customerPhone}</p>
-                    </div>
-                  )}
-                  {selectedBooking.customerCountry && (
-                    <div>
-                      <span className="text-gray-400 font-medium">Country:</span>
-                      <p className="text-white">{selectedBooking.customerCountry}</p>
-                    </div>
-                  )}
-                  {selectedBooking.emergencyContactName && (
-                    <div>
-                      <span className="text-gray-400 font-medium">Emergency Contact:</span>
-                      <p className="text-white">{selectedBooking.emergencyContactName}</p>
-                      {selectedBooking.emergencyContactPhone && (
-                        <p className="text-gray-300 text-xs">{selectedBooking.emergencyContactPhone}</p>
-                      )}
-                    </div>
-                  )}
+                    }`}>
+                    {selectedBooking.paymentStatus === 'paid' ? 'CONFIRMED' : (selectedBooking.status?.toUpperCase() || 'PENDING')}
+                  </span>
                 </div>
-              </div>
 
-              {/* Booking Details */}
-              <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-emerald-400" />
-                  Booking Details
-                </h3>
-                <div className="space-y-3 text-sm">
-                  {selectedBooking.datesWithTypes && Array.isArray(selectedBooking.datesWithTypes) && selectedBooking.datesWithTypes.length > 0 ? (
-                    <div>
-                      <span className="text-gray-400 font-medium">Dates:</span>
-                      <div className="mt-2 space-y-1">
-                        {selectedBooking.datesWithTypes.map((item, index) => {
-                          const date = item.date ? new Date(item.date) : null;
-                          const type = item.type || 'full-day';
-                          const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
-                          const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
-                          // Calculate price for this day
-                          const isFullDay = type === 'full' || type === 'full-day';
-                          const dayPrice = isFullDay
-                            ? selectedBooking.priceFullDay || selectedBooking.pricePerDay
-                            : selectedBooking.priceHalfDay || (selectedBooking.pricePerDay * 0.6);
-                          if (!date) return null;
-                          return (
-                            <div key={index} className="flex items-center justify-between text-sm">
-                              <span className="text-white">{formatDate(date)}</span>
-                              <div className="flex items-center gap-2">
-                                <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
-                                {dayPrice && (
-                                  <span className="text-white font-medium">LKR {dayPrice.toLocaleString()}</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : selectedBooking.selectedDates ? (
-                    <div>
-                      <span className="text-gray-400 font-medium">Dates:</span>
-                      <p className="text-white">
-                        {Array.isArray(selectedBooking.selectedDates)
-                          ? selectedBooking.selectedDates.map(d => formatDate(new Date(d))).join(', ')
-                          : formatDate(new Date(selectedBooking.selectedDates))}
-                      </p>
-                    </div>
-                  ) : selectedBooking.datesString ? (
-                    <div>
-                      <span className="text-gray-400 font-medium">Dates:</span>
-                      <p className="text-white">{selectedBooking.datesString}</p>
-                    </div>
-                  ) : null}
-                  {selectedBooking.destination && (
-                    <div>
-                      <span className="text-gray-400 font-medium">Destination:</span>
-                      <p className="text-white">{selectedBooking.destination}</p>
-                    </div>
-                  )}
-                  {selectedBooking.nationalPark && (
-                    <div>
-                      <span className="text-gray-400 font-medium">National Park:</span>
-                      <p className="text-white">{selectedBooking.nationalPark}</p>
-                    </div>
-                  )}
-                  {selectedBooking.vehicleType && (
-                    <div>
-                      <span className="text-gray-400 font-medium">Vehicle Type:</span>
-                      <p className="text-white">{selectedBooking.vehicleType}</p>
-                    </div>
-                  )}
-                  {selectedBooking.totalPrice && (
-                    <div>
-                      <span className="text-gray-400 font-medium">Total Price:</span>
-                      <p className="text-white font-semibold">LKR {selectedBooking.totalPrice.toLocaleString()}</p>
-                    </div>
-                  )}
-                  {selectedBooking.createdAt && (
-                    <div>
-                      <span className="text-gray-400 font-medium">Booked on:</span>
-                      <p className="text-white">
-                        {formatDate(selectedBooking.createdAt?.toDate?.() || selectedBooking.createdAt)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Location Details */}
-              {(selectedBooking.needsHotelPickup || selectedBooking.pickupLocation || selectedBooking.dropoffLocation || selectedBooking.hotelName || selectedBooking.hotelAddress) && (
+                {/* Customer Information */}
                 <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-emerald-400" />
-                    Location Details
+                    <User className="h-5 w-5 text-emerald-400" />
+                    Customer Information
                   </h3>
                   <div className="space-y-3 text-sm">
-                    {selectedBooking.needsHotelPickup && (
+                    <div>
+                      <span className="text-gray-400 font-medium">Name:</span>
+                      <p className="text-white">{selectedBooking.customerName || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 font-medium">Email:</span>
+                      <p className="text-white">{selectedBooking.customerEmail || 'N/A'}</p>
+                    </div>
+                    {selectedBooking.customerPhone && (
                       <div>
-                        <span className="text-gray-400 font-medium">Hotel Pickup:</span>
-                        <p className="text-white">Yes</p>
+                        <span className="text-gray-400 font-medium">Phone:</span>
+                        <p className="text-white">{selectedBooking.customerPhone}</p>
                       </div>
                     )}
-                    {selectedBooking.hotelName && (
+                    {selectedBooking.customerCountry && (
                       <div>
-                        <span className="text-gray-400 font-medium">Hotel Name:</span>
-                        <p className="text-white">{selectedBooking.hotelName}</p>
+                        <span className="text-gray-400 font-medium">Country:</span>
+                        <p className="text-white">{selectedBooking.customerCountry}</p>
                       </div>
                     )}
-                    {selectedBooking.hotelAddress && (
+                    {selectedBooking.emergencyContactName && (
                       <div>
-                        <span className="text-gray-400 font-medium">Hotel Address:</span>
-                        <p className="text-white">{selectedBooking.hotelAddress}</p>
-                      </div>
-                    )}
-                    {selectedBooking.pickupLocation && (
-                      <div>
-                        <span className="text-gray-400 font-medium">Pickup Location:</span>
-                        <p className="text-white">{selectedBooking.pickupLocation}</p>
-                      </div>
-                    )}
-                    {selectedBooking.dropoffLocation && (
-                      <div>
-                        <span className="text-gray-400 font-medium">Drop-off Location:</span>
-                        <p className="text-white">{selectedBooking.dropoffLocation}</p>
+                        <span className="text-gray-400 font-medium">Emergency Contact:</span>
+                        <p className="text-white">{selectedBooking.emergencyContactName}</p>
+                        {selectedBooking.emergencyContactPhone && (
+                          <p className="text-gray-300 text-xs">{selectedBooking.emergencyContactPhone}</p>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
-              )}
 
-              {/* Additional Notes */}
-              {selectedBooking.additionalNotes && (
+                {/* Booking Details */}
                 <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-emerald-400" />
-                    Additional Notes
+                    <Calendar className="h-5 w-5 text-emerald-400" />
+                    Booking Details
                   </h3>
-                  <p className="text-white text-sm whitespace-pre-wrap">{selectedBooking.additionalNotes}</p>
+                  <div className="space-y-3 text-sm">
+                    {selectedBooking.datesWithTypes && Array.isArray(selectedBooking.datesWithTypes) && selectedBooking.datesWithTypes.length > 0 ? (
+                      <div>
+                        <span className="text-gray-400 font-medium">Dates:</span>
+                        <div className="mt-2 space-y-1">
+                          {selectedBooking.datesWithTypes.map((item, index) => {
+                            const date = item.date ? new Date(item.date) : null;
+                            const type = item.type || 'full-day';
+                            const typeLabel = type === 'half-day' ? 'Half Day' : 'Full Day';
+                            const typeColor = type === 'half-day' ? 'text-yellow-400' : 'text-green-400';
+                            // Calculate price for this day
+                            const isFullDay = type === 'full' || type === 'full-day';
+                            const dayPrice = isFullDay
+                              ? selectedBooking.priceFullDay || selectedBooking.pricePerDay
+                              : selectedBooking.priceHalfDay || (selectedBooking.pricePerDay * 0.6);
+                            if (!date) return null;
+                            return (
+                              <div key={index} className="flex items-center justify-between text-sm">
+                                <span className="text-white">{formatDate(date)}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className={`font-medium ${typeColor}`}>{typeLabel}</span>
+                                  {dayPrice && (
+                                    <span className="text-white font-medium">LKR {dayPrice.toLocaleString()}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : selectedBooking.selectedDates ? (
+                      <div>
+                        <span className="text-gray-400 font-medium">Dates:</span>
+                        <p className="text-white">
+                          {Array.isArray(selectedBooking.selectedDates)
+                            ? selectedBooking.selectedDates.map(d => formatDate(new Date(d))).join(', ')
+                            : formatDate(new Date(selectedBooking.selectedDates))}
+                        </p>
+                      </div>
+                    ) : selectedBooking.datesString ? (
+                      <div>
+                        <span className="text-gray-400 font-medium">Dates:</span>
+                        <p className="text-white">{selectedBooking.datesString}</p>
+                      </div>
+                    ) : null}
+                    {selectedBooking.destination && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Destination:</span>
+                        <p className="text-white">{selectedBooking.destination}</p>
+                      </div>
+                    )}
+                    {selectedBooking.nationalPark && (
+                      <div>
+                        <span className="text-gray-400 font-medium">National Park:</span>
+                        <p className="text-white">{selectedBooking.nationalPark}</p>
+                      </div>
+                    )}
+                    {selectedBooking.vehicleType && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Vehicle Type:</span>
+                        <p className="text-white">{selectedBooking.vehicleType}</p>
+                      </div>
+                    )}
+                    {selectedBooking.totalPrice && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Total Price:</span>
+                        <p className="text-white font-semibold">LKR {selectedBooking.totalPrice.toLocaleString()}</p>
+                      </div>
+                    )}
+                    {selectedBooking.createdAt && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Booked on:</span>
+                        <p className="text-white">
+                          {formatDate(selectedBooking.createdAt?.toDate?.() || selectedBooking.createdAt)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              {/* Action Buttons for Pending Bookings */}
-              {selectedBooking.status === 'pending' && (
-                <div className="flex gap-3 pt-4 border-t border-gray-700">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBookingStatusUpdate(selectedBooking.id, 'accepted');
-                      setShowBookingDetails(false);
-                      setSelectedBooking(null);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
-                  >
-                    <Check className="h-5 w-5" />
-                    Accept
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBookingStatusUpdate(selectedBooking.id, 'declined');
-                      setShowBookingDetails(false);
-                      setSelectedBooking(null);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
-                  >
-                    <X className="h-5 w-5" />
-                    Decline
-                  </button>
-                </div>
-              )}
+                {/* Location Details */}
+                {(selectedBooking.needsHotelPickup || selectedBooking.pickupLocation || selectedBooking.dropoffLocation || selectedBooking.hotelName || selectedBooking.hotelAddress) && (
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-emerald-400" />
+                      Location Details
+                    </h3>
+                    <div className="space-y-3 text-sm">
+                      {selectedBooking.needsHotelPickup && (
+                        <div>
+                          <span className="text-gray-400 font-medium">Hotel Pickup:</span>
+                          <p className="text-white">Yes</p>
+                        </div>
+                      )}
+                      {selectedBooking.hotelName && (
+                        <div>
+                          <span className="text-gray-400 font-medium">Hotel Name:</span>
+                          <p className="text-white">{selectedBooking.hotelName}</p>
+                        </div>
+                      )}
+                      {selectedBooking.hotelAddress && (
+                        <div>
+                          <span className="text-gray-400 font-medium">Hotel Address:</span>
+                          <p className="text-white">{selectedBooking.hotelAddress}</p>
+                        </div>
+                      )}
+                      {selectedBooking.pickupLocation && (
+                        <div>
+                          <span className="text-gray-400 font-medium">Pickup Location:</span>
+                          <p className="text-white">{selectedBooking.pickupLocation}</p>
+                        </div>
+                      )}
+                      {selectedBooking.dropoffLocation && (
+                        <div>
+                          <span className="text-gray-400 font-medium">Drop-off Location:</span>
+                          <p className="text-white">{selectedBooking.dropoffLocation}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Notes */}
+                {selectedBooking.additionalNotes && (
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-emerald-400" />
+                      Additional Notes
+                    </h3>
+                    <p className="text-white text-sm whitespace-pre-wrap">{selectedBooking.additionalNotes}</p>
+                  </div>
+                )}
+
+                {/* Action Buttons for Pending Bookings */}
+                {selectedBooking.status === 'pending' && (
+                  <div className="flex gap-3 pt-4 border-t border-gray-700">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBookingStatusUpdate(selectedBooking.id, 'accepted');
+                        setShowBookingDetails(false);
+                        setSelectedBooking(null);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
+                    >
+                      <Check className="h-5 w-5" />
+                      Accept
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBookingStatusUpdate(selectedBooking.id, 'declined');
+                        setShowBookingDetails(false);
+                        setSelectedBooking(null);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+                    >
+                      <X className="h-5 w-5" />
+                      Decline
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       <Footer />
     </div >
