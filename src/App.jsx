@@ -27,11 +27,14 @@ import {
   getDocs,
 } from "firebase/firestore";
 // Supabase Storage imports (replacing Firebase Storage)
-import { uploadProfileImage, uploadDocument } from "./lib/supabase";
-import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, ChevronDown, Bell, X, Send, Check, CheckCheck, MessageCircle, ArrowUp, Calendar } from "lucide-react";
+import { uploadProfileImage, uploadDocument, uploadProviderDocumentClientSide } from "./lib/supabase";
+import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, ChevronDown, Bell, X, Send, Check, CheckCheck, MessageCircle, ArrowUp, Calendar, Briefcase, CheckCircle } from "lucide-react";
 
 // Import images from src/assets
 import logo from "./assets/logo.png";
+import loginBg from "./assets/section5.avif";
+import touristBg from "./assets/tourist.avif";
+import providerBg from "./assets/provider.avif";
 
 // Import components
 import Navbar from "./components/home/Navbar";
@@ -78,7 +81,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 // Import Chat components
 import Chat from "./components/Chat";
 import ChatList from "./components/ChatList";
-import BookingSection from "./components/BookingSection";
+import BookingPanel from "./components/BookingPanel";
 
 // Import Availability Calendar
 import AvailabilityCalendar from "./components/AvailabilityCalendar";
@@ -1307,8 +1310,37 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
   const [showNotifications, setShowNotifications] = useState(false);
   const [upcomingTrip, setUpcomingTrip] = useState(null);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0 });
+  const [isProvider, setIsProvider] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Fetch upcoming trip for countdown badge
+  // Check if mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Check if user is provider
+  useEffect(() => {
+    const checkRole = async () => {
+      if (!user) return;
+      // Simple check based on object properties if available, otherwise fetch
+      // Assuming 'serviceType' property exists on provider user objects as seen in other code
+      if (user.serviceType || user.guideId || user.driverId) {
+        setIsProvider(true);
+      } else {
+        // Double check against db to be sure
+        const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+        setIsProvider(providerDoc.exists());
+      }
+    };
+    checkRole();
+  }, [user]);
+
+
   useEffect(() => {
     if (!user || !user.uid) return;
 
@@ -1447,7 +1479,8 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
     }
   };
 
-  if (!user) return null;
+  // Render logic: Show bell if user is provider OR (user is tourist AND it's mobile)
+  if (!user || (!isProvider && !isMobile)) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 notification-container">
@@ -1670,7 +1703,7 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white overflow-x-hidden max-w-full">
       {/* Chat Modal */}
       {showChatModal && chatOtherUser && user && (
         <Chat
@@ -1707,12 +1740,8 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
       )}
 
       {/* Home Content with All Sections */}
-      <div className="pt--1 space-y-1">
-        <Section1>
-          {/* Booking Panel - Only show for tourists, not for service providers */}
-          {/* BookingSection component handles its own visibility based on user role */}
-          {user && <BookingSection user={user} />}
-        </Section1>
+      <div className="pt-0 space-y-0">
+        <Section1 />
         <Section3 />
         <Section4 />
         <Section5 />
@@ -1770,22 +1799,26 @@ function App() {
             // Try to get user's name from their profile
             let userName = user.displayName || '';
 
-            // Try to get from tourists collection
             try {
-              const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
-              if (touristDoc.exists()) {
-                userName = touristDoc.data().fullName || touristDoc.data().name || userName;
+              // 1. Check Admins Collection
+              const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+              if (adminDoc.exists()) {
+                userName = 'Admin';
+              } else {
+                // 2. Check Tourists Collection
+                const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
+                if (touristDoc.exists()) {
+                  userName = touristDoc.data().fullName || touristDoc.data().name || userName;
+                } else {
+                  // 3. Check Service Providers Collection
+                  const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+                  if (providerDoc.exists()) {
+                    userName = providerDoc.data().fullName || providerDoc.data().name || userName;
+                  }
+                }
               }
             } catch (e) {
-              // Try serviceProviders collection
-              try {
-                const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
-                if (providerDoc.exists()) {
-                  userName = providerDoc.data().fullName || providerDoc.data().name || userName;
-                }
-              } catch (e2) {
-                console.log('Could not fetch user name from collections');
-              }
+              console.log('Error fetching user details for welcome message', e);
             }
 
             setWelcomeUserName(userName || 'User');
@@ -1948,47 +1981,8 @@ function App() {
     sessionStorage.removeItem('authServiceType');
     sessionStorage.removeItem('returnToPath');
 
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      try {
-        // Step 1: Check if user is admin (ONLY by document existence)
-        const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
-        if (adminDoc.exists()) {
-          console.log('✅ Admin user logged in, redirecting to admin panel');
-          setTimeout(() => {
-            window.location.href = '/admin-panel';
-          }, 500);
-          setReturnToPath(null);
-          return;
-        }
-
-        // Step 2: Check if user is a service provider
-        const providerDoc = await getDoc(doc(db, 'serviceProviders', currentUser.uid));
-        if (providerDoc.exists()) {
-          const providerData = providerDoc.data();
-          if (providerData.serviceType === 'Jeep Driver' || providerData.serviceType === 'Tour Guide') {
-            // Service provider logged in - redirect to home if on restricted pages
-            const restrictedRoutes = ['/destination', '/guide', '/driver'];
-            if (returnPath && restrictedRoutes.some(route => returnPath.startsWith(route))) {
-              setTimeout(() => {
-                window.location.href = '/';
-              }, 500);
-              setReturnToPath(null);
-              return;
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error checking user role in handleAuthSuccess:', error);
-      }
-    }
-
-    if (returnPath && returnPath !== '/login' && returnPath !== '/register') {
-      // Redirect to the previous page after successful login
-      setTimeout(() => {
-        window.location.href = returnPath;
-      }, 500);
-    }
+    // Navigation is now handled by the Authentication component directly using navigate()
+    // This prevents full page reloads and the white screen issue
     setReturnToPath(null);
   };
 
@@ -2452,13 +2446,22 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
-        {/* Global Notification Bell with Countdown - Visible on ALL pages */}
-        <GlobalNotificationBell
+        {/* Global Notification Bell - Only for Service Providers */}
+        {/* Global Notification Bell - Only for Service Providers */}
+        <ConditionalNotificationBell
           user={user}
           notifications={notifications}
           onNotificationClick={handleNotificationClick}
           onMarkAsRead={handleMarkAsRead}
         />
+
+        {/* Global Booking Panel - Only for Tourists (replaces bell) */}
+        {user && (
+          <ConditionalBookingPanel
+            user={user}
+            notifications={notifications}
+          />
+        )}
 
       </Router>
     </AuthProvider>
@@ -2540,6 +2543,42 @@ const isValidPhone = (phone, countryCode) => {
   return country.pattern.test(digits);
 };
 
+// Helper to check if current path should hide global UI components
+const shouldHideGlobalUI = (pathname) => {
+  const hiddenPaths = ['/login', '/register', '/auth'];
+  return hiddenPaths.some(path => pathname === path || pathname.startsWith(path + '/'));
+};
+
+const ConditionalNotificationBell = ({ user, notifications = [], onNotificationClick, onMarkAsRead }) => {
+  const location = useLocation();
+  if (shouldHideGlobalUI(location.pathname)) return null;
+
+  return (
+    <GlobalNotificationBell
+      user={user}
+      notifications={notifications}
+      onNotificationClick={onNotificationClick}
+      onMarkAsRead={onMarkAsRead}
+    />
+  );
+};
+
+// Booking Panel Wrapper to hide on specific pages
+const ConditionalBookingPanel = ({ user, notifications }) => {
+  const location = useLocation();
+  const isProfilePage = location.pathname === '/profile';
+
+  // Hide on Admin Dashboard
+  if (isProfilePage || location.pathname.startsWith('/admin') || shouldHideGlobalUI(location.pathname)) return null;
+
+  return (
+    <BookingPanel
+      user={user}
+      notifications={notifications}
+    />
+  );
+};
+
 // Authentication Wrapper Component - Handles URL params
 function AuthenticationWrapper({ onAuthSuccess, returnToPath, initialScreen = "login", onBackToHome }) {
   const { serviceType: urlServiceType } = useParams();
@@ -2569,18 +2608,38 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   // Immediately sync to sessionStorage if URL has serviceType
   useEffect(() => {
     if (urlServiceType) {
-      console.log('🔒 URL serviceType detected, forcing states');
-      if (role !== 'provider') {
-        setRole('provider');
-        sessionStorage.setItem('authRole', 'provider');
+      console.log('🔒 URL serviceType detected, checking states');
+
+      // Only enforce provider role if we are on the register screen
+      if (screen === 'register') {
+        if (role !== 'provider') {
+          console.log('  - Enforcing provider role for registration');
+          setRole('provider');
+          sessionStorage.setItem('authRole', 'provider');
+        }
       }
-      if (screen !== 'register') {
-        setScreen('register');
-        sessionStorage.setItem('authScreen', 'register');
-      }
+
+      // We removed the forced setScreen('register') here to allow users 
+      // to see the login screen after successful registration (where URL might still be /register/:type)
     }
-  }, [urlServiceType]); // Run whenever urlServiceType changes
-  const [msg, setMsg] = useState("");
+  }, [urlServiceType, screen, role]); // Run whenever urlServiceType, screen, or role changes
+  // Modern Toast Notification System
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = (message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 5000); // Auto dismiss after 5 seconds
+  };
+
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
+
+
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
@@ -2797,7 +2856,6 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     setDailyRate("");
     setSpecialPackageRates("");
     setCurrencyPreference("LKR");
-    setMsg("");
     setBusy(false);
   };
 
@@ -2889,10 +2947,10 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         return;
       }
 
-      // Check if at least one certification has a file uploaded
-      const hasUploadedCert = certifications.some(cert => certificationFiles[cert]);
-      if (!hasUploadedCert) {
-        setMsg("❌ Please upload at least one certification document");
+      // Check if EVERY selected certification has a file uploaded
+      const missingFiles = certifications.filter(cert => !certificationFiles[cert]);
+      if (missingFiles.length > 0) {
+        setMsg(`❌ Please upload verification documents for: ${missingFiles.join(', ')}`);
         return;
       }
     }
@@ -2947,20 +3005,20 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
         // For Luxury Safari Jeep
         if (hasLuxuryJeep && fullDayLux <= halfDayLux) {
-          setMsg("❌ Full Day Luxury price must be greater than Half Day Luxury price");
+          addToast("Full Day Luxury price must be greater than Half Day Luxury price", "error");
           return;
         }
 
         // For Tour Guide (uses priceFullDayStandard and priceHalfDayStandard)
         if (serviceType === "Tour Guide" && fullDayStd > 0 && halfDayStd > 0 && fullDayStd <= halfDayStd) {
-          setMsg("❌ Full Day price must be greater than Half Day price");
+          addToast("Full Day price must be greater than Half Day price", "error");
           return;
         }
       }
     }
 
     setBusy(true);
-    setMsg("⏳ Creating your account...");
+    addToast("Creating your account...", "info");
 
     try {
       console.log("Creating user with email:", email);
@@ -3059,43 +3117,37 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             destinations: destinationsArray,
             specialQualifications: specialQualifications || [],
             areasOfExpertise: areasOfExpertise || [],
-            certifications: certifications || [], // Add certifications field
+            certifications: certifications || [],
             verificationDocuments: verificationDocuments || [],
-            verificationDocumentUrls: {}, // Will be populated after file uploads
-            // Save Guide's Registered Rates (from registration form)
+            verificationDocumentUrls: {},
             priceFullDayStandard: parsePrice(priceFullDayStandard),
             priceHalfDayStandard: parsePrice(priceHalfDayStandard),
-            // Legacy fields for backward compatibility
             hourlyRate: hourlyRate ? parseInt(hourlyRate) : 0,
             dailyRate: dailyRate ? parseInt(dailyRate) : 0,
-            fullDayPrice: parsePrice(priceFullDayStandard), // Alias
-            halfDayPrice: parsePrice(priceHalfDayStandard), // Alias
+            fullDayPrice: parsePrice(priceFullDayStandard),
+            halfDayPrice: parsePrice(priceHalfDayStandard),
             specialPackageRates: specialPackageRates || "",
             currencyPreference: currencyPreference || "LKR",
             languages: languages || [],
-            availability: availableDates || {}, // Object mapping dates to status (busy, halfday, unavailable)
+            availability: availableDates || {},
             description: description?.trim() || "",
             featured: false,
           };
         } else if (serviceType === "Renting") {
-          // For Renting Shop - Same features as Jeep Driver
-          // Convert single destination to array format for Firestore compatibility
           const destinationsArray = destinations ? [destinations] : [];
           userData = {
             ...userData,
-            destinations: destinationsArray, // Use destinations like jeep drivers
-            province: destinations || "", // Keep province for backward compatibility
-            languages: languages || [], // Include languages (same as jeep drivers)
-            specialSkills: specialSkills || [], // Include special skills (same as jeep drivers)
+            destinations: destinationsArray,
+            province: destinations || "",
+            languages: languages || [],
+            specialSkills: specialSkills || [],
             certifications: certifications || [],
-            certificationUrls: {}, // Will be populated after file uploads
-            availability: availableDates || {}, // Object mapping dates to status (busy, halfday, unavailable)
+            certificationUrls: {},
+            availability: availableDates || {},
             description: description?.trim() || "",
             featured: false,
           };
         } else {
-          // For Jeep Driver
-          // Convert single destination to array format for Firestore compatibility
           const destinationsArray = destinations ? [destinations] : [];
           userData = {
             ...userData,
@@ -3103,11 +3155,46 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
             languages: languages || [],
             specialSkills: specialSkills || [],
             certifications: certifications || [],
-            certificationUrls: {}, // Will be populated after file uploads
-            availability: availableDates || {}, // Object mapping dates to status (busy, halfday, unavailable)
+            certificationUrls: {},
+            availability: availableDates || {},
             description: description?.trim() || "",
             featured: false,
           };
+        }
+      }
+
+      // 📄 Upload Certification Files (if any)
+      if (role === 'provider' && collectionName === 'serviceProviders' && Object.keys(certificationFiles).length > 0) {
+        console.log("📄 Uploading certification files...");
+        const certUrls = {};
+
+        for (const [certName, file] of Object.entries(certificationFiles)) {
+          try {
+            // Use the new provider upload function
+            // Filename format: {uid}_{timestamp}_{cleanName}
+            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const { url, error } = await uploadProviderDocumentClientSide(file, uid, `${certName.replace(/\s+/g, '_')}_${cleanName}`);
+
+            if (error) {
+              console.error(`❌ Failed to upload certification ${certName}:`, error);
+              continue;
+            }
+
+            if (url) {
+              console.log(`✅ Uploaded ${certName}:`, url);
+              certUrls[certName] = url;
+            }
+          } catch (uploadErr) {
+            console.error(`❌ Error uploading ${certName}:`, uploadErr);
+          }
+        }
+
+        // Add to userData
+        userData.certificationUrls = certUrls;
+
+        // Also map to verificationDocumentUrls if it's a Tour Guide (just in case they are treated similarly)
+        if (serviceType === "Tour Guide") {
+          userData.verificationDocumentUrls = { ...userData.verificationDocumentUrls, ...certUrls };
         }
       }
 
@@ -3117,14 +3204,11 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       await setDoc(doc(db, collectionName, uid), userData);
       console.log("✅ User data saved to Firestore successfully!");
 
-      // Update profile display name immediately
       await updateProfile(userCredential.user, {
         displayName: fullName
       });
 
-      // Handle profile picture upload - Upload immediately to ensure it's saved
       if (profileFile) {
-        // Upload profile picture immediately (don't wait)
         (async () => {
           try {
             console.log("📸 Uploading profile picture to Supabase Storage...");
@@ -3132,8 +3216,6 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
             if (error) {
               console.error("❌ Profile image upload failed:", error);
-              console.error("   Error details:", error.message || error);
-              // Profile picture can be uploaded later via profile settings
               return;
             }
 
@@ -3144,13 +3226,11 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
             console.log("✅ Profile image uploaded to Supabase, URL:", photoURL);
 
-            // Update Firestore with profile picture URL immediately
             await setDoc(doc(db, collectionName, uid), {
               profilePicture: photoURL,
               updatedAt: serverTimestamp(),
             }, { merge: true });
 
-            // Update Firebase Auth profile
             try {
               await updateProfile(userCredential.user, {
                 displayName: fullName,
@@ -3158,27 +3238,18 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
               });
             } catch (authError) {
               console.warn("⚠️ Could not update Firebase Auth photoURL:", authError);
-              // Continue - Firestore update is more important
             }
-
-            console.log("✅ Profile picture saved to Firestore (and Firebase Auth)");
-            console.log("   Profile image URL:", photoURL);
           } catch (uploadError) {
             console.error("❌ Profile image upload failed:", uploadError);
-            console.error("   Error details:", uploadError.message || uploadError);
-            // Profile picture can be uploaded later via profile settings
           }
-        })(); // Immediately invoke async function
+        })();
       }
 
-      // Complete account creation first, then upload files in background
-      setMsg("🎉 Account created successfully! Redirecting to login...");
+      addToast("Account created successfully! Redirecting to login...", "success");
       setBusy(false);
 
-      // Upload certification files in background (non-blocking)
-      // For Jeep Driver and Renting service types
+      // Upload certification files in background
       if ((serviceType === "Jeep Driver" || serviceType === "Renting") && Object.keys(certificationFiles).length > 0) {
-        // Start background upload without blocking
         setTimeout(async () => {
           try {
             console.log("📄 Starting background upload of certification files for Jeep Driver...");
@@ -3191,34 +3262,25 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                 const timestamp = Date.now();
                 const fileName = `${uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
-                console.log(`📤 Uploading ${certName} to Supabase Storage...`);
-
-                // Upload to Supabase Storage
-                const { url: fileURL, error, path } = await uploadDocument(file, uid, fileName);
+                const { url: fileURL, error, path } = await uploadProviderDocumentClientSide(file, uid, fileName);
 
                 if (error) {
-                  console.error(`❌ Failed to upload certification ${certName}:`, error);
-
-                  // Save document metadata even if upload fails (with error status)
                   documents.push({
                     certificationName: certName,
                     fileName: fileName,
-                    fileUrl: null, // No URL for failed uploads
+                    fileUrl: null,
                     fileSize: file.size,
                     fileType: file.type || `application/${ext}`,
                     uploadedAt: new Date(),
                     documentId: `${uid}_${timestamp}`,
-                    supabasePath: null, // No path for failed uploads
+                    supabasePath: null,
                     uploadStatus: 'failed',
                     uploadError: error.message || 'Upload failed'
                   });
-                  // Continue with other files
                   continue;
                 }
 
-                if (!path) {
-                  console.error(`❌ Upload succeeded but no path returned for ${certName}`);
-                  // Still save metadata but mark as failed
+                if (path) {
                   documents.push({
                     certificationName: certName,
                     fileName: fileName,
@@ -3227,122 +3289,56 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                     fileType: file.type || `application/${ext}`,
                     uploadedAt: new Date(),
                     documentId: `${uid}_${timestamp}`,
-                    supabasePath: null,
-                    uploadStatus: 'failed',
-                    uploadError: 'Upload succeeded but path not returned'
+                    supabasePath: path,
+                    uploadStatus: 'uploaded'
                   });
-                  continue;
+                  uploadedCount++;
                 }
-
-                console.log(`✅ File uploaded to Supabase: ${certName}`);
-                console.log(`✅ Path stored: ${path}`);
-
-                // Add to documents array
-                // Note: fileURL might be null for private buckets, but supabasePath is always returned
-                documents.push({
-                  certificationName: certName,
-                  fileName: fileName,
-                  fileUrl: fileURL || null, // May be null for private buckets
-                  fileSize: file.size,
-                  fileType: file.type || `application/${ext}`,
-                  uploadedAt: new Date(),
-                  documentId: `${uid}_${timestamp}`, // Unique ID for this document
-                  supabasePath: path, // Store Supabase path (REQUIRED for viewing/deleting)
-                  uploadStatus: 'uploaded' // ✅ Mark as successfully uploaded
-                });
-                uploadedCount++;
               } catch (fileError) {
                 console.error(`❌ Failed to upload certification ${certName}:`, fileError);
-                console.error('Error details:', {
-                  message: fileError.message,
-                  stack: fileError.stack
-                });
-
-                // Save document metadata even if upload fails (with error status)
                 documents.push({
                   certificationName: certName,
                   fileName: `${uid}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-                  fileUrl: null, // No URL for failed uploads
+                  fileUrl: null,
                   fileSize: file.size,
                   fileType: file.type || `application/${file.name.split('.').pop()}`,
                   uploadedAt: new Date(),
                   documentId: `${uid}_${Date.now()}`,
-                  supabasePath: null, // No path for failed uploads
+                  supabasePath: null,
                   uploadStatus: 'failed',
                   uploadError: fileError.message || 'Upload failed'
                 });
-                // Continue with other files
               }
             }
 
-            // Store all documents under one user ID in Firestore (even if some uploads failed)
             if (documents.length > 0) {
-              try {
-                const userCertDocRef = doc(db, 'jeepDriverCertifications', uid);
-                const existingDoc = await getDoc(userCertDocRef);
+              const userCertDocRef = doc(db, 'jeepDriverCertifications', uid);
+              const existingDoc = await getDoc(userCertDocRef);
 
-                console.log(`💾 Saving ${documents.length} document(s) to Firestore...`);
-                console.log('📋 Documents to save:', documents.map(d => ({
-                  name: d.certificationName,
-                  hasPath: !!d.supabasePath,
-                  hasUrl: !!d.fileUrl,
-                  status: d.uploadStatus
-                })));
-
-                if (existingDoc.exists()) {
-                  // Update existing document - merge with existing documents
-                  const existingData = existingDoc.data();
-                  const existingDocuments = existingData.documents || [];
-                  const allDocuments = [...existingDocuments, ...documents];
-
-                  await setDoc(userCertDocRef, {
-                    providerId: uid,
-                    documents: allDocuments,
-                    updatedAt: serverTimestamp()
-                  }, { merge: true });
-
-                  console.log(`✅ Updated Firestore: ${allDocuments.length} total documents (${existingDocuments.length} existing + ${documents.length} new)`);
-                } else {
-                  // Create new document
-                  await setDoc(userCertDocRef, {
-                    providerId: uid,
-                    documents: documents,
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                  });
-
-                  console.log(`✅ Created new Firestore document with ${documents.length} document(s)`);
-                }
-
-                console.log(`✅ Successfully saved ${documents.length} certification document(s) to Firestore`);
-                console.log(`   - ${uploadedCount} successfully uploaded to Supabase Storage`);
-                console.log(`   - ${documents.length - uploadedCount} failed or pending`);
-              } catch (firestoreError) {
-                console.error('❌ Failed to save to Firestore:', firestoreError);
-                console.error('Error details:', {
-                  code: firestoreError.code,
-                  message: firestoreError.message,
-                  stack: firestoreError.stack
+              if (existingDoc.exists()) {
+                const existingData = existingDoc.data();
+                const allDocuments = [...(existingData.documents || []), ...documents];
+                await setDoc(userCertDocRef, {
+                  providerId: uid,
+                  documents: allDocuments,
+                  updatedAt: serverTimestamp()
+                }, { merge: true });
+              } else {
+                await setDoc(userCertDocRef, {
+                  providerId: uid,
+                  documents: documents,
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
                 });
               }
-            } else {
-              console.warn("⚠️ No certification files to save");
             }
           } catch (uploadError) {
             console.error("❌ Certification files upload failed:", uploadError);
-            console.error('Upload error details:', {
-              message: uploadError.message,
-              code: uploadError.code,
-              stack: uploadError.stack
-            });
-            // Files will be uploaded later via admin panel if needed
           }
-        }, 500); // Increased delay to ensure account creation completes
+        }, 500);
       }
 
-      // Upload verification document files in background (non-blocking) for Tour Guides
       if (serviceType === "Tour Guide" && Object.keys(verificationDocumentFiles).length > 0) {
-        // Start background upload without blocking
         setTimeout(async () => {
           try {
             console.log("📄 Starting background upload of verification document files for Tour Guide...");
@@ -3355,34 +3351,25 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                 const timestamp = Date.now();
                 const fileName = `${uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
-                console.log(`📤 Uploading ${docName} to Supabase Storage...`);
-
-                // Upload to Supabase Storage
-                const { url: fileURL, error, path } = await uploadDocument(file, uid, fileName);
+                const { url: fileURL, error, path } = await uploadProviderDocumentClientSide(file, uid, fileName);
 
                 if (error) {
-                  console.error(`❌ Failed to upload document ${docName}:`, error);
-
-                  // Save document metadata even if upload fails (with error status)
                   documents.push({
                     certificationName: docName,
                     fileName: fileName,
-                    fileUrl: null, // No URL for failed uploads
+                    fileUrl: null,
                     fileSize: file.size,
                     fileType: file.type || `application/${ext}`,
                     uploadedAt: new Date(),
                     documentId: `${uid}_${timestamp}`,
-                    supabasePath: null, // No path for failed uploads
+                    supabasePath: null,
                     uploadStatus: 'failed',
                     uploadError: error.message || 'Upload failed'
                   });
-                  // Continue with other files
                   continue;
                 }
 
-                if (!path) {
-                  console.error(`❌ Upload succeeded but no path returned for ${docName}`);
-                  // Still save metadata but mark as failed
+                if (path) {
                   documents.push({
                     certificationName: docName,
                     fileName: fileName,
@@ -3391,126 +3378,53 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                     fileType: file.type || `application/${ext}`,
                     uploadedAt: new Date(),
                     documentId: `${uid}_${timestamp}`,
-                    supabasePath: null,
-                    uploadStatus: 'failed',
-                    uploadError: 'Upload succeeded but path not returned'
+                    supabasePath: path,
+                    uploadStatus: 'uploaded'
                   });
-                  continue;
+                  uploadedCount++;
                 }
-
-                console.log(`✅ File uploaded to Supabase: ${docName}`);
-                console.log(`✅ Path stored: ${path}`);
-
-                // Add to documents array
-                // Note: fileURL might be null for private buckets, but supabasePath is always returned
-                documents.push({
-                  certificationName: docName,
-                  fileName: fileName,
-                  fileUrl: fileURL || null, // May be null for private buckets
-                  fileSize: file.size,
-                  fileType: file.type || `application/${ext}`,
-                  uploadedAt: new Date(),
-                  documentId: `${uid}_${timestamp}`, // Unique ID for this document
-                  supabasePath: path, // Store Supabase path (REQUIRED for viewing/deleting)
-                  uploadStatus: 'uploaded' // ✅ Mark as successfully uploaded
-                });
-                uploadedCount++;
               } catch (fileError) {
                 console.error(`❌ Failed to upload verification document ${docName}:`, fileError);
-                console.error('Error details:', {
-                  message: fileError.message,
-                  code: fileError.code,
-                  stack: fileError.stack
-                });
-
-                // Check for CORS error
-                if (fileError.message && (fileError.message.includes('CORS') || fileError.message.includes('blocked') || fileError.code === 'storage/unauthorized')) {
-                  console.error('⚠️ CORS ERROR DETECTED:');
-                  console.error('   Firebase Storage CORS is not configured.');
-                  console.error('   To fix: Run "gsutil cors set cors.json gs://safarihub-a80bd.firebasestorage.app"');
-                  console.error('   Or configure CORS in Firebase Console: Storage > Settings > CORS');
-                }
-
-                // Save document metadata even if upload fails (with error status)
                 documents.push({
                   certificationName: docName,
                   fileName: `${uid}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-                  fileUrl: null, // No URL for failed uploads
+                  fileUrl: null,
                   fileSize: file.size,
                   fileType: file.type || `application/${file.name.split('.').pop()}`,
                   uploadedAt: new Date(),
                   documentId: `${uid}_${Date.now()}`,
-                  supabasePath: null, // No path for failed uploads
+                  supabasePath: null,
                   uploadStatus: 'failed',
                   uploadError: fileError.message || 'Upload failed'
                 });
-                // Continue with other files
               }
             }
 
-            // Store all documents under one user ID in Firestore (even if some uploads failed)
             if (documents.length > 0) {
-              try {
-                const userCertDocRef = doc(db, 'guideCertifications', uid);
-                const existingDoc = await getDoc(userCertDocRef);
+              const userCertDocRef = doc(db, 'guideCertifications', uid);
+              const existingDoc = await getDoc(userCertDocRef);
 
-                console.log(`💾 Saving ${documents.length} document(s) to Firestore...`);
-                console.log('📋 Documents to save:', documents.map(d => ({
-                  name: d.certificationName,
-                  hasPath: !!d.supabasePath,
-                  hasUrl: !!d.fileUrl,
-                  status: d.uploadStatus
-                })));
-
-                if (existingDoc.exists()) {
-                  // Update existing document - merge with existing documents
-                  const existingData = existingDoc.data();
-                  const existingDocuments = existingData.documents || [];
-                  const allDocuments = [...existingDocuments, ...documents];
-
-                  await setDoc(userCertDocRef, {
-                    providerId: uid,
-                    documents: allDocuments,
-                    updatedAt: serverTimestamp()
-                  }, { merge: true });
-
-                  console.log(`✅ Updated Firestore: ${allDocuments.length} total documents (${existingDocuments.length} existing + ${documents.length} new)`);
-                } else {
-                  // Create new document
-                  await setDoc(userCertDocRef, {
-                    providerId: uid,
-                    documents: documents,
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                  });
-
-                  console.log(`✅ Created new Firestore document with ${documents.length} document(s)`);
-                }
-
-                console.log(`✅ Successfully saved ${documents.length} verification document(s) to Firestore`);
-                console.log(`   - ${uploadedCount} successfully uploaded to Supabase Storage`);
-                console.log(`   - ${documents.length - uploadedCount} failed or pending`);
-              } catch (firestoreError) {
-                console.error('❌ Failed to save to Firestore:', firestoreError);
-                console.error('Error details:', {
-                  code: firestoreError.code,
-                  message: firestoreError.message,
-                  stack: firestoreError.stack
+              if (existingDoc.exists()) {
+                const existingData = existingDoc.data();
+                const allDocuments = [...(existingData.documents || []), ...documents];
+                await setDoc(userCertDocRef, {
+                  providerId: uid,
+                  documents: allDocuments,
+                  updatedAt: serverTimestamp()
+                }, { merge: true });
+              } else {
+                await setDoc(userCertDocRef, {
+                  providerId: uid,
+                  documents: documents,
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
                 });
               }
-            } else {
-              console.warn("⚠️ No verification document files to save");
             }
           } catch (uploadError) {
             console.error("❌ Verification document files upload failed:", uploadError);
-            console.error('Upload error details:', {
-              message: uploadError.message,
-              code: uploadError.code,
-              stack: uploadError.stack
-            });
-            // Files will be uploaded later via admin panel if needed
           }
-        }, 500); // Increased delay to ensure account creation completes
+        }, 500);
       }
 
       setTimeout(() => {
@@ -3529,7 +3443,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
     } catch (error) {
       console.error("❌ Registration error:", error);
-      let errorMessage = "❌ Registration failed! ";
+      let errorMessage = "Registration failed! ";
 
       if (error.code === 'auth/email-already-in-use') {
         errorMessage += "Email is already registered.";
@@ -3543,8 +3457,55 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         errorMessage += `Error: ${error.message}`;
       }
 
-      setMsg(errorMessage);
+      addToast(errorMessage, "error");
       setBusy(false);
+    }
+  };
+
+  // Handle post-login navigation without reload
+  const navigateAfterLogin = async (user) => {
+    console.log('🔄 Handling post-login navigation for:', user.uid);
+
+    try {
+      // Step 1: Check if user is admin
+      const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+      if (adminDoc.exists()) {
+        console.log('✅ Admin user logged in, navigating to admin panel');
+        if (navigate) navigate('/admin-panel');
+        return;
+      }
+
+      // Step 2: Check if user is a service provider
+      const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+      if (providerDoc.exists()) {
+        const providerData = providerDoc.data();
+        if (providerData.serviceType === 'Jeep Driver' || providerData.serviceType === 'Tour Guide') {
+          // Check if return path is restricted
+          const restrictedRoutes = ['/destination', '/guide', '/driver'];
+          if (returnToPath && restrictedRoutes.some(route => returnToPath.startsWith(route))) {
+            if (navigate) navigate('/');
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user role for navigation:', error);
+    }
+
+    // Call onAuthSuccess (now simplified) to clear session storage
+    if (onAuthSuccess) onAuthSuccess(returnToPath);
+
+    // Perform Navigation
+    if (returnToPath && returnToPath !== '/login' && returnToPath !== '/register') {
+      console.log('👉 Returning to:', returnToPath);
+      if (navigate) navigate(returnToPath);
+    } else {
+      console.log('🏠 Going home');
+      if (navigate) {
+        navigate('/');
+      } else if (onBackToHome) {
+        onBackToHome();
+      }
     }
   };
 
@@ -3552,7 +3513,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
   const handleLogin = async (e) => {
     e.preventDefault();
     setBusy(true);
-    setMsg("");
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -3560,13 +3521,21 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       // Fetch user's name for success message
       let userName = user.displayName || '';
       try {
-        const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
-        if (touristDoc.exists()) {
-          userName = touristDoc.data().fullName || touristDoc.data().name || userName;
+        // Check if user is an admin first
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        if (adminDoc.exists()) {
+          userName = adminDoc.data().name || 'Admin';
         } else {
-          const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
-          if (providerDoc.exists()) {
-            userName = providerDoc.data().fullName || providerDoc.data().name || userName;
+          // Check tourists
+          const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
+          if (touristDoc.exists()) {
+            userName = touristDoc.data().fullName || touristDoc.data().name || userName;
+          } else {
+            // Check service providers
+            const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
+            if (providerDoc.exists()) {
+              userName = providerDoc.data().fullName || providerDoc.data().name || userName;
+            }
           }
         }
       } catch (nameError) {
@@ -3574,16 +3543,17 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       }
 
       // Show success popup with user's name
-      setSuccessUserName(userName || 'User');
+      setSuccessUserName(userName || (user.email === 'admin@safarihub.com' ? 'Admin' : 'User'));
       setShowSuccessPopup(true);
       setBusy(false);
 
       setTimeout(() => {
         setShowSuccessPopup(false);
-        onAuthSuccess(returnToPath);
-      }, 2500);
+        // Use the new navigation handler
+        navigateAfterLogin(user);
+      }, 2000);
     } catch (error) {
-      let errorMessage = "❌ Login failed! ";
+      let errorMessage = "Login failed! ";
 
       if (error.code === 'auth/invalid-credential') {
         errorMessage += "Invalid email or password.";
@@ -3595,7 +3565,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         errorMessage += "Please try again.";
       }
 
-      setMsg(errorMessage);
+      addToast(errorMessage, "error");
       setBusy(false);
     }
   };
@@ -3614,129 +3584,191 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
     }
   }, [initialScreen]);
 
+  // Helper for rendering toasts
+  const toastMarkup = (
+    <div className="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+      {toasts.map(toast => (
+        <div
+          key={toast.id}
+          className={`pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg backdrop-blur-md border animate-slideInRight ${toast.type === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-200' :
+            toast.type === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-200' :
+              'bg-blue-500/20 border-blue-500/50 text-blue-200'
+            }`}
+        >
+          {toast.type === 'error' && <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          {toast.type === 'success' && <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+          {toast.type === 'info' && <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          <span className="text-sm font-medium">{toast.message}</span>
+          <button onClick={() => removeToast(toast.id)} className="ml-2 hover:text-white"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+        </div>
+      ))}
+    </div>
+  );
+
   // Login Page
   if (screen === "login")
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-black flex items-center justify-center p-4 font-sans relative overflow-hidden">
+
+        {/* Ambient Background Glow */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-900/20 rounded-full blur-[120px]"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-teal-900/20 rounded-full blur-[120px]"></div>
+        </div>
+
+        {toastMarkup}
+
         {/* Success Popup */}
         {showSuccessPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-gradient-to-br from-green-600 to-green-700 text-white rounded-2xl p-8 shadow-2xl max-w-md w-full mx-4 animate-scaleIn">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-3xl p-8 shadow-2xl max-w-md w-full mx-4 animate-scaleIn border border-white/20">
               <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center shadow-inner">
+                  <CheckCircle className="w-8 h-8 text-white" />
                 </div>
                 <div className="text-center">
                   <h3 className="text-2xl font-bold mb-2">Welcome Back!</h3>
-                  <p className="text-lg text-green-100">Hello, {successUserName}!</p>
-                  <p className="text-sm text-green-200 mt-2">Login successful. Redirecting...</p>
+                  <p className="text-lg text-emerald-100">Hello, {successUserName}!</p>
+                  <p className="text-sm text-emerald-200/80 mt-2 font-medium">Login successful. Redirecting...</p>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="relative w-full max-w-md">
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
+        {/* Main Card Container */}
+        <div className="w-full max-w-5xl bg-gray-900/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-[600px] z-10 animate-fade-in-up">
+
+          {/* Left Side - Image Section */}
+          <div className="w-full lg:w-1/2 p-3 relative h-64 lg:h-auto">
+            <div className="w-full h-full relative rounded-[10px] overflow-hidden group shadow-inner">
+              <img
+                src={loginBg}
+                alt="Login Background"
+                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+
+              {/* Image Overlay Content */}
+              <div className="absolute bottom-0 left-0 w-full p-8 text-white">
+                <div className="inline-flex items-center gap-2 bg-emerald-500/20 backdrop-blur-md border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-semibold text-emerald-300 mb-4">
+                  <Camera className="w-3 h-3" />
+                  <span>Adventure Awaits</span>
+                </div>
+                <h3 className="text-3xl font-bold mb-2 leading-tight">Capture the<br />Unforgettable</h3>
+                <p className="text-sm text-gray-300 opacity-90">Join SafariHub to explore, rent, and experience.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Login Form */}
+          <div className="w-full lg:w-1/2 p-8 lg:p-12 relative flex flex-col justify-center">
+
             {/* Back Button */}
             {onBackToHome && (
               <button
                 onClick={onBackToHome}
-                className="absolute top-4 left-4 text-yellow-400 hover:text-yellow-300 font-semibold flex items-center gap-2 text-sm transition-colors"
+                className="absolute top-6 left-6 lg:left-8 text-gray-500 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full"
+                title="Back to Home"
               >
-                <ChevronLeft className="h-4 w-4" />
-                Back to Home
+                <ChevronLeft className="h-5 w-5" />
               </button>
             )}
 
-            <div className="text-center mb-8">
-              <img
-                src={logo}
-                alt="SafariHub Logo"
-                className="h-24 sm:h-28 md:h-32 w-auto object-contain mx-auto mb-4 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={onBackToHome || (() => { })}
-              />
-              <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
-              <p className="text-gray-300 mt-2">Sign in to continue your adventure</p>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-white font-medium text-sm">
-                  <Mail className="h-4 w-4 text-yellow-400" />
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-sm"
-                  placeholder="Enter your email"
+            <div className="max-w-md mx-auto w-full">
+              <div className="text-center mb-8">
+                <img
+                  src={logo}
+                  alt="SafariHub Logo"
+                  className="h-12 w-auto object-contain mx-auto mb-6"
+                  onClick={onBackToHome || (() => { })}
                 />
+                <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Welcome Back</h2>
+                <p className="text-gray-400 text-sm">Sign in to access your dashboard</p>
               </div>
 
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-white font-medium text-sm">
-                  <Lock className="h-4 w-4 text-yellow-400" />
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-sm pr-12"
-                    placeholder="Enter your password"
-                  />
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-gray-400 text-xs font-bold uppercase tracking-wider ml-1">
+                    Email Address
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-gray-500 group-focus-within:text-emerald-500 transition-colors" />
+                    </div>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="w-full pl-12 pr-4 py-3.5 bg-black/40 border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm font-medium hover:border-gray-600"
+                      placeholder="name@example.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-gray-400 text-xs font-bold uppercase tracking-wider">
+                      Password
+                    </label>
+                    <button type="button" className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors">
+                      Forgot Password?
+                    </button>
+                  </div>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-500 group-focus-within:text-emerald-500 transition-colors" />
+                    </div>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="w-full pl-12 pr-12 py-3.5 bg-black/40 border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm font-medium hover:border-gray-600"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
                   <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-yellow-400"
+                    type="submit"
+                    disabled={busy}
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-500/20 transform hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {busy ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Verifying...</span>
+                      </div>
+                    ) : (
+                      "Sign In"
+                    )}
                   </button>
                 </div>
-              </div>
+              </form>
 
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                {busy ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Signing In...
-                  </div>
-                ) : (
-                  "Sign In"
-                )}
-              </button>
-
-              <div className="text-center pt-4 border-t border-white/10">
-                <p className="text-gray-300 text-sm">
-                  New to site?{" "}
+              <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                <p className="text-gray-400 text-sm">
+                  Don't have an account?{" "}
                   <button
                     type="button"
                     onClick={() => setScreen("register")}
-                    className="text-yellow-400 hover:text-yellow-300 font-semibold underline"
+                    className="text-emerald-400 hover:text-emerald-300 font-bold hover:underline transition-all ml-1"
                   >
-                    REGISTER
+                    Register Now
                   </button>
                 </p>
               </div>
-            </form>
-
-            {/* Error messages only - success shows as popup */}
-            {msg && msg.includes("❌") && (
-              <div className="mt-4 p-4 rounded-xl text-center animate-slideUp bg-red-500/20 text-red-300 border border-red-500/30">
-                <p className="text-sm font-medium">{msg}</p>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
@@ -3757,6 +3789,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
+        {toastMarkup}
         <div className="w-full max-w-2xl">
           {/* Back Button - Now scrolls with content */}
           {onBackToHome && (
@@ -3841,7 +3874,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
               onVerificationDocumentFileSelect={handleVerificationDocumentFileSelect}
               onSubmit={handleRegister}
               busy={busy}
-              msg={msg}
+
             />
           ) : (
             <UserTypeSelection onSelect={setRole} logo={logo} onBackToHome={onBackToHome} />
@@ -3856,41 +3889,64 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
 
 // User Type Selection Component
 const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
-  <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-2xl">
+  <div className="bg-gray-900/60 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 shadow-2xl animate-fadeIn w-full mx-auto flex flex-col justify-center h-full max-h-[85vh]">
     <div className="text-center mb-6">
-      <img
-        src={logo}
-        alt="SafariHub Logo"
-        className="h-24 sm:h-28 md:h-32 w-auto object-contain mx-auto mb-4 cursor-pointer hover:opacity-80 transition-opacity"
-        onClick={onBackToHome || (() => { })}
-      />
-      <h2 className="text-xl font-bold text-white">Join SafariHub</h2>
-      <p className="text-gray-300 text-sm mt-1">Choose your adventure type</p>
+      <div className="relative inline-block group">
+        <div className="absolute inset-0 bg-emerald-500/30 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
+        <img
+          src={logo}
+          alt="SafariHub Logo"
+          className="relative h-20 sm:h-24 w-auto object-contain mx-auto mb-4 cursor-pointer hover:scale-105 transition-transform duration-500 drop-shadow-2xl"
+          onClick={onBackToHome || (() => { })}
+        />
+      </div>
+      <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-teal-200 mb-2 tracking-tight">
+        Join SafariHub
+      </h2>
+      <p className="text-gray-400 text-sm md:text-base font-light tracking-wide">
+        Choose your path to adventure
+      </p>
     </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 gap-4 md:gap-6 w-full max-w-sm mx-auto">
       <button
         onClick={() => onSelect('tourist')}
-        className="relative bg-gradient-to-br from-emerald-500/10 via-green-500/10 to-teal-500/10 border border-emerald-500/30 rounded-2xl p-6 text-center shadow-lg backdrop-blur-sm"
+        className="group relative overflow-hidden rounded-2xl h-32 md:h-40 text-center shadow-xl hover:shadow-emerald-500/20 transition-all duration-500 hover:-translate-y-1 w-full border border-white/10"
       >
-        {/* Content */}
-        <div className="relative z-10">
-          <h3 className="text-xl font-bold text-white mb-2">Tourist</h3>
-          <p className="text-gray-300 text-sm">
-            Explore amazing destinations
+        <div
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
+          style={{ backgroundImage: `url(${touristBg})` }}
+        />
+        <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors duration-500" />
+
+        <div className="relative z-10 flex flex-col items-center justify-center h-full">
+          <div className="flex items-center gap-3 mb-1">
+            <User className="h-6 w-6 text-emerald-400" />
+            <h3 className="text-xl font-bold text-white group-hover:text-emerald-300 transition-colors">Tourist</h3>
+          </div>
+          <p className="text-gray-300 text-xs px-4 group-hover:text-white transition-colors">
+            Discover destinations & book safaris
           </p>
         </div>
       </button>
 
       <button
         onClick={() => onSelect('provider')}
-        className="relative bg-gradient-to-br from-yellow-500/10 via-amber-500/10 to-orange-500/10 border border-yellow-500/30 rounded-2xl p-6 text-center shadow-lg backdrop-blur-sm"
+        className="group relative overflow-hidden rounded-2xl h-32 md:h-40 text-center shadow-xl hover:shadow-amber-500/20 transition-all duration-500 hover:-translate-y-1 w-full border border-white/10"
       >
-        {/* Content */}
-        <div className="relative z-10">
-          <h3 className="text-xl font-bold text-white mb-2">Service Provider</h3>
-          <p className="text-gray-300 text-sm">
-            Offer your services
+        <div
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
+          style={{ backgroundImage: `url(${providerBg})` }}
+        />
+        <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors duration-500" />
+
+        <div className="relative z-10 flex flex-col items-center justify-center h-full">
+          <div className="flex items-center gap-3 mb-1">
+            <Briefcase className="h-6 w-6 text-amber-400" />
+            <h3 className="text-xl font-bold text-white group-hover:text-amber-300 transition-colors">Service Provider</h3>
+          </div>
+          <p className="text-gray-300 text-xs px-4 group-hover:text-white transition-colors">
+            Offer services & grow your business
           </p>
         </div>
       </button>
@@ -3899,7 +3955,7 @@ const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
 );
 
 // RegistrationForm Component
-const RegistrationForm = ({ role, serviceType, formData, handlers, profilePreview, onProfileImageSelect, certificationFiles, onCertificationFileSelect, verificationDocumentFiles, onVerificationDocumentFileSelect, onSubmit, busy, msg }) => {
+const RegistrationForm = ({ role, serviceType, formData, handlers, profilePreview, onProfileImageSelect, certificationFiles, onCertificationFileSelect, verificationDocumentFiles, onVerificationDocumentFileSelect, onSubmit, busy }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
@@ -4057,13 +4113,13 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl max-h-[80vh] overflow-y-auto relative">
-      <div className="text-center mb-4">
-        <h2 className="text-xl font-bold text-white">
-          {isTourist ? 'Tourist Registration' : 'Service Provider Registration'}
+    <div className="bg-gray-900/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl max-h-[85vh] overflow-y-auto relative custom-scrollbar animate-fadeIn">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-teal-200">
+          {isTourist ? 'Tourist Registration' : 'Partner Registration'}
         </h2>
-        <p className="text-gray-300 text-xs mt-1">
-          {isTourist ? 'Create your adventure account' : 'Join our network of service providers'}
+        <p className="text-gray-400 text-sm mt-2 tracking-wide font-light">
+          {isTourist ? 'Begin your journey with us today' : 'Join our exclusive network of providers'}
         </p>
       </div>
 
@@ -5046,27 +5102,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               </>
             )}
 
-            {/* Profile Picture */}
-            {(isTourist || formData.serviceType) && (
-              <div className="space-y-1">
-                <label className="flex items-center gap-2 text-white font-medium text-xs">
-                  <Camera className="h-3 w-3 text-yellow-400" />
-                  Profile Picture (Optional)
-                </label>
-                <div className="flex items-center gap-2">
-                  {profilePreview && (
-                    <img src={profilePreview} alt="Profile preview" className="w-8 h-8 rounded-full object-cover border border-yellow-400" />
-                  )}
-                  <input
-                    type="file"
-                    onChange={onProfileImageSelect}
-                    accept="image/*"
-                    className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-white file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-yellow-400 file:text-black hover:file:bg-yellow-500 text-xs"
-                  />
-                </div>
-                <p className="text-xs text-gray-400">Max file size: 2MB</p>
-              </div>
-            )}
+
 
             {/* Close the main conditional wrapper */}
           </>
@@ -5074,35 +5110,32 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
 
         {/* Submit Button */}
         {(isTourist || formData.serviceType) && (
-          <div className="pt-2">
+          <div className="pt-6">
             <button
               type="submit"
               disabled={busy}
-              className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="w-full group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
-              {busy ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Creating Account...
-                </div>
-              ) : (
-                isTourist ? "Create Tourist Account" : "Register as Provider"
-              )}
+              <div className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"></div>
+              <span className="relative flex items-center justify-center gap-2 text-base tracking-wide">
+                {busy ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Setting up your profile...
+                  </>
+                ) : (
+                  <>
+                    {isTourist ? "Create Tourist Account" : "Register as Partner"}
+                    {!busy && <ChevronLeft className="h-4 w-4 rotate-180 group-hover:translate-x-1 transition-transform" />}
+                  </>
+                )}
+              </span>
             </button>
           </div>
         )}
       </form>
 
-      {msg && (
-        <div className={`mt-3 p-2 rounded text-center text-xs font-medium ${msg.includes("❌")
-          ? "bg-red-500/20 text-red-300 border border-red-500/30"
-          : msg.includes("⏳")
-            ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
-            : "bg-green-500/20 text-green-300 border border-green-500/30"
-          }`}>
-          {msg}
-        </div>
-      )}
+
     </div>
   );
 };

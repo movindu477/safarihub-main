@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 
 // Import images from src/assets
-import parkImage from "../../assets/296811179_1216698719063054_6756487280100765789_n.jpg";
+import parkImage from "../../assets/national.avif";
 import sanImage from "../../assets/hero3.jpg";
 import beachImage from "../../assets/beach.avif";
 import forestImage from "../../assets/forest.avif";
@@ -30,122 +31,123 @@ export default function Section4() {
     }, 500);
   };
 
-  const videos = [
+  const adventures = [
     {
       src: parkImage,
       title: "National Parks",
       sectionId: "national-parks",
-      description: "Discover Sri Lanka's magnificent national parks, home to diverse wildlife including elephants, leopards, and hundreds of bird species. Experience the raw beauty of nature in protected wilderness areas."
+      description: "Discover Sri Lanka's magnificent national parks, home to diverse wildlife including elephants, leopards, and hundreds of bird species."
     },
     {
       src: sanImage,
       title: "Sanctuaries",
       sectionId: "sanctuaries",
-      description: "Explore peaceful wildlife sanctuaries that provide safe havens for endangered species. These protected areas offer unique opportunities to observe wildlife in their natural habitats."
+      description: "Explore peaceful wildlife sanctuaries that provide safe havens for endangered species in their natural habitats."
     },
     {
       src: beachImage,
       title: "Beaches",
       sectionId: "beaches",
-      description: "Relax on pristine beaches with golden sands and crystal-clear waters. From popular coastal destinations to hidden gems, discover the perfect spot for your beach getaway."
+      description: "Relax on pristine beaches with golden sands and crystal-clear waters. From popular destinations to hidden gems."
     },
     {
       src: forestImage,
       title: "Forest Reserves",
       sectionId: "forest-reserves",
-      description: "Immerse yourself in lush forest reserves teeming with biodiversity. Walk through ancient forests, discover rare flora and fauna, and connect with nature in these verdant landscapes."
+      description: "Immerse yourself in lush forest reserves teeming with biodiversity. Discover rare flora and fauna in verdant landscapes."
     },
     {
       src: campImage,
       title: "Camp Sites",
       sectionId: "camping-sites",
-      description: "Experience the great outdoors at carefully selected camping sites. Sleep under the stars, wake up to nature's sounds, and create unforgettable memories in the wilderness."
+      description: "Experience the great outdoors at carefully selected camping sites. Sleep under the stars and create unforgettable memories."
     },
     {
       src: jeepImage,
       title: "Pekoe Trail",
       sectionId: "Pekoe Trail.",
-      description: "Embark on an epic journey along the Pekoe Trail, a scenic route through tea country and mountain landscapes. Experience the rich culture and breathtaking views of Sri Lanka's hill country."
+      description: "Embark on an epic journey along the Pekoe Trail through tea country and breathtaking mountain landscapes."
     },
   ];
 
   return (
-    <section className="w-full bg-white text-black py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-20">
-      {/* Title Section */}
-      <div className="text-center mb-12 sm:mb-16">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold relative inline-block">
-          Explore Our Adventures
-          <span className="block w-20 sm:w-24 h-1 bg-green-600 mx-auto mt-3 sm:mt-4 animate-pulse rounded-full"></span>
-        </h2>
-      </div>
+    <section className="relative w-full bg-gradient-to-b from-gray-50 to-white py-20 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header Section */}
+        <div className="text-center mb-16 sm:mb-20">
+          <div className="inline-block">
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Explore Our Adventures
+            </h2>
+            <div className="h-1.5 bg-gradient-to-r from-green-400 via-green-600 to-green-400 rounded-full"></div>
+          </div>
+          <p className="mt-6 text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
+            Discover extraordinary destinations and create memories that last a lifetime
+          </p>
+        </div>
 
-      {/* Video Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 justify-items-center">
-        {videos.map((item, index) => (
-          <div
-            key={index}
-            className="w-full max-w-[400px] sm:max-w-[450px] lg:max-w-[500px]"
-          >
-            {/* Title Above Image */}
-            <h3 className="text-xl sm:text-2xl lg:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 text-center">
-              {item.title}
-            </h3>
-
-            {/* Image Card */}
+        {/* Adventures Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
+          {adventures.map((item, index) => (
             <div
-              onClick={(e) => {
-                // On mobile, toggle active state when clicking the card background
-                const isMobile = window.innerWidth < 768;
-                if (isMobile && (e.target === e.currentTarget || e.target.tagName === 'IMG' || e.target.classList.contains('card-overlay'))) {
-                  setActiveCard(activeCard === index ? null : index);
-                } else if (!isMobile) {
-                  // On desktop, navigate on click
-                  handleBoxClick(item.sectionId);
-                }
-              }}
-              className="group relative w-full h-[250px] sm:h-[280px] lg:h-[300px] rounded-xl sm:rounded-2xl overflow-hidden shadow-lg sm:shadow-xl lg:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-500 cursor-pointer touch-manipulation"
+              key={index}
+              className={`group relative h-[380px] sm:h-[420px] rounded-3xl overflow-hidden cursor-pointer shadow-xl hover:shadow-2xl transition-all duration-500 ${activeCard === index ? 'ring-2 ring-emerald-500' : ''}`}
+              onMouseEnter={() => setActiveCard(index)}
+              onMouseLeave={() => setActiveCard(null)}
+              onClick={() => setActiveCard(index === activeCard ? null : index)}
             >
-              {/* Image Background */}
-              <img
-                src={item.src}
-                alt={item.title}
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                loading="lazy"
-              />
+              {/* Full Background Image */}
+              <div className="absolute inset-0">
+                <img
+                  src={item.src}
+                  alt={item.title}
+                  className={`w-full h-full object-cover transition-transform duration-700 ${activeCard === index ? 'scale-110' : 'group-hover:scale-110'}`}
+                  loading="lazy"
+                />
+                {/* Gradient Overlay */}
+                <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent transition-opacity duration-300 ${activeCard === index ? 'opacity-90' : 'opacity-80 group-hover:opacity-90'}`}></div>
+              </div>
 
-              {/* Dark Overlay - Appears on hover (desktop) or tap (mobile) */}
-              <div className={`absolute inset-0 transition-all duration-500 card-overlay ${
-                activeCard === index 
-                  ? 'bg-black/60' 
-                  : 'bg-black/0 group-hover:bg-black/60'
-              }`}></div>
+              {/* Floating Badge */}
+              <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full shadow-lg z-10">
+                <span className="text-xs font-bold text-white uppercase tracking-wider">Featured</span>
+              </div>
 
-              {/* Hover Content - Description and Button */}
-              <div className={`absolute inset-0 flex flex-col items-center justify-center transform transition-all duration-500 ease-in-out px-4 sm:px-6 pointer-events-none ${
-                activeCard === index 
-                  ? 'opacity-100 translate-y-0' 
-                  : 'opacity-0 translate-y-6 sm:translate-y-8 group-hover:opacity-100 group-hover:translate-y-0'
-              }`}>
-                {/* Description Paragraph */}
-                <p className="text-white text-sm sm:text-base lg:text-lg text-center mb-4 sm:mb-6 leading-relaxed">
-                  {item.description}
-                </p>
-                {/* Explore Now Button */}
-                <button
-                  className="bg-green-600 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-lg font-semibold hover:bg-green-700 active:bg-green-800 transform hover:scale-105 active:scale-95 transition-all duration-300 shadow-lg text-sm sm:text-base cursor-pointer touch-manipulation pointer-events-auto z-10"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleBoxClick(item.sectionId);
-                    setActiveCard(null); // Close after navigation
-                  }}
-                >
-                  Explore Now
-                </button>
+              {/* Content Overlay */}
+              <div className="absolute inset-0 flex flex-col justify-end p-6 sm:p-8 z-10">
+                <div className={`transform transition-all duration-500 ${activeCard === index ? 'translate-y-0' : 'translate-y-8 group-hover:translate-y-0'}`}>
+                  {/* Title */}
+                  <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3 drop-shadow-lg">
+                    {item.title}
+                  </h3>
+
+                  {/* Hidden Content - Reveals on Hover or Click */}
+                  <div className={`space-y-4 transition-all duration-500 delay-100 overflow-hidden ${activeCard === index ? 'opacity-100 max-h-60' : 'opacity-0 max-h-0 group-hover:opacity-100 group-hover:max-h-60'}`}>
+                    <p className="text-gray-200 text-sm sm:text-base leading-relaxed line-clamp-3">
+                      {item.description}
+                    </p>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBoxClick(item.sectionId);
+                      }}
+                      className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2.5 px-5 rounded-xl transition-colors duration-300 shadow-lg text-sm"
+                    >
+                      <span>Explore Now</span>
+                      <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+
+      {/* Background Decoration */}
+      <div className="absolute top-20 right-10 w-72 h-72 bg-green-200/30 rounded-full blur-3xl -z-10"></div>
+      <div className="absolute bottom-20 left-10 w-96 h-96 bg-blue-200/20 rounded-full blur-3xl -z-10"></div>
     </section>
   );
 }

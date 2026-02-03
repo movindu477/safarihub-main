@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Filter,
   MapPin,
   ChevronDown,
   Search,
   X,
-  AlertCircle
+  AlertCircle,
+  Compass
 } from "lucide-react";
 
 // Import background images
@@ -23,6 +24,27 @@ import knuckfoBackground from "../../assets/knuckfo.jpg";
 
 export default function Destination2() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Handle scroll to section if returning from details page
+  useEffect(() => {
+    if (location.state && location.state.scrollTo) {
+      const elementId = location.state.scrollTo;
+      setTimeout(() => {
+        const element = document.getElementById(elementId);
+        if (element) {
+          const offset = 100; // Offset for header/sticky elements
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }
+      }, 500); // Slight delay to ensure rendering
+    }
+  }, [location.state]);
 
   // Destination ID mapping function
   const getDestinationId = (name) => {
@@ -81,20 +103,6 @@ export default function Destination2() {
     "Kumana Wildlife": "Eastern Province",
     "Sinharaja Forest Reserve": "Sabaragamuwa Province",
     "Knuckles Forest Reserve": "Central Province"
-  };
-
-  // Map destinations to their districts
-  const destinationToDistrictMap = {
-    "Yala National Park": "Hambantota",
-    "Wilpattu National Park": "Puttalam",
-    "Mirissa Beach": "Matara",
-    "Unawatuna Beach": "Galle",
-    "Horton Plains": "Nuwara Eliya",
-    "Knuckles Mountain Range": "Matale",
-    "Lunugamvehera": "Hambantota",
-    "Kumana Wildlife": "Ampara",
-    "Sinharaja Forest Reserve": "Ratnapura",
-    "Knuckles Forest Reserve": "Matale"
   };
 
   // Category to section ID mapping
@@ -334,22 +342,27 @@ export default function Destination2() {
   };
 
   const FilterSection = ({ title, icon: Icon, options, filterKey }) => (
-    <div className="bg-white rounded-lg p-4 border border-gray-200">
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className="h-5 w-5 text-green-600" />
-        <h3 className="font-semibold text-gray-800">{title}</h3>
+    <div className="bg-white/50 backdrop-blur-md rounded-xl p-5 border border-white/20 shadow-sm">
+      <div className="flex items-center gap-2 mb-4 text-emerald-700">
+        <Icon className="h-5 w-5" />
+        <h3 className="font-bold text-gray-800 tracking-wide">{title}</h3>
       </div>
-      <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
         {options.map((option) => (
-          <label key={option} className="flex items-center gap-2 cursor-pointer">
+          <label key={option} className="cursor-pointer group relative">
             <input
               type="radio"
               name={filterKey}
               checked={filters[filterKey] === option}
               onChange={() => handleFilterChange(filterKey, option)}
-              className="text-green-600 focus:ring-green-500"
+              className="peer sr-only"
             />
-            <span className="text-sm text-gray-700">{option}</span>
+            <span className="inline-block px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 border border-transparent 
+              bg-white text-gray-600 shadow-sm
+              peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:shadow-md peer-checked:shadow-emerald-500/20
+              group-hover:bg-emerald-50">
+              {option}
+            </span>
           </label>
         ))}
       </div>
@@ -363,43 +376,61 @@ export default function Destination2() {
     }
 
     return (
-      <div id={sectionId} className="mb-16 scroll-mt-24">
+      <div id={sectionId} className="mb-24 scroll-mt-24">
         <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+          <h2 className="text-2xl md:text-4xl font-black text-gray-900 mb-4 tracking-tight">
             {title}
           </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          <div className="h-1 w-20 bg-emerald-500 mx-auto rounded-full mb-6"></div>
+          <p className="text-base text-gray-600 max-w-2xl mx-auto leading-relaxed">
             {description}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8 md:gap-12">
           {items.filter(item => shouldShowDestination(item.name)).map((item, index) => (
             <div
               key={index}
+              id={getDestinationId(item.name)}
               onClick={() => navigate(`/destination/${getDestinationId(item.name)}`)}
-              className="relative rounded-2xl overflow-hidden shadow-2xl group cursor-pointer"
+              className="group relative h-[400px] md:h-[450px] rounded-3xl overflow-hidden cursor-pointer shadow-xl transition-all duration-500 hover:shadow-2xl hover:shadow-emerald-900/10"
             >
               <div
-                className="h-96 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110"
                 style={{ backgroundImage: `url(${item.background})` }}
               >
-                <div className="absolute inset-0 bg-black/40 transition-all duration-300 group-hover:bg-black/30"></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                {/* Overlay with gradient */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-90"></div>
+              </div>
 
-                <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                  <h3 className="text-3xl md:text-4xl font-black mb-4">{item.name}</h3>
-                  <p className="text-lg mb-6 opacity-90 max-w-md">
-                    {item.description}
-                  </p>
+              {/* Content Card */}
+              <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 transform translate-y-4 transition-transform duration-500 group-hover:translate-y-0">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+                    <span className="text-xs font-semibold text-white tracking-wider uppercase">
+                      {destinationToProvinceMap[item.name]}
+                    </span>
+                  </div>
+                </div>
+
+                <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 drop-shadow-md">
+                  {item.name}
+                </h3>
+
+                <p className="text-gray-200 text-sm md:text-base mb-6 line-clamp-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
+                  {item.description}
+                </p>
+
+                <div className="flex items-center gap-3">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/destination/${getDestinationId(item.name)}`);
                     }}
-                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
+                    className="flex-1 bg-white text-emerald-900 px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-all duration-300 hover:bg-emerald-50 active:scale-95 flex items-center justify-center gap-2 group-hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                   >
-                    Explore {item.name.split(' ')[0]}
+                    Explore Now
+                    <Compass className="w-4 h-4 ml-1" />
                   </button>
                 </div>
               </div>
@@ -411,65 +442,82 @@ export default function Destination2() {
   };
 
   return (
-    <section id="destinations-section" className="py-16 bg-gray-50">
-      <div className="container mx-auto px-4">
-        {/* Main Title */}
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+    <section id="destinations-section" className="py-20 bg-slate-50 relative overflow-hidden">
+      {/* Decorative background elements blur */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-40">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-emerald-300 rounded-full blur-[120px]"></div>
+        <div className="absolute top-[30%] -right-[10%] w-[30%] h-[30%] bg-blue-300 rounded-full blur-[120px]"></div>
+        <div className="absolute -bottom-[10%] left-[20%] w-[30%] h-[30%] bg-teal-200 rounded-full blur-[100px]"></div>
+      </div>
+
+      <div className="container mx-auto px-4 md:px-8 relative z-10">
+        {/* Main Title Section */}
+        <div className="text-center mb-16">
+          <span className="inline-block py-1 px-3 rounded-full bg-emerald-100/50 border border-emerald-200 text-emerald-700 text-xs font-bold uppercase tracking-widest mb-4">
+            Destinations
+          </span>
+          <h2 className="text-3xl md:text-5xl font-black text-slate-900 mb-6 tracking-tight">
             Find Your Perfect{" "}
-            <span className="bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
-              Safari Adventure
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">
+              Escape
             </span>
           </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-slate-600 max-w-2xl mx-auto font-light">
             Discover amazing wildlife experiences with our comprehensive filtering system.
             Find exactly what you're looking for in Sri Lanka's most beautiful destinations.
           </p>
         </div>
 
         {/* Search and Filter Bar */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <div className="sticky top-24 z-40 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/40 p-4 md:p-6 mb-16 transition-all duration-300">
           <div className="flex flex-col lg:flex-row gap-4 items-center">
             {/* Search Input with Suggestions */}
-            <div className="flex-1 relative w-full">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <div className="flex-1 relative w-full group">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+              </div>
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Search destinations..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="Search destinations (e.g. Yala, Mirissa...)"
+                className="block w-full pl-11 pr-4 py-4 bg-slate-100/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 focus:bg-white transition-all duration-300 text-base shadow-inner"
               />
 
               {/* Search Suggestions Dropdown */}
               {showSuggestions && searchSuggestions.length > 0 && (
                 <div
                   ref={suggestionsRef}
-                  className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                  className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top-2"
                 >
-                  {searchSuggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="w-full text-left px-4 py-3 hover:bg-green-50 transition-colors border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Search className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-800">{suggestion}</span>
-                      </div>
-                    </button>
-                  ))}
+                  <div className="p-2">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-emerald-50 transition-colors group flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-slate-100 rounded-full text-slate-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
+                            <MapPin className="h-4 w-4" />
+                          </div>
+                          <span className="font-medium text-slate-700 group-hover:text-emerald-900">{suggestion}</span>
+                        </div>
+                        <span className="text-xs text-slate-400 group-hover:text-emerald-600 font-medium">Jump to section</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
               {/* Search Error Message */}
               {searchError && (
-                <div className="absolute z-50 w-full mt-1 bg-red-50 border border-red-200 rounded-lg shadow-lg p-4">
-                  <div className="flex items-center gap-2 text-red-600">
-                    <AlertCircle className="h-5 w-5" />
-                    <span className="font-medium">{searchError}</span>
+                <div className="absolute z-50 w-full mt-2 bg-red-50 border border-red-100 rounded-xl shadow-lg p-3 animate-in fade-in slide-in-from-top-1">
+                  <div className="flex items-center gap-2 text-red-600 text-sm font-medium">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{searchError}</span>
                   </div>
                 </div>
               )}
@@ -478,62 +526,65 @@ export default function Destination2() {
             {/* Filter Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors"
+              className={`flex items-center gap-2 px-6 py-4 rounded-xl font-semibold transition-all duration-300 w-full lg:w-auto justify-center shadow-lg shadow-emerald-900/5 active:scale-95 ${showFilters
+                ? 'bg-emerald-600 text-white shadow-emerald-600/20'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-emerald-200'
+                }`}
             >
-              <Filter className="h-5 w-5" />
-              Filters
-              <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              <Filter className={`h-5 w-5 ${showFilters ? 'animate-pulse' : ''}`} />
+              <span>Filters</span>
+              <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${showFilters ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Clear Filters */}
-            {filters.location && (
+            {(filters.location || filters.province || searchQuery) && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 px-4 py-3 transition-colors"
+                className="flex items-center gap-2 text-rose-500 hover:text-rose-700 px-4 py-3 text-sm font-bold transition-colors w-full lg:w-auto justify-center"
               >
-                <X className="h-5 w-5" />
-                Clear All
+                <X className="h-4 w-4" />
+                Clear
               </button>
             )}
           </div>
 
           {/* Expanded Filters */}
-          {showFilters && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className={`grid transition-all duration-500 ease-in-out overflow-hidden ${showFilters ? 'grid-rows-[1fr] opacity-100 mt-6 pt-6 border-t border-slate-100' : 'grid-rows-[0fr] opacity-0'}`}>
+            <div className="min-h-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Location Filter */}
                 <FilterSection
-                  title="Location"
-                  icon={MapPin}
+                  title="By Category"
+                  icon={Compass}
                   options={filterOptions.location}
                   filterKey="location"
                 />
                 {/* Province Filter */}
                 <FilterSection
-                  title="Province"
+                  title="By Province"
                   icon={MapPin}
                   options={filterOptions.province}
                   filterKey="province"
                 />
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* National Parks Section */}
         <DestinationSection
           sectionId="national-parks"
           title="National Parks"
-          description="Explore Sri Lanka's most famous national parks and discover unique wildlife experiences"
+          description="Explore Sri Lanka's most famous national parks, where leopards roam freely and elephants gather."
           items={[
             {
               name: "Yala National Park",
-              description: "Home to the highest density of leopards in the world. Experience thrilling jeep safaris and witness diverse wildlife in their natural habitat.",
+              description: "Home to the highest density of leopards in the world. Experience thrilling jeep safaris near the ocean.",
               background: yalaBackground
             },
             {
               name: "Wilpattu National Park",
-              description: "Sri Lanka's largest national park known for its natural lakes and rich biodiversity. Perfect for spotting leopards, sloth bears, and migratory birds.",
+              description: "Sri Lanka's largest national park, famous for its natural lakes (villus) and serene, uncrowded wilderness.",
               background: wilpattuBackground
             }
           ]}
@@ -542,17 +593,17 @@ export default function Destination2() {
         {/* Famous Beaches Section */}
         <DestinationSection
           sectionId="beaches"
-          title="Famous Beaches"
-          description="Discover Sri Lanka's stunning coastline with pristine beaches and crystal-clear waters"
+          title="Tropical Beaches"
+          description="Golden sands, surfing waves, and whale watching in the deep blue Indian Ocean."
           items={[
             {
               name: "Mirissa Beach",
-              description: "Famous for its golden sands, whale watching opportunities, and vibrant nightlife. Perfect for surfing, swimming, and relaxing by the Indian Ocean.",
+              description: "The whale watching capital. Vibrant nightlife, palm-fringed bays, and perfect surfing waves await.",
               background: mirissaBackground
             },
             {
               name: "Unawatuna Beach",
-              description: "A beautiful crescent-shaped bay with calm turquoise waters. Ideal for snorkeling, diving, and enjoying spectacular sunsets in a tropical paradise.",
+              description: "A family-friendly bay with calm turquoise waters, coral reefs, and legendary sunsets.",
               background: unaBackground
             }
           ]}
@@ -561,17 +612,17 @@ export default function Destination2() {
         {/* Camping Sites Section */}
         <DestinationSection
           sectionId="camping-sites"
-          title="Camping Sites"
-          description="Experience the great outdoors with amazing camping sites amidst nature's beauty"
+          title="Camping & Trekking"
+          description="Experience the cool highlands and misty mountains for an unforgettable outdoor adventure."
           items={[
             {
               name: "Horton Plains",
-              description: "A beautiful highland plateau offering breathtaking views and unique camping experiences. Perfect for hiking and witnessing World's End viewpoint.",
+              description: "Trek to World's End, a sheer cliff with a 4,000ft drop, through misty grasslands and cloud forests.",
               background: hortBackground
             },
             {
               name: "Knuckles Mountain Range",
-              description: "A UNESCO World Heritage site with diverse ecosystems. Ideal for adventure camping, trekking, and exploring pristine mountain landscapes.",
+              description: "A UNESCO World Heritage site offering rugged peaks, hidden waterfalls, and pure isolation.",
               background: knucklesBackground
             }
           ]}
@@ -581,16 +632,16 @@ export default function Destination2() {
         <DestinationSection
           sectionId="sanctuaries"
           title="Wildlife Sanctuaries"
-          description="Protecting Sri Lanka's diverse wildlife in their natural habitats"
+          description="Protected havens where nature thrives, connecting major parks and ecosystems."
           items={[
             {
               name: "Lunugamvehera",
-              description: "An important elephant corridor connecting Yala and Uda Walawe national parks. Home to elephants, deer, and various bird species in a dry zone habitat.",
+              description: " Vital elephant corridor linking Yala and Udawalawe. A birdwatcher's paradise in the dry zone.",
               background: lunuBackground
             },
             {
               name: "Kumana Wildlife",
-              description: "Famous for its bird sanctuary and mangrove swamps. A paradise for birdwatchers with over 200 species including migratory birds during nesting season.",
+              description: "Known as Yala East, famous for its 200-hectare mangrove swamp and nesting migratory birds.",
               background: kumanaBackground
             }
           ]}
@@ -599,44 +650,46 @@ export default function Destination2() {
         {/* Forest Reserves Section */}
         <DestinationSection
           sectionId="forest-reserves"
-          title="Forest Reserves"
-          description="Explore Sri Lanka's rich forest ecosystems and biodiversity hotspots"
+          title="Rainforest Reserves"
+          description="Step into the lush, green heart of the island, teeming with endemic species."
           items={[
             {
               name: "Sinharaja Forest Reserve",
-              description: "A UNESCO World Heritage site and biodiversity hotspot. Home to numerous endemic species, rare birds, and lush tropical rainforest vegetation.",
+              description: "A primary tropical rainforest and biodiversity hotspot. The lungs of Sri Lanka.",
               background: sinBackground
             },
             {
               name: "Knuckles Forest Reserve",
-              description: "Part of the Knuckles Mountain Range with montane forests, waterfalls, and diverse flora and fauna. Perfect for eco-tourism and nature photography.",
+              description: "Misty cloud forests and pygmy forests unique to this isolated mountain range.",
               background: knuckfoBackground
             }
           ]}
         />
 
-        {/* Active Filters Display */}
+        {/* Active Filters Display Chips */}
         {(filters.location || filters.province) && (
-          <div className="mt-8 p-4 bg-white rounded-lg shadow-sm border">
-            <h4 className="font-semibold text-gray-800 mb-3">Active Filters:</h4>
-            <div className="flex flex-wrap gap-2">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-2xl border border-emerald-100 z-50 animate-in slide-in-from-bottom-5 flex items-center gap-3">
+            <span className="text-sm font-semibold text-slate-500">Filtered by:</span>
+            <div className="flex gap-2">
               {filters.location && (
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                  {filters.location}
-                  <button onClick={() => handleFilterChange("location", "")} className="text-green-600 hover:text-green-800 cursor-pointer">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
+                <button
+                  onClick={() => handleFilterChange("location", "")}
+                  className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 hover:bg-emerald-200 transition-colors"
+                >
+                  {filters.location} <X className="h-3 w-3" />
+                </button>
               )}
               {filters.province && (
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                  {filters.province}
-                  <button onClick={() => handleFilterChange("province", "")} className="text-green-600 hover:text-green-800 cursor-pointer">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
+                <button
+                  onClick={() => handleFilterChange("province", "")}
+                  className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 hover:bg-emerald-200 transition-colors"
+                >
+                  {filters.province} <X className="h-3 w-3" />
+                </button>
               )}
             </div>
+            <div className="w-px h-4 bg-slate-300 mx-1"></div>
+            <button onClick={clearFilters} className="text-xs font-bold text-rose-500 hover:text-rose-700">Clear All</button>
           </div>
         )}
       </div>

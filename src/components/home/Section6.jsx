@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Star } from "lucide-react";
+import { Star, Quote } from "lucide-react";
 import { getFirestore, collection, query, getDocs, getDoc, doc, orderBy, limit } from "firebase/firestore";
 
 export default function Section6() {
@@ -18,11 +18,10 @@ export default function Section6() {
     const fetchReviews = async () => {
       try {
         setLoading(true);
-        // Get all reviews from Firestore
         const reviewsQuery = query(
           collection(db, 'reviews'),
           orderBy('rating', 'desc'),
-          limit(50) // Get top 50 highest rated reviews
+          limit(50)
         );
 
         const reviewsSnapshot = await getDocs(reviewsQuery);
@@ -31,7 +30,6 @@ export default function Section6() {
         for (const reviewDoc of reviewsSnapshot.docs) {
           const reviewData = reviewDoc.data();
 
-          // Get user information from tourists collection
           let userName = reviewData.userName || 'Anonymous User';
           let userCountry = 'Unknown';
 
@@ -48,7 +46,6 @@ export default function Section6() {
             }
           }
 
-          // Only include reviews with rating 4 or 5 (highest ratings)
           if (reviewData.rating >= 4) {
             reviewsData.push({
               id: reviewDoc.id,
@@ -60,7 +57,6 @@ export default function Section6() {
           }
         }
 
-        // Sort by rating (highest first) and limit to top 12
         const sortedReviews = reviewsData
           .sort((a, b) => b.rating - a.rating)
           .slice(0, 12);
@@ -77,10 +73,8 @@ export default function Section6() {
     fetchReviews();
   }, [db]);
 
-  // Duplicate reviews multiple times for seamless infinite loop
   const duplicatedReviews = [...reviews, ...reviews, ...reviews, ...reviews];
 
-  // Update items per view based on screen size
   useEffect(() => {
     const updateItemsPerView = () => {
       if (window.innerWidth >= 1024) {
@@ -97,20 +91,17 @@ export default function Section6() {
     return () => window.removeEventListener('resize', updateItemsPerView);
   }, []);
 
-  // Continuous infinite scroll animation - Very slow movement
   useEffect(() => {
     if (!carouselRef.current) return;
 
-    const speed = 0.060; // Extremely slow speed (percentage per frame - lower = slower)
-    const itemWidth = 100 / itemsPerView; // percentage width per item
-    const resetPoint = itemWidth * reviews.length; // Reset after one full set
+    const speed = 0.060;
+    const itemWidth = 100 / itemsPerView;
+    const resetPoint = itemWidth * reviews.length;
 
     const animate = () => {
-      // Only update position if not paused
       if (!isPaused) {
         positionRef.current += speed;
 
-        // Reset position seamlessly when we've scrolled through one set of reviews
         if (positionRef.current >= resetPoint) {
           positionRef.current = 0;
         }
@@ -133,28 +124,35 @@ export default function Section6() {
   }, [itemsPerView, reviews.length, isPaused]);
 
   return (
-    <section className="w-full bg-gradient-to-b from-gray-50 to-white py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-7xl mx-auto">
-        {/* Title and Description - Centered */}
-        <div className="text-center mb-8 sm:mb-12 lg:mb-16">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
-            Customer Reviews
+    <section className="relative w-full bg-gradient-to-b from-white via-gray-50 to-white py-16 sm:py-20 lg:py-24 overflow-hidden">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-green-200/20 rounded-full blur-3xl -z-10"></div>
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-200/20 rounded-full blur-3xl -z-10"></div>
+
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header Section */}
+        <div className="text-center mb-12 sm:mb-16">
+          <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+            What Our Customers Say
           </h2>
+
           <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
             Discover what our satisfied customers have to say about their unforgettable safari experiences with SafariHub.
-            Join thousands of happy travelers who have explored the wild beauty of Sri Lanka with us.
           </p>
         </div>
 
-        {/* Reviews Carousel Container */}
+        {/* Reviews Carousel */}
         <div className="relative overflow-hidden">
           {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-              <p className="mt-4 text-gray-600">Loading reviews...</p>
+            <div className="text-center py-16">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-green-600 border-t-transparent"></div>
+              <p className="mt-4 text-gray-600 font-medium">Loading reviews...</p>
             </div>
           ) : duplicatedReviews.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-16">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                <Quote className="w-8 h-8 text-gray-400" />
+              </div>
               <p className="text-gray-600">No reviews available yet.</p>
             </div>
           ) : (
@@ -174,12 +172,17 @@ export default function Section6() {
                   }}
                 >
                   <div
-                    className="bg-white rounded-[10px] p-6 sm:p-8 shadow-lg border border-gray-200 h-full flex flex-col"
+                    className="group relative bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl border border-gray-100 h-full flex flex-col transition-all duration-300 hover:-translate-y-1"
                     onMouseEnter={() => setIsPaused(true)}
                     onMouseLeave={() => setIsPaused(false)}
                   >
+                    {/* Quote Icon */}
+                    <div className="absolute top-6 right-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <Quote className="w-12 h-12 sm:w-16 sm:h-16 text-green-600" />
+                    </div>
+
                     {/* Rating Stars */}
-                    <div className="flex items-center gap-1 mb-4">
+                    <div className="flex items-center gap-1 mb-4 relative z-10">
                       {[...Array(review.rating)].map((_, i) => (
                         <Star
                           key={i}
@@ -189,24 +192,42 @@ export default function Section6() {
                     </div>
 
                     {/* Review Text */}
-                    <p className="text-sm sm:text-base text-gray-700 leading-relaxed mb-6 flex-grow">
+                    <p className="text-sm sm:text-base text-gray-700 leading-relaxed mb-6 flex-grow relative z-10 italic">
                       "{review.review}"
                     </p>
 
                     {/* Customer Info */}
-                    <div className="border-t border-gray-200 pt-4">
-                      <p className="font-semibold text-base sm:text-lg text-gray-900 mb-1">
-                        {review.name}
-                      </p>
-                      <p className="text-sm sm:text-base text-gray-500">
-                        {review.country}
-                      </p>
+                    <div className="flex items-center gap-4 pt-4 border-t border-gray-200 relative z-10">
+                      {/* Avatar */}
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl flex-shrink-0">
+                        {review.name.charAt(0).toUpperCase()}
+                      </div>
+
+                      {/* Name and Country */}
+                      <div className="flex-grow min-w-0">
+                        <p className="font-bold text-base sm:text-lg text-gray-900 truncate">
+                          {review.name}
+                        </p>
+                        <p className="text-sm text-gray-500 truncate">
+                          {review.country}
+                        </p>
+                      </div>
                     </div>
+
+                    {/* Decorative Corner */}
+                    <div className="absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-tl from-green-500/10 to-transparent rounded-tl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+
+        {/* Bottom Info */}
+        <div className="text-center mt-12">
+          <p className="text-sm text-gray-500">
+            Showing top-rated reviews from our satisfied customers
+          </p>
         </div>
       </div>
     </section>

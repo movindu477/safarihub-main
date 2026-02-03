@@ -21,7 +21,7 @@ const AdminCertificationPanel = ({ adminUser }) => {
     setLoading(true);
     try {
       let providersQuery;
-      
+
       if (filter === 'all') {
         providersQuery = query(
           collection(db, 'serviceProviders'),
@@ -51,7 +51,7 @@ const AdminCertificationPanel = ({ adminUser }) => {
       const providersData = await Promise.all(
         snapshot.docs.map(async (docSnapshot) => {
           const data = docSnapshot.data();
-          
+
           // Get document URLs
           const documentUrls = {};
           if (data.verificationDocuments && Array.isArray(data.verificationDocuments)) {
@@ -79,7 +79,7 @@ const AdminCertificationPanel = ({ adminUser }) => {
 
   const handleApprove = async (providerId, providerData) => {
     if (!confirm('Approve this provider as certified?')) return;
-    
+
     setProcessing(true);
     try {
       await updateDoc(doc(db, 'serviceProviders', providerId), {
@@ -112,7 +112,7 @@ const AdminCertificationPanel = ({ adminUser }) => {
   const handleReject = async (providerId) => {
     const reason = prompt('Enter reason for rejection (optional):');
     if (reason === null) return; // User cancelled
-    
+
     setProcessing(true);
     try {
       await updateDoc(doc(db, 'serviceProviders', providerId), {
@@ -168,41 +168,37 @@ const AdminCertificationPanel = ({ adminUser }) => {
         <div className="mb-6 flex flex-wrap gap-2">
           <button
             onClick={() => setFilter('pending')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'pending'
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pending'
                 ? 'bg-yellow-600 text-white'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
+              }`}
           >
             Pending Review ({providers.filter(p => !p.certificationApproved && !p.certificationRejected).length})
           </button>
           <button
             onClick={() => setFilter('approved')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'approved'
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'approved'
                 ? 'bg-green-600 text-white'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
+              }`}
           >
             Approved ({providers.filter(p => p.certificationApproved).length})
           </button>
           <button
             onClick={() => setFilter('rejected')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'rejected'
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'rejected'
                 ? 'bg-red-600 text-white'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
+              }`}
           >
             Rejected ({providers.filter(p => p.certificationRejected).length})
           </button>
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'all'
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all'
                 ? 'bg-emerald-600 text-white'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
+              }`}
           >
             All ({providers.length})
           </button>
@@ -275,8 +271,7 @@ const AdminCertificationPanel = ({ adminUser }) => {
                   }}
                   className="w-full mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  <Eye className="h-4 w-4" />
-                  Review Details
+                  View
                 </button>
               </div>
             ))}

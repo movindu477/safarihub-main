@@ -16,7 +16,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
   const navigate = useNavigate();
   const location = useLocation();
   const auth = getAuth();
-  
+
   // Check for rebooking flow
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -33,35 +33,35 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
   useEffect(() => {
     const shouldScroll = sessionStorage.getItem('scrollToDriver');
     const driverId = sessionStorage.getItem('lastViewedDriverId');
-    
+
     if (shouldScroll === 'true' && filteredJeeps.length > 0 && driverId) {
       console.log('🔄 Attempting to scroll to driver card:', driverId);
-      
+
       // Function to scroll to the element
       const scrollToElement = () => {
         const element = document.getElementById(`driver-card-${driverId}`);
         if (element) {
           console.log('✅ Found driver card element, scrolling...');
-          
+
           // Use scrollIntoView for reliable scrolling
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
+          element.scrollIntoView({
+            behavior: 'smooth',
             block: 'center',
             inline: 'nearest'
           });
-          
+
           // Add a slight delay for smooth scroll, then highlight
           setTimeout(() => {
             // Highlight the card briefly
             element.style.transition = 'box-shadow 0.3s ease-in-out';
             element.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.5)';
-            
+
             // Remove highlight after 2 seconds
             setTimeout(() => {
               element.style.boxShadow = '';
             }, 2000);
           }, 500);
-          
+
           // Clear the flag after successful scroll
           sessionStorage.removeItem('scrollToDriver');
           return true;
@@ -69,12 +69,12 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
         console.log('❌ Driver card element not found yet');
         return false;
       };
-      
+
       // Wait for DOM to be fully rendered with multiple retry attempts
       const attemptScroll = (attempt = 0) => {
         const maxAttempts = 8;
         const delays = [200, 300, 500, 700, 1000, 1500, 2000, 2500]; // Increasing delays
-        
+
         if (attempt < maxAttempts) {
           setTimeout(() => {
             if (!scrollToElement() && attempt < maxAttempts - 1) {
@@ -88,12 +88,12 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
           }, delays[attempt]);
         }
       };
-      
+
       // Start attempting to scroll after initial delay
       setTimeout(() => {
         attemptScroll();
       }, 100);
-      
+
       // Clean up saved scroll position after use
       const savedScrollPosition = sessionStorage.getItem('jeepListingScrollPosition');
       if (savedScrollPosition) {
@@ -109,7 +109,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     specialSkills: [],
     certification: '', // Changed from array to single value
   });
-  
+
   // Sort state
   const [sortBy, setSortBy] = useState(''); // 'price-high', 'price-low', 'a-z', 'recent', 'rating-high', 'rating-low'
 
@@ -137,7 +137,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       '4x4 Modified Jeep'
     ],
     languages: [
-      'English', 'Sinhala', 'Tamil', 'Hindi', 
+      'English', 'Sinhala', 'Tamil', 'Hindi',
       'French', 'German', 'Chinese', 'Japanese'
     ],
     specialSkills: [
@@ -157,7 +157,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
   // Real-time data listener for service providers
   useEffect(() => {
     console.log('🔔 Setting up real-time data listener for service providers...');
-    
+
     const serviceProvidersRef = collection(db, 'serviceProviders');
     const jeepDriversQuery = query(
       serviceProvidersRef,
@@ -167,13 +167,13 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
 
     const unsubscribe = onSnapshot(jeepDriversQuery, (snapshot) => {
       console.log('🔄 Real-time service providers data update received');
-      
+
       const updatedJeeps = [];
-      
+
       snapshot.forEach((doc) => {
         const providerData = doc.data();
         const providerId = doc.id;
-        
+
         // Only include Jeep Drivers
         if (providerData.serviceType === 'Jeep Driver') {
           updatedJeeps.push({
@@ -182,10 +182,10 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             driverName: providerData.fullName || providerData.driverName || 'Safari Driver',
             imageUrl: providerData.profilePicture || providerData.imageUrl || '',
             location: providerData.location || providerData.baseLocation || 'Sri Lanka',
-            
+
             // Service Info
-            rating: typeof providerData.rating === 'number' ? providerData.rating : 
-                   typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
+            rating: typeof providerData.rating === 'number' ? providerData.rating :
+              typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
             totalReviews: providerData.totalReviews || 0,
             priceFullDay: providerData.priceFullDay || providerData.pricePerDay || providerData.price || providerData.dailyRate || 0,
             priceHalfDay: providerData.priceHalfDay || (providerData.pricePerDay ? providerData.pricePerDay * 0.6 : 0) || 0,
@@ -193,31 +193,31 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             priceHalfDayStandard: providerData.priceHalfDayStandard || 0,
             priceFullDayLuxury: providerData.priceFullDayLuxury || 0,
             priceHalfDayLuxury: providerData.priceHalfDayLuxury || 0,
-            vehicleType: Array.isArray(providerData.vehicleType) ? providerData.vehicleType : 
-                        providerData.vehicleType ? [providerData.vehicleType] : ['Standard Safari Jeep'],
+            vehicleType: Array.isArray(providerData.vehicleType) ? providerData.vehicleType :
+              providerData.vehicleType ? [providerData.vehicleType] : ['Standard Safari Jeep'],
             vehicleTypes: Array.isArray(providerData.vehicleTypes) ? providerData.vehicleTypes : [],
             experience: providerData.experienceYears || providerData.experience || 0,
             createdAt: providerData.createdAt || null,
-            
+
             // Arrays with proper fallbacks
-            destinations: Array.isArray(providerData.destinations) ? providerData.destinations : 
-                         providerData.destinations ? [providerData.destinations] : 
-                         ['Multiple National Parks'],
+            destinations: Array.isArray(providerData.destinations) ? providerData.destinations :
+              providerData.destinations ? [providerData.destinations] :
+                ['Multiple National Parks'],
             languages: Array.isArray(providerData.languages) ? providerData.languages :
-                      Array.isArray(providerData.languagesSpoken) ? providerData.languagesSpoken :
-                      providerData.languagesSpoken ? [providerData.languagesSpoken] :
-                      providerData.languages ? [providerData.languages] :
-                      ['English', 'Sinhala'],
+              Array.isArray(providerData.languagesSpoken) ? providerData.languagesSpoken :
+                providerData.languagesSpoken ? [providerData.languagesSpoken] :
+                  providerData.languages ? [providerData.languages] :
+                    ['English', 'Sinhala'],
             specialSkills: Array.isArray(providerData.specialSkills) ? providerData.specialSkills :
-                          providerData.specialSkills ? [providerData.specialSkills] : [],
+              providerData.specialSkills ? [providerData.specialSkills] : [],
             certifications: Array.isArray(providerData.certifications) ? providerData.certifications :
-                           providerData.certifications ? [providerData.certifications] : [],
-            
+              providerData.certifications ? [providerData.certifications] : [],
+
             // Contact Info
             contactPhone: providerData.contactPhone || providerData.phone || providerData.phoneNumber || 'Not provided',
             contactEmail: providerData.contactEmail || providerData.email || '',
             description: providerData.description || providerData.bio || 'Experienced safari jeep driver',
-            
+
             // Mark if this is the current user's profile
             isCurrentUser: currentUser && currentUser.uid === providerId,
 
@@ -233,7 +233,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       updatedJeeps.forEach(jeep => {
         // Starting price based on half-day price (Standard first, then Luxury)
         let startingPrice = 0;
-        
+
         if (jeep.vehicleTypes && jeep.vehicleTypes.length > 0) {
           // New pricing structure with separate prices
           if (jeep.vehicleTypes.includes('Standard Safari Jeep') && jeep.priceHalfDayStandard) {
@@ -242,27 +242,27 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             startingPrice = jeep.priceHalfDayLuxury;
           }
         }
-        
+
         // Fallback to legacy pricing if new structure not available
         if (!startingPrice) {
           startingPrice = jeep.priceHalfDay || jeep.priceFullDay || 0;
         }
-        
+
         jeep.startingPrice = startingPrice;
       });
 
       const currentUserJeep = updatedJeeps.find(j => j.isCurrentUser);
       const certifiedCount = updatedJeeps.filter(j => j.certificationStatus === 'certified').length;
       const uncertifiedCount = updatedJeeps.filter(j => j.certificationStatus !== 'certified').length;
-      
+
       console.log(`🚙 Real-time data: ${updatedJeeps.length} jeep drivers (${certifiedCount} certified, ${uncertifiedCount} uncertified)`);
       if (currentUserJeep) {
         console.log(`👤 Current user jeep: ${currentUserJeep.driverName} (Status: ${currentUserJeep.certificationStatus})`);
       }
-      
+
       setJeeps(updatedJeeps);
       setFilteredJeeps(updatedJeeps);
-      
+
       if (loading) {
         setLoading(false);
       }
@@ -281,13 +281,13 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
   // Filter and sort logic
   useEffect(() => {
     console.log('🔄 Applying filters and sorting...', filters, sortBy);
-    
+
     let filtered = [...jeeps];
 
     // Destination filter (from props - selectedDestination)
     if (selectedDestination) {
-      filtered = filtered.filter(jeep => 
-        jeep.destinations?.some(dest => 
+      filtered = filtered.filter(jeep =>
+        jeep.destinations?.some(dest =>
           dest.toLowerCase().includes(selectedDestination.toLowerCase())
         )
       );
@@ -296,11 +296,11 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     // Vehicle type filter - support multiple vehicle types
     if (filters.vehicleType) {
       filtered = filtered.filter(jeep => {
-        const vehicleTypesArray = jeep.vehicleTypes && jeep.vehicleTypes.length > 0 
-          ? jeep.vehicleTypes 
+        const vehicleTypesArray = jeep.vehicleTypes && jeep.vehicleTypes.length > 0
+          ? jeep.vehicleTypes
           : (Array.isArray(jeep.vehicleType) ? jeep.vehicleType : [jeep.vehicleType]);
-        
-        return vehicleTypesArray.some(type => 
+
+        return vehicleTypesArray.some(type =>
           type && type.toLowerCase() === filters.vehicleType.toLowerCase()
         );
       });
@@ -309,8 +309,8 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     // Languages filter
     if (filters.languages.length > 0) {
       filtered = filtered.filter(jeep =>
-        filters.languages.every(lang => 
-          jeep.languages?.some(jLang => 
+        filters.languages.every(lang =>
+          jeep.languages?.some(jLang =>
             jLang.toLowerCase().includes(lang.toLowerCase())
           )
         )
@@ -320,8 +320,8 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     // Special skills filter
     if (filters.specialSkills.length > 0) {
       filtered = filtered.filter(jeep =>
-        filters.specialSkills.every(skill => 
-          jeep.specialSkills?.some(jSkill => 
+        filters.specialSkills.every(skill =>
+          jeep.specialSkills?.some(jSkill =>
             jSkill.toLowerCase().includes(skill.toLowerCase())
           )
         )
@@ -400,7 +400,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
   const handleProfileClick = (jeep) => {
     // Save current scroll position before navigating
     sessionStorage.setItem('jeepListingScrollPosition', window.scrollY.toString());
-    
+
     // Save the driver ID to sessionStorage so we can scroll to it when coming back
     sessionStorage.setItem('lastViewedDriverId', jeep.id);
     sessionStorage.setItem('scrollToDriver', 'true');
@@ -446,13 +446,13 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     try {
       const touristDocRef = doc(db, 'tourists', user.uid);
       const touristDoc = await getDoc(touristDocRef);
-      
-      const existingFavorites = touristDoc.exists() 
+
+      const existingFavorites = touristDoc.exists()
         ? (touristDoc.data().favoriteJeepDrivers || [])
         : [];
-      
+
       const isFavorited = existingFavorites.includes(jeepId);
-      
+
       if (touristDoc.exists()) {
         if (isFavorited) {
           // Remove from favorites
@@ -478,7 +478,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
         }, { merge: true });
         setFavoriteMessage('Service provider added to favorite');
       }
-      
+
       setTimeout(() => setFavoriteMessage(null), 2000);
     } catch (error) {
       console.error('Error toggling favorite:', error);
@@ -533,7 +533,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       certification: '',
     });
     setSortBy('');
-    
+
     // Clear destination filter if callback is provided
     if (onClearDestination) {
       onClearDestination();
@@ -572,14 +572,13 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     );
   };
 
-  // Profile Image Component with proper error handling - Round fit
-  const ProfileImage = ({ jeep }) => {
+  // Profile Image Component with proper error handling - Flexible for both full background and circular
+  const ProfileImage = ({ jeep, className }) => {
     const [imageError, setImageError] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
 
     const handleImageError = () => {
       console.log(`❌ Image failed to load for ${jeep.driverName}: ${jeep.imageUrl}`);
-      setImageError(true);
     };
 
     const handleImageLoad = () => {
@@ -590,7 +589,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
     // If no image URL or image failed to load, show placeholder
     if (!jeep.imageUrl || imageError) {
       return (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
+        <div className={`flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300 ${className || 'w-full h-full'}`}>
           <div className="text-center">
             <div className="w-20 h-20 bg-gray-400 rounded-full flex items-center justify-center mx-auto mb-2">
               <span className="text-3xl">🚙</span>
@@ -601,19 +600,19 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
       );
     }
 
-    // Show image with proper loading states - fit to round
+    // Show image with proper loading states
     return (
-      <div className="w-full h-full relative">
+      <div className={`relative ${className || 'w-full h-full'}`}>
         {!imageLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-full">
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-500"></div>
           </div>
         )}
         <img
           src={jeep.imageUrl}
           alt={jeep.driverName}
-          className={`w-full h-full object-cover rounded-full ${imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`${className || 'w-full h-full object-cover'} ${imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
           onError={handleImageError}
           onLoad={handleImageLoad}
           loading="lazy"
@@ -642,13 +641,13 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
           <h3 className="text-2xl font-bold text-gray-800 mb-3">Something went wrong</h3>
           <p className="text-gray-600 mb-6">{error}</p>
           <div className="space-y-3">
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="w-full bg-emerald-500 text-white py-3 px-6 rounded-lg hover:bg-emerald-600 transition-colors font-semibold"
             >
               Try Again
             </button>
-            <button 
+            <button
               onClick={clearFilters}
               className="w-full border border-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -835,7 +834,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
         {/* Results Count */}
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <p className="text-gray-600 text-lg">
-            Found <span className="font-bold text-emerald-600">{filteredJeeps.length}</span> jeep{filteredJeeps.length !== 1 ? 's' : ''} 
+            Found <span className="font-bold text-emerald-600">{filteredJeeps.length}</span> jeep{filteredJeeps.length !== 1 ? 's' : ''}
             {jeeps.length > 0 && ` out of ${jeeps.length} total`}
           </p>
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
@@ -851,202 +850,110 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
           <div className="space-y-12">
             {/* Certified Drivers Section - Always Show */}
             <div>
-              <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Shield className="h-6 w-6 text-green-600 flex-shrink-0" />
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        Certified Drivers
-                      </h2>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Verified and certified by our admin team
-                      </p>
-                    </div>
+              <div className="mb-8 flex items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="bg-green-100 p-3 rounded-2xl">
+                    <Shield className="h-8 w-8 text-green-600" />
                   </div>
-                  <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    {filteredJeeps.filter(jeep => jeep.certificationStatus === 'certified').length}
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                      Certified Drivers
+                    </h2>
+                    <p className="text-sm text-gray-500 font-medium mt-1">
+                      Verified and certified by our admin team
+                    </p>
                   </div>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-gray-200">
+                    {filteredJeeps.filter(jeep => jeep.certificationStatus === 'certified').length} Drivers Available
+                  </span>
                 </div>
               </div>
               {filteredJeeps.filter(jeep => jeep.certificationStatus === 'certified').length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                   {filteredJeeps
                     .filter(jeep => jeep.certificationStatus === 'certified')
                     .map((jeep, index) => (
-                      <div 
+                      <div
                         key={jeep.id}
                         id={`driver-card-${jeep.id}`}
-                        className="bg-white rounded-none shadow-lg overflow-hidden border-2 border-green-500 cursor-pointer hover:shadow-2xl transition-shadow"
+                        className="group relative h-[420px] bg-white rounded-[32px] shadow-xl shadow-gray-100/50 overflow-hidden cursor-pointer hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500"
                         onClick={() => handleProfileClick(jeep)}
                       >
-                        {/* Profile Image Section - Big Rounded */}
-                        <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                          {/* Rounded Profile Image Container */}
-                          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-500 shadow-xl relative">
-                            <ProfileImage jeep={jeep} />
-                          </div>
-                          
-                          {/* Certified Badge */}
-                          <div className="absolute top-3 left-3 bg-green-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg z-10 flex items-center gap-1.5">
+                        {/* Full Background Image */}
+                        <div className="absolute inset-0 h-full w-full">
+                          <ProfileImage jeep={jeep} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+                        </div>
+
+                        {/* Top Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                          <div className="bg-white/90 backdrop-blur-md text-green-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm flex items-center gap-1.5">
                             <Shield className="h-3.5 w-3.5" />
                             CERTIFIED
                           </div>
-
-                          {/* Experience Badge */}
                           {jeep.experience > 0 && (
-                            <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
-                              {jeep.experience}+ years
-                            </div>
-                          )}
-
-                          {/* Current User Badge */}
-                          {jeep.isCurrentUser && (
-                            <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
-                              Your Profile
+                            <div className="bg-black/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                              {jeep.experience}+ Years
                             </div>
                           )}
                         </div>
 
-                        {/* Driver Details */}
-                        <div className="p-5">
-                          {/* Name */}
-                          <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1">
-                            {jeep.driverName}
-                          </h3>
-
-                          {/* Location */}
-                          <div className="flex items-center gap-2 text-gray-600 mb-3">
-                            <MapPin className="h-4 w-4 flex-shrink-0" />
-                            <p className="text-sm line-clamp-1">{jeep.location}</p>
+                        {/* Sliding Content Box */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl p-6 rounded-t-[32px] transform transition-transform duration-500 translate-y-[88px] group-hover:translate-y-0">
+                          <div className="mb-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="text-xl font-bold text-gray-900 truncate pr-2">
+                                {jeep.driverName}
+                              </h3>
+                              <Shield className="h-5 w-5 text-green-500 fill-green-500 flex-shrink-0" />
+                            </div>
+                            <p className="text-sm text-gray-500 font-medium line-clamp-1 flex items-center gap-1.5">
+                              {jeep.vehicleTypes && jeep.vehicleTypes[0] ? jeep.vehicleTypes[0] : 'Professional Driver'}
+                            </p>
                           </div>
 
-                          {/* Rating */}
-                          <div className="flex items-center gap-2 mb-3">
-                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                            <span className="text-sm font-semibold text-gray-700">
-                              {jeep.rating || 'New'}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              ({jeep.reviewCount || 0} reviews)
-                            </span>
-                          </div>
-
-                          {/* Verified Badge */}
-                          <div className="mb-3">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                              <Shield className="h-3 w-3" />
-                              <span>Verified Driver</span>
+                          <div className="flex items-center gap-4 mt-4 mb-6">
+                            <div className="flex items-center gap-1.5">
+                              <Users className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm font-bold text-gray-900">{jeep.totalReviews || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                              <span className="text-sm font-bold text-gray-900">{jeep.rating || 'New'}</span>
                             </div>
                           </div>
 
-                          {/* Vehicle Types */}
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Types:</p>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {Array.isArray(jeep.vehicleType) ? jeep.vehicleType.join(', ') : jeep.vehicleType}
-                            </p>
-                          </div>
-
-                          {/* Destinations */}
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Destinations:</p>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {jeep.destinations?.join(', ')}
-                            </p>
-                          </div>
-
-                          {/* Languages */}
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Languages:</p>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {jeep.languages?.slice(0, 3).join(', ')}
-                              {jeep.languages?.length > 3 && '...'}
-                            </p>
-                          </div>
-
-                          {/* Detailed Pricing */}
-                          <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-gray-700 mb-2">Pricing Details:</p>
+                          {/* Hidden Details revealed on hover */}
+                          <div className="space-y-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-75">
                             <div className="space-y-2">
-                              {/* Standard Safari Jeep Pricing */}
-                              {jeep.vehicleTypes?.includes('Standard Safari Jeep') && 
-                               (jeep.priceHalfDayStandard > 0 || jeep.priceFullDayStandard > 0 || jeep.priceHalfDay > 0 || jeep.priceFullDay > 0) && (
-                                <div className="border-b border-green-200 pb-2">
-                                  <p className="text-xs font-medium text-green-700 mb-1">Standard Safari Jeep:</p>
-                                  <div className="space-y-0.5">
-                                    {(jeep.priceHalfDayStandard > 0 || jeep.priceHalfDay > 0) && (
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-600">Half Day:</span>
-                                        <span className="font-bold text-green-600">
-                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceHalfDayStandard || jeep.priceHalfDay)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {(jeep.priceFullDayStandard > 0 || jeep.priceFullDay > 0) && (
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-600">Full Day:</span>
-                                        <span className="font-bold text-green-600">
-                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceFullDayStandard || jeep.priceFullDay)}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Luxury Safari Jeep Pricing */}
-                              {jeep.vehicleTypes?.includes('Luxury Safari Jeep') && 
-                               (jeep.priceHalfDayLuxury > 0 || jeep.priceFullDayLuxury > 0) && (
-                                <div className="pt-1">
-                                  <p className="text-xs font-medium text-yellow-700 mb-1">Luxury Safari Jeep:</p>
-                                  <div className="space-y-0.5">
-                                    {jeep.priceHalfDayLuxury > 0 && (
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-600">Half Day:</span>
-                                        <span className="font-bold text-yellow-600">
-                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceHalfDayLuxury)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {jeep.priceFullDayLuxury > 0 && (
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-600">Full Day:</span>
-                                        <span className="font-bold text-yellow-600">
-                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceFullDayLuxury)}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Fallback if no prices available */}
-                              {(!jeep.vehicleTypes?.includes('Standard Safari Jeep') || 
-                                (jeep.priceHalfDayStandard <= 0 && jeep.priceFullDayStandard <= 0 && jeep.priceHalfDay <= 0 && jeep.priceFullDay <= 0)) &&
-                               (!jeep.vehicleTypes?.includes('Luxury Safari Jeep') || 
-                                (jeep.priceHalfDayLuxury <= 0 && jeep.priceFullDayLuxury <= 0)) && (
-                                <p className="text-xs text-gray-500 text-center">Contact for pricing</p>
-                              )}
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <MapPin className="h-4 w-4 text-gray-400" />
+                                <span className="truncate">{jeep.location}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <Users className="h-4 w-4 text-gray-400" />
+                                <span className="truncate">{jeep.languages?.slice(0, 2).join(', ')}</span>
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Favorite Button */}
-                          {currentUser && !jeep.isCurrentUser && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleFavorite(jeep.id);
-                              }}
-                              className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors ${
-                                userFavorites.includes(jeep.id)
-                                  ? 'bg-gray-800 text-white hover:bg-gray-900'
-                                  : 'bg-black text-white hover:bg-gray-800'
-                              }`}
-                            >
-                              {userFavorites.includes(jeep.id) ? 'Remove from Favorites' : 'Add to Favorites'}
-                            </button>
-                          )}
+                            {currentUser && !jeep.isCurrentUser && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleFavorite(jeep.id);
+                                }}
+                                className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${userFavorites.includes(jeep.id)
+                                  ? 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                                  : 'bg-gray-900 text-white hover:bg-black shadow-lg shadow-gray-900/20'
+                                  }`}
+                              >
+                                {userFavorites.includes(jeep.id) ? 'Saved' : 'Add to Favorites'}
+                                <span className="text-lg leading-none mb-0.5">{userFavorites.includes(jeep.id) ? '♥' : '+'}</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1062,196 +969,110 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
 
             {/* Uncertified/Pending Drivers Section - Always Show */}
             <div>
-              <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-6 w-6 text-yellow-600 flex-shrink-0" />
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        Uncertified Jeep Drivers
-                      </h2>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Drivers pending certification review
-                      </p>
-                    </div>
+              <div className="mb-8 flex items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="bg-yellow-100 p-3 rounded-2xl">
+                    <Clock className="h-8 w-8 text-yellow-600" />
                   </div>
-                  <div className="bg-yellow-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    {filteredJeeps.filter(jeep => jeep.certificationStatus !== 'certified').length}
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                      Pending Verification
+                    </h2>
+                    <p className="text-sm text-gray-500 font-medium mt-1">
+                      Drivers currently under admin review
+                    </p>
                   </div>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="bg-yellow-500 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-yellow-200">
+                    {filteredJeeps.filter(jeep => jeep.certificationStatus !== 'certified').length} Drivers Waiting
+                  </span>
                 </div>
               </div>
               {filteredJeeps.filter(jeep => jeep.certificationStatus !== 'certified').length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                   {filteredJeeps
                     .filter(jeep => jeep.certificationStatus !== 'certified')
                     .map((jeep, index) => (
-                      <div 
+                      <div
                         key={jeep.id}
                         id={`driver-card-${jeep.id}`}
-                        className="bg-white rounded-none shadow-lg overflow-hidden border border-gray-200 cursor-pointer"
+                        className="group relative h-[420px] bg-white rounded-[32px] shadow-xl shadow-gray-100/50 overflow-hidden cursor-pointer hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500"
                         onClick={() => handleProfileClick(jeep)}
                       >
-                        {/* Profile Image Section - Big Rounded */}
-                        <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                          {/* Rounded Profile Image Container */}
-                          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-300 shadow-xl relative">
-                            <ProfileImage jeep={jeep} />
-                          </div>
-                          
-                          {/* Experience Badge */}
-                          {jeep.experience > 0 && (
-                            <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
-                              {jeep.experience}+ years
-                            </div>
-                          )}
+                        {/* Full Background Image */}
+                        <div className="absolute inset-0 h-full w-full">
+                          <ProfileImage jeep={jeep} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+                        </div>
 
-                          {/* Current User Badge */}
-                          {jeep.isCurrentUser && (
-                            <div className="absolute bottom-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
-                              Your Profile
+                        {/* Top Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                          <div className="bg-white/90 backdrop-blur-md text-yellow-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5" />
+                            PENDING
+                          </div>
+                          {jeep.experience > 0 && (
+                            <div className="bg-black/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                              {jeep.experience}+ Years
                             </div>
                           )}
                         </div>
 
-                        {/* Driver Details */}
-                        <div className="p-5">
-                          {/* Name */}
-                          <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1">
-                            {jeep.driverName}
-                          </h3>
-
-                          {/* Location */}
-                          <div className="flex items-center gap-2 text-gray-600 mb-3">
-                            <MapPin className="h-4 w-4 flex-shrink-0" />
-                            <p className="text-sm line-clamp-1">{jeep.location}</p>
+                        {/* Sliding Content Box */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl p-6 rounded-t-[32px] transform transition-transform duration-500 translate-y-[88px] group-hover:translate-y-0">
+                          <div className="mb-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="text-xl font-bold text-gray-900 truncate pr-2">
+                                {jeep.driverName}
+                              </h3>
+                              {/* No Green Shield for Pending */}
+                            </div>
+                            <p className="text-sm text-gray-500 font-medium line-clamp-1">
+                              {jeep.vehicleTypes && jeep.vehicleTypes[0] ? jeep.vehicleTypes[0] : 'Aspiring Driver'}
+                            </p>
                           </div>
 
-                          {/* Rating */}
-                          <div className="flex items-center gap-2 mb-3">
-                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                            <span className="text-sm font-semibold text-gray-700">
-                              {jeep.rating || 'New'}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              ({jeep.reviewCount || 0} reviews)
-                            </span>
-                          </div>
-
-                          {/* Pending Badge */}
-                          <div className="mb-3">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
-                              <Clock className="h-3 w-3" />
-                              <span>Pending Review</span>
+                          <div className="flex items-center gap-4 mt-4 mb-6">
+                            <div className="flex items-center gap-1.5">
+                              <Users className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm font-bold text-gray-900">{jeep.totalReviews || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                              <span className="text-sm font-bold text-gray-900">{jeep.rating || 'New'}</span>
                             </div>
                           </div>
 
-                          {/* Vehicle Types */}
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Types:</p>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {Array.isArray(jeep.vehicleType) ? jeep.vehicleType.join(', ') : jeep.vehicleType}
-                            </p>
-                          </div>
-
-                          {/* Destinations */}
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Destinations:</p>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {jeep.destinations?.join(', ')}
-                            </p>
-                          </div>
-
-                          {/* Languages */}
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Languages:</p>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {jeep.languages?.slice(0, 3).join(', ')}
-                              {jeep.languages?.length > 3 && '...'}
-                            </p>
-                          </div>
-
-                          {/* Detailed Pricing */}
-                          <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-gray-700 mb-2">Pricing Details:</p>
+                          {/* Hidden Details revealed on hover */}
+                          <div className="space-y-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-75">
                             <div className="space-y-2">
-                              {/* Standard Safari Jeep Pricing */}
-                              {jeep.vehicleTypes?.includes('Standard Safari Jeep') && 
-                               (jeep.priceHalfDayStandard > 0 || jeep.priceFullDayStandard > 0 || jeep.priceHalfDay > 0 || jeep.priceFullDay > 0) && (
-                                <div className="border-b border-green-200 pb-2">
-                                  <p className="text-xs font-medium text-green-700 mb-1">Standard Safari Jeep:</p>
-                                  <div className="space-y-0.5">
-                                    {(jeep.priceHalfDayStandard > 0 || jeep.priceHalfDay > 0) && (
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-600">Half Day:</span>
-                                        <span className="font-bold text-green-600">
-                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceHalfDayStandard || jeep.priceHalfDay)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {(jeep.priceFullDayStandard > 0 || jeep.priceFullDay > 0) && (
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-600">Full Day:</span>
-                                        <span className="font-bold text-green-600">
-                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceFullDayStandard || jeep.priceFullDay)}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Luxury Safari Jeep Pricing */}
-                              {jeep.vehicleTypes?.includes('Luxury Safari Jeep') && 
-                               (jeep.priceHalfDayLuxury > 0 || jeep.priceFullDayLuxury > 0) && (
-                                <div className="pt-1">
-                                  <p className="text-xs font-medium text-yellow-700 mb-1">Luxury Safari Jeep:</p>
-                                  <div className="space-y-0.5">
-                                    {jeep.priceHalfDayLuxury > 0 && (
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-600">Half Day:</span>
-                                        <span className="font-bold text-yellow-600">
-                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceHalfDayLuxury)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {jeep.priceFullDayLuxury > 0 && (
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-600">Full Day:</span>
-                                        <span className="font-bold text-yellow-600">
-                                          LKR {new Intl.NumberFormat('en-LK').format(jeep.priceFullDayLuxury)}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Fallback if no prices available */}
-                              {(!jeep.vehicleTypes?.includes('Standard Safari Jeep') || 
-                                (jeep.priceHalfDayStandard <= 0 && jeep.priceFullDayStandard <= 0 && jeep.priceHalfDay <= 0 && jeep.priceFullDay <= 0)) &&
-                               (!jeep.vehicleTypes?.includes('Luxury Safari Jeep') || 
-                                (jeep.priceHalfDayLuxury <= 0 && jeep.priceFullDayLuxury <= 0)) && (
-                                <p className="text-xs text-gray-500 text-center">Contact for pricing</p>
-                              )}
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <MapPin className="h-4 w-4 text-gray-400" />
+                                <span className="truncate">{jeep.location}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <Users className="h-4 w-4 text-gray-400" />
+                                <span className="truncate">{jeep.languages?.slice(0, 2).join(', ')}</span>
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Favorite Button */}
-                          {currentUser && !jeep.isCurrentUser && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleFavorite(jeep.id);
-                              }}
-                              className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors ${
-                                userFavorites.includes(jeep.id)
-                                  ? 'bg-gray-800 text-white hover:bg-gray-900'
-                                  : 'bg-black text-white hover:bg-gray-800'
-                              }`}
-                            >
-                              {userFavorites.includes(jeep.id) ? 'Remove from Favorites' : 'Add to Favorites'}
-                            </button>
-                          )}
+                            {currentUser && !jeep.isCurrentUser && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleFavorite(jeep.id);
+                                }}
+                                className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${userFavorites.includes(jeep.id)
+                                  ? 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                                  : 'bg-gray-900 text-white hover:bg-black shadow-lg shadow-gray-900/20'
+                                  }`}
+                              >
+                                {userFavorites.includes(jeep.id) ? 'Saved' : 'Add to Favorites'}
+                                <span className="text-lg leading-none mb-0.5">{userFavorites.includes(jeep.id) ? '♥' : '+'}</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1271,7 +1092,7 @@ const JeepSection2 = ({ currentUser, selectedDestination, onClearDestination }) 
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-2xl font-bold text-gray-800 mb-4">No jeeps found</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {jeeps.length === 0 
+              {jeeps.length === 0
                 ? "No jeep drivers are currently registered. Check back later or contact support."
                 : "We couldn't find any safari jeeps matching your current filters. Try adjusting your search criteria."
               }

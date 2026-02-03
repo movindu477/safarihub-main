@@ -20,7 +20,8 @@ import {
   FileText,
   Package,
   TrendingUp,
-  Settings
+  Settings,
+  ArrowRight
 } from "lucide-react";
 import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc, onSnapshot, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
@@ -97,6 +98,27 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const userDataRef = useRef(null);
   const currentUserIdRef = useRef(null);
 
+  // Initialize userData from localStorage if available to prevent flicker
+  useEffect(() => {
+    try {
+      const cachedServiceType = localStorage.getItem('userRole');
+      const cachedProfilePic = localStorage.getItem('userProfilePic');
+      const cachedName = localStorage.getItem('userName');
+
+      if (cachedServiceType && !userData) {
+        setUserData({
+          serviceType: cachedServiceType,
+          profilePicture: cachedProfilePic, // Optional, for avatar immediate load
+          fullName: cachedName
+        });
+        // If we have cached role, we can assume loading is "done" for layout purposes
+        setLoading(false);
+      }
+    } catch (e) {
+      console.error("Error reading from localStorage", e);
+    }
+  }, []);
+
   useEffect(() => {
     const currentUser = user || authUser;
 
@@ -106,6 +128,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       setLoading(false);
       userDataRef.current = null;
       currentUserIdRef.current = null;
+      // Clear cache on explicit no-user state (though logout handles this too)
       return;
     }
 
@@ -113,6 +136,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
     if (currentUserIdRef.current === currentUser.uid && userDataRef.current) {
       return;
     }
+
+    // START FETCHING - SET LOADING TRUE
+    // Only set loading true if we don't have cached data to prevent UI jump
+    if (!userData) setLoading(true);
 
     currentUserIdRef.current = currentUser.uid;
     console.log('🔍 Setting up database listeners for user:', currentUser.uid);
@@ -127,37 +154,31 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
         if (touristDoc.exists()) {
           const initialData = touristDoc.data();
-          console.log('✅ Found user in tourists collection:', {
-            uid: currentUser.uid,
-            name: initialData.fullName,
-            profilePicture: initialData.profilePicture || '❌ No image',
-            hasProfilePicture: !!initialData.profilePicture
-          });
+          console.log('✅ Found user in tourists collection');
 
           // Set initial data immediately
           userDataRef.current = initialData;
           setUserData(initialData);
           setLoading(false);
 
+          // Cache essential data
+          localStorage.setItem('userRole', 'Tourist');
+          localStorage.setItem('userName', initialData.fullName || '');
+          if (initialData.profilePicture) localStorage.setItem('userProfilePic', initialData.profilePicture);
+
           // Set up real-time listener for tourists with debouncing
           unsubscribeTourist = onSnapshot(touristDocRef, (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data();
-              // Only update if data actually changed
               if (JSON.stringify(data) !== JSON.stringify(userDataRef.current)) {
-                console.log('📸 User data updated (tourist)');
                 userDataRef.current = data;
                 setUserData(data);
+                // Update cache
+                if (data.serviceType) localStorage.setItem('userRole', data.serviceType);
+                else localStorage.setItem('userRole', 'Tourist');
+                if (data.profilePicture) localStorage.setItem('userProfilePic', data.profilePicture);
               }
-            } else {
-              console.log('⚠️ Tourist document no longer exists');
-              userDataRef.current = null;
-              setUserData(null);
             }
-            setLoading(false);
-          }, (error) => {
-            console.error("❌ Error in tourist listener:", error);
-            setLoading(false);
           });
         } else {
           // Try serviceProviders collection
@@ -166,50 +187,43 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
           if (providerDoc.exists()) {
             const initialData = providerDoc.data();
-            console.log('✅ Found user in serviceProviders collection:', {
-              uid: currentUser.uid,
-              name: initialData.fullName,
-              serviceType: initialData.serviceType,
-              profilePicture: initialData.profilePicture || '❌ No image',
-              hasProfilePicture: !!initialData.profilePicture
-            });
+            console.log('✅ Found user in serviceProviders collection');
 
             // Set initial data immediately
             userDataRef.current = initialData;
             setUserData(initialData);
             setLoading(false);
 
+            // Cache essential data
+            const sType = initialData.serviceType || 'Service Provider';
+            localStorage.setItem('userRole', sType);
+            localStorage.setItem('userName', initialData.fullName || '');
+            if (initialData.profilePicture) localStorage.setItem('userProfilePic', initialData.profilePicture);
+
             // Set up real-time listener for service providers with debouncing
             unsubscribeProvider = onSnapshot(providerDocRef, (snapshot) => {
               if (snapshot.exists()) {
                 const data = snapshot.data();
-                // Only update if data actually changed
                 if (JSON.stringify(data) !== JSON.stringify(userDataRef.current)) {
-                  console.log('📸 User data updated (provider)');
                   userDataRef.current = data;
                   setUserData(data);
+                  // Update cache
+                  if (data.serviceType) localStorage.setItem('userRole', data.serviceType);
+                  if (data.profilePicture) localStorage.setItem('userProfilePic', data.profilePicture);
                 }
-              } else {
-                console.log('⚠️ Provider document no longer exists');
-                userDataRef.current = null;
-                setUserData(null);
               }
-              setLoading(false);
-            }, (error) => {
-              console.error("❌ Error in provider listener:", error);
-              setLoading(false);
             });
           } else {
-            console.log("⚠️ No user data found in Firestore for:", currentUser.uid);
-            userDataRef.current = null;
-            setUserData(null);
+            console.log("⚠️ No user data found in Firestore");
+            // Don't clear userData immediately if we have cache, to prevent flicker? 
+            // best to clear if we definitively found nothing server-side.
+            // userDataRef.current = null;
+            // setUserData(null); 
             setLoading(false);
           }
         }
       } catch (error) {
         console.error("❌ Error setting up user data listeners:", error);
-        userDataRef.current = null;
-        setUserData(null);
         setLoading(false);
       }
     };
@@ -233,6 +247,11 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       userDataRef.current = null;
       currentUserIdRef.current = null;
       setMenuOpen(false);
+
+      // Clear cache immediately
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userProfilePic');
+      localStorage.removeItem('userName');
 
       // Call the onLogout callback if provided
       if (onLogout) {
@@ -467,691 +486,675 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
   return (
     <>
-      {/* Navbar - Modern Full Width - Optimized for performance */}
-      <nav className={`fixed top-0 left-0 right-0 w-full text-white flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-12 py-3 z-50 h-16 border-b border-gray-700/40 transition-[background-color,backdrop-filter,box-shadow] duration-200 ease-out will-change-[background-color,backdrop-filter,box-shadow] transform-gpu ${isScrolled
-        ? 'bg-black/95 backdrop-blur-md shadow-lg shadow-black/20'
-        : 'bg-black/90 backdrop-blur-sm shadow-md shadow-black/10'
+      {/* Main Navbar - Modern Black Glassmorphism */}
+      <nav className={`fixed md:left-1/2 md:-translate-x-1/2 left-0 right-0 md:max-w-6xl text-white flex items-center justify-between z-50 md:rounded-full rounded-b-2xl border border-white/10 transition-all duration-300 ease-out bg-black/95 backdrop-blur-xl shadow-xl md:w-[95%] pointer-events-auto ${currentUser
+        ? 'md:top-4 top-0 md:px-8 md:py-2 px-4 py-3'
+        : 'md:top-6 top-0 md:px-10 md:py-3 px-5 py-4'
         }`}>
-        {/* Left side - Logo */}
-        <div className="flex items-center space-x-3 flex-shrink-0 z-10">
-          <img
-            src={logo}
-            alt="SafariHub Logo"
-            className="h-14 sm:h-16 md:h-16 lg:h-16 w-auto object-contain cursor-pointer transition-transform duration-200 ease-out will-change-transform"
-            onClick={handleHomeClick}
-            loading="eager"
-            decoding="async"
-          />
+
+        {/* Logo - Mobile Only */}
+        <div className="md:hidden flex items-center pointer-events-auto">
+          <div className="flex items-center cursor-pointer group" onClick={handleHomeClick}>
+            <span className="font-bold text-xl tracking-wide text-white transition-colors duration-300">
+              SAFARI<span className="text-emerald-500">HUB</span>
+            </span>
+          </div>
         </div>
 
-        {/* Center - Desktop Links */}
-        <div className="hidden md:flex items-center space-x-4 lg:space-x-6 xl:space-x-8 absolute left-1/2 transform -translate-x-1/2">
-          {navItems.map((item) => (
-            <button
-              key={item.label}
-              onClick={item.onClick}
-              className={`text-sm lg:text-base font-medium px-3 lg:px-4 py-2 rounded-lg transition-all duration-200 ease-out cursor-pointer whitespace-nowrap will-change-[background-color,color] ${isActivePath(item.path)
-                ? "bg-gray-800/70 text-gray-100 border border-gray-500/40 shadow-inner"
-                : "text-gray-100 hover:text-white hover:bg-gray-800/30"
-                }`}
-            >
-              {item.label}
-            </button>
-          ))}
+        {/* Desktop Layout - Three Columns */}
+        <div className="hidden md:flex items-center w-full">
+          {/* Left Side - Modern Brand/Logo */}
+          <div className="flex-1 flex items-center justify-start">
+            <div className="flex items-center cursor-pointer group" onClick={handleHomeClick}>
+              <span className="font-bold text-2xl tracking-wide text-white transition-colors duration-300">
+                SAFARI<span className="text-emerald-500 group-hover:text-emerald-400">HUB</span>
+              </span>
+            </div>
+          </div>
 
-          {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers, tour guides & renting stores) */}
-          {/* Wait for user data to load before showing to prevent glitch */}
-          {!loading && !isServiceProvider && (
-            <div
-              className="relative"
-              onMouseEnter={handleServicesMouseEnter}
-              onMouseLeave={handleServicesMouseLeave}
-            >
+          {/* Center - Desktop Links */}
+          <div className="flex items-center justify-center gap-1">
+            {navItems.map((item) => (
               <button
-                className={`text-sm lg:text-base font-medium px-3 lg:px-4 py-2 rounded-lg transition-all duration-200 ease-out flex items-center gap-1 cursor-pointer whitespace-nowrap will-change-[background-color,color] ${isServicesActive
-                  ? "bg-gray-800/70 text-gray-100 border border-gray-500/40 shadow-inner"
-                  : "text-gray-100 hover:text-white hover:bg-gray-800/30"
+                key={item.label}
+                onClick={item.onClick}
+                className={`relative text-xs font-semibold tracking-wide px-5 py-2.5 rounded-full transition-all duration-300 ease-out cursor-pointer whitespace-nowrap group overflow-hidden ${isActivePath(item.path)
+                  ? "text-white bg-white/10"
+                  : "text-gray-300 hover:text-white hover:bg-white/10"
                   }`}
               >
-                OUR SERVICES
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ease-out will-change-transform ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
+                <span className="relative z-10">{item.label}</span>
               </button>
+            ))}
 
-              {/* Invisible connecting bridge to prevent gap */}
+            {/* Services Dropdown - Only show for tourists */}
+            {!loading && !isServiceProvider && (
               <div
-                className="absolute top-full left-0 w-full h-2 bg-transparent"
+                className="relative group"
                 onMouseEnter={handleServicesMouseEnter}
-              ></div>
+                onMouseLeave={handleServicesMouseLeave}
+              >
+                <button
+                  className={`text-xs font-semibold tracking-wide px-5 py-2.5 rounded-full transition-all duration-300 ease-out flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${isServicesActive
+                    ? "text-white bg-white/10"
+                    : "text-gray-300 hover:text-white hover:bg-white/10"
+                    }`}
+                >
+                  OUR SERVICES
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-300 ease-out group-hover:rotate-180 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
 
-              {/* Dropdown Menu */}
-              {servicesDropdownOpen && (
+                {/* Invisible connecting bridge */}
                 <div
-                  className="absolute top-full left-0 w-64 bg-black/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-700/40 overflow-hidden animate-fadeIn mt-2 will-change-[opacity,transform] transform-gpu"
-                  style={{ contain: 'layout style paint' }}
+                  className="absolute top-full left-0 w-full h-4 bg-transparent"
                   onMouseEnter={handleServicesMouseEnter}
-                  onMouseLeave={handleServicesMouseLeave}
-                >
-                  <div className="py-2">
-                    {servicesItems.map((item, index) => {
-                      const IconComponent = item.icon;
-                      return (
-                        <button
-                          key={item.label}
-                          onClick={item.onClick}
-                          className={`flex items-center gap-3 px-4 py-3 text-white transition-all duration-200 ease-out group cursor-pointer w-full text-left will-change-[background-color,color] ${item.path && isActivePath(item.path)
-                            ? "bg-gray-800 text-gray-100"
-                            : "hover:bg-gray-800 hover:text-white"
-                            }`}
-                          style={{ animationDelay: `${index * 30}ms` }}
-                        >
-                          <IconComponent className="h-4 w-4 text-gray-200 group-hover:text-white" />
-                          <span className="font-medium text-sm">{item.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                ></div>
 
-        {/* Right side - User Authentication Buttons or Profile */}
-        <div className="hidden md:flex items-center space-x-2 lg:space-x-3 flex-shrink-0 z-10 ml-auto">
-          {!currentUser ? (
-            <>
-              <button
-                onClick={handleLoginClick}
-                className="bg-white hover:bg-gray-100 text-black px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg font-semibold transition-all duration-200 ease-out hover:shadow-lg hover:scale-105 backdrop-blur-sm border border-gray-300 shadow-lg shadow-black/30 cursor-pointer text-sm lg:text-base whitespace-nowrap will-change-[background-color,transform,box-shadow]"
-              >
-                Login
-              </button>
-              <button
-                onClick={handleRegisterClick}
-                className="border-2 border-white text-white hover:bg-white hover:text-black px-4 lg:px-6 py-2 lg:py-2.5 rounded-lg font-semibold transition-all duration-200 ease-out hover:shadow-lg hover:scale-105 backdrop-blur-sm shadow-lg shadow-gray-400/20 cursor-pointer text-sm lg:text-base whitespace-nowrap will-change-[background-color,color,transform,box-shadow]"
-              >
-                Register
-              </button>
-            </>
-          ) : (
-            <div className="relative">
-              {userProfileData.avatar && userProfileData.avatar !== userImage ? (
-                <img
-                  src={userProfileData.avatar}
-                  alt="User"
-                  className="h-9 w-9 lg:h-10 lg:w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-200 ease-out border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 object-cover will-change-[opacity,border-color]"
-                  onClick={() => setProfileOpen(true)}
-                  onError={(e) => {
-                    console.error('❌ Profile image failed to load in navbar:', userProfileData.avatar);
-                    console.error('   Attempting fallback to default image');
-                    e.target.src = userImage;
-                    e.target.onerror = null; // Prevent infinite loop
-                  }}
-                  onLoad={() => {
-                    console.log('✅ Profile image loaded successfully in navbar');
-                  }}
-                />
-              ) : (
-                <div
-                  className="h-9 w-9 lg:h-10 lg:w-10 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 bg-gray-700 flex items-center justify-center"
-                  onClick={() => setProfileOpen(true)}
-                >
-                  <User className="h-5 w-5 lg:h-6 lg:w-6 text-gray-400" />
-                </div>
-              )}
-              {/* Online indicator */}
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-gray-700 shadow-sm"></div>
-            </div>
-          )}
-        </div>
-
-        {/* Hamburger Menu (Mobile) */}
-        <div className="md:hidden flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-          {currentUser ? (
-            <div className="flex items-center space-x-2">
-              {/* User Profile for Mobile */}
-              <div className="relative">
-                {userProfileData.avatar && userProfileData.avatar !== userImage ? (
-                  <img
-                    src={userProfileData.avatar}
-                    alt="User"
-                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 object-cover"
-                    onClick={() => setProfileOpen(true)}
-                    onError={(e) => {
-                      console.error('❌ Profile image failed to load:', userProfileData.avatar);
-                      e.target.src = userImage;
-                    }}
-                  />
-                ) : (
+                {/* Dropdown Menu */}
+                {servicesDropdownOpen && (
                   <div
-                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 hover:border-gray-200 shadow-lg shadow-gray-500/30 bg-gray-700 flex items-center justify-center"
-                    onClick={() => setProfileOpen(true)}
+                    className="absolute top-full left-1/2 -translate-x-1/2 w-64 bg-black/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 overflow-hidden animate-slideUp mt-2 will-change-transform z-50 p-1.5"
+                    onMouseEnter={handleServicesMouseEnter}
+                    onMouseLeave={handleServicesMouseLeave}
                   >
-                    <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                    <div className="space-y-0.5">
+                      {servicesItems.map((item, index) => {
+                        const IconComponent = item.icon;
+                        return (
+                          <button
+                            key={item.label}
+                            onClick={item.onClick}
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 group cursor-pointer w-full text-left relative overflow-hidden ${item.path && isActivePath(item.path)
+                              ? "bg-white/10 text-white"
+                              : "text-gray-300 hover:bg-white/10 hover:text-white"
+                              }`}
+                          >
+                            <div className={`p-1.5 rounded-lg transition-colors duration-300 ${item.path && isActivePath(item.path) ? "bg-emerald-600/20 text-emerald-400" : "bg-white/5 text-gray-400 group-hover:bg-emerald-600/20 group-hover:text-emerald-400"}`}>
+                              <IconComponent className="h-4 w-4" />
+                            </div>
+                            <span className="font-semibold text-xs tracking-wide">{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
-                <div className="absolute bottom-0 right-0 w-2 h-2 bg-gray-400 rounded-full border-2 border-gray-700"></div>
               </div>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleLoginClick}
-                className="bg-white hover:bg-gray-100 text-black px-3 py-1.5 rounded-lg font-medium transition-colors text-sm backdrop-blur-sm border border-gray-300 shadow-lg shadow-black/20 whitespace-nowrap"
+            )}
+          </div>
+
+          {/* Right - User Authentication Buttons & Profile */}
+          <div className="flex-1 flex items-center justify-end gap-4">
+            {!currentUser ? (
+              <>
+                <button
+                  onClick={handleLoginClick}
+                  className="text-gray-300 hover:text-emerald-400 font-semibold px-4 py-2 text-sm transition-colors duration-300"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={handleRegisterClick}
+                  className="group relative pl-6 pr-5 py-2.5 rounded-full bg-emerald-600 text-white font-bold text-sm overflow-hidden transition-all duration-300 hover:shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95 flex items-center gap-2"
+                >
+                  <span className="relative z-10 transition-colors duration-300">Register</span>
+                  <ArrowRight className="w-4 h-4 relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
+                  <div className="absolute inset-0 bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </button>
+              </>
+            ) : (
+              <div
+                className="relative group cursor-pointer"
+                onClick={() => setProfileOpen(true)}
               >
-                Login
-              </button>
-            </div>
-          )}
-          <Menu
-            className="h-7 w-7 sm:h-8 sm:w-8 text-white cursor-pointer hover:text-gray-200 transition-colors duration-300 flex-shrink-0"
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full blur opacity-0 group-hover:opacity-50 transition duration-500"></div>
+                <div className="relative p-0.5 rounded-full bg-white border border-gray-200 hover:border-emerald-500 transition-colors duration-300">
+                  {userProfileData.avatar && userProfileData.avatar !== userImage ? (
+                    <img
+                      src={userProfileData.avatar}
+                      alt="User"
+                      className="h-9 w-9 md:h-10 md:w-10 rounded-full object-cover shadow-sm group-hover:scale-95 transition-transform duration-300"
+                      onError={(e) => { e.target.src = userImage; e.target.onerror = null; }}
+                    />
+                  ) : (
+                    <div className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors duration-300">
+                      <User className="h-5 w-5 text-gray-400 group-hover:text-gray-600" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Menu Button - Modernized */}
+        <div className="md:hidden flex items-center pointer-events-auto">
+          <button
             onClick={() => setMenuOpen(true)}
-          />
+            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 hover:border-emerald-500/50 active:scale-95 transition-all duration-300 group shadow-sm"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5 text-gray-200 group-hover:text-emerald-400 transition-colors duration-300" />
+          </button>
         </div>
       </nav>
 
+
+
+
       {/* Mobile Navigation Side Panel */}
-      {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black bg-opacity-70 z-40 backdrop-blur-sm md:hidden animate-fadeIn"
-            onClick={() => setMenuOpen(false)}
-          />
+      {
+        menuOpen && (
+          <>
+            <div
+              className="fixed inset-0 bg-black bg-opacity-70 z-40 backdrop-blur-sm md:hidden animate-fadeIn"
+              onClick={() => setMenuOpen(false)}
+            />
 
-          <div className="fixed top-0 left-0 h-full w-full bg-black text-white z-50 md:hidden animate-slideInLeft backdrop-blur-xl border-r border-gray-700/30">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/30 bg-gray-900/40 backdrop-blur-sm">
-              <img
-                src={logo}
-                alt="SafariHub Logo"
-                className="h-8 w-auto object-contain cursor-pointer"
-                onClick={handleHomeClick}
-              />
-              <X
-                className="h-8 w-8 text-white cursor-pointer hover:text-gray-200 transition-colors duration-300 bg-gray-800/30 rounded-lg p-1"
-                onClick={() => setMenuOpen(false)}
-              />
-            </div>
+            <div className="fixed top-0 left-0 h-full w-3/4 bg-black/60 backdrop-blur-md text-white z-50 md:hidden animate-slideInLeft border-r border-white/10 shadow-2xl">
+              <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-black/40 backdrop-blur-sm">
+                <img
+                  src={logo}
+                  alt="SafariHub Logo"
+                  className="h-7 w-auto object-contain cursor-pointer"
+                  onClick={handleHomeClick}
+                />
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200"
+                  aria-label="Close menu"
+                >
+                  <X className="h-6 w-6 text-white" />
+                </button>
+              </div>
 
-            <div className="h-full flex flex-col justify-between px-6 py-6">
-              <div className="space-y-0">
-                {navItems.map((item, index) => (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      if (item.onClick) item.onClick();
-                      setMenuOpen(false);
-                    }}
-                    className={`block transition-all duration-300 py-5 border-b border-gray-700/20 font-medium text-xl w-full text-left animate-fadeInUp group cursor-pointer ${isActivePath(item.path)
-                      ? "text-gray-100 bg-gray-900/60"
-                      : "text-white hover:text-gray-200 hover:border-gray-600"
-                      }`}
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <span className="flex items-center">
-                      {item.label}
-                      <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
-                    </span>
-                  </button>
-                ))}
-
-                {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers, tour guides & renting stores) */}
-                {/* Wait for user data to load before showing to prevent glitch */}
-                {!loading && !isServiceProvider && (
-                  <div className="border-b border-gray-700/40">
+              <div className="h-full flex flex-col justify-between px-6 py-6">
+                <div className="space-y-0">
+                  {navItems.map((item, index) => (
                     <button
-                      onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
-                      className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group cursor-pointer"
-                      style={{ animationDelay: "200ms" }}
+                      key={item.label}
+                      onClick={() => {
+                        if (item.onClick) item.onClick();
+                        setMenuOpen(false);
+                      }}
+                      className={`block transition-all duration-300 py-5 border-b border-white/10 font-medium text-xl w-full text-left animate-fadeInUp group cursor-pointer ${isActivePath(item.path)
+                        ? "text-white bg-white/10"
+                        : "text-white hover:text-gray-200 hover:border-white/30"
+                        }`}
+                      style={{ animationDelay: `${index * 100}ms` }}
                     >
                       <span className="flex items-center">
-                        OUR SERVICES
+                        {item.label}
                         <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
                       </span>
-                      <ChevronDown className={`h-5 w-5 transition-transform duration-300 ${mobileServicesOpen ? 'rotate-180' : ''}`} />
                     </button>
+                  ))}
 
-                    {mobileServicesOpen && (
-                      <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-gray-700/40 ml-2">
-                        {servicesItems.map((item, index) => {
-                          const IconComponent = item.icon;
-                          return (
-                            <button
-                              key={item.label}
-                              onClick={() => {
-                                if (item.onClick) item.onClick();
-                                setMenuOpen(false);
-                              }}
-                              className={`flex items-center gap-3 transition-all duration-300 py-4 border-b border-gray-800/40 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer ${item.path && isActivePath(item.path)
-                                ? "text-gray-100 bg-gray-900/60 border-gray-700"
-                                : "text-white hover:text-gray-200 hover:border-gray-700"
-                                }`}
-                              style={{ animationDelay: `${index * 50 + 300}ms` }}
-                            >
-                              <IconComponent className="h-4 w-4 text-gray-200" />
-                              {item.label}
-                            </button>
-                          );
-                        })}
+                  {/* Services Dropdown - Only show for tourists, hide for service providers (jeep drivers, tour guides & renting stores) */}
+                  {/* Wait for user data to load before showing to prevent glitch */}
+                  {!loading && !isServiceProvider && (
+                    <div className="border-b border-white/10">
+                      <button
+                        onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
+                        className="flex items-center justify-between w-full text-white hover:text-gray-200 transition-all duration-300 py-5 font-medium text-xl text-left animate-fadeInUp group cursor-pointer"
+                        style={{ animationDelay: "200ms" }}
+                      >
+                        <span className="flex items-center">
+                          OUR SERVICES
+                          <span className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">→</span>
+                        </span>
+                        <ChevronDown className={`h-5 w-5 transition-transform duration-300 ${mobileServicesOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {mobileServicesOpen && (
+                        <div className="pl-4 pb-2 space-y-0 animate-fadeIn border-l border-white/10 ml-2">
+                          {servicesItems.map((item, index) => {
+                            const IconComponent = item.icon;
+                            return (
+                              <button
+                                key={item.label}
+                                onClick={() => {
+                                  if (item.onClick) item.onClick();
+                                  setMenuOpen(false);
+                                }}
+                                className={`flex items-center gap-3 transition-all duration-300 py-4 border-b border-white/10 font-medium text-lg w-full text-left animate-fadeInUp cursor-pointer ${item.path && isActivePath(item.path)
+                                  ? "text-white bg-white/10 border-white/20"
+                                  : "text-white hover:text-gray-200 hover:border-white/20"
+                                  }`}
+                                style={{ animationDelay: `${index * 50 + 300}ms` }}
+                              >
+                                <IconComponent className="h-4 w-4 text-gray-200" />
+                                {item.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Authentication Buttons for Mobile - Show when NOT logged in */}
+                {!currentUser && (
+                  <div className="space-y-3 py-4 border-t border-white/10 pt-6 animate-fadeInUp"
+                    style={{ animationDelay: "400ms" }}>
+                    <button
+                      onClick={handleLoginClick}
+                      className="w-full bg-white hover:bg-gray-100 text-black py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-gray-300 shadow-lg shadow-black/30 cursor-pointer"
+                    >
+                      Login
+                    </button>
+                    <button
+                      onClick={handleRegisterClick}
+                      className="w-full border-2 border-white text-white hover:bg-white hover:text-black py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-gray-400/20 cursor-pointer"
+                    >
+                      Register
+                    </button>
+                  </div>
+                )}
+
+                {currentUser && (
+                  <div className="space-y-3 pt-6 border-t border-white/10">
+                    {/* User Profile in Mobile Menu */}
+                    <div
+                      className="flex items-center space-x-3 py-4 animate-fadeInUp cursor-pointer group"
+                      style={{ animationDelay: "450ms" }}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setProfileOpen(true);
+                      }}
+                    >
+                      <div className="relative">
+                        {userProfileData.avatar && userProfileData.avatar !== userImage ? (
+                          <img
+                            src={userProfileData.avatar}
+                            alt="User"
+                            className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-white/20 group-hover:border-white shadow-lg shadow-black/30 object-cover"
+                            onError={(e) => {
+                              console.error('❌ Profile image failed to load:', userProfileData.avatar);
+                              e.target.src = userImage;
+                            }}
+                          />
+                        ) : (
+                          <div className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-white/20 group-hover:border-white shadow-lg shadow-black/30 bg-white/10 flex items-center justify-center">
+                            <User className="h-6 w-6 text-white/70" />
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-gray-800"></div>
                       </div>
-                    )}
+                      <div>
+                        <span className="text-white group-hover:text-gray-200 transition-colors duration-300 font-medium text-lg block">
+                          {userProfileData.name}
+                        </span>
+                        <span className="text-gray-200 text-sm">{userProfileData.membership}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
+            </div>
+          </>
+        )
+      }
 
-              {/* Authentication Buttons for Mobile - Show when NOT logged in */}
-              {!currentUser && (
-                <div className="space-y-3 py-4 border-t border-gray-700/20 pt-6 animate-fadeInUp"
-                  style={{ animationDelay: "400ms" }}>
-                  <button
-                    onClick={handleLoginClick}
-                    className="w-full bg-white hover:bg-gray-100 text-black py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm border border-gray-300 shadow-lg shadow-black/30 cursor-pointer"
-                  >
-                    Login
-                  </button>
-                  <button
-                    onClick={handleRegisterClick}
-                    className="w-full border-2 border-white text-white hover:bg-white hover:text-black py-3 rounded-xl font-semibold transition-all duration-300 text-lg hover:shadow-lg backdrop-blur-sm shadow-lg shadow-gray-400/20 cursor-pointer"
-                  >
-                    Register
-                  </button>
-                </div>
-              )}
+      {/* Profile Side Panel */}
+      {
+        profileOpen && currentUser && (
+          <>
+            <div
+              className="fixed inset-0 bg-black bg-opacity-70 z-40 backdrop-blur-sm animate-fadeIn"
+              onClick={() => setProfileOpen(false)}
+            />
 
-              {currentUser && (
-                <div className="space-y-3 pt-6 border-t border-gray-400/20">
-                  {/* User Profile in Mobile Menu */}
-                  <div
-                    className="flex items-center space-x-3 py-4 animate-fadeInUp cursor-pointer group"
-                    style={{ animationDelay: "450ms" }}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setProfileOpen(true);
-                    }}
-                  >
-                    <div className="relative">
+            <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-br from-black via-gray-900 to-black text-white shadow-2xl border-l border-white/10 overflow-hidden z-50 animate-slideInRight">
+              {/* Close Button - Top Right - Fixed position to stay visible when scrolling */}
+              <div className="fixed top-4 right-4 z-[100]">
+                <button
+                  onClick={() => setProfileOpen(false)}
+                  className="p-2.5 cursor-pointer bg-white/10 rounded-full hover:bg-white/20 transition-all backdrop-blur-sm shadow-lg"
+                  aria-label="Close profile"
+                >
+                  <X className="h-5 w-5 text-white" />
+                </button>
+              </div>
+
+              <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
+                <div className="relative">
+                  <div className="h-48 bg-gradient-to-br from-green-600/20 via-transparent to-transparent relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-gray-700/30 to-transparent"></div>
+                    <div className="absolute top-0 right-0 w-72 h-72 bg-green-500/10 rounded-full -mr-36 -mt-36 blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 w-56 h-56 bg-green-600/10 rounded-full -ml-28 -mb-28 blur-3xl"></div>
+                  </div>
+
+                  <div className="px-6 pb-6 -mt-20 relative z-10">
+                    <div className="relative inline-block">
                       {userProfileData.avatar && userProfileData.avatar !== userImage ? (
                         <img
                           src={userProfileData.avatar}
                           alt="User"
-                          className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 group-hover:border-gray-200 shadow-lg shadow-gray-500/30 object-cover"
+                          className="relative h-32 w-32 rounded-full border-4 border-white/20 bg-gray-900 shadow-2xl object-cover"
                           onError={(e) => {
-                            console.error('❌ Profile image failed to load:', userProfileData.avatar);
+                            console.error('❌ Profile image failed to load in slide panel:', userProfileData.avatar);
+                            console.error('   User data:', userData);
+                            console.error('   Current user:', currentUser);
                             e.target.src = userImage;
+                            e.target.onerror = null; // Prevent infinite loop
+                          }}
+                          onLoad={() => {
+                            console.log('✅ Profile image loaded successfully in slide panel');
                           }}
                         />
                       ) : (
-                        <div className="h-12 w-12 rounded-full cursor-pointer hover:opacity-80 transition duration-300 border-2 border-gray-300/60 group-hover:border-gray-200 shadow-lg shadow-gray-500/30 bg-gray-700 flex items-center justify-center">
-                          <User className="h-6 w-6 text-gray-400" />
+                        <div className="relative h-32 w-32 rounded-full border-4 border-white/20 bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl flex items-center justify-center">
+                          <User className="h-16 w-16 text-gray-300" />
                         </div>
                       )}
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-gray-800"></div>
+                      <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 rounded-full border-3 border-white shadow-lg animate-pulse"></div>
                     </div>
-                    <div>
-                      <span className="text-white group-hover:text-gray-200 transition-colors duration-300 font-medium text-lg block">
-                        {userProfileData.name}
-                      </span>
-                      <span className="text-gray-200 text-sm">{userProfileData.membership}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
 
-      {/* Profile Side Panel */}
-      {profileOpen && currentUser && (
-        <>
-          <div
-            className="fixed inset-0 bg-black bg-opacity-70 z-40 backdrop-blur-sm animate-fadeIn"
-            onClick={() => setProfileOpen(false)}
-          />
-
-          <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-white shadow-2xl border-l-2 border-gray-700/50 overflow-hidden z-50 animate-slideInRight">
-            {/* Close Button - Top Right - Fixed position to stay visible when scrolling */}
-            <div className="fixed top-4 right-4 z-[60]">
-              <button
-                onClick={() => setProfileOpen(false)}
-                className="p-2 cursor-pointer bg-gray-800/80 rounded-full hover:bg-gray-700/80 transition-colors backdrop-blur-sm"
-                aria-label="Close profile"
-              >
-                <X className="h-5 w-5 text-gray-300" />
-              </button>
-            </div>
-
-            <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
-              <div className="relative">
-                <div className="h-40 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-gray-700/30 to-transparent"></div>
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-gray-600/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-gray-700/10 rounded-full -ml-24 -mb-24 blur-2xl"></div>
-                </div>
-
-                <div className="px-6 pb-6 -mt-20 relative z-10">
-                  <div className="relative inline-block">
-                    {userProfileData.avatar && userProfileData.avatar !== userImage ? (
-                      <img
-                        src={userProfileData.avatar}
-                        alt="User"
-                        className="relative h-32 w-32 rounded-full border-4 border-gray-900 bg-gray-900 shadow-2xl shadow-gray-900/50 object-cover"
-                        onError={(e) => {
-                          console.error('❌ Profile image failed to load in slide panel:', userProfileData.avatar);
-                          console.error('   User data:', userData);
-                          console.error('   Current user:', currentUser);
-                          e.target.src = userImage;
-                          e.target.onerror = null; // Prevent infinite loop
-                        }}
-                        onLoad={() => {
-                          console.log('✅ Profile image loaded successfully in slide panel');
-                        }}
-                      />
-                    ) : (
-                      <div className="relative h-32 w-32 rounded-full border-4 border-gray-900 bg-gray-800 shadow-2xl shadow-gray-900/50 flex items-center justify-center">
-                        <User className="h-16 w-16 text-gray-400" />
-                      </div>
-                    )}
-                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-gray-400 rounded-full border-2 border-gray-900 shadow-lg shadow-gray-500/50 animate-pulse"></div>
-                  </div>
-
-                  <div className="mt-4 animate-fadeInUp" style={{ animationDelay: "100ms" }}>
-                    <h2 className="text-2xl font-bold text-white">{userProfileData.name}</h2>
-                    <p className="text-gray-300 text-sm mt-1">{userProfileData.email}</p>
-                    <div className="flex flex-col gap-2 mt-3">
-                      <span className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-1.5 rounded-full text-xs font-bold w-fit shadow-lg shadow-gray-700/50 border border-gray-500/30">
-                        {userProfileData.membership}
-                      </span>
-                      <span className="text-gray-400 text-sm flex items-center gap-2">
-                        <Calendar className="h-3 w-3" />
-                        Member since {userProfileData.joinDate}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {userData && (
-                <div className="px-6 py-5 border-y border-gray-700/30 bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm animate-fadeInUp" style={{ animationDelay: "200ms" }}>
-                  <h3 className="text-lg font-bold text-gray-400 mb-4 flex items-center gap-2">
-                    <div className="p-1.5 bg-gray-800/50 rounded-lg border border-gray-600/30">
-                      <User className="h-4 w-4 text-gray-300" />
-                    </div>
-                    Profile Information
-                  </h3>
-                  <div className="space-y-3">
-                    {userProfileData.phone !== "Not provided" && (
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
-                        <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                          <Phone className="h-3.5 w-3.5 text-gray-400" />
-                        </div>
-                        <span className="text-gray-300 font-medium">Phone: </span>
-                        <span className="text-white">{userProfileData.phone}</span>
-                      </div>
-                    )}
-
-                    {userProfileData.location !== "Not specified" && (
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
-                        <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                          <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                        </div>
-                        <span className="text-gray-300 font-medium">
-                          {userProfileData.role === "Service Provider" ? "Location: " : "Country: "}
+                    <div className="mt-4 animate-fadeInUp" style={{ animationDelay: "100ms" }}>
+                      <h2 className="text-2xl font-bold text-white">{userProfileData.name}</h2>
+                      <p className="text-gray-300 text-sm mt-1">{userProfileData.email}</p>
+                      <div className="flex flex-col gap-2 mt-3">
+                        <span className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-1.5 rounded-full text-xs font-bold w-fit shadow-lg border border-green-500/30">
+                          {userProfileData.membership}
                         </span>
-                        <span className="text-white">{userProfileData.location}</span>
-                      </div>
-                    )}
-
-                    {userProfileData.languages !== "Not specified" && (
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
-                        <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                          <Globe className="h-3.5 w-3.5 text-gray-400" />
-                        </div>
-                        <span className="text-gray-300 font-medium">
-                          {userProfileData.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
+                        <span className="text-gray-400 text-sm flex items-center gap-2">
+                          <Calendar className="h-3 w-3" />
+                          Member since {userProfileData.joinDate}
                         </span>
-                        <span className="text-white">{userProfileData.languages}</span>
                       </div>
-                    )}
-
-                    {userProfileData.experience && (
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
-                        <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                          <Award className="h-3.5 w-3.5 text-gray-400" />
-                        </div>
-                        <span className="text-gray-300 font-medium">Experience: </span>
-                        <span className="text-white">{userProfileData.experience} years</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
-                      <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                        <User className="h-3.5 w-3.5 text-gray-400" />
-                      </div>
-                      <span className="text-gray-300 font-medium">Role: </span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${userProfileData.role === "Service Provider"
-                        ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg shadow-gray-700/50 border border-gray-500/30"
-                        : "bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg shadow-gray-600/50 border border-gray-400/30"
-                        }`}>
-                        {userProfileData.role}
-                      </span>
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* Admin Button for Service Providers */}
-              {isServiceProvider && (
-                <div className="p-6 pb-4 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp" style={{ animationDelay: "400ms" }}>
-                  {/* My Profile */}
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      navigate('/admin?tab=profile');
-                    }}
-                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                    style={{ animationDelay: "500ms" }}
-                  >
-                    <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                      <User className="h-5 w-5 text-gray-300" />
+                {userData && (
+                  <div className="px-6 py-5 border-y border-white/10 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-sm animate-fadeInUp" style={{ animationDelay: "200ms" }}>
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <div className="p-1.5 bg-green-600/20 rounded-lg border border-green-500/30">
+                        <User className="h-4 w-4 text-green-400" />
+                      </div>
+                      Profile Information
+                    </h3>
+                    <div className="space-y-3">
+                      {userProfileData.phone !== "Not provided" && (
+                        <div className="flex items-center gap-3 text-sm p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                          <div className="p-2 bg-green-600/20 rounded-lg border border-green-500/30">
+                            <Phone className="h-4 w-4 text-green-400" />
+                          </div>
+                          <span className="text-gray-300 font-medium">Phone: </span>
+                          <span className="text-white">{userProfileData.phone}</span>
+                        </div>
+                      )}
+
+                      {userProfileData.location !== "Not specified" && (
+                        <div className="flex items-center gap-3 text-sm p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                          <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
+                            <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                          </div>
+                          <span className="text-gray-300 font-medium">
+                            {userProfileData.role === "Service Provider" ? "Location: " : "Country: "}
+                          </span>
+                          <span className="text-white">{userProfileData.location}</span>
+                        </div>
+                      )}
+
+                      {userProfileData.languages !== "Not specified" && (
+                        <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
+                          <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
+                            <Globe className="h-3.5 w-3.5 text-gray-400" />
+                          </div>
+                          <span className="text-gray-300 font-medium">
+                            {userProfileData.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
+                          </span>
+                          <span className="text-white">{userProfileData.languages}</span>
+                        </div>
+                      )}
+
+                      {userProfileData.experience && (
+                        <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
+                          <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
+                            <Award className="h-3.5 w-3.5 text-gray-400" />
+                          </div>
+                          <span className="text-gray-300 font-medium">Experience: </span>
+                          <span className="text-white">{userProfileData.experience} years</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
+                        <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
+                          <User className="h-3.5 w-3.5 text-gray-400" />
+                        </div>
+                        <span className="text-gray-300 font-medium">Role: </span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${userProfileData.role === "Service Provider"
+                          ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg shadow-gray-700/50 border border-gray-500/30"
+                          : "bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg shadow-gray-600/50 border border-gray-400/30"
+                          }`}>
+                          {userProfileData.role}
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-medium text-gray-200">
-                      My Profile
-                    </span>
-                  </button>
+                  </div>
+                )}
 
-                  {/* My Bookings */}
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      navigate('/admin?tab=bookings');
-                    }}
-                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                    style={{ animationDelay: "550ms" }}
-                  >
-                    <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                      <Calendar className="h-5 w-5 text-gray-300" />
-                    </div>
-                    <span className="font-medium text-gray-200">
-                      My Bookings
-                    </span>
-                  </button>
-
-                  {/* My Packages - For all service providers */}
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      navigate('/admin?tab=packages');
-                    }}
-                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                    style={{ animationDelay: "600ms" }}
-                  >
-                    <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                      <Package className="h-5 w-5 text-gray-300" />
-                    </div>
-                    <span className="font-medium text-gray-200">
-                      My Packages
-                    </span>
-                  </button>
-
-                  {/* Manage Rentals - Only for Renting Shops */}
-                  {userData?.serviceType === 'Renting' && (
+                {/* Admin Button for Service Providers */}
+                {isServiceProvider && (
+                  <div className="p-6 pb-4 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp" style={{ animationDelay: "400ms" }}>
+                    {/* My Profile */}
                     <button
                       onClick={() => {
                         setProfileOpen(false);
-                        navigate('/manage-rentals');
+                        navigate('/admin?tab=profile');
                       }}
                       className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                      style={{ animationDelay: "650ms" }}
+                      style={{ animationDelay: "500ms" }}
+                    >
+                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                        <User className="h-5 w-5 text-gray-300" />
+                      </div>
+                      <span className="font-medium text-gray-200">
+                        My Profile
+                      </span>
+                    </button>
+
+                    {/* My Bookings */}
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/admin?tab=bookings');
+                      }}
+                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                      style={{ animationDelay: "550ms" }}
                     >
                       <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
                         <Calendar className="h-5 w-5 text-gray-300" />
                       </div>
                       <span className="font-medium text-gray-200">
-                        Manage Rentals
+                        My Bookings
                       </span>
                     </button>
-                  )}
 
-                  {/* Payment Wallet - Removed for service providers */}
+                    {/* My Packages - For all service providers */}
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/admin?tab=packages');
+                      }}
+                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                      style={{ animationDelay: "600ms" }}
+                    >
+                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                        <Package className="h-5 w-5 text-gray-300" />
+                      </div>
+                      <span className="font-medium text-gray-200">
+                        My Packages
+                      </span>
+                    </button>
 
-                  {/* Help & Support */}
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      setShowProviderSupport(true);
-                    }}
-                    className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                    style={{ animationDelay: "600ms" }}
-                  >
-                    <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                      <HelpCircle className="h-5 w-5 text-gray-300" />
-                    </div>
-                    <span className="font-medium text-gray-200">
-                      Help & Support
-                    </span>
-                  </button>
-
-                </div>
-              )}
-
-              {profileMenuItems.length > 0 && (
-                <div className={`p-6 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp ${isServiceProvider ? 'pt-4' : ''}`} style={{ animationDelay: "400ms" }}>
-                  {profileMenuItems.map((item, index) => {
-                    const IconComponent = item.icon;
-                    return (
-                      <a
-                        key={item.label}
-                        href={item.href}
-                        className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-700/30 animate-fadeInUp hover:bg-gray-800/30 transition-colors relative"
-                        style={{ animationDelay: `${index * 50 + 500}ms` }}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (item.onClick) {
-                            item.onClick();
-                          } else {
-                            setProfileOpen(false);
-                          }
+                    {/* Manage Rentals - Only for Renting Shops */}
+                    {userData?.serviceType === 'Renting' && (
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          navigate('/manage-rentals');
                         }}
+                        className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                        style={{ animationDelay: "650ms" }}
                       >
-                        <div className="p-2 bg-gray-800/30 rounded-lg border border-gray-700/30">
-                          <IconComponent className="h-5 w-5 text-gray-400" />
+                        <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                          <Calendar className="h-5 w-5 text-gray-300" />
                         </div>
-                        <span className="font-medium text-gray-300">
-                          {item.label}
+                        <span className="font-medium text-gray-200">
+                          Manage Rentals
                         </span>
-                      </a>
-                    );
-                  })}
-                </div>
-              )}
+                      </button>
+                    )}
 
-              <div className="px-6 py-5 border-t border-gray-700/30 bg-gradient-to-b from-gray-900 to-black mt-auto animate-fadeInUp" style={{ animationDelay: "600ms" }}>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-4 p-3.5 rounded-xl text-red-400 w-full border border-red-700/30 cursor-pointer"
-                >
-                  <div className="p-2 bg-red-700/20 rounded-lg border border-red-600/30">
-                    <LogOut className="h-5 w-5" />
+                    {/* Payment Wallet - Removed for service providers */}
+
+                    {/* Help & Support */}
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        setShowProviderSupport(true);
+                      }}
+                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
+                      style={{ animationDelay: "600ms" }}
+                    >
+                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
+                        <HelpCircle className="h-5 w-5 text-gray-300" />
+                      </div>
+                      <span className="font-medium text-gray-200">
+                        Help & Support
+                      </span>
+                    </button>
+
                   </div>
-                  <span className="font-medium">Log Out</span>
-                </button>
+                )}
+
+                {profileMenuItems.length > 0 && (
+                  <div className={`p-6 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp ${isServiceProvider ? 'pt-4' : ''}`} style={{ animationDelay: "400ms" }}>
+                    {profileMenuItems.map((item, index) => {
+                      const IconComponent = item.icon;
+                      return (
+                        <a
+                          key={item.label}
+                          href={item.href}
+                          className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-700/30 animate-fadeInUp hover:bg-gray-800/30 transition-colors relative"
+                          style={{ animationDelay: `${index * 50 + 500}ms` }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (item.onClick) {
+                              item.onClick();
+                            } else {
+                              setProfileOpen(false);
+                            }
+                          }}
+                        >
+                          <div className="p-2 bg-gray-800/30 rounded-lg border border-gray-700/30">
+                            <IconComponent className="h-5 w-5 text-gray-400" />
+                          </div>
+                          <span className="font-medium text-gray-300">
+                            {item.label}
+                          </span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="px-6 py-5 border-t border-gray-700/30 bg-gradient-to-b from-gray-900 to-black mt-auto animate-fadeInUp" style={{ animationDelay: "600ms" }}>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-4 p-3.5 rounded-xl text-red-400 w-full border border-red-700/30 cursor-pointer"
+                  >
+                    <div className="p-2 bg-red-700/20 rounded-lg border border-red-600/30">
+                      <LogOut className="h-5 w-5" />
+                    </div>
+                    <span className="font-medium">Log Out</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )
+      }
 
       {/* Help & Support Chat Modal for Service Providers */}
-      {showProviderSupport && currentUser && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="relative w-full max-w-4xl h-[90vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <HelpCircle className="h-6 w-6" />
-                <div>
-                  <h3 className="font-semibold text-lg">Help & Support</h3>
-                  <p className="text-xs text-emerald-100">Chat with Admin</p>
+      {
+        showProviderSupport && currentUser && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="relative w-full max-w-4xl h-[90vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <HelpCircle className="h-6 w-6" />
+                  <div>
+                    <h3 className="font-semibold text-lg">Help & Support</h3>
+                    <p className="text-xs text-emerald-100">Chat with Admin</p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => setShowProviderSupport(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                  aria-label="Close support chat"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setShowProviderSupport(false)}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                aria-label="Close support chat"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            {/* Chat Component */}
-            <div className="h-[calc(100%-4rem)]">
-              <Chat
-                user={currentUser}
-                otherUserId="admin-support"
-                otherUserName="Admin Support"
-                otherUserPhoto=""
-                onClose={() => setShowProviderSupport(false)}
-              />
+              {/* Chat Component */}
+              <div className="h-[calc(100%-4rem)]">
+                <Chat
+                  user={currentUser}
+                  otherUserId="admin-support"
+                  otherUserName="Admin Support"
+                  otherUserPhoto=""
+                  onClose={() => setShowProviderSupport(false)}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Help & Support Chat Modal for Users/Tourists */}
-      {showUserSupport && currentUser && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="relative w-full max-w-4xl h-[90vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <HelpCircle className="h-6 w-6" />
-                <div>
-                  <h3 className="font-semibold text-lg">Help & Support</h3>
-                  <p className="text-xs text-emerald-100">Chat with Admin</p>
+      {
+        showUserSupport && currentUser && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="relative w-full max-w-4xl h-[90vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <HelpCircle className="h-6 w-6" />
+                  <div>
+                    <h3 className="font-semibold text-lg">Help & Support</h3>
+                    <p className="text-xs text-emerald-100">Chat with Admin</p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => setShowUserSupport(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                  aria-label="Close support chat"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setShowUserSupport(false)}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                aria-label="Close support chat"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            {/* Chat Component */}
-            <div className="h-[calc(100%-4rem)]">
-              <Chat
-                user={currentUser}
-                otherUserId="admin-support"
-                otherUserName="Admin Support"
-                otherUserPhoto=""
-                onClose={() => setShowUserSupport(false)}
-              />
+              {/* Chat Component */}
+              <div className="h-[calc(100%-4rem)]">
+                <Chat
+                  user={currentUser}
+                  otherUserId="admin-support"
+                  otherUserName="Admin Support"
+                  otherUserPhoto=""
+                  onClose={() => setShowUserSupport(false)}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       <style>{`
         @keyframes slideInRight {

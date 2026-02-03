@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { 
-  Heart, 
-  Globe, 
-  Users, 
-  Award, 
-  Shield, 
+import {
+  Heart,
+  Globe,
+  Users,
+  Award,
+  Shield,
   Sparkles,
   MapPin,
   Target,
@@ -23,7 +23,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
   const location = useLocation();
   const db = getFirestore();
   const [showChatList, setShowChatList] = useState(false);
-  
+
   // Dynamic stats state
   const [stats, setStats] = useState([
     { number: "...", label: "Service Providers" },
@@ -56,7 +56,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
         const reviewsSnapshot = await getDocs(collection(db, 'reviews'));
         let totalRating = 0;
         let reviewCount = 0;
-        
+
         reviewsSnapshot.forEach((doc) => {
           const review = doc.data();
           if (review.rating) {
@@ -65,8 +65,8 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
           }
         });
 
-        const averageRating = reviewCount > 0 
-          ? (totalRating / reviewCount).toFixed(1) 
+        const averageRating = reviewCount > 0
+          ? (totalRating / reviewCount).toFixed(1)
           : "5.0";
 
         // Format numbers with + suffix for large numbers
@@ -158,9 +158,9 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar 
-        user={user} 
-        onLogout={onLogout} 
+      <Navbar
+        user={user}
+        onLogout={onLogout}
         onLogin={(screen) => (onShowAuth ? onShowAuth(screen || 'login') : null)}
         onRegister={(screen) => (onShowAuth ? onShowAuth(screen || 'register') : null)}
         onOpenChatList={() => setShowChatList(true)}
@@ -171,66 +171,54 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
         <ChatList
           user={user}
           onClose={() => setShowChatList(false)}
-      />
+        />
       )}
 
       {/* Hero Section */}
-      <section className="relative w-full h-screen overflow-hidden">
+      <section className="relative w-full h-screen flex items-center justify-center overflow-hidden">
         {/* Background Image */}
-        <div className="absolute top-0 left-0 w-full h-full">
+        <div className="absolute inset-0 z-0">
           <div
-            className="absolute top-0 left-0 w-full h-full"
+            className="w-full h-full bg-cover bg-center bg-no-repeat"
             style={{
               backgroundImage: `url(${aboutback1})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
             }}
-          ></div>
-        </div>
-
-        {/* Content Section */}
-        <div
-          className="
-            absolute inset-0 z-10 
-            flex flex-col justify-center 
-            px-8 md:px-20
-            text-white
-            text-left md:items-start
-            items-center text-center md:text-left
-          "
-        >
-          {/* Title */}
-          <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-4 md:mb-6">
-              <Sparkles className="h-4 w-4" />
-              <span className="text-sm font-medium">About SafariHub</span>
-            </div>
-            
-            <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 md:mb-6 leading-tight drop-shadow-lg">
-              Connecting Adventure Seekers with
-              <span className="block text-emerald-200">Nature's Wonders</span>
-            </h1>
-            
-            <p className="text-sm md:text-base lg:text-lg xl:text-xl text-white/90 mb-6 md:mb-8 max-w-2xl leading-relaxed drop-shadow-md">
-              Your trusted platform for discovering authentic wildlife safaris, expert tour guides, 
-              and unforgettable adventures across Sri Lanka's pristine national parks.
-            </p>
-
-            <div className="flex flex-wrap gap-4">
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 md:px-6 py-2 md:py-3">
-                <MapPin className="h-4 w-4 md:h-5 md:w-5 inline-block mr-2" />
-                <span className="font-semibold text-sm md:text-base">Sri Lanka</span>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 md:px-6 py-2 md:py-3">
-                <span className="font-semibold text-sm md:text-base">Since 2024</span>
-              </div>
-            </div>
+          >
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30"></div>
           </div>
         </div>
 
-        {/* Optional gradient fade at the bottom for elegance */}
-        <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/40 to-transparent pointer-events-none z-10"></div>
+        {/* Content Section */}
+        <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-left flex flex-col items-start justify-center h-full">
+
+          {/* Subtitle Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-6 animate-fadeInUp">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-sm font-medium text-emerald-100 tracking-wider uppercase">
+              About Us
+            </span>
+          </div>
+
+          {/* Main Title */}
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-white leading-tight tracking-tight drop-shadow-2xl animate-fadeInUp" style={{ animationDelay: "0.2s" }}>
+            Connecting You with <br className="hidden md:block" />
+            <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+              Nature's Wonders
+            </span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-10 max-w-2xl leading-relaxed drop-shadow-lg font-light animate-fadeInUp" style={{ animationDelay: "0.4s" }}>
+            Your trusted gateway to authentic wildlife safaris, expert local guides,
+            and unforgettable adventures across Sri Lanka's pristine landscapes.
+          </p>
+        </div>
+
+        {/* Slide Indicator (decorative) */}
+        <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-30">
+          <div className="w-12 h-2 rounded-full bg-white"></div>
+        </div>
       </section>
 
       {/* Mission Section */}
@@ -243,16 +231,16 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
               </h2>
               <div className="w-24 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 mx-auto"></div>
             </div>
-            
+
             <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 border border-gray-100">
               <p className="text-lg md:text-xl text-gray-700 leading-relaxed mb-6">
-                At SafariHub, we believe that everyone deserves to experience the magic of Sri Lanka's 
-                wildlife and natural beauty. Our mission is to bridge the gap between adventure enthusiasts 
+                At SafariHub, we believe that everyone deserves to experience the magic of Sri Lanka's
+                wildlife and natural beauty. Our mission is to bridge the gap between adventure enthusiasts
                 and local experts, creating meaningful connections that benefit both tourists and service providers.
               </p>
               <p className="text-lg md:text-xl text-gray-700 leading-relaxed">
-                We're committed to promoting sustainable tourism, supporting local communities, and ensuring 
-                every journey is safe, authentic, and unforgettable. Through our platform, we empower local 
+                We're committed to promoting sustainable tourism, supporting local communities, and ensuring
+                every journey is safe, authentic, and unforgettable. Through our platform, we empower local
                 guides and jeep drivers while helping visitors discover the hidden gems of this beautiful island.
               </p>
             </div>
@@ -275,7 +263,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
-              <div 
+              <div
                 key={index}
                 className="group bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-8 border border-emerald-100 hover:border-emerald-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2"
               >
@@ -327,7 +315,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {values.map((value, index) => (
-              <div 
+              <div
                 key={index}
                 className="bg-white rounded-xl p-6 border border-gray-200 hover:border-emerald-300 hover:shadow-lg transition-all duration-300"
               >
@@ -354,7 +342,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
               Ready to Start Your Adventure?
             </h2>
             <p className="text-xl text-emerald-100 mb-8 max-w-2xl mx-auto">
-              Join thousands of travelers exploring Sri Lanka's natural wonders. 
+              Join thousands of travelers exploring Sri Lanka's natural wonders.
               Find your perfect guide or start offering your services today.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -374,6 +362,23 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
           </div>
         </div>
       </section>
+
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.8s ease-out forwards;
+          opacity: 0;
+        }
+      `}</style>
 
       <Footer />
     </div>

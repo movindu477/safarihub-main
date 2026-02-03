@@ -337,9 +337,6 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
     };
   }, [navigate]);
 
-  // Don't scroll to top automatically - let GuideSection2 handle scroll restoration
-  // This allows the scroll-to-element logic to work properly
-
   // Handle notification click
   const handleNotificationClick = async (notification) => {
     console.log('🔘 Notification clicked:', notification);
@@ -454,92 +451,15 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
       <GuideHero />
       <div className="h-1 bg-black"></div>
 
-      {/* Destination Selection Box */}
-      {showDestinationSelector && (
-        <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white flex items-center justify-center py-8 px-4">
-          <div className="bg-white rounded-xl shadow-lg border border-emerald-200 p-5 max-w-lg w-full">
-            <h2 className="text-xl font-bold text-emerald-700 mb-1.5 text-center">Select a Destination</h2>
-            <p className="text-gray-600 text-sm mb-4 text-center">Choose a destination to find available tour guides</p>
-            <div className="relative">
-              <select
-                value={selectedDestination || ''}
-                onChange={(e) => {
-                  const value = e.target.value || null;
-                  setSelectedDestination(value);
-                  setShowDestinationSelector(false);
-                  // Save to sessionStorage
-                  if (value) {
-                    sessionStorage.setItem('selectedDestination', value);
-                    sessionStorage.setItem('showDestinationSelector', 'false');
-                  } else {
-                    sessionStorage.removeItem('selectedDestination');
-                    sessionStorage.setItem('showDestinationSelector', 'true');
-                  }
-                }}
-                className="w-full p-2.5 pr-10 text-base border-2 border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white appearance-none cursor-pointer"
-              >
-                <option value="">All Destinations</option>
-                {allDestinations.map(dest => (
-                  <option key={dest} value={dest}>{dest}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-emerald-600 pointer-events-none" />
-            </div>
-            <button
-              onClick={() => {
-                setSelectedDestination(null);
-                setShowDestinationSelector(false);
-                // Clear from sessionStorage
-                sessionStorage.removeItem('selectedDestination');
-                sessionStorage.setItem('showDestinationSelector', 'false');
-              }}
-              className="mt-3 w-full bg-emerald-700 text-white py-2 px-4 rounded-lg font-medium text-sm"
-            >
-              Show All Guides
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!showDestinationSelector && (
-        <>
-          {selectedDestination && (
-            <div className="bg-emerald-100 border-b border-emerald-200 py-4">
-              <div className="container mx-auto px-4 flex items-center justify-between">
-                <p className="text-emerald-900 font-semibold">
-                  Showing guides for: <span className="text-emerald-700">{selectedDestination}</span>
-                </p>
-                <button
-                  onClick={() => {
-                    setSelectedDestination(null);
-                    setShowDestinationSelector(true);
-                    // Clear from sessionStorage
-                    sessionStorage.removeItem('selectedDestination');
-                    sessionStorage.setItem('showDestinationSelector', 'true');
-                  }}
-                  className="text-emerald-700 hover:text-emerald-900 font-medium underline"
-                >
-                  Change Destination
-                </button>
-              </div>
-            </div>
-          )}
-          <GuideSection2 
-            currentUser={user} 
-            userRole={currentUser ? 'tourist' : ''} 
-            selectedDestination={selectedDestination}
-            onClearDestination={() => {
-              setSelectedDestination(null);
-              sessionStorage.removeItem('selectedDestination');
-              sessionStorage.setItem('showDestinationSelector', 'true');
-            }}
-          />
-          <div className="h-1 bg-black"></div>
-          <Footer />
-        </>
-      )}
+      <GuideSection2
+        currentUser={user}
+        userRole={currentUser ? 'tourist' : ''}
+      />
+      <div className="h-1 bg-black"></div>
+      <Footer />
     </div>
   );
+
 }
 
 // Export the guide-specific notification function with a different name

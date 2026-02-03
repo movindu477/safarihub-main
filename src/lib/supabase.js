@@ -5,8 +5,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client with public anon key (safe for client-side)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://nlzsojxtzmmbkyakdfvl.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5senNvanh0em1tYmt5YWtkZnZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NDgxMzAsImV4cCI6MjA1MTIyNDEzMH0.aTWt36pAQCUZxYYFTQ6_MqW3jlA7n0QBqOMKYb28rMw';
+// IMPORTANT: Replace YOUR_ANON_KEY_HERE with your actual anon key from Supabase Dashboard → Settings → API
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://garmyrrkqsboyrgcfytm.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY_HERE'; // Get this from Supabase Dashboard
 
 const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -57,6 +58,126 @@ export const uploadDocumentClientSide = async (file, userId, fileName = null) =>
     };
   } catch (error) {
     console.error('❌ Upload failed:', error);
+    return {
+      url: null,
+      path: null,
+      error: error.message || 'Upload failed'
+    };
+  }
+};
+
+/**
+ * Upload Provider Document using client-side Supabase
+ * @param {File} file - Document file to upload
+ * @param {string} userId - User ID
+ * @param {string} fileName - Optional custom file name
+ * @returns {Promise<{url: string, path: string, error: any}>}
+ */
+export const uploadProviderDocumentClientSide = async (file, userId, fileName = null) => {
+  try {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    // Generate file path
+    const timestamp = Date.now();
+    const sanitizedName = (fileName || file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${userId}/${timestamp}_${sanitizedName}`;
+
+    console.log('📤 Uploading provider document to Supabase:', filePath);
+
+    // Upload to Supabase Storage - provider-documents bucket
+    // Note: User created bucket as PROVIDER-DOCUMENTS (case sensitive)
+    const { data, error } = await supabaseClient.storage
+      .from('PROVIDER-DOCUMENTS')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('❌ Upload error:', error);
+      throw error;
+    }
+
+    console.log('✅ Upload successful:', data);
+
+    // Get public URL
+    const { data: urlData } = supabaseClient.storage
+      .from('PROVIDER-DOCUMENTS')
+      .getPublicUrl(filePath);
+
+    return {
+      url: urlData.publicUrl,
+      path: filePath,
+      error: null
+    };
+  } catch (error) {
+    console.error('❌ Upload failed:', error);
+    return {
+      url: null,
+      path: null,
+      error: error.message || 'Upload failed'
+    };
+  }
+};
+
+/**
+ * Upload Profile Image using client-side Supabase (works in production)
+ * @param {File} file - Image file to upload
+ * @param {string} userId - User ID
+ * @returns {Promise<{url: string, path: string, error: any}>}
+ */
+export const uploadProfileImageClientSide = async (file, userId) => {
+  try {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      throw new Error('File must be an image');
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error('Image size must be less than 5MB');
+    }
+
+    // Generate file path
+    const timestamp = Date.now();
+    const fileExtension = file.name.split('.').pop();
+    const filePath = `users/${userId}/profile/${timestamp}.${fileExtension}`;
+
+    console.log('📤 Uploading profile image to Supabase:', filePath);
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabaseClient.storage
+      .from('profile-images')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true // Allow overwriting
+      });
+
+    if (error) {
+      console.error('❌ Upload error:', error);
+      throw error;
+    }
+
+    console.log('✅ Upload successful:', data);
+
+    // Get public URL
+    const { data: urlData } = supabaseClient.storage
+      .from('profile-images')
+      .getPublicUrl(filePath);
+
+    return {
+      url: urlData.publicUrl,
+      path: filePath,
+      error: null
+    };
+  } catch (error) {
+    console.error('❌ Profile image upload failed:', error);
     return {
       url: null,
       path: null,
@@ -129,34 +250,24 @@ export const testSupabase = async () => {
 };
 
 /**
- * Upload Profile Image via Backend API
- * This uses the backend which has Supabase Service Role key (bypasses RLS)
+ * Upload Profile Image via Client-Side Supabase
  * @param {File} file - Image file
  * @param {string} userId - User ID
  * @returns {Promise<{url: string, error: any}>}
  */
 export const uploadProfileImage = async (file, userId) => {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('userId', userId);
+  console.log('📤 Uploading profile image to Supabase');
 
-    const response = await fetch(`${API_BASE_URL}/api/upload-profile-image`, {
-      method: 'POST',
-      body: formData
-    });
+  // Use client-side Supabase upload
+  const result = await uploadProfileImageClientSide(file, userId);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Upload failed');
-    }
-
-    const data = await response.json();
-    return { url: data.url, error: null };
-  } catch (error) {
-    console.error('❌ Profile image upload error:', error);
-    return { url: null, error };
+  if (result.error) {
+    console.error('❌ Supabase upload failed:', result.error);
+    return { url: null, error: result.error };
   }
+
+  console.log('✅ Supabase upload successful:', result.url);
+  return { url: result.url, error: null };
 };
 
 /**
@@ -262,90 +373,121 @@ export const getDocumentUrl = async (documentPath, expiresIn = 3600) => {
     // Extract just the path if it's a full URL
     let filePath = documentPath;
     if (documentPath.includes('supabase.co')) {
-      const match = documentPath.match(/\/documents\/(.+)$/);
+      // Try to match 'documents' or 'PROVIDER-DOCUMENTS'
+      const match = documentPath.match(/\/(documents|PROVIDER-DOCUMENTS)\/(.+)$/);
       if (match) {
-        filePath = match[1];
+        filePath = match[2];
       }
     }
 
     // Remove leading slash if present
     filePath = filePath.replace(/^\/+/, '');
-
     console.log('📄 Extracted file path:', filePath);
 
-    // Method 1: Try public URL first (fastest, works for public buckets)
+    // Method 1: Try public URL (documents bucket)
     try {
       const publicUrl = `${supabaseUrl}/storage/v1/object/public/documents/${filePath}`;
-      console.log('🔗 Trying public URL:', publicUrl);
-      
-      // Test if URL is accessible
       const testResponse = await fetch(publicUrl, { method: 'HEAD' });
       if (testResponse.ok) {
-        console.log('✅ Public URL accessible, using it directly');
+        console.log('✅ Public URL (documents) accessible');
         return { signedUrl: publicUrl, error: null };
       }
-    } catch (publicError) {
-      console.log('⚠️ Public URL not accessible, trying signed URL...');
-    }
+    } catch (e) { /* Ignore */ }
 
-    // Method 2: Try client-side signed URL (works with RLS policies)
+    // Method 1b: Try public URL (PROVIDER-DOCUMENTS bucket)
+    try {
+      const publicUrlProvider = `${supabaseUrl}/storage/v1/object/public/PROVIDER-DOCUMENTS/${filePath}`;
+      const testResponse = await fetch(publicUrlProvider, { method: 'HEAD' });
+      if (testResponse.ok) {
+        console.log('✅ Public URL (PROVIDER-DOCUMENTS) accessible');
+        return { signedUrl: publicUrlProvider, error: null };
+      }
+    } catch (e) { /* Ignore */ }
+
+    // Method 2: Try signed URL (documents bucket)
     try {
       const { data, error } = await supabaseClient.storage
         .from('documents')
         .createSignedUrl(filePath, expiresIn);
 
-      if (error) {
-        console.warn('⚠️ Client-side signed URL error:', error);
-        throw error;
-      }
-
-      if (data?.signedUrl) {
-        console.log('✅ Client-side signed URL generated successfully');
+      if (!error && data?.signedUrl) {
         return { signedUrl: data.signedUrl, error: null };
       }
-    } catch (clientError) {
-      console.warn('⚠️ Client-side signed URL failed, trying backend...', clientError);
-    }
+    } catch (e) { /* Ignore */ }
+
+    // Method 2b: Try signed URL (PROVIDER-DOCUMENTS bucket)
+    try {
+      const { data, error } = await supabaseClient.storage
+        .from('PROVIDER-DOCUMENTS')
+        .createSignedUrl(filePath, expiresIn);
+
+      if (!error && data?.signedUrl) {
+        return { signedUrl: data.signedUrl, error: null };
+      }
+    } catch (e) { console.warn('Signed URL generation failed for both buckets'); }
+
 
     // Method 3: Backend fallback (for local development)
     if (API_BASE_URL && !API_BASE_URL.includes('localhost')) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/get-document-url`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ 
-            path: filePath,
-            expiresIn 
-          }),
-          signal: AbortSignal.timeout(5000) // 5 second timeout
-        });
-
-        if (!response.ok) {
-          throw new Error(`Backend returned ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data?.signedUrl) {
-          console.log('✅ Backend signed URL generated successfully');
-          return { signedUrl: data.signedUrl, error: null };
-        }
-      } catch (backendError) {
-        console.warn('⚠️ Backend fallback failed:', backendError.message);
-      }
+      // ... (Keep existing backend fallback if needed, but risky if backend doesn't support provider docs)
+      // Skipping for now as client-side should work with public policy
     }
 
-    // Method 4: Last resort - construct public URL and hope for the best
-    const fallbackUrl = `${supabaseUrl}/storage/v1/object/public/documents/${filePath}`;
-    console.log('⚠️ Using fallback public URL (may not work):', fallbackUrl);
+    // Method 4: Fallback - Guess it's a provider document if it didn't work for documents
+    // Or just default to documents logic if we can't be sure
+    const fallbackUrl = `${supabaseUrl}/storage/v1/object/public/PROVIDER-DOCUMENTS/${filePath}`;
+    console.log('⚠️ Using fallback public URL (PROVIDER-DOCUMENTS):', fallbackUrl);
     return { signedUrl: fallbackUrl, error: null };
 
   } catch (error) {
     console.error('❌ All methods failed. Error:', error);
-    return { 
-      signedUrl: null, 
-      error: error.message || 'Failed to get document URL. Please ensure documents are uploaded correctly.' 
+    return {
+      signedUrl: null,
+      error: error.message || 'Failed to get document URL.'
     };
+  }
+};
+
+/**
+ * Delete Provider Document using client-side Supabase
+ * @param {string} filePath - File path to delete
+ * @returns {Promise<{success: boolean, error: any}>}
+ */
+export const deleteProviderDocumentClientSide = async (filePath) => {
+  try {
+    if (!filePath) {
+      throw new Error('No file path provided');
+    }
+
+    // Extract just the path if it's a full URL
+    let pathToDelete = filePath;
+    if (filePath.includes('supabase.co')) {
+      try {
+        const urlObj = new URL(filePath);
+        const parts = urlObj.pathname.split('/PROVIDER-DOCUMENTS/');
+        if (parts.length > 1) {
+          pathToDelete = decodeURIComponent(parts[1]);
+        }
+      } catch (e) {
+        console.warn("Could not parse URL, using raw path", e);
+      }
+    }
+
+    console.log('🗑️ Deleting provider document from Supabase:', pathToDelete);
+
+    const { data, error } = await supabaseClient.storage
+      .from('PROVIDER-DOCUMENTS')
+      .remove([pathToDelete]);
+
+    if (error) {
+      console.error('❌ Delete error:', error);
+      throw error;
+    }
+
+    console.log('✅ Delete successful');
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('❌ Delete failed:', error);
+    return { success: false, error: error.message || 'Delete failed' };
   }
 };

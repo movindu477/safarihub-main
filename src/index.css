@@ -71,6 +71,22 @@
   animation: slideDown 0.4s ease-out;
 }
 
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out;
+}
+
 /* Global cursor styles for interactive elements */
 button,
 a,
@@ -147,6 +163,122 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 } */
+
+/* Splash Screen Styles */
+.splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.8s ease-out;
+}
+
+.splash-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3rem;
+}
+
+.splash-logo {
+  width: 200px;
+  height: auto;
+  animation: slideFromLeft 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.splash-button {
+  padding: 0.75rem 2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  background-color: #047857;
+  border: 2px solid #047857;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  animation: slideFromRight 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  letter-spacing: 2px;
+}
+
+.splash-button:hover {
+  background-color: #065f46;
+  border-color: #065f46;
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(4, 120, 87, 0.5);
+}
+
+.loading-line-container {
+  width: 300px;
+  height: 4px;
+  background-color: rgba(16, 185, 129, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  animation: slideFromRight 0.5s ease-out;
+}
+
+.loading-line {
+  height: 100%;
+  background: linear-gradient(90deg, #047857, #065f46, #047857);
+  background-size: 200% 100%;
+  border-radius: 2px;
+  animation: loadingProgress 2s ease-out forwards, shimmerEffect 1.5s infinite;
+  box-shadow: 0 0 10px rgba(4, 120, 87, 0.8);
+}
+
+@keyframes slideFromLeft {
+  0% {
+    transform: translateX(-100vw);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideFromRight {
+  0% {
+    transform: translateX(100vw);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes loadingProgress {
+  0% {
+    width: 0%;
+  }
+
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes shimmerEffect {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
 
 /* Hide browser default password reveal button */
 input[type="password"]::-ms-reveal,

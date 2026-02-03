@@ -509,6 +509,30 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
   );
 };
 
+// Simple Alert Modal Component
+const SimpleAlertModal = ({ isOpen, message, onClose }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full animate-fadeIn transition-all transform scale-100">
+        <div className="flex flex-col items-center text-center">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="w-6 h-6 text-red-600" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Attention Needed</h3>
+          <p className="text-gray-600 mb-6 whitespace-pre-line text-sm">{message}</p>
+          <button
+            onClick={onClose}
+            className="w-full bg-black text-white py-3 rounded-xl font-semibold hover:bg-gray-800 transition-colors"
+          >
+            Okay, got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Booking Form Modal Component
 const BookingFormModal = ({
   isOpen,
@@ -528,6 +552,11 @@ const BookingFormModal = ({
   selectedVehicleType,
   halfDayTimes
 }) => {
+  const [alertInfo, setAlertInfo] = useState({ show: false, message: '' });
+
+  const showAlert = (message) => {
+    setAlertInfo({ show: true, message });
+  };
   // Filter out step 4 (Additional Requests) if booking a package
   // Emergency Contact step removed - form submits from Additional Requests (normal) or Pickup & Drop-off (package)
   const allSteps = [
@@ -590,7 +619,10 @@ const BookingFormModal = ({
       }
     } else if (currentStep === 4 && !selectedPackage) {
       // Step 4: Additional Requests (only for non-package bookings) - Final step for normal bookings
-      if (formData.needsSnacks && (!formData.selectedSnacks || formData.selectedSnacks.length === 0)) {
+      // Check if snack quantities has at least one item with count > 0
+      const hasSnacks = formData.snackQuantities && Object.values(formData.snackQuantities).some(val => val > 0);
+
+      if (formData.needsSnacks && !hasSnacks) {
         errors.selectedSnacks = 'Please select at least one snack/meal';
       }
     }
@@ -601,10 +633,10 @@ const BookingFormModal = ({
     if (Object.keys(errors).length > 0) {
       const firstErrorField = Object.keys(errors)[0];
       const errorMessages = Object.entries(errors).map(([field, msg]) => {
-        return `${field}: ${msg}`;
+        return `${msg}`;
       }).join('\n');
 
-      alert(`Please fill in:\n\n${errorMessages}\n\nNavigating to the required field...`);
+      showAlert(`Please address the following:\n\n${errorMessages}`);
 
       // Scroll to and focus the first error field
       setTimeout(() => {
@@ -1226,7 +1258,7 @@ const BookingFormModal = ({
                     await onSubmit();
                   } catch (error) {
                     console.error('❌ Error in onSubmit:', error);
-                    alert('An error occurred. Please try again.');
+                    showAlert('An error occurred. Please try again.');
                   }
                 } else {
                   console.warn('⚠️ Step validation failed');
@@ -1239,6 +1271,12 @@ const BookingFormModal = ({
           )}
         </div>
       </div>
+
+      <SimpleAlertModal
+        isOpen={alertInfo.show}
+        message={alertInfo.message}
+        onClose={() => setAlertInfo({ ...alertInfo, show: false })}
+      />
     </div >
   );
 };
@@ -1322,7 +1360,6 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
     // Additional Requests
     needsBinoculars: false,
     needsChildSeat: false,
-    needsWater: false,
     needsWater: false,
     needsSnacks: false,
     // Add-on Counts
@@ -2071,6 +2108,27 @@ const JeepProfile = ({ user, onLogout, onShowAuth, notifications, onNotification
         datesString: datesString,
         totalPrice: Number(totalPrice.toFixed(2)), // Must be a number
         pricePerDay: Number(driver.pricePerDay || 0),
+        // Store breakdown prices for Payment Summary
+        priceFullDay: Number((() => {
+          if (selectedPackage) {
+            return (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep)
+              ? (selectedPackage.fullDayPriceLuxury || selectedPackage.fullDayPrice)
+              : (selectedPackage.fullDayPriceStandard || selectedPackage.fullDayPrice);
+          }
+          if (selectedVehicleType === 'Standard Safari Jeep') return driver.priceFullDayStandard || driver.pricePerDay || 0;
+          if (selectedVehicleType === 'Luxury Safari Jeep') return driver.priceFullDayLuxury || (driver.pricePerDay * 1.5) || 0;
+          return driver.pricePerDay || 0;
+        })()),
+        priceHalfDay: Number((() => {
+          if (selectedPackage) {
+            return (selectedVehicleType === 'Luxury Safari Jeep' && selectedPackage.hasLuxuryJeep)
+              ? (selectedPackage.halfDayPriceLuxury || selectedPackage.halfDayPrice)
+              : (selectedPackage.halfDayPriceStandard || selectedPackage.halfDayPrice);
+          }
+          if (selectedVehicleType === 'Standard Safari Jeep') return driver.priceHalfDayStandard || (driver.pricePerDay * 0.6) || 0;
+          if (selectedVehicleType === 'Luxury Safari Jeep') return driver.priceHalfDayLuxury || (driver.pricePerDay * 0.8) || 0;
+          return (driver.pricePerDay * 0.6) || 0;
+        })()),
         numberOfDays: Number(selectedDates.length),
         serviceType: driver.serviceType || 'Jeep Driver',
         status: 'pending',

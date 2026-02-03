@@ -690,7 +690,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                       if (booking.needsWater) addOnsTotal += 300;
 
                       // Calculate actual total (base + add-ons)
-                      const calculatedTotal = baseServiceCharge + addOnsTotal;
+                      const calculatedTotal = (baseServiceCharge + addOnsTotal) || booking.totalPrice || 0;
 
                       return (
                         <>

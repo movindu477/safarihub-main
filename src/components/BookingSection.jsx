@@ -290,7 +290,7 @@ const BookingSection = ({ user }) => {
 
   return (
     <div className="relative">
-      <section className="absolute top-28 right-4 z-40 w-96 h-[calc(100vh-180px)] bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
+      <section className="absolute top-[30vh] right-10 z-40 w-96 max-h-[60vh] bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden flex flex-col">
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="bg-linear-to-r from-green-600 to-green-700 text-white p-4 flex items-center justify-between border-b border-green-800 shrink-0">

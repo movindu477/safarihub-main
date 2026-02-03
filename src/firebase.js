@@ -1,13 +1,13 @@
 import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  doc, 
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  doc,
   setDoc,
   updateDoc,
   serverTimestamp,
@@ -19,7 +19,7 @@ import {
   arrayRemove
 } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-// Firebase Storage removed - using Supabase Storage instead
+import { getStorage } from 'firebase/storage'; // Re-enabled for profile images
 
 const firebaseConfig = {
   apiKey: "AIzaSyAXjQQ9BYX4upBJx_Ko5jTUq9nTCIDItSA",
@@ -34,7 +34,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-// Firebase Storage removed - using Supabase Storage instead
+const storage = getStorage(app); // Initialize Firebase Storage
 
 // ==================== ENHANCED ONLINE STATUS MANAGEMENT ====================
 
@@ -70,17 +70,17 @@ const registerListener = (listenerId, unsubscribe) => {
 export const addReview = async (reviewData) => {
   try {
     console.log('📝 Adding new review for provider:', reviewData.providerId);
-    
+
     const reviewRef = await addDoc(collection(db, 'reviews'), {
       ...reviewData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdAtValue: Date.now()
     });
-    
+
     // Update provider's average rating and total reviews
     await updateProviderRating(reviewData.providerId);
-    
+
     console.log('✅ Review added successfully with ID:', reviewRef.id);
     return reviewRef.id;
   } catch (error) {
@@ -95,30 +95,30 @@ export const addReview = async (reviewData) => {
 export const updateProviderRating = async (providerId) => {
   try {
     console.log('🔄 Updating provider rating for:', providerId);
-    
+
     const reviewsQuery = query(
       collection(db, 'reviews'),
       where('providerId', '==', providerId)
     );
-    
+
     const reviewsSnapshot = await getDocs(reviewsQuery);
     const reviews = [];
-    
+
     reviewsSnapshot.forEach(doc => {
       reviews.push({ id: doc.id, ...doc.data() });
     });
-    
+
     if (reviews.length > 0) {
       const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
       const averageRating = totalRating / reviews.length;
-      
+
       const providerRef = doc(db, 'serviceProviders', providerId);
       await updateDoc(providerRef, {
         rating: averageRating,
         totalReviews: reviews.length,
         updatedAt: serverTimestamp()
       });
-      
+
       console.log(`✅ Provider ${providerId} rating updated: ${averageRating.toFixed(1)}/5 from ${reviews.length} reviews`);
     } else {
       // No reviews, reset to default
@@ -128,10 +128,10 @@ export const updateProviderRating = async (providerId) => {
         totalReviews: 0,
         updatedAt: serverTimestamp()
       });
-      
+
       console.log(`✅ Provider ${providerId} rating reset to default (no reviews)`);
     }
-    
+
     return reviews;
   } catch (error) {
     console.error('❌ Error updating provider rating:', error);
@@ -145,14 +145,14 @@ export const updateProviderRating = async (providerId) => {
 export const getReviews = (providerId, callback) => {
   try {
     console.log('📖 Setting up real-time reviews listener for provider:', providerId);
-    
+
     const reviewsQuery = query(
       collection(db, 'reviews'),
       where('providerId', '==', providerId),
       orderBy('createdAtValue', 'desc')
     );
-    
-    const unsubscribe = onSnapshot(reviewsQuery, 
+
+    const unsubscribe = onSnapshot(reviewsQuery,
       (snapshot) => {
         const reviews = [];
         snapshot.forEach(doc => {
@@ -171,7 +171,7 @@ export const getReviews = (providerId, callback) => {
   } catch (error) {
     console.error('❌ Error getting reviews:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -181,12 +181,12 @@ export const getReviews = (providerId, callback) => {
 export const deleteReview = async (reviewId, providerId) => {
   try {
     console.log('🗑️ Deleting review:', reviewId);
-    
+
     await deleteDoc(doc(db, 'reviews', reviewId));
-    
+
     // Update provider rating after deletion
     await updateProviderRating(providerId);
-    
+
     console.log('✅ Review deleted successfully');
     return true;
   } catch (error) {
@@ -201,22 +201,22 @@ export const deleteReview = async (reviewId, providerId) => {
 export const getUserReviewForProvider = async (userId, providerId) => {
   try {
     console.log('🔍 Checking user review for provider:', { userId, providerId });
-    
+
     const userReviewQuery = query(
       collection(db, 'reviews'),
       where('providerId', '==', providerId),
       where('userId', '==', userId)
     );
-    
+
     const querySnapshot = await getDocs(userReviewQuery);
-    
+
     if (!querySnapshot.empty) {
       const doc = querySnapshot.docs[0];
       const reviewData = { id: doc.id, ...doc.data() };
       console.log('✅ Found existing user review');
       return reviewData;
     }
-    
+
     console.log('ℹ️ No existing review found for user');
     return null;
   } catch (error) {
@@ -231,15 +231,15 @@ export const getUserReviewForProvider = async (userId, providerId) => {
 export const updateReview = async (reviewId, reviewData) => {
   try {
     console.log('✏️ Updating review:', reviewId);
-    
+
     await updateDoc(doc(db, 'reviews', reviewId), {
       ...reviewData,
       updatedAt: serverTimestamp()
     });
-    
+
     // Update provider rating
     await updateProviderRating(reviewData.providerId);
-    
+
     console.log('✅ Review updated successfully');
     return true;
   } catch (error) {
@@ -256,13 +256,13 @@ export const updateReview = async (reviewId, reviewData) => {
 export const setUserOnline = async (userId, userRole = null, userData = {}) => {
   try {
     console.log(`🟢 Setting user ${userId} online as ${userRole}`);
-    
+
     // If role not provided, detect it
     let finalUserRole = userRole;
     if (!finalUserRole) {
       finalUserRole = await getUserRole(userId);
     }
-    
+
     const onlineData = {
       userId: userId,
       userRole: finalUserRole,
@@ -277,12 +277,12 @@ export const setUserOnline = async (userId, userRole = null, userData = {}) => {
       lastActive: new Date().toISOString(),
       ...userData
     };
-    
+
     // Update both onlineStatus collection and user's main document
     const updatePromises = [
       setDoc(doc(db, 'onlineStatus', userId), onlineData, { merge: true })
     ];
-    
+
     // Also update the user's main document based on role
     if (finalUserRole === 'tourist') {
       updatePromises.push(
@@ -306,9 +306,9 @@ export const setUserOnline = async (userId, userRole = null, userData = {}) => {
         }, { merge: true })
       );
     }
-    
+
     await Promise.all(updatePromises);
-    
+
     console.log(`✅ User ${userId} successfully set online as ${finalUserRole}`);
     return true;
   } catch (error) {
@@ -323,13 +323,13 @@ export const setUserOnline = async (userId, userRole = null, userData = {}) => {
 export const setUserOffline = async (userId, userRole = null) => {
   try {
     console.log(`🔴 Setting user ${userId} offline`);
-    
+
     // If role not provided, detect it
     let finalUserRole = userRole;
     if (!finalUserRole) {
       finalUserRole = await getUserRole(userId);
     }
-    
+
     const offlineData = {
       isOnline: false,
       online: false,
@@ -339,12 +339,12 @@ export const setUserOffline = async (userId, userRole = null) => {
       status: 'offline',
       lastActive: new Date().toISOString()
     };
-    
+
     // Update both onlineStatus collection and user's main document
     const updatePromises = [
       setDoc(doc(db, 'onlineStatus', userId), offlineData, { merge: true })
     ];
-    
+
     // Also update the user's main document based on role
     if (finalUserRole === 'tourist') {
       updatePromises.push(
@@ -358,9 +358,9 @@ export const setUserOffline = async (userId, userRole = null) => {
         }, { merge: true })
       );
     }
-    
+
     await Promise.all(updatePromises);
-    
+
     console.log(`✅ User ${userId} successfully set offline`);
     return true;
   } catch (error) {
@@ -376,10 +376,10 @@ export const getUserRole = async (userId) => {
   try {
     const touristDoc = await getDoc(doc(db, 'tourists', userId));
     if (touristDoc.exists()) return 'tourist';
-    
+
     const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
     if (providerDoc.exists()) return 'provider';
-    
+
     return null;
   } catch (error) {
     console.error('Error getting user role:', error);
@@ -393,10 +393,10 @@ export const getUserRole = async (userId) => {
 export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
   try {
     console.log('🔔 Setting up enhanced real-time online status listener for service providers...');
-    
+
     const { serviceType = 'all', maxResults = 100 } = options;
     const providersRef = collection(db, 'serviceProviders');
-    
+
     let providersQuery;
     if (serviceType === 'all') {
       providersQuery = query(providersRef, limit(maxResults));
@@ -408,29 +408,29 @@ export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
       );
     }
 
-    const unsubscribe = onSnapshot(providersQuery, 
+    const unsubscribe = onSnapshot(providersQuery,
       (snapshot) => {
         const onlineStatusMap = {};
         const now = Date.now();
-        
+
         snapshot.docs.forEach(doc => {
           const provider = doc.data();
           const providerId = doc.id;
-          
+
           // Calculate detailed offline status
           const isOnline = provider.online || provider.isOnline || false;
           const lastSeen = provider.lastSeen;
           const lastSeenTimestamp = provider.lastSeenTimestamp;
-          
+
           let offlineText = 'Offline';
           let lastSeenText = 'Unknown';
-          
+
           if (lastSeenTimestamp) {
             const lastSeenDate = new Date(lastSeenTimestamp);
             const diffInMinutes = Math.floor((now - lastSeenTimestamp) / (1000 * 60));
             const diffInHours = Math.floor(diffInMinutes / 60);
             const diffInDays = Math.floor(diffInHours / 24);
-            
+
             if (diffInMinutes < 1) {
               lastSeenText = 'Just now';
             } else if (diffInMinutes < 60) {
@@ -440,10 +440,10 @@ export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
             } else {
               lastSeenText = `${diffInDays}d ago`;
             }
-            
+
             offlineText = `Last seen ${lastSeenText}`;
           }
-          
+
           onlineStatusMap[providerId] = {
             isOnline: isOnline,
             online: isOnline,
@@ -463,7 +463,7 @@ export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
             currencyPreference: provider.currencyPreference || 'LKR'
           };
         });
-        
+
         const onlineCount = Object.values(onlineStatusMap).filter(p => p.isOnline).length;
         console.log(`👥 Enhanced real-time status: ${onlineCount} ${serviceType === 'all' ? 'providers' : serviceType + 's'} online out of ${snapshot.docs.length}`);
         callback(onlineStatusMap);
@@ -478,7 +478,7 @@ export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
   } catch (error) {
     console.error('Error getting enhanced online status:', error);
     callback({});
-    return () => {};
+    return () => { };
   }
 };
 
@@ -488,24 +488,24 @@ export const getServiceProvidersOnlineStatus = (callback, options = {}) => {
 export const getUserOnlineStatus = (userId, callback) => {
   try {
     const userRef = doc(db, 'onlineStatus', userId);
-    
-    const unsubscribe = onSnapshot(userRef, 
+
+    const unsubscribe = onSnapshot(userRef,
       (doc) => {
         if (doc.exists()) {
           const data = doc.data();
           const now = Date.now();
           const isOnline = data.isOnline || false;
           const lastSeenTimestamp = data.lastSeenTimestamp;
-          
+
           let offlineText = 'Offline';
           let lastSeenText = 'Unknown';
-          
+
           if (lastSeenTimestamp) {
             const lastSeenDate = new Date(lastSeenTimestamp);
             const diffInMinutes = Math.floor((now - lastSeenTimestamp) / (1000 * 60));
             const diffInHours = Math.floor(diffInMinutes / 60);
             const diffInDays = Math.floor(diffInHours / 24);
-            
+
             if (diffInMinutes < 1) {
               lastSeenText = 'Just now';
             } else if (diffInMinutes < 60) {
@@ -515,10 +515,10 @@ export const getUserOnlineStatus = (userId, callback) => {
             } else {
               lastSeenText = `${diffInDays}d ago`;
             }
-            
+
             offlineText = `Last seen ${lastSeenText}`;
           }
-          
+
           callback({
             isOnline: isOnline,
             online: isOnline,
@@ -532,10 +532,10 @@ export const getUserOnlineStatus = (userId, callback) => {
             lastSeenText: lastSeenText
           });
         } else {
-          callback({ 
-            isOnline: false, 
+          callback({
+            isOnline: false,
             online: false,
-            lastSeen: null, 
+            lastSeen: null,
             status: 'offline',
             offlineText: 'Never been online',
             lastSeenText: 'Never'
@@ -544,29 +544,29 @@ export const getUserOnlineStatus = (userId, callback) => {
       },
       (error) => {
         console.error('Error in user online status:', error);
-        callback({ 
-          isOnline: false, 
+        callback({
+          isOnline: false,
           online: false,
-          lastSeen: null, 
+          lastSeen: null,
           status: 'offline',
           offlineText: 'Status unavailable',
           lastSeenText: 'Unknown'
         });
       }
     );
-    
+
     return registerListener(`user_status_${userId}`, unsubscribe);
   } catch (error) {
     console.error('Error getting user online status:', error);
-    callback({ 
-      isOnline: false, 
+    callback({
+      isOnline: false,
       online: false,
-      lastSeen: null, 
+      lastSeen: null,
       status: 'offline',
       offlineText: 'Error loading status',
       lastSeenText: 'Unknown'
     });
-    return () => {};
+    return () => { };
   }
 };
 
@@ -598,7 +598,7 @@ export const createOrGetConversation = async (user1Id, user2Id, user1Name, user2
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-      
+
       console.log(`✅ New conversation created: ${conversationId}`);
     }
 
@@ -627,7 +627,7 @@ export const getConversationById = async (conversationId) => {
 
 export const getOtherParticipant = (conversation, currentUserId) => {
   if (!conversation || !conversation.participantIds) return null;
-  
+
   const otherParticipantId = conversation.participantIds.find(id => id !== currentUserId);
   return {
     id: otherParticipantId,
@@ -645,7 +645,7 @@ export const getUserConversations = (userId, callback) => {
       orderBy('lastMessageTimestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(userConversationsQuery, 
+    const unsubscribe = onSnapshot(userConversationsQuery,
       (snapshot) => {
         const conversations = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -664,7 +664,7 @@ export const getUserConversations = (userId, callback) => {
   } catch (error) {
     console.error('Error getting conversations:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -673,7 +673,7 @@ export const getMessages = (conversationId, callback) => {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
     const messagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
 
-    const unsubscribe = onSnapshot(messagesQuery, 
+    const unsubscribe = onSnapshot(messagesQuery,
       (snapshot) => {
         const messages = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -692,14 +692,14 @@ export const getMessages = (conversationId, callback) => {
   } catch (error) {
     console.error('Error getting messages:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
 export const sendMessage = async (conversationId, messageData) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-    
+
     const messageDoc = await addDoc(messagesRef, {
       ...messageData,
       timestamp: serverTimestamp(),
@@ -773,7 +773,7 @@ export const getUserNotifications = (userId, callback) => {
       orderBy('timestampValue', 'desc')
     );
 
-    const unsubscribe = onSnapshot(notificationsQuery, 
+    const unsubscribe = onSnapshot(notificationsQuery,
       (snapshot) => {
         const notifications = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -792,7 +792,7 @@ export const getUserNotifications = (userId, callback) => {
   } catch (error) {
     console.error('Error getting notifications:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -807,7 +807,7 @@ export const createNotification = async (notificationData) => {
       createdAt: serverTimestamp(),
       createdAtValue: Date.now()
     });
-    
+
     console.log(`✅ Notification created for user ${notificationData.recipientId}`, {
       notificationId: notificationDoc.id,
       type: notificationData.type,
@@ -843,7 +843,7 @@ export const getServiceProviders = (callback, options = {}) => {
   try {
     const { serviceType = 'all', maxResults = 50 } = options;
     const providersRef = collection(db, 'serviceProviders');
-    
+
     let providersQuery;
     if (serviceType === 'all') {
       providersQuery = query(
@@ -858,7 +858,7 @@ export const getServiceProviders = (callback, options = {}) => {
       );
     }
 
-    const unsubscribe = onSnapshot(providersQuery, 
+    const unsubscribe = onSnapshot(providersQuery,
       (snapshot) => {
         const providers = snapshot.docs.map(doc => {
           const data = doc.data();
@@ -910,7 +910,7 @@ export const getServiceProviders = (callback, options = {}) => {
   } catch (error) {
     console.error('Error getting service providers:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -921,14 +921,14 @@ export const getTourGuides = (callback, options = {}) => {
   try {
     const { maxResults = 50, filters = {} } = options;
     const providersRef = collection(db, 'serviceProviders');
-    
+
     let tourGuidesQuery = query(
       providersRef,
       where('serviceType', '==', 'Tour Guide'),
       limit(maxResults)
     );
 
-    const unsubscribe = onSnapshot(tourGuidesQuery, 
+    const unsubscribe = onSnapshot(tourGuidesQuery,
       (snapshot) => {
         const tourGuides = snapshot.docs.map(doc => {
           const data = doc.data();
@@ -978,7 +978,7 @@ export const getTourGuides = (callback, options = {}) => {
   } catch (error) {
     console.error('Error getting tour guides:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -995,7 +995,7 @@ export const getJeepDrivers = (callback, options = {}) => {
       limit(maxResults)
     );
 
-    const unsubscribe = onSnapshot(jeepDriversQuery, 
+    const unsubscribe = onSnapshot(jeepDriversQuery,
       (snapshot) => {
         const jeepDrivers = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -1014,7 +1014,7 @@ export const getJeepDrivers = (callback, options = {}) => {
   } catch (error) {
     console.error('Error getting jeep drivers:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -1079,12 +1079,12 @@ export const getServiceProvider = async (providerId) => {
 export const updateServiceProvider = async (providerId, updateData) => {
   try {
     console.log(`✏️ Updating service provider: ${providerId}`);
-    
+
     await updateDoc(doc(db, 'serviceProviders', providerId), {
       ...updateData,
       updatedAt: serverTimestamp()
     });
-    
+
     console.log(`✅ Service provider ${providerId} updated successfully`);
     return true;
   } catch (error) {
@@ -1109,7 +1109,7 @@ export const getTourGuidesBySpecialization = (specialization, callback, options 
       limit(maxResults)
     );
 
-    const unsubscribe = onSnapshot(tourGuidesQuery, 
+    const unsubscribe = onSnapshot(tourGuidesQuery,
       (snapshot) => {
         const tourGuides = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -1128,7 +1128,7 @@ export const getTourGuidesBySpecialization = (specialization, callback, options 
   } catch (error) {
     console.error('Error getting specialized tour guides:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -1146,7 +1146,7 @@ export const getTourGuidesByExpertise = (expertise, callback, options = {}) => {
       limit(maxResults)
     );
 
-    const unsubscribe = onSnapshot(tourGuidesQuery, 
+    const unsubscribe = onSnapshot(tourGuidesQuery,
       (snapshot) => {
         const tourGuides = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -1165,7 +1165,7 @@ export const getTourGuidesByExpertise = (expertise, callback, options = {}) => {
   } catch (error) {
     console.error('Error getting expertise-specific tour guides:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -1183,7 +1183,7 @@ export const getTourGuidesByLanguage = (language, callback, options = {}) => {
       limit(maxResults)
     );
 
-    const unsubscribe = onSnapshot(tourGuidesQuery, 
+    const unsubscribe = onSnapshot(tourGuidesQuery,
       (snapshot) => {
         const tourGuides = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -1202,7 +1202,7 @@ export const getTourGuidesByLanguage = (language, callback, options = {}) => {
   } catch (error) {
     console.error('Error getting language-specific tour guides:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -1213,12 +1213,12 @@ export const getTourGuidesByPriceRange = (minPrice, maxPrice, priceType = 'hourl
   try {
     const { maxResults = 50 } = options;
     const providersRef = collection(db, 'serviceProviders');
-    
+
     let priceField = 'hourlyRate';
     if (priceType === 'daily') {
       priceField = 'dailyRate';
     }
-    
+
     const tourGuidesQuery = query(
       providersRef,
       where('serviceType', '==', 'Tour Guide'),
@@ -1227,7 +1227,7 @@ export const getTourGuidesByPriceRange = (minPrice, maxPrice, priceType = 'hourl
       limit(maxResults)
     );
 
-    const unsubscribe = onSnapshot(tourGuidesQuery, 
+    const unsubscribe = onSnapshot(tourGuidesQuery,
       (snapshot) => {
         const tourGuides = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -1246,7 +1246,7 @@ export const getTourGuidesByPriceRange = (minPrice, maxPrice, priceType = 'hourl
   } catch (error) {
     console.error('Error getting price-range tour guides:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -1264,7 +1264,7 @@ export const getFeaturedTourGuides = (callback, options = {}) => {
       limit(maxResults)
     );
 
-    const unsubscribe = onSnapshot(featuredTourGuidesQuery, 
+    const unsubscribe = onSnapshot(featuredTourGuidesQuery,
       (snapshot) => {
         const tourGuides = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -1283,7 +1283,7 @@ export const getFeaturedTourGuides = (callback, options = {}) => {
   } catch (error) {
     console.error('Error getting featured tour guides:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -1303,7 +1303,7 @@ export const getUserInfo = async (userId) => {
         ...touristDoc.data()
       };
     }
-    
+
     // Check service providers collection
     const providerDoc = await getDoc(doc(db, 'serviceProviders', userId));
     if (providerDoc.exists()) {
@@ -1321,7 +1321,7 @@ export const getUserInfo = async (userId) => {
         ...data
       };
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error getting user info:', error);
@@ -1336,17 +1336,17 @@ export const searchServiceProviders = (searchTerm, callback, options = {}) => {
   try {
     const { maxResults = 50 } = options;
     const providersRef = collection(db, 'serviceProviders');
-    
+
     // Since Firestore doesn't support OR queries directly, we'll search in memory
     const providersQuery = query(providersRef, limit(maxResults));
 
-    const unsubscribe = onSnapshot(providersQuery, 
+    const unsubscribe = onSnapshot(providersQuery,
       (snapshot) => {
         const allProviders = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-        
+
         const filteredProviders = allProviders.filter(provider => {
           const searchLower = searchTerm.toLowerCase();
           return (
@@ -1354,13 +1354,13 @@ export const searchServiceProviders = (searchTerm, callback, options = {}) => {
             provider.location?.toLowerCase().includes(searchLower) ||
             provider.serviceType?.toLowerCase().includes(searchLower) ||
             provider.description?.toLowerCase().includes(searchLower) ||
-            (provider.specialQualifications && provider.specialQualifications.some(qual => 
+            (provider.specialQualifications && provider.specialQualifications.some(qual =>
               qual.toLowerCase().includes(searchLower))) ||
-            (provider.areasOfExpertise && provider.areasOfExpertise.some(area => 
+            (provider.areasOfExpertise && provider.areasOfExpertise.some(area =>
               area.toLowerCase().includes(searchLower)))
           );
         });
-        
+
         console.log(`🔍 Found ${filteredProviders.length} providers matching "${searchTerm}"`);
         callback(filteredProviders);
       },
@@ -1374,7 +1374,7 @@ export const searchServiceProviders = (searchTerm, callback, options = {}) => {
   } catch (error) {
     console.error('Error searching service providers:', error);
     callback([]);
-    return () => {};
+    return () => { };
   }
 };
 
@@ -1393,5 +1393,5 @@ export const getActiveListenerIds = () => {
 };
 
 // Export Firebase instances
-export { db, auth };
+export { db, auth, storage };
 export default app;

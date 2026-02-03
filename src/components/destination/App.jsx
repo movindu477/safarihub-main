@@ -91,7 +91,7 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
       }, 0)
     }
-    
+
     window.addEventListener('popstate', handlePopState)
     return () => {
       window.removeEventListener('popstate', handlePopState)
@@ -106,8 +106,8 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
         setTimeout(() => {
           const element = document.getElementById(hash)
           if (element) {
-            element.scrollIntoView({ 
-              behavior: 'smooth', 
+            element.scrollIntoView({
+              behavior: 'smooth',
               block: 'start',
               inline: 'nearest'
             })
@@ -181,18 +181,18 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
   return (
     <div className="min-h-screen bg-white">
       {/* Global Notification Bell (Bottom Right) */}
-      <GlobalNotificationBell 
+      <GlobalNotificationBell
         user={user}
         notifications={notifications}
         onNotificationClick={handleNotificationClick}
         onMarkAsRead={handleMarkAsRead}
       />
-      
-      
+
+
       {/* Main Content */}
       <main className="relative">
-        <Navbar 
-          user={user} 
+        <Navbar
+          user={user}
           onLogin={(screen) => (onShowAuth ? onShowAuth(screen || 'login') : handleLogin())}
           onRegister={(screen) => (onShowAuth ? onShowAuth(screen || 'register') : handleRegister())}
           onLogout={handleLogout}
@@ -205,7 +205,7 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
           <ChatList
             user={user}
             onClose={() => setShowChatList(false)}
-        />
+          />
         )}
         <DestinationHero />
         <Destination2 />

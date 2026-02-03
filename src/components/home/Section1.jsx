@@ -1,186 +1,193 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 
-// Import all hero images from src/assets
-import hero1 from "../../assets/hero1.avif";
-import hero2 from "../../assets/hero2.avif";
-import hero3 from "../../assets/hero3.jpg";
-import hero4 from "../../assets/hero4.jpg";
-import logo from "../../assets/logo - Copy.png";
+// Import desktop background images
+import section1Bg from "../../assets/section1.avif";
+import section2Bg from "../../assets/section2.avif";
+import section3Bg from "../../assets/section3.avif";
+import section4Bg from "../../assets/section4.avif";
+
+// Import mobile background images
+import sectionre1Bg from "../../assets/sectionre1.avif";
+import sectionre2Bg from "../../assets/sectionre2.avif";
+import sectionre3Bg from "../../assets/sectionre3.avif";
+import sectionre4Bg from "../../assets/sectionre4.avif";
 
 export default function Section1({ children }) {
-  const navigate = useNavigate();
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [contentVisible, setContentVisible] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
 
-  const heroImages = [hero1, hero2, hero3, hero4];
+  // Desktop slideshow data with different content for each slide
+  const desktopSlides = [
+    {
+      image: section1Bg,
+      title: "SafariHub",
+      subtitle: "Welcome To",
+      description: "Create Memories That Last a Lifetime",
+    },
+    {
+      image: section2Bg,
+      title: "Wild Adventures",
+      subtitle: "Explore The",
+      description: "Discover Untamed Beauty in Nature's Paradise",
+    },
+    {
+      image: section3Bg,
+      title: "Tropical Beaches",
+      subtitle: "Relax at",
+      description: "Unwind on Pristine Shores with Crystal Clear Waters",
+    },
+    {
+      image: section4Bg,
+      title: "Wildlife Encounters",
+      subtitle: "Witness Majestic",
+      description: "Up Close with Nature's Greatest Creatures",
+    },
+  ];
 
-  // Animate content slide-in on mount
+  // Mobile background images (slideshow for backgrounds only)
+  const mobileImages = [sectionre1Bg, sectionre2Bg, sectionre3Bg, sectionre4Bg];
+
+  // Auto-advance slideshow every 6 seconds
   useEffect(() => {
-    setContentVisible(true);
-  }, []);
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % desktopSlides.length);
+    }, 6000);
 
-  useEffect(() => {
-    // Reset transition state when image changes
-    setIsTransitioning(false);
-
-    // Total cycle time: 8 seconds (6s display + 2s slide transition)
-    const displayDuration = 6000; // 6 seconds display
-    const transitionDuration = 2000; // 2 seconds for slide transition
-
-    const displayTimer = setTimeout(() => {
-      // Start transition (slide)
-      setIsTransitioning(true);
-      
-      // After transition completes, switch to next image
-      const transitionTimer = setTimeout(() => {
-        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % heroImages.length);
-      }, transitionDuration);
-
-      return () => clearTimeout(transitionTimer);
-    }, displayDuration);
-
-    return () => clearTimeout(displayTimer);
-  }, [currentImageIndex, heroImages.length]);
+    return () => clearInterval(timer);
+  }, [desktopSlides.length]);
 
   return (
     <section className="relative w-full h-screen overflow-hidden">
-      {/* Background Images with Smooth Slide Animation (No Zoom) */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
-        {heroImages.map((image, index) => {
-          const isActive = index === currentImageIndex;
-          const isNext = index === (currentImageIndex + 1) % heroImages.length;
-          
-          // Determine position and opacity for sliding effect (no zoom)
-          let translateX = 0;
-          let opacity = 0;
-          let zIndex = 0;
-          
-          if (isActive && !isTransitioning) {
-            // Active image: visible, no zoom
-            translateX = 0;
-            opacity = 1;
-            zIndex = 10;
-          } else if (isActive && isTransitioning) {
-            // Active image: sliding out to left
-            translateX = -100;
-            opacity = 0;
-            zIndex = 10;
-          } else if (isNext && !isTransitioning) {
-            // Next image: waiting off-screen to the right
-            translateX = 100;
-            opacity = 0;
-            zIndex = 5;
-          } else if (isNext && isTransitioning) {
-            // Next image: sliding in from right
-            translateX = 0;
-            opacity = 1;
-            zIndex = 20;
-          } else {
-            // Other images: hidden
-            translateX = index < currentImageIndex ? -100 : 100;
-            opacity = 0;
-            zIndex = 0;
-          }
-          
-          // Determine transition timing (smooth sliding only, no zoom)
-          let transition = 'none';
-          if (isActive && isTransitioning) {
-            // Slide out left
-            transition = 'transform 2s cubic-bezier(0.4, 0, 0.2, 1), opacity 2s ease-out';
-          } else if (isNext && isTransitioning) {
-            // Slide in from right
-            transition = 'transform 2s cubic-bezier(0.4, 0, 0.2, 1), opacity 2s ease-in';
-          }
-          
-          return (
-            <div
-              key={index}
-              className="absolute top-0 left-0 w-full h-full"
-              style={{
-                backgroundImage: `url(${image})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
-                opacity: opacity,
-                zIndex: zIndex,
-                transform: `translateX(${translateX}%)`,
-                transition: transition,
-                willChange: 'transform, opacity',
-              }}
-            ></div>
-          );
-        })}
-      </div>
-
-      {/* Content Section - Centered */}
-      <div
-        className="
-          absolute inset-0 z-20 
-          flex flex-col justify-center items-center
-          px-4 sm:px-6 md:px-8
-          text-white text-center
-        "
-        style={{
-          transform: 'none',
-          willChange: 'auto',
-        }}
-      >
-        {/* Center dark overlay for better text readability */}
-        <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
-
-        {/* Content Container - Fade in animation */}
-        <div 
-          className="relative z-10 flex flex-col items-center space-y-4 sm:space-y-6 max-w-4xl"
+      {/* Background Images - Desktop with Smooth Transitions */}
+      {desktopSlides.map((slide, index) => (
+        <div
+          key={`desktop-${index}`}
+          className={`hidden sm:block absolute top-0 left-0 w-full h-full transition-opacity duration-1500 ease-in-out ${index === currentSlide ? "opacity-100" : "opacity-0"
+            }`}
           style={{
-            opacity: contentVisible ? 1 : 0,
-            transition: 'opacity 1s ease-in',
-            willChange: 'opacity',
+            backgroundImage: `url(${slide.image})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center center",
+            backgroundRepeat: "no-repeat",
           }}
-        >
-          {/* Welcome To Text */}
-          <div className="text-xl sm:text-2xl md:text-3xl font-thin leading-tight drop-shadow-lg">
-            Welcome To
-          </div>
-          
-          {/* SafariHub Logo */}
-          <div className="leading-tight drop-shadow-lg">
-            <img
-              src={logo}
-              alt="SafariHub Logo"
-              className="h-16 sm:h-20 md:h-24 lg:h-32 xl:h-40 w-auto drop-shadow-lg mx-auto"
-              style={{ transform: 'none' }}
-            />
-          </div>
+        />
+      ))}
 
-          {/* Tagline */}
-          <div className="text-base sm:text-lg md:text-xl font-light drop-shadow-lg -mt-2">
-            Your All in One Gateway to Adventure.
+      {/* Background Images - Mobile with Smooth Transitions */}
+      {mobileImages.map((image, index) => (
+        <div
+          key={`mobile-${index}`}
+          className={`block sm:hidden absolute top-0 left-0 w-full h-full transition-opacity duration-1500 ease-in-out ${index === currentSlide ? "opacity-100" : "opacity-0"
+            }`}
+          style={{
+            backgroundImage: `url(${image})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center center",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+      ))}
+
+      {/* Gradient Overlay - Optimized for readability */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10"></div>
+
+      {/* DESKTOP CONTENT - Left Aligned Text */}
+      <div className="hidden sm:flex relative z-20 h-full w-full px-12 items-center">
+        {/* Left Side: Text Content */}
+        <div className="flex-1 max-w-3xl relative h-full flex items-center">
+          <div className="relative w-full">
+            {desktopSlides.map((slide, index) => (
+              <div
+                key={index}
+                className={`absolute top-1/2 -translate-y-1/2 left-0 w-full transition-all duration-1000 ease-in-out ${index === currentSlide
+                  ? "opacity-100 translate-x-0"
+                  : "opacity-0 -translate-x-8 pointer-events-none"
+                  }`}
+              >
+                {/* Subtitle Badge */}
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-6 animate-fadeInUp">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-sm font-medium text-emerald-100 tracking-wider uppercase">
+                    {slide.subtitle}
+                  </span>
+                </div>
+
+                {/* Main Title */}
+                <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-white leading-tight drop-shadow-lg animate-fadeInUp" style={{ animationDelay: "0.2s" }}>
+                  {slide.title}
+                </h1>
+
+                {/* Description */}
+                <p className="text-lg md:text-xl text-gray-200 font-light max-w-xl leading-relaxed animate-fadeInUp" style={{ animationDelay: "0.4s" }}>
+                  {slide.description}
+                </p>
+
+
+              </div>
+            ))}
           </div>
-
-          {/* Description Paragraph */}
-          <p className="text-sm sm:text-base md:text-lg text-white/90 leading-relaxed max-w-2xl px-4 drop-shadow-md">
-            Embark on unforgettable journeys through Sri Lanka's breathtaking landscapes. From majestic wildlife to pristine beaches, discover your next adventure.
-          </p>
-
-          {/* Explore Destinations Button */}
-          <button
-            onClick={() => navigate('/destination')}
-            className="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold 
-              py-3 px-8 sm:py-3.5 sm:px-10 rounded-lg transition-all duration-300 
-              transform hover:scale-105 shadow-lg cursor-pointer text-sm sm:text-base touch-manipulation mt-2"
-          >
-            Explore Destinations
-          </button>
         </div>
       </div>
 
-      {/* Optional gradient fade at the bottom for elegance */}
-      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/40 to-transparent pointer-events-none z-10"></div>
+      {/* Booking Panel Container - Absolute Positioned */}
+      <div className="hidden sm:block absolute z-30 top-0 right-0 w-full h-full pointer-events-none">
+        <div className="w-full h-full relative">
+          <div className="pointer-events-auto">
+            {children}
+          </div>
+        </div>
+      </div>
 
-      {/* Booking Panel - Positioned in hero section */}
-      {children}
+      {/* MOBILE CONTENT - Static "Welcome To SafariHub" */}
+      <div className="sm:hidden flex relative z-20 h-full items-center justify-center px-4">
+        <div className="max-w-lg text-center">
+          {/* Subtitle Text */}
+          <h2 className="text-xl font-light mb-2 text-white animate-fadeInUp">
+            Welcome To
+          </h2>
+
+          {/* Main Title */}
+          <h1 className="text-3xl font-bold mb-3 text-white animate-fadeInUp" style={{ animationDelay: "0.2s" }}>
+            SafariHub
+          </h1>
+
+          {/* Description */}
+          <p className="text-sm font-light text-white/90 animate-fadeInUp" style={{ animationDelay: "0.4s" }}>
+            Create Memories That Last a Lifetime
+          </p>
+        </div>
+      </div>
+
+      {/* Slide Indicators - Desktop Only */}
+      <div className="hidden sm:flex absolute bottom-12 left-1/2 transform -translate-x-1/2 z-30 gap-3">
+        {desktopSlides.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => setCurrentSlide(index)}
+            className={`h-2 rounded-full transition-all duration-500 ${index === currentSlide
+              ? "w-12 bg-white"
+              : "w-2 bg-white/50 hover:bg-white/75"
+              }`}
+            aria-label={`Go to slide ${index + 1}`}
+          />
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.8s ease-out forwards;
+          opacity: 0;
+        }
+      `}</style>
     </section>
   );
 }

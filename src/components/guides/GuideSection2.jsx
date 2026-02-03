@@ -3,7 +3,23 @@ import { collection, doc, onSnapshot, query, where, orderBy, limit, getDoc, upda
 import { getAuth } from 'firebase/auth';
 import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Star, MapPin, Clock, Users, Shield, Award, Globe, Calendar } from 'lucide-react';
+import { MessageCircle, Star, MapPin, Clock, Users, Shield, Award, Globe, Calendar, ChevronDown } from 'lucide-react';
+
+const ALL_DESTINATIONS = [
+  'Yala National Park',
+  'Wilpattu National Park',
+  'Udawalawe National Park',
+  'Minneriya National Park',
+  'Kaudulla National Park',
+  'Bundala National Park',
+  'Kumana National Park',
+  'Horton Plains',
+  'Sinharaja Forest Reserve',
+  'Knuckles Mountain Range',
+  'Mirissa Beach',
+  'Unawatuna Beach',
+  'Lunugamvehera'
+];
 
 const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDestination }) => {
   const [guides, setGuides] = useState([]);
@@ -19,35 +35,35 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
   useEffect(() => {
     const shouldScroll = sessionStorage.getItem('scrollToGuide');
     const guideId = sessionStorage.getItem('lastViewedGuideId');
-    
+
     if (shouldScroll === 'true' && filteredGuides.length > 0 && guideId) {
       console.log('🔄 Attempting to scroll to guide card:', guideId);
-      
+
       // Function to scroll to the element
       const scrollToElement = () => {
         const element = document.getElementById(`guide-card-${guideId}`);
         if (element) {
           console.log('✅ Found guide card element, scrolling...');
-          
+
           // Use scrollIntoView for reliable scrolling
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
+          element.scrollIntoView({
+            behavior: 'smooth',
             block: 'center',
             inline: 'nearest'
           });
-          
+
           // Add a slight delay for smooth scroll, then highlight
           setTimeout(() => {
             // Highlight the card briefly
             element.style.transition = 'box-shadow 0.3s ease-in-out';
             element.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.5)';
-            
+
             // Remove highlight after 2 seconds
             setTimeout(() => {
               element.style.boxShadow = '';
             }, 2000);
           }, 500);
-          
+
           // Clear the flag after successful scroll
           sessionStorage.removeItem('scrollToGuide');
           return true;
@@ -55,12 +71,12 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
         console.log('❌ Guide card element not found yet');
         return false;
       };
-      
+
       // Wait for DOM to be fully rendered with multiple retry attempts
       const attemptScroll = (attempt = 0) => {
         const maxAttempts = 8;
         const delays = [200, 300, 500, 700, 1000, 1500, 2000, 2500]; // Increasing delays
-        
+
         if (attempt < maxAttempts) {
           setTimeout(() => {
             if (!scrollToElement() && attempt < maxAttempts - 1) {
@@ -74,12 +90,12 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
           }, delays[attempt]);
         }
       };
-      
+
       // Start attempting to scroll after initial delay
       setTimeout(() => {
         attemptScroll();
       }, 100);
-      
+
       // Clean up saved scroll position after use
       const savedScrollPosition = sessionStorage.getItem('guideListingScrollPosition');
       if (savedScrollPosition) {
@@ -96,6 +112,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     certification: '', // Changed from array to single value
     languages: [],
     sortBy: '',
+    destination: sessionStorage.getItem('selectedDestination') || '', // Added destination filter
   });
 
   // Filter options
@@ -271,17 +288,17 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
 
     let filtered = [...guides];
 
-    // Destination filter (from props - selectedDestination) - filter guides by destinations
-    if (selectedDestination) {
+    // Destination filter - filter guides by destinations
+    if (filters.destination) {
       filtered = filtered.filter(guide =>
         guide.destinations?.some(dest =>
-          dest.toLowerCase().includes(selectedDestination.toLowerCase())
+          dest.toLowerCase().includes(filters.destination.toLowerCase())
         )
       );
     }
 
     // Expertise area filter (from filter dropdown) - only if no destination filter is active
-    if (filters.expertise && !selectedDestination) {
+    if (filters.expertise && !filters.destination) {
       filtered = filtered.filter(guide =>
         guide.areasOfExpertise?.some(expertise =>
           expertise.toLowerCase().includes(filters.expertise.toLowerCase())
@@ -350,7 +367,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
 
     console.log('✅ Filtered results:', filtered.length);
     setFilteredGuides(filtered);
-  }, [filters, guides, selectedDestination]);
+  }, [filters, guides]);
 
   const handleFilterChange = (filterType, value) => {
     setFilters(prev => ({
@@ -385,9 +402,8 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     sessionStorage.setItem('lastViewedGuideId', guide.id);
     sessionStorage.setItem('scrollToGuide', 'true');
     // Save selectedDestination to sessionStorage to preserve it when navigating back
-    if (selectedDestination) {
-      sessionStorage.setItem('selectedDestination', selectedDestination);
-      sessionStorage.setItem('showDestinationSelector', 'false');
+    if (filters.destination) {
+      sessionStorage.setItem('selectedDestination', filters.destination);
     }
 
     // Navigate to guide profile - FIXED NAVIGATION
@@ -428,13 +444,13 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     try {
       const touristDocRef = doc(db, 'tourists', user.uid);
       const touristDoc = await getDoc(touristDocRef);
-      
-      const existingFavorites = touristDoc.exists() 
+
+      const existingFavorites = touristDoc.exists()
         ? (touristDoc.data().favoriteGuides || [])
         : [];
-      
+
       const isFavorited = existingFavorites.includes(guideId);
-      
+
       if (touristDoc.exists()) {
         if (isFavorited) {
           // Remove from favorites
@@ -460,7 +476,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
         }, { merge: true });
         setFavoriteMessage('Service provider added to favorite');
       }
-      
+
       setTimeout(() => setFavoriteMessage(null), 2000);
     } catch (error) {
       console.error('Error toggling favorite:', error);
@@ -504,9 +520,9 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     sessionStorage.setItem('lastViewedGuideId', guide.id);
     sessionStorage.setItem('scrollToGuide', 'true');
     // Save selectedDestination to sessionStorage to preserve it when navigating back
-    if (selectedDestination) {
-      sessionStorage.setItem('selectedDestination', selectedDestination);
-      sessionStorage.setItem('showDestinationSelector', 'false');
+    // Save selectedDestination to sessionStorage to preserve it when navigating back
+    if (filters.destination) {
+      sessionStorage.setItem('selectedDestination', filters.destination);
     }
 
     navigate(`/guide-profile/${guide.id}?openChat=true`);
@@ -520,8 +536,12 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
       qualification: '',
       certification: '',
       languages: [],
-      sortBy: ''
+      sortBy: '',
+      destination: ''
     });
+
+    // Clear session storage for destination
+    sessionStorage.removeItem('selectedDestination');
 
     // Clear destination filter if callback is provided
     if (onClearDestination) {
@@ -571,8 +591,8 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     );
   };
 
-  // Profile Image Component with proper error handling - Round fit
-  const ProfileImage = ({ guide }) => {
+  // Profile Image Component with proper error handling and flexible styling
+  const ProfileImage = ({ guide, className }) => {
     const [imageError, setImageError] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
 
@@ -589,29 +609,28 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
     // If no image URL or image failed to load, show placeholder
     if (!guide.imageUrl || imageError) {
       return (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
+        <div className={`flex items-center justify-center bg-gray-200 ${className || 'w-full h-full'}`}>
           <div className="text-center">
-            <div className="w-20 h-20 bg-gray-400 rounded-full flex items-center justify-center mx-auto mb-2">
-              <span className="text-3xl">🧭</span>
+            <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center mx-auto mb-2">
+              <span className="text-2xl">🧭</span>
             </div>
-            <p className="text-sm font-medium text-gray-600">No Photo</p>
           </div>
         </div>
       );
     }
 
-    // Show image with proper loading states - fit to round
+    // Show image with proper loading states
     return (
-      <div className="w-full h-full relative">
+      <div className={`relative ${className || 'w-full h-full'}`}>
         {!imageLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-full">
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-500"></div>
           </div>
         )}
         <img
           src={guide.imageUrl}
           alt={guide.guideName}
-          className={`w-full h-full object-cover rounded-full transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`${className || 'w-full h-full object-cover'} ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
           onError={handleImageError}
           onLoad={handleImageLoad}
           loading="lazy"
@@ -659,7 +678,7 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
   }
 
   return (
-    <div id="guides-section" className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
+    <div id="guides-section" className="min-h-screen bg-gray-50/50">
       <FavoriteMessage />
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
@@ -706,6 +725,28 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Destination Filter - Added to filter section */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Destination
+              </label>
+              <div className="relative">
+                <select
+                  value={filters.destination}
+                  onChange={(e) => handleFilterChange('destination', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white appearance-none"
+                >
+                  <option value="">All Destinations</option>
+                  {ALL_DESTINATIONS.map(dest => (
+                    <option key={dest} value={dest}>
+                      {dest}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             {/* Certification Filter - Moved to top row */}
@@ -807,127 +848,110 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
           <div className="space-y-12">
             {/* Certified Guides Section - Always Show */}
             <div>
-              <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Shield className="h-6 w-6 text-green-600 flex-shrink-0" />
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        Certified Guides
-                      </h2>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Verified and certified by our admin team
-                      </p>
-                    </div>
+              <div className="mb-8 flex items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="bg-green-100 p-3 rounded-2xl">
+                    <Shield className="h-8 w-8 text-green-600" />
                   </div>
-                  <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    {filteredGuides.filter(guide => guide.certificationStatus === 'certified').length}
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                      Certified Guides
+                    </h2>
+                    <p className="text-sm text-gray-500 font-medium mt-1">
+                      Verified professionals with proven expertise
+                    </p>
                   </div>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-gray-200">
+                    {filteredGuides.filter(guide => guide.certificationStatus === 'certified').length} Guides Available
+                  </span>
                 </div>
               </div>
               {filteredGuides.filter(guide => guide.certificationStatus === 'certified').length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                   {filteredGuides
                     .filter(guide => guide.certificationStatus === 'certified')
                     .map((guide, index) => (
-                      <div 
+                      <div
                         key={guide.id}
                         id={`guide-card-${guide.id}`}
-                        className="bg-white rounded-none shadow-lg overflow-hidden border-2 border-green-500 cursor-pointer hover:shadow-2xl transition-shadow"
+                        className="group relative h-[420px] bg-white rounded-[32px] shadow-xl shadow-gray-100/50 overflow-hidden cursor-pointer hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500"
                         onClick={() => handleProfileClick(guide)}
                       >
-                        {/* Profile Image Section */}
-                        <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-500 shadow-xl relative">
-                            <ProfileImage guide={guide} />
-                          </div>
-                          
-                          {/* Certified Badge */}
-                          <div className="absolute top-3 left-3 bg-green-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg z-10 flex items-center gap-1.5">
-                            <Shield className="h-3.5 w-3.5" />
+                        {/* Full Background Image */}
+                        <div className="absolute inset-0 h-full w-full">
+                          <ProfileImage guide={guide} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+                        </div>
+
+                        {/* Top Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                          <div className="bg-white/90 backdrop-blur-md text-green-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm flex items-center gap-1.5">
+                            <Shield className="h-3.5 w-3.5 fill-current" />
                             CERTIFIED
                           </div>
-
-                          {/* Experience Badge */}
                           {guide.experience > 0 && (
-                            <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
-                              {guide.experience}+ years
-                            </div>
-                          )}
-
-                          {/* Current User Badge */}
-                          {guide.isCurrentUser && (
-                            <div className="absolute bottom-3 left-3 bg-green-600 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
-                              Your Profile
+                            <div className="bg-black/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                              {guide.experience}+ Years
                             </div>
                           )}
                         </div>
 
-                        {/* Guide Details */}
-                        <div className="p-5">
-                          <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1">
-                            {guide.guideName || guide.fullName}
-                          </h3>
-
-                          <div className="flex items-center gap-2 text-gray-600 mb-3">
-                            <MapPin className="h-4 w-4 flex-shrink-0" />
-                            <p className="text-sm line-clamp-1">{guide.location}</p>
-                          </div>
-
-                          <div className="flex items-center gap-2 mb-3">
-                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                            <span className="text-sm font-semibold text-gray-700">
-                              {guide.rating || 'New'}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              ({guide.reviewCount || 0} reviews)
-                            </span>
-                          </div>
-
-                          {/* Verified Badge */}
-                          <div className="mb-3">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                              <Shield className="h-3 w-3" />
-                              <span>Verified Guide</span>
+                        {/* Sliding Content Box */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl p-6 rounded-t-[32px] transform transition-transform duration-500 translate-y-[88px] group-hover:translate-y-0">
+                          <div className="mb-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="text-xl font-bold text-gray-900 truncate pr-2">
+                                {guide.guideName || guide.fullName}
+                              </h3>
+                              <Shield className="h-5 w-5 text-green-500 fill-green-500 flex-shrink-0" />
                             </div>
-                          </div>
-
-                          {/* Languages */}
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Languages:</p>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {guide.languages?.slice(0, 3).join(', ')}
-                              {guide.languages?.length > 3 && '...'}
+                            <p className="text-sm text-gray-500 font-medium line-clamp-1 flex items-center gap-1.5">
+                              {guide.specializations && guide.specializations[0] ? guide.specializations[0] : 'Professional Guide'}
                             </p>
                           </div>
 
-                          {/* Specializations */}
-                          {guide.specializations && guide.specializations.length > 0 && (
-                            <div className="mb-3">
-                              <p className="text-sm font-semibold text-gray-700 mb-1">Specializations:</p>
-                              <p className="text-sm text-gray-600 line-clamp-2">
-                                {guide.specializations.slice(0, 2).join(', ')}
-                                {guide.specializations.length > 2 && '...'}
-                              </p>
+                          <div className="flex items-center gap-4 mt-4 mb-6">
+                            <div className="flex items-center gap-1.5">
+                              <Users className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm font-bold text-gray-900">{guide.totalReviews || 0}</span>
                             </div>
-                          )}
+                            <div className="flex items-center gap-1.5">
+                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                              <span className="text-sm font-bold text-gray-900">{guide.rating || 'New'}</span>
+                            </div>
+                          </div>
 
-                          {/* Favorite Button */}
-                          {currentUser && !guide.isCurrentUser && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleFavorite(guide.id);
-                              }}
-                              className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors ${
-                                userFavorites.includes(guide.id)
-                                  ? 'bg-gray-800 text-white hover:bg-gray-900'
-                                  : 'bg-black text-white hover:bg-gray-800'
-                              }`}
-                            >
-                              {userFavorites.includes(guide.id) ? 'Remove from Favorites' : 'Add to Favorites'}
-                            </button>
-                          )}
+                          {/* Hidden Details revealed on hover */}
+                          <div className="space-y-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-75">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <MapPin className="h-4 w-4 text-gray-400" />
+                                <span className="truncate">{guide.location}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <Globe className="h-4 w-4 text-gray-400" />
+                                <span className="truncate">{guide.languages?.slice(0, 2).join(', ')}</span>
+                              </div>
+                            </div>
+
+                            {currentUser && !guide.isCurrentUser && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleFavorite(guide.id);
+                                }}
+                                className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${userFavorites.includes(guide.id)
+                                  ? 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                                  : 'bg-gray-900 text-white hover:bg-black shadow-lg shadow-gray-900/20'
+                                  }`}
+                              >
+                                {userFavorites.includes(guide.id) ? 'Saved' : 'Add to Favorites'}
+                                <span className="text-lg leading-none mb-0.5">{userFavorites.includes(guide.id) ? '♥' : '+'}</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -943,121 +967,110 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
 
             {/* Uncertified/Pending Guides Section - Always Show */}
             <div>
-              <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-6 w-6 text-yellow-600 flex-shrink-0" />
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        Uncertified Guides
-                      </h2>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Guides pending certification review
-                      </p>
-                    </div>
+              <div className="mb-8 flex items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="bg-yellow-100 p-3 rounded-2xl">
+                    <Clock className="h-8 w-8 text-yellow-600" />
                   </div>
-                  <div className="bg-yellow-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    {filteredGuides.filter(guide => guide.certificationStatus !== 'certified').length}
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                      Pending Verification
+                    </h2>
+                    <p className="text-sm text-gray-500 font-medium mt-1">
+                      Guides currently under admin review
+                    </p>
                   </div>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="bg-yellow-500 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-yellow-200">
+                    {filteredGuides.filter(guide => guide.certificationStatus !== 'certified').length} Guides Waiting
+                  </span>
                 </div>
               </div>
               {filteredGuides.filter(guide => guide.certificationStatus !== 'certified').length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                   {filteredGuides
                     .filter(guide => guide.certificationStatus !== 'certified')
                     .map((guide, index) => (
-                      <div 
+                      <div
                         key={guide.id}
                         id={`guide-card-${guide.id}`}
-                        className="bg-white rounded-none shadow-lg overflow-hidden border border-gray-200 cursor-pointer"
+                        className="group relative h-[420px] bg-white rounded-[32px] shadow-xl shadow-gray-100/50 overflow-hidden cursor-pointer hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500"
                         onClick={() => handleProfileClick(guide)}
                       >
-                        {/* Profile Image Section */}
-                        <div className="h-64 relative overflow-hidden bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-500 shadow-xl relative">
-                            <ProfileImage guide={guide} />
-                          </div>
-                          
-                          {/* Experience Badge */}
-                          {guide.experience > 0 && (
-                            <div className="absolute top-3 right-3 bg-black text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg z-10">
-                              {guide.experience}+ years
-                            </div>
-                          )}
+                        {/* Full Background Image */}
+                        <div className="absolute inset-0 h-full w-full">
+                          <ProfileImage guide={guide} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+                        </div>
 
-                          {/* Current User Badge */}
-                          {guide.isCurrentUser && (
-                            <div className="absolute bottom-3 left-3 bg-green-600 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg z-10">
-                              Your Profile
+                        {/* Top Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                          <div className="bg-white/90 backdrop-blur-md text-yellow-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5" />
+                            PENDING
+                          </div>
+                          {guide.experience > 0 && (
+                            <div className="bg-black/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                              {guide.experience}+ Years
                             </div>
                           )}
                         </div>
 
-                        {/* Guide Details */}
-                        <div className="p-5">
-                          <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1">
-                            {guide.guideName}
-                          </h3>
-
-                          <div className="flex items-center gap-2 text-gray-600 mb-3">
-                            <MapPin className="h-4 w-4 flex-shrink-0" />
-                            <p className="text-sm line-clamp-1">{guide.location}</p>
-                          </div>
-
-                          <div className="flex items-center gap-2 mb-3">
-                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                            <span className="text-sm font-semibold text-gray-700">
-                              {guide.rating || 'New'}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              ({guide.reviewCount || 0} reviews)
-                            </span>
-                          </div>
-
-                          {/* Pending Badge */}
-                          <div className="mb-3">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
-                              <Clock className="h-3 w-3" />
-                              <span>Pending Review</span>
+                        {/* Sliding Content Box */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl p-6 rounded-t-[32px] transform transition-transform duration-500 translate-y-[88px] group-hover:translate-y-0">
+                          <div className="mb-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="text-xl font-bold text-gray-900 truncate pr-2">
+                                {guide.guideName}
+                              </h3>
+                              {/* No Green Shield for Pending */}
                             </div>
-                          </div>
-
-                          {/* Languages */}
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-gray-700 mb-1">Languages:</p>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {guide.languages?.slice(0, 3).join(', ')}
-                              {guide.languages?.length > 3 && '...'}
+                            <p className="text-sm text-gray-500 font-medium line-clamp-1">
+                              {guide.specializations && guide.specializations[0] ? guide.specializations[0] : 'Aspiring Guide'}
                             </p>
                           </div>
 
-                          {/* Specializations */}
-                          {guide.specializations && guide.specializations.length > 0 && (
-                            <div className="mb-3">
-                              <p className="text-sm font-semibold text-gray-700 mb-1">Specializations:</p>
-                              <p className="text-sm text-gray-600 line-clamp-2">
-                                {guide.specializations.slice(0, 2).join(', ')}
-                                {guide.specializations.length > 2 && '...'}
-                              </p>
+                          <div className="flex items-center gap-4 mt-4 mb-6">
+                            <div className="flex items-center gap-1.5">
+                              <Users className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm font-bold text-gray-900">{guide.totalReviews || 0}</span>
                             </div>
-                          )}
+                            <div className="flex items-center gap-1.5">
+                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                              <span className="text-sm font-bold text-gray-900">{guide.rating || 'New'}</span>
+                            </div>
+                          </div>
 
-                          {/* Favorite Button */}
-                          {currentUser && !guide.isCurrentUser && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleFavorite(guide.id);
-                              }}
-                              className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors ${
-                                userFavorites.includes(guide.id)
-                                  ? 'bg-gray-800 text-white hover:bg-gray-900'
-                                  : 'bg-black text-white hover:bg-gray-800'
-                              }`}
-                            >
-                              {userFavorites.includes(guide.id) ? 'Remove from Favorites' : 'Add to Favorites'}
-                            </button>
-                          )}
+                          {/* Hidden Details revealed on hover */}
+                          <div className="space-y-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-75">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <MapPin className="h-4 w-4 text-gray-400" />
+                                <span className="truncate">{guide.location}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <Globe className="h-4 w-4 text-gray-400" />
+                                <span className="truncate">{guide.languages?.slice(0, 2).join(', ')}</span>
+                              </div>
+                            </div>
+
+                            {currentUser && !guide.isCurrentUser && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleFavorite(guide.id);
+                                }}
+                                className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${userFavorites.includes(guide.id)
+                                  ? 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                                  : 'bg-gray-900 text-white hover:bg-black shadow-lg shadow-gray-900/20'
+                                  }`}
+                              >
+                                {userFavorites.includes(guide.id) ? 'Saved' : 'Add to Favorites'}
+                                <span className="text-lg leading-none mb-0.5">{userFavorites.includes(guide.id) ? '♥' : '+'}</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1083,18 +1096,18 @@ const GuideSection2 = ({ currentUser, userRole, selectedDestination, onClearDest
               }
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={clearFilters}
-              className="px-8 py-3 bg-blue-500 text-white rounded-lg font-semibold"
-            >
-              Clear All Filters
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold"
-            >
-              Refresh Page
-            </button>
+              <button
+                onClick={clearFilters}
+                className="px-8 py-3 bg-blue-500 text-white rounded-lg font-semibold"
+              >
+                Clear All Filters
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold"
+              >
+                Refresh Page
+              </button>
             </div>
           </div>
         )}
