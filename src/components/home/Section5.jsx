@@ -1,12 +1,34 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, CheckCircle } from "lucide-react";
+import { getFirestore, collection, query, where, getCountFromServer } from "firebase/firestore";
 
 // Import background image from src/assets
 import cameraImage from "../../assets/camera1.avif";
 
 export default function Section5() {
   const navigate = useNavigate();
+  const [rentalCount, setRentalCount] = useState(0);
+
+  useEffect(() => {
+    const fetchRentalCount = async () => {
+      try {
+        const db = getFirestore();
+        const q = query(
+          collection(db, "serviceProviders"),
+          where("serviceType", "==", "Renting")
+        );
+        const snapshot = await getCountFromServer(q);
+        setRentalCount(snapshot.data().count);
+      } catch (error) {
+        console.error("Error fetching rental count:", error);
+        // Fallback to a default value if fetch fails, or keep 0
+        setRentalCount(50);
+      }
+    };
+
+    fetchRentalCount();
+  }, []);
 
   const features = [
     "Professional DSLR cameras",
@@ -85,7 +107,9 @@ export default function Section5() {
                     <Camera className="w-6 h-6 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">50+</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {rentalCount}+
+                    </p>
                     <p className="text-sm text-gray-600">Rental Locations</p>
                   </div>
                 </div>

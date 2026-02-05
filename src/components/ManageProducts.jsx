@@ -1,36 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
   serverTimestamp,
-  getDoc 
+  getDoc
 } from 'firebase/firestore';
-import { 
-  Package, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  EyeOff, 
-  DollarSign, 
-  FileText, 
-  CheckCircle, 
-  X, 
-  Save, 
-  Camera, 
-  Tent, 
-  Shield, 
-  Box 
+import {
+  Package,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff,
+  DollarSign,
+  FileText,
+  CheckCircle,
+  X,
+  Save,
+  Camera,
+  Tent,
+  Shield,
+  Box
 } from 'lucide-react';
-import { uploadDocumentClientSide, deleteDocumentClientSide } from '../lib/supabase';
+import { uploadProductImageClientSide, deleteDocumentClientSide, deleteProviderDocumentClientSide } from '../lib/supabase';
 
 const ManageProducts = () => {
   const [user, setUser] = useState(null);
@@ -120,7 +120,7 @@ const ManageProducts = () => {
     try {
       const uploadedUrls = [];
       for (const file of files) {
-        const { url, error } = await uploadDocumentClientSide(file, user.uid, `product-${Date.now()}-${file.name}`);
+        const { url, error } = await uploadProductImageClientSide(file, user.uid, `product-${Date.now()}-${file.name}`);
         if (error) throw new Error(error);
         uploadedUrls.push(url);
       }
@@ -141,11 +141,13 @@ const ManageProducts = () => {
   const handleRemoveImage = async (imageUrl, index) => {
     try {
       // Extract file path from URL for deletion
-      const pathMatch = imageUrl.match(/documents\/(.+)$/);
-      if (pathMatch) {
-        await deleteDocumentClientSide(pathMatch[1]);
+      if (imageUrl.includes('documents')) {
+        const pathMatch = imageUrl.match(/documents\/(.+)$/);
+        if (pathMatch) await deleteDocumentClientSide(pathMatch[1]);
+      } else if (imageUrl.includes('PROVIDER-DOCUMENTS')) {
+        await deleteProviderDocumentClientSide(imageUrl);
       }
-      
+
       setFormData(prev => ({
         ...prev,
         images: prev.images.filter((_, i) => i !== index)
@@ -204,8 +206,8 @@ const ManageProducts = () => {
         pricePerDay: parseFloat(formData.pricePerDay),
         securityDeposit: parseFloat(formData.securityDeposit) || 0,
         quantity: parseInt(formData.quantity),
-        availableQuantity: editingProduct 
-          ? editingProduct.availableQuantity 
+        availableQuantity: editingProduct
+          ? editingProduct.availableQuantity
           : parseInt(formData.quantity),
         updatedAt: serverTimestamp()
       };
@@ -260,9 +262,15 @@ const ManageProducts = () => {
     try {
       // Delete product images
       for (const imageUrl of productImages || []) {
-        const pathMatch = imageUrl.match(/documents\/(.+)$/);
-        if (pathMatch) {
-          await deleteDocumentClientSide(pathMatch[1]).catch(err => 
+        if (imageUrl.includes('documents')) {
+          const pathMatch = imageUrl.match(/documents\/(.+)$/);
+          if (pathMatch) {
+            await deleteDocumentClientSide(pathMatch[1]).catch(err =>
+              console.warn('Failed to delete image:', err)
+            );
+          }
+        } else if (imageUrl.includes('PROVIDER-DOCUMENTS')) {
+          await deleteProviderDocumentClientSide(imageUrl).catch(err =>
             console.warn('Failed to delete image:', err)
           );
         }
@@ -278,16 +286,18 @@ const ManageProducts = () => {
     }
   };
 
-  const toggleAvailability = async (productId, currentStatus) => {
+
+
+  const updateAvailability = async (productId, newStatus) => {
     try {
       await updateDoc(doc(db, 'rentalProducts', productId), {
-        available: !currentStatus,
+        available: newStatus,
         updatedAt: serverTimestamp()
       });
-      setMessage({ type: 'success', text: `Product ${!currentStatus ? 'activated' : 'deactivated'}` });
+      setMessage({ type: 'success', text: `Product marked as ${newStatus ? 'In Stock' : 'Out of Stock'}` });
       setTimeout(() => setMessage({ type: '', text: '' }), 2000);
     } catch (error) {
-      console.error('Error toggling availability:', error);
+      console.error('Error updating availability:', error);
       setMessage({ type: 'error', text: 'Failed to update availability' });
     }
   };
@@ -302,7 +312,7 @@ const ManageProducts = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+      <div className="min-h-screen bg-linear-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
         <div className="max-w-7xl mx-auto px-4 py-20 text-center">
           <p className="text-gray-400">Please log in to manage products</p>
         </div>
@@ -312,7 +322,7 @@ const ManageProducts = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+      <div className="min-h-screen bg-linear-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
         <div className="max-w-7xl mx-auto px-4 py-20 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
           <p className="mt-4 text-gray-400">Loading products...</p>
@@ -322,7 +332,7 @@ const ManageProducts = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
+    <div className="min-h-screen bg-linear-to-b from-gray-900 via-gray-800 to-gray-900 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -346,11 +356,10 @@ const ManageProducts = () => {
 
         {/* Message Display */}
         {message.text && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
-            message.type === 'success' 
-              ? 'bg-emerald-900/20 border border-emerald-700 text-emerald-300' 
-              : 'bg-red-900/20 border border-red-700 text-red-300'
-          }`}>
+          <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${message.type === 'success'
+            ? 'bg-emerald-900/20 border border-emerald-700 text-emerald-300'
+            : 'bg-red-900/20 border border-red-700 text-red-300'
+            }`}>
             {message.type === 'success' ? (
               <CheckCircle className="h-5 w-5" />
             ) : (
@@ -569,7 +578,7 @@ const ManageProducts = () => {
                   <Camera className="h-5 w-5 text-emerald-500" />
                   Product Images * (Max 5)
                 </h3>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                   {formData.images.map((imageUrl, index) => (
                     <div key={index} className="relative group">
@@ -678,9 +687,8 @@ const ManageProducts = () => {
               {products.map((product) => (
                 <div
                   key={product.id}
-                  className={`bg-gray-800/50 backdrop-blur-sm border ${
-                    product.available ? 'border-gray-700' : 'border-red-900/50'
-                  } rounded-2xl overflow-hidden hover:border-emerald-500/50 transition-colors`}
+                  className={`bg-gray-800/50 backdrop-blur-sm border ${product.available ? 'border-gray-700' : 'border-red-900/50'
+                    } rounded-2xl overflow-hidden hover:border-emerald-500/50 transition-colors`}
                 >
                   {/* Product Image */}
                   <div className="relative h-48 bg-gray-900">
@@ -695,14 +703,13 @@ const ManageProducts = () => {
                         <Package className="h-16 w-16 text-gray-700" />
                       </div>
                     )}
-                    
+
                     {/* Availability Badge */}
                     <div className="absolute top-3 right-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        product.available
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-red-600 text-white'
-                      }`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${product.available
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-red-600 text-white'
+                        }`}>
                         {product.available ? 'Available' : 'Unavailable'}
                       </span>
                     </div>
@@ -749,7 +756,7 @@ const ManageProducts = () => {
                       <div className="bg-gray-900/50 rounded-lg p-3">
                         <p className="text-xs text-gray-500 mb-1">Stock</p>
                         <p className="text-lg font-bold text-white">
-                          {product.availableQuantity || 0}/{product.quantity}
+                          {product.quantity}
                         </p>
                       </div>
                     </div>
@@ -772,26 +779,20 @@ const ManageProducts = () => {
                         <Edit className="h-4 w-4" />
                         Edit
                       </button>
-                      <button
-                        onClick={() => toggleAvailability(product.id, product.available)}
-                        className={`px-3 py-2 ${
-                          product.available
-                            ? 'bg-gray-600 hover:bg-gray-700'
-                            : 'bg-emerald-600 hover:bg-emerald-700'
-                        } text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition-colors`}
-                      >
-                        {product.available ? (
-                          <>
-                            <EyeOff className="h-4 w-4" />
-                            Hide
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-4 w-4" />
-                            Show
-                          </>
-                        )}
-                      </button>
+                      <div className="relative">
+                        <select
+                          value={product.available ? 'true' : 'false'}
+                          onChange={(e) => updateAvailability(product.id, e.target.value === 'true')}
+                          className={`w-full appearance-none px-3 py-2 ${product.available
+                            ? 'bg-emerald-600/20 border-emerald-600/50 text-emerald-400'
+                            : 'bg-red-600/20 border-red-600/50 text-red-400'
+                            } border rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer text-center`}
+                        >
+                          <option value="true" className="bg-gray-800 text-emerald-400">In Stock</option>
+                          <option value="false" className="bg-gray-800 text-red-400">Out of Stock</option>
+                        </select>
+
+                      </div>
                       <button
                         onClick={() => handleDeleteProduct(product.id, product.images)}
                         className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition-colors"

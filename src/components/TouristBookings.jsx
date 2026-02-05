@@ -480,7 +480,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <Navbar user={user} onLogout={onLogout} onLogin={onShowAuth} onRegister={onShowAuth} />
 
-      <div className="flex-1 pt-20 pb-10 px-4">
+      <div className="flex-1 pt-32 pb-10 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-6 flex items-center gap-4">

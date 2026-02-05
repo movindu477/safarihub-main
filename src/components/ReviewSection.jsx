@@ -19,7 +19,7 @@ import {
   getProviderReviewStats
 } from '../reviewservice';
 
-const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded }) => {
+const ReviewSection = ({ driverId, guideId, providerId: propProviderId, providerType: propProviderType, currentUser, userRole, onReviewAdded }) => {
   const [reviews, setReviews] = useState([]);
   const [userReview, setUserReview] = useState(null);
   const [rating, setRating] = useState(0);
@@ -32,8 +32,8 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
   const [loading, setLoading] = useState(true);
 
   // Determine provider ID and type
-  const providerId = driverId || guideId;
-  const providerType = driverId ? 'driver' : 'guide';
+  const providerId = propProviderId || driverId || guideId;
+  const providerType = propProviderType || (driverId ? 'driver' : 'guide');
 
   // Load reviews and user's existing review
   useEffect(() => {
@@ -57,7 +57,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
           const userRev = await getUserReviewForProvider(providerId, currentUser.uid, providerType);
           console.log('📋 User review found:', userRev ? 'Yes' : 'No');
           setUserReview(userRev);
-          
+
           if (userRev) {
             setRating(userRev.rating);
             setReviewText(userRev.comment);
@@ -87,10 +87,10 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
     console.log('🎯 Setting up real-time reviews listener');
     const unsubscribe = getProviderReviews(providerId, (reviewsData) => {
       console.log(`🔄 Received ${reviewsData.length} reviews from server`);
-      
+
       setReviews(reviewsData);
       setLoading(false);
-      
+
       // Update user review from server data
       if (currentUser) {
         const userRev = reviewsData.find(review => review.userId === currentUser.uid);
@@ -127,7 +127,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
 
     const totalRating = reviewsData.reduce((sum, review) => sum + (review.rating || 0), 0);
     const averageRating = totalRating / reviewsData.length;
-    
+
     const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     reviewsData.forEach(review => {
       const rating = Math.floor(review.rating || 0);
@@ -145,14 +145,14 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
-    
+
     console.log('🎯 Submit review button clicked');
-    console.log('📊 Form data:', { 
-      rating, 
+    console.log('📊 Form data:', {
+      rating,
       reviewTextLength: reviewText.length,
       currentUser: !!currentUser,
       currentUserId: currentUser?.uid,
-      driverId 
+      driverId
     });
 
     // Validation
@@ -162,14 +162,14 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
       setError(errorMsg);
       return;
     }
-    
+
     if (!reviewText.trim() || reviewText.trim().length < 10) {
       const errorMsg = 'Review must be at least 10 characters long';
       console.error('❌ Validation failed:', errorMsg);
       setError(errorMsg);
       return;
     }
-    
+
     if (!currentUser) {
       const errorMsg = 'Please login to submit a review';
       console.error('❌ Validation failed:', errorMsg);
@@ -187,7 +187,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
     setSubmitting(true);
     setError('');
     setSuccess('');
-    
+
     try {
       const reviewData = {
         [providerType === 'driver' ? 'driverId' : 'guideId']: providerId,
@@ -216,21 +216,21 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
 
       // Update provider rating
       await updateProviderRating(providerId, providerType);
-      
+
       // Reset form only for new reviews
       if (!userReview) {
         setReviewText('');
         setRating(0);
       }
-      
+
       // Switch to reviews tab and show success
       setActiveTab('reviews');
-      
+
       // Call parent callback if provided
       if (onReviewAdded) {
         onReviewAdded();
       }
-      
+
       // Scroll to top of reviews section after a short delay to ensure DOM update
       setTimeout(() => {
         const reviewsSection = document.getElementById('reviews-section');
@@ -238,15 +238,15 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
           reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }, 100);
-      
+
       console.log('✅ Review submitted successfully!');
 
     } catch (error) {
       console.error('❌ Error submitting review:', error);
       console.error('Full error object:', error);
-      
+
       let errorMessage = 'Failed to submit review. Please try again.';
-      
+
       // Provide more specific error messages based on Firebase error codes
       if (error.code === 'permission-denied') {
         errorMessage = 'Permission denied. Please check if you are logged in and have the right permissions.';
@@ -255,7 +255,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       setError(errorMessage);
     } finally {
       setSubmitting(false);
@@ -274,7 +274,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
         setReviewText('');
         setError('');
         setSuccess('Review deleted successfully!');
-        
+
         // Call parent callback if provided
         if (onReviewAdded) {
           onReviewAdded();
@@ -291,7 +291,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
       setError('Please login to like reviews');
       return;
     }
-    
+
     try {
       await likeReview(reviewId, currentUser.uid);
       setError('');
@@ -306,7 +306,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
       setError('Please login to dislike reviews');
       return;
     }
-    
+
     try {
       await dislikeReview(reviewId, currentUser.uid);
       setError('');
@@ -328,7 +328,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
         setError('Report reason must be at least 5 characters long');
         return;
       }
-      
+
       try {
         await reportReview(reviewId, currentUser.uid, reason.trim());
         alert('Review reported successfully. Our team will review it shortly.');
@@ -353,7 +353,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Recently';
-    
+
     try {
       let date;
       if (timestamp.toDate && typeof timestamp.toDate === 'function') {
@@ -363,15 +363,15 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
       } else {
         date = new Date(timestamp);
       }
-      
+
       const now = new Date();
       const diffTime = Math.abs(now - date);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
+
       if (diffDays === 1) return 'Yesterday';
       if (diffDays < 7) return `${diffDays} days ago`;
       if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-      
+
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -385,7 +385,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
 
   // Check if user can write a review
   const canWriteReview = currentUser && (userRole === 'tourist' || !userRole);
-  
+
   // Debug logging
   useEffect(() => {
     if (activeTab === 'write') {
@@ -446,7 +446,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
               Read what other travelers say about this {providerType === 'driver' ? 'driver' : 'guide'}
             </p>
           </div>
-          
+
           {reviewStats && (
             <div className="flex items-center gap-6">
               <div className="text-center">
@@ -458,17 +458,17 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
                   {reviewStats.totalReviews} review{reviewStats.totalReviews !== 1 ? 's' : ''}
                 </div>
               </div>
-              
+
               <div className="hidden sm:block">
                 <div className="space-y-1">
                   {[5, 4, 3, 2, 1].map(star => (
                     <div key={star} className="flex items-center gap-2 text-sm">
                       <span className="w-8 text-gray-600">{star}★</span>
                       <div className="w-24 bg-gray-200 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-yellow-400 h-2 rounded-full"
-                          style={{ 
-                            width: `${reviewStats.totalReviews > 0 ? (reviewStats.ratingDistribution[star] / reviewStats.totalReviews) * 100 : 0}%` 
+                          style={{
+                            width: `${reviewStats.totalReviews > 0 ? (reviewStats.ratingDistribution[star] / reviewStats.totalReviews) * 100 : 0}%`
                           }}
                         ></div>
                       </div>
@@ -489,23 +489,21 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
         <nav className="flex -mb-px">
           <button
             onClick={() => setActiveTab('reviews')}
-            className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors cursor-pointer ${
-              activeTab === 'reviews'
+            className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors cursor-pointer ${activeTab === 'reviews'
                 ? 'border-green-600 text-green-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+              }`}
           >
             All Reviews ({reviews.length})
           </button>
-          
+
           {canWriteReview && (
             <button
               onClick={() => setActiveTab('write')}
-              className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors cursor-pointer ${
-                activeTab === 'write'
+              className={`py-3 px-4 text-center border-b-2 font-medium text-sm transition-colors cursor-pointer ${activeTab === 'write'
                   ? 'border-green-600 text-green-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               {userReview ? 'Edit Your Review' : 'Write a Review'}
             </button>
@@ -533,125 +531,124 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 {userReview ? 'Edit Your Review' : 'Share Your Experience'}
               </h3>
-              
+
               <form onSubmit={handleSubmitReview} className="space-y-4" noValidate>
-            {/* Star Rating */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Your Rating *
-              </label>
-              <div className="flex space-x-1">
-                {[1, 2, 3, 4, 5].map((star) => (
+                {/* Star Rating */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Rating *
+                  </label>
+                  <div className="flex space-x-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRating(star)}
+                        className="p-1 focus:outline-none transition-transform hover:scale-110 cursor-pointer"
+                      >
+                        <Star
+                          size={32}
+                          className={star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {rating === 0 && "Select a rating"}
+                    {rating === 1 && "Poor - Very disappointed"}
+                    {rating === 2 && "Fair - Some issues"}
+                    {rating === 3 && "Good - Met expectations"}
+                    {rating === 4 && "Very Good - Exceeded expectations"}
+                    {rating === 5 && "Excellent - Above and beyond"}
+                  </p>
+                </div>
+
+                {/* Review Text */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Review *
+                  </label>
+                  <textarea
+                    value={reviewText}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      console.log('Textarea onChange triggered, value length:', newValue.length);
+                      setReviewText(newValue);
+                    }}
+                    onKeyDown={(e) => {
+                      console.log('Key pressed:', e.key);
+                    }}
+                    onClick={() => {
+                      console.log('Textarea clicked');
+                    }}
+                    placeholder={`Share your experience with this ${providerType === 'driver' ? 'driver' : 'guide'}... What did you like? What could be improved? Be specific about the service, ${providerType === 'driver' ? 'vehicle condition, ' : ''}knowledge, and overall experience.`}
+                    rows="6"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none bg-white text-gray-900 placeholder-gray-400 transition-all duration-200 hover:border-emerald-300"
+                    style={{
+                      pointerEvents: submitting ? 'none' : 'auto',
+                      cursor: submitting ? 'not-allowed' : 'text'
+                    }}
+                    required
+                    minLength="10"
+                    disabled={submitting}
+                    readOnly={submitting}
+                    autoComplete="off"
+                    spellCheck="true"
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-sm text-gray-500">
+                      Minimum 10 characters. Your review will be visible to all users.
+                    </p>
+                    <p className={`text-sm font-medium ${reviewText.length >= 10 ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                      {reviewText.length}/10 characters
+                    </p>
+                  </div>
+                </div>
+
+                {/* Submit Buttons */}
+                <div className="flex space-x-3">
                   <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRating(star)}
-                    className="p-1 focus:outline-none transition-transform hover:scale-110 cursor-pointer"
+                    type="submit"
+                    disabled={!rating || !reviewText.trim() || reviewText.trim().length < 10 || submitting}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center cursor-pointer"
                   >
-                    <Star
-                      size={32}
-                      className={star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
-                    />
+                    {submitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        {userReview ? 'Updating...' : 'Submitting...'}
+                      </>
+                    ) : userReview ? (
+                      'Update Review'
+                    ) : (
+                      'Submit Review'
+                    )}
                   </button>
-                ))}
-              </div>
-              <p className="text-sm text-gray-500 mt-1">
-                {rating === 0 && "Select a rating"}
-                {rating === 1 && "Poor - Very disappointed"}
-                {rating === 2 && "Fair - Some issues"}
-                {rating === 3 && "Good - Met expectations"}
-                {rating === 4 && "Very Good - Exceeded expectations"}
-                {rating === 5 && "Excellent - Above and beyond"}
-              </p>
-            </div>
 
-            {/* Review Text */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Your Review *
-              </label>
-              <textarea
-                value={reviewText}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  console.log('Textarea onChange triggered, value length:', newValue.length);
-                  setReviewText(newValue);
-                }}
-                onKeyDown={(e) => {
-                  console.log('Key pressed:', e.key);
-                }}
-                onClick={() => {
-                  console.log('Textarea clicked');
-                }}
-                placeholder={`Share your experience with this ${providerType === 'driver' ? 'driver' : 'guide'}... What did you like? What could be improved? Be specific about the service, ${providerType === 'driver' ? 'vehicle condition, ' : ''}knowledge, and overall experience.`}
-                rows="6"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none bg-white text-gray-900 placeholder-gray-400 transition-all duration-200 hover:border-emerald-300"
-                style={{ 
-                  pointerEvents: submitting ? 'none' : 'auto',
-                  cursor: submitting ? 'not-allowed' : 'text'
-                }}
-                required
-                minLength="10"
-                disabled={submitting}
-                readOnly={submitting}
-                autoComplete="off"
-                spellCheck="true"
-              />
-              <div className="flex justify-between items-center mt-1">
-                <p className="text-sm text-gray-500">
-                  Minimum 10 characters. Your review will be visible to all users.
-                </p>
-                <p className={`text-sm font-medium ${
-                  reviewText.length >= 10 ? 'text-green-600' : 'text-gray-500'
-                }`}>
-                  {reviewText.length}/10 characters
-                </p>
-              </div>
-            </div>
+                  {userReview && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteReview}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center cursor-pointer"
+                    >
+                      <Trash2 size={16} className="mr-2" />
+                      Delete
+                    </button>
+                  )}
 
-            {/* Submit Buttons */}
-            <div className="flex space-x-3">
-              <button
-                type="submit"
-                disabled={!rating || !reviewText.trim() || reviewText.trim().length < 10 || submitting}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center cursor-pointer"
-              >
-                {submitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    {userReview ? 'Updating...' : 'Submitting...'}
-                  </>
-                ) : userReview ? (
-                  'Update Review'
-                ) : (
-                  'Submit Review'
-                )}
-              </button>
-              
-              {userReview && (
-                <button
-                  type="button"
-                  onClick={handleDeleteReview}
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center cursor-pointer"
-                >
-                  <Trash2 size={16} className="mr-2" />
-                  Delete
-                </button>
-              )}
-              
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('reviews');
-                  setError('');
-                  setSuccess('');
-                }}
-                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('reviews');
+                      setError('');
+                      setSuccess('');
+                    }}
+                    className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </>
           )}
         </div>
@@ -686,21 +683,20 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
           ) : (
             <div className="space-y-4">
               {reviews.map((review, index) => (
-                <div 
+                <div
                   key={review.id}
                   id={`review-${review.id}`}
-                  className={`bg-white rounded-lg border p-6 ${
-                    currentUser?.uid === review.userId 
-                      ? 'border-emerald-300 bg-emerald-50/40' 
+                  className={`bg-white rounded-lg border p-6 ${currentUser?.uid === review.userId
+                      ? 'border-emerald-300 bg-emerald-50/40'
                       : 'border-gray-200'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                         {review.userPhoto ? (
-                          <img 
-                            src={review.userPhoto} 
+                          <img
+                            src={review.userPhoto}
                             alt={review.userName}
                             className="w-10 h-10 rounded-full object-cover"
                           />
@@ -721,7 +717,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
                         </div>
                       </div>
                     </div>
-                    
+
                     {currentUser?.uid === review.userId && (
                       <button
                         onClick={() => {
@@ -739,39 +735,37 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
                       </button>
                     )}
                   </div>
-                  
+
                   <p className="text-gray-700 leading-relaxed mb-4">{review.comment}</p>
-                  
+
                   {/* Review Actions */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <div className="flex items-center space-x-4">
                       <button
                         onClick={() => handleLikeReview(review.id)}
                         disabled={!currentUser}
-                        className={`flex items-center space-x-1 text-sm cursor-pointer ${
-                          review.likedBy?.includes(currentUser?.uid) 
-                            ? 'text-green-600 font-medium' 
+                        className={`flex items-center space-x-1 text-sm cursor-pointer ${review.likedBy?.includes(currentUser?.uid)
+                            ? 'text-green-600 font-medium'
                             : 'text-gray-500 hover:text-green-600'
-                        } disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                          } disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                       >
                         <ThumbsUp size={14} />
                         <span>Helpful ({review.likes || 0})</span>
                       </button>
-                      
+
                       <button
                         onClick={() => handleDislikeReview(review.id)}
                         disabled={!currentUser}
-                        className={`flex items-center space-x-1 text-sm cursor-pointer ${
-                          review.dislikedBy?.includes(currentUser?.uid) 
-                            ? 'text-red-600 font-medium' 
+                        className={`flex items-center space-x-1 text-sm cursor-pointer ${review.dislikedBy?.includes(currentUser?.uid)
+                            ? 'text-red-600 font-medium'
                             : 'text-gray-500 hover:text-red-600'
-                        } disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                          } disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                       >
                         <ThumbsDown size={14} />
                         <span>Not Helpful ({review.dislikes || 0})</span>
                       </button>
                     </div>
-                    
+
                     {currentUser && currentUser.uid !== review.userId && (
                       <button
                         onClick={() => handleReportReview(review.id, review.userName)}
@@ -782,7 +776,7 @@ const ReviewSection = ({ driverId, guideId, currentUser, userRole, onReviewAdded
                         Report
                       </button>
                     )}
-                    
+
                     {currentUser?.uid === review.userId && (
                       <div className="text-xs text-green-600 font-medium">
                         Your review

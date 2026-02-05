@@ -11,10 +11,14 @@ const getMockCurrentWeather = () => ({
 });
 
 const getMockForecast = () => ({
-  list: Array(5).fill(null).map((_, i) => ({
-    dt_txt: new Date(Date.now() + i * 86400000).toISOString().replace('T', ' ').substring(0, 19),
+  list: Array(40).fill(null).map((_, i) => ({
+    dt_txt: new Date(Date.now() + i * (3 * 3600 * 1000)).toISOString().replace('T', ' ').substring(0, 19),
     main: { temp: 28 + Math.random() * 2 },
-    weather: [{ main: i % 2 === 0 ? 'Clear' : 'Clouds', icon: '01d' }]
+    weather: [{
+      main: (Math.floor(i / 8)) % 2 === 0 ? 'Clear' : 'Clouds',
+      description: (Math.floor(i / 8)) % 2 === 0 ? 'clear sky' : 'broken clouds',
+      icon: '01d'
+    }]
   }))
 });
 

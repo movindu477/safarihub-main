@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, X, Clock, CheckCircle, MapPin, User, Check, X as XIcon } from 'lucide-react';
+import { MessageCircle, X, Clock, CheckCircle, MapPin, User, Check, X as XIcon, Star, Navigation } from 'lucide-react';
 import { updateBookingStatus, getBookingById } from '../App';
 
 const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMarkAsRead, currentUser }) => {
@@ -45,6 +45,8 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
         return <MessageCircle className="h-4 w-4 text-blue-500" />;
       case 'booking':
         return <MapPin className="h-4 w-4 text-green-500" />;
+      case 'payment':
+        return <Clock className="h-4 w-4 text-amber-500" />;
       default:
         return <User className="h-4 w-4 text-gray-500" />;
     }
@@ -56,6 +58,8 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
         return 'bg-blue-100 text-blue-800';
       case 'booking':
         return 'bg-green-100 text-green-800';
+      case 'payment':
+        return 'bg-amber-100 text-amber-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -108,18 +112,23 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
     });
   };
 
-  // Check if notification is for customer receiving booking acceptance
+  // Check if notification is for customer receiving booking acceptance OR payment reminder
   const isCustomerBookingAccepted = (notification) => {
     const bookingInfo = bookingStatuses[notification.id];
-    return notification.type === 'booking' &&
+
+    // Show buttons for payment type notifications (administrative reminders)
+    if (notification.type === 'payment' && notification.bookingId && currentUser && notification.recipientId === currentUser.uid) {
+      return true;
+    }
+
+    // Show buttons for booking acceptance notifications
+    return (notification.type === 'booking' || notification.type === 'payment') &&
       notification.bookingId &&
       currentUser &&
       notification.recipientId === currentUser.uid &&
-      notification.message &&
-      notification.message.toLowerCase().includes('accepted') &&
       bookingInfo &&
-      bookingInfo.status === 'accepted' &&
-      bookingInfo.paymentStatus !== 'paid'; // Only show if not paid yet
+      (bookingInfo.status === 'accepted' || bookingInfo.status === 'confirmed') &&
+      bookingInfo.paymentStatus !== 'paid';
   };
 
   // Check if notification is for provider receiving booking request
@@ -134,9 +143,9 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-h-96 overflow-hidden w-80 sm:w-96">
+    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-h-[500px] flex flex-col overflow-hidden w-80 sm:w-96">
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4">
+      <div className="bg-linear-to-r from-green-500 to-green-600 text-white p-4 shrink-0">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-lg">Notifications</h3>
           <button
@@ -162,7 +171,24 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
       </div>
 
       {/* Notifications List */}
-      <div className="max-h-80 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+        <style jsx>{`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 10px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+          }
+        `}</style>
+
+
         {notifications.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
@@ -179,7 +205,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                   }`}
               >
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     {getNotificationIcon(notification.type)}
                   </div>
 
@@ -189,14 +215,14 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                         }`}>
                         {notification.title || notification.senderName || 'System'}
                       </p>
-                      <div className="flex items-center space-x-1 text-xs text-gray-500 flex-shrink-0 ml-2">
+                      <div className="flex items-center space-x-1 text-xs text-gray-500 shrink-0 ml-2">
                         <Clock className="h-3 w-3" />
                         <span className="whitespace-nowrap">{formatTime(notification.timestamp)}</span>
                       </div>
                     </div>
 
                     <p
-                      className={`text-sm mb-2 break-words ${notification.read ? 'text-gray-500' : 'text-gray-700'
+                      className={`text-sm mb-2 wrap-break-word ${notification.read ? 'text-gray-500' : 'text-gray-700'
                         } ${notification.type === 'booking' && notification.bookingData
                           ? 'whitespace-pre-line'
                           : 'line-clamp-3'
@@ -405,9 +431,45 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                       </div>
                     )}
 
+                    {/* Review and Suggestion Buttons */}
+                    {notification.type === 'review' && (
+                      <div className="mt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const providerPath = notification.serviceType === 'Jeep Driver'
+                              ? `/jeep-profile/${notification.senderId}?tab=reviews`
+                              : `/guide-profile/${notification.senderId}?tab=reviews`;
+                            window.location.href = providerPath;
+                          }}
+                          className="w-full bg-linear-to-r from-amber-500 to-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:from-amber-600 hover:to-amber-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+                        >
+                          <Star size={14} className="fill-current" />
+                          Rate & Review Experience
+                        </button>
+                      </div>
+                    )}
+
+                    {notification.type === 'decline_with_suggestion' && (
+                      <div className="mt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const destPath = notification.destinationId
+                              ? `/destination/${notification.destinationId.toLowerCase().replace(/\s+/g, '-')}`
+                              : '/destination';
+                            window.location.href = `${destPath}?sort=rating`;
+                          }}
+                          className="w-full bg-linear-to-r from-blue-500 to-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:from-blue-600 hover:to-blue-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+                        >
+                          <Navigation size={14} />
+                          Book Another Highly Rated Guide
+                        </button>
+                      </div>
+                    )}
                     {/* Accept/Decline Buttons for Customers receiving booking accepted notifications */}
                     {isCustomerBookingAccepted(notification) && (
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex gap-2 mt-2 mb-3">
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
@@ -441,8 +503,8 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                           ) : (
                             <>
-                              <Check size={14} />
-                              Accept & Pay
+                              <Clock size={14} />
+                              Pay Now
                             </>
                           )}
                         </button>
@@ -460,7 +522,7 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                                 throw new Error('Booking not found');
                               }
 
-                              // Update booking status to declined
+                              // Update booking status to declined (this will release dates and notify provider)
                               await updateBookingStatus(
                                 notification.bookingId,
                                 'declined',
@@ -471,7 +533,10 @@ const NotificationPanel = ({ notifications, onClose, onNotificationClick, onMark
                               );
 
                               await onMarkAsRead(notification.id);
-                              alert('❌ Booking declined. The service provider has been notified.');
+
+                              // Reload page to refresh all booking displays
+                              alert('❌ Booking declined. The service provider has been notified and dates have been released.');
+                              window.location.reload();
                             } catch (error) {
                               console.error('Error declining booking:', error);
                               alert('Failed to decline booking. Please try again.');

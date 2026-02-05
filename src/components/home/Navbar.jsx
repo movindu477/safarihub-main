@@ -11,6 +11,7 @@ import {
   MapPin,
   Globe,
   Phone,
+  Clock,
   Award,
   ChevronDown,
   Map,
@@ -33,6 +34,7 @@ import userImage from "../../assets/user.png";
 
 // Import Chat component for Help & Support
 import Chat from "../Chat";
+import UserProfileSidePanel from "../UserProfileSidePanel";
 
 export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -329,7 +331,13 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
   // Determine user role (must be after userData is set) - memoized
   const userRole = useMemo(() => userData?.serviceType || null, [userData?.serviceType]);
   const isServiceProvider = useMemo(() =>
-    Boolean(userData && (userRole === "Jeep Driver" || userRole === "Tour Guide" || userRole === "Renting")),
+    Boolean(userData && (
+      userRole === "Jeep Driver" ||
+      userRole === "Tour Guide" ||
+      userRole === "Renting" ||
+      userRole === "Renting Store" ||
+      (typeof userRole === 'string' && (userRole.includes('Jeep') || userRole.includes('Guide') || userRole.includes('Renting')))
+    )),
     [userData, userRole]
   );
 
@@ -371,20 +379,33 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
 
   // Memoize profile menu items
   const profileMenuItems = useMemo(() => {
+    const isRenting = userData?.serviceType === 'Renting' || userData?.serviceType === 'Renting Store';
+
     if (isServiceProvider) {
-      // Service providers don't see My Favorites, Settings, or Help & Support
-      return [];
+      if (isRenting) {
+        return [
+          { icon: User, label: "My Profile", href: "/admin?tab=profile", onClick: () => navigate('/admin?tab=profile') },
+          { icon: Package, label: "My Products", href: "/admin?tab=packages", onClick: () => navigate('/admin?tab=packages') },
+          { icon: HelpCircle, label: "Help & Support", href: "#", onClick: () => setShowProviderSupport(true) },
+        ];
+      }
+      return [
+        { icon: User, label: "My Profile", href: "/admin?tab=profile", onClick: () => navigate('/admin?tab=profile') },
+        { icon: Calendar, label: "My Bookings", href: "/admin?tab=bookings", onClick: () => navigate('/admin?tab=bookings') },
+        { icon: Package, label: "My Packages", href: "/admin?tab=packages", onClick: () => navigate('/admin?tab=packages') },
+        { icon: Clock, label: "Availability", href: "/admin?tab=availability", onClick: () => navigate('/admin?tab=availability') },
+        { icon: HelpCircle, label: "Help & Support", href: "#", onClick: () => setShowProviderSupport(true) },
+      ];
     } else {
       return [
         { icon: User, label: "My Profile", href: "/profile", onClick: handleProfileClick },
         { icon: Calendar, label: "My Bookings", href: "/my-bookings", onClick: handleMyBookingsClick },
         { icon: TrendingUp, label: "For You", href: "/personalized-dashboard", onClick: handleFavoritesClick },
-        { icon: CreditCard, label: "Payment Wallet", href: "/payment-wallet", onClick: handlePaymentWalletClick },
         { icon: Settings, label: "Preferences", href: "/user-preferences", onClick: handlePreferencesClick },
         { icon: HelpCircle, label: "Help & Support", href: "#", onClick: handleUserSupportClick },
       ];
     }
-  }, [isServiceProvider, handleProfileClick, handleMyBookingsClick, handleFavoritesClick, handlePreferencesClick, handlePaymentWalletClick, handleUserSupportClick]);
+  }, [isServiceProvider, handleProfileClick, handleMyBookingsClick, handleFavoritesClick, handlePreferencesClick, handleUserSupportClick, navigate, userData?.serviceType]);
 
   // Memoize navigation handlers
   const handleAdminClick = useCallback(() => navigate("/admin"), [navigate]);
@@ -605,9 +626,9 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
             ) : (
               <div
                 className="relative group cursor-pointer"
-                onClick={() => setProfileOpen(true)}
+                onClick={() => setProfileOpen(!profileOpen)}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full blur opacity-0 group-hover:opacity-50 transition duration-500"></div>
+                <div className="absolute inset-0 bg-linear-to-r from-emerald-500 to-teal-500 rounded-full blur opacity-0 group-hover:opacity-50 transition duration-500"></div>
                 <div className="relative p-0.5 rounded-full bg-white border border-gray-200 hover:border-emerald-500 transition-colors duration-300">
                   {userProfileData.avatar && userProfileData.avatar !== userImage ? (
                     <img
@@ -622,10 +643,21 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                     </div>
                   )}
                 </div>
+
+                {/* User Side Panel Integration */}
+                <UserProfileSidePanel
+                  isOpen={profileOpen}
+                  onClose={() => setProfileOpen(false)}
+                  userProfileData={userProfileData}
+                  profileMenuItems={profileMenuItems}
+                  handleLogout={handleLogout}
+                  isServiceProvider={isServiceProvider}
+                />
               </div>
             )}
           </div>
         </div>
+
 
         {/* Mobile Menu Button - Modernized */}
         <div className="md:hidden flex items-center pointer-events-auto">
@@ -761,7 +793,7 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
                       style={{ animationDelay: "450ms" }}
                       onClick={() => {
                         setMenuOpen(false);
-                        setProfileOpen(true);
+                        navigate('/profile');
                       }}
                     >
                       <div className="relative">
@@ -797,296 +829,15 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
         )
       }
 
-      {/* Profile Side Panel */}
-      {
-        profileOpen && currentUser && (
-          <>
-            <div
-              className="fixed inset-0 bg-black bg-opacity-70 z-40 backdrop-blur-sm animate-fadeIn"
-              onClick={() => setProfileOpen(false)}
-            />
 
-            <div className="fixed top-0 right-0 h-full w-[90vw] max-w-md bg-gradient-to-br from-black via-gray-900 to-black text-white shadow-2xl border-l border-white/10 overflow-hidden z-50 animate-slideInRight">
-              {/* Close Button - Top Right - Fixed position to stay visible when scrolling */}
-              <div className="fixed top-4 right-4 z-[100]">
-                <button
-                  onClick={() => setProfileOpen(false)}
-                  className="p-2.5 cursor-pointer bg-white/10 rounded-full hover:bg-white/20 transition-all backdrop-blur-sm shadow-lg"
-                  aria-label="Close profile"
-                >
-                  <X className="h-5 w-5 text-white" />
-                </button>
-              </div>
-
-              <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
-                <div className="relative">
-                  <div className="h-48 bg-gradient-to-br from-green-600/20 via-transparent to-transparent relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-gray-700/30 to-transparent"></div>
-                    <div className="absolute top-0 right-0 w-72 h-72 bg-green-500/10 rounded-full -mr-36 -mt-36 blur-3xl"></div>
-                    <div className="absolute bottom-0 left-0 w-56 h-56 bg-green-600/10 rounded-full -ml-28 -mb-28 blur-3xl"></div>
-                  </div>
-
-                  <div className="px-6 pb-6 -mt-20 relative z-10">
-                    <div className="relative inline-block">
-                      {userProfileData.avatar && userProfileData.avatar !== userImage ? (
-                        <img
-                          src={userProfileData.avatar}
-                          alt="User"
-                          className="relative h-32 w-32 rounded-full border-4 border-white/20 bg-gray-900 shadow-2xl object-cover"
-                          onError={(e) => {
-                            console.error('❌ Profile image failed to load in slide panel:', userProfileData.avatar);
-                            console.error('   User data:', userData);
-                            console.error('   Current user:', currentUser);
-                            e.target.src = userImage;
-                            e.target.onerror = null; // Prevent infinite loop
-                          }}
-                          onLoad={() => {
-                            console.log('✅ Profile image loaded successfully in slide panel');
-                          }}
-                        />
-                      ) : (
-                        <div className="relative h-32 w-32 rounded-full border-4 border-white/20 bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl flex items-center justify-center">
-                          <User className="h-16 w-16 text-gray-300" />
-                        </div>
-                      )}
-                      <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 rounded-full border-3 border-white shadow-lg animate-pulse"></div>
-                    </div>
-
-                    <div className="mt-4 animate-fadeInUp" style={{ animationDelay: "100ms" }}>
-                      <h2 className="text-2xl font-bold text-white">{userProfileData.name}</h2>
-                      <p className="text-gray-300 text-sm mt-1">{userProfileData.email}</p>
-                      <div className="flex flex-col gap-2 mt-3">
-                        <span className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-1.5 rounded-full text-xs font-bold w-fit shadow-lg border border-green-500/30">
-                          {userProfileData.membership}
-                        </span>
-                        <span className="text-gray-400 text-sm flex items-center gap-2">
-                          <Calendar className="h-3 w-3" />
-                          Member since {userProfileData.joinDate}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {userData && (
-                  <div className="px-6 py-5 border-y border-white/10 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-sm animate-fadeInUp" style={{ animationDelay: "200ms" }}>
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                      <div className="p-1.5 bg-green-600/20 rounded-lg border border-green-500/30">
-                        <User className="h-4 w-4 text-green-400" />
-                      </div>
-                      Profile Information
-                    </h3>
-                    <div className="space-y-3">
-                      {userProfileData.phone !== "Not provided" && (
-                        <div className="flex items-center gap-3 text-sm p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                          <div className="p-2 bg-green-600/20 rounded-lg border border-green-500/30">
-                            <Phone className="h-4 w-4 text-green-400" />
-                          </div>
-                          <span className="text-gray-300 font-medium">Phone: </span>
-                          <span className="text-white">{userProfileData.phone}</span>
-                        </div>
-                      )}
-
-                      {userProfileData.location !== "Not specified" && (
-                        <div className="flex items-center gap-3 text-sm p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                          <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                            <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                          </div>
-                          <span className="text-gray-300 font-medium">
-                            {userProfileData.role === "Service Provider" ? "Location: " : "Country: "}
-                          </span>
-                          <span className="text-white">{userProfileData.location}</span>
-                        </div>
-                      )}
-
-                      {userProfileData.languages !== "Not specified" && (
-                        <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
-                          <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                            <Globe className="h-3.5 w-3.5 text-gray-400" />
-                          </div>
-                          <span className="text-gray-300 font-medium">
-                            {userProfileData.role === "Service Provider" ? "Languages: " : "Preferred Language: "}
-                          </span>
-                          <span className="text-white">{userProfileData.languages}</span>
-                        </div>
-                      )}
-
-                      {userProfileData.experience && (
-                        <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
-                          <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                            <Award className="h-3.5 w-3.5 text-gray-400" />
-                          </div>
-                          <span className="text-gray-300 font-medium">Experience: </span>
-                          <span className="text-white">{userProfileData.experience} years</span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-3 text-sm p-2 rounded-lg bg-gray-800/30 border border-gray-700/30">
-                        <div className="p-1.5 bg-gray-800/40 rounded-lg border border-gray-700/30">
-                          <User className="h-3.5 w-3.5 text-gray-400" />
-                        </div>
-                        <span className="text-gray-300 font-medium">Role: </span>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${userProfileData.role === "Service Provider"
-                          ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg shadow-gray-700/50 border border-gray-500/30"
-                          : "bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg shadow-gray-600/50 border border-gray-400/30"
-                          }`}>
-                          {userProfileData.role}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Admin Button for Service Providers */}
-                {isServiceProvider && (
-                  <div className="p-6 pb-4 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp" style={{ animationDelay: "400ms" }}>
-                    {/* My Profile */}
-                    <button
-                      onClick={() => {
-                        setProfileOpen(false);
-                        navigate('/admin?tab=profile');
-                      }}
-                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                      style={{ animationDelay: "500ms" }}
-                    >
-                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                        <User className="h-5 w-5 text-gray-300" />
-                      </div>
-                      <span className="font-medium text-gray-200">
-                        My Profile
-                      </span>
-                    </button>
-
-                    {/* My Bookings */}
-                    <button
-                      onClick={() => {
-                        setProfileOpen(false);
-                        navigate('/admin?tab=bookings');
-                      }}
-                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                      style={{ animationDelay: "550ms" }}
-                    >
-                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                        <Calendar className="h-5 w-5 text-gray-300" />
-                      </div>
-                      <span className="font-medium text-gray-200">
-                        My Bookings
-                      </span>
-                    </button>
-
-                    {/* My Packages - For all service providers */}
-                    <button
-                      onClick={() => {
-                        setProfileOpen(false);
-                        navigate('/admin?tab=packages');
-                      }}
-                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                      style={{ animationDelay: "600ms" }}
-                    >
-                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                        <Package className="h-5 w-5 text-gray-300" />
-                      </div>
-                      <span className="font-medium text-gray-200">
-                        My Packages
-                      </span>
-                    </button>
-
-                    {/* Manage Rentals - Only for Renting Shops */}
-                    {userData?.serviceType === 'Renting' && (
-                      <button
-                        onClick={() => {
-                          setProfileOpen(false);
-                          navigate('/manage-rentals');
-                        }}
-                        className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                        style={{ animationDelay: "650ms" }}
-                      >
-                        <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                          <Calendar className="h-5 w-5 text-gray-300" />
-                        </div>
-                        <span className="font-medium text-gray-200">
-                          Manage Rentals
-                        </span>
-                      </button>
-                    )}
-
-                    {/* Payment Wallet - Removed for service providers */}
-
-                    {/* Help & Support */}
-                    <button
-                      onClick={() => {
-                        setProfileOpen(false);
-                        setShowProviderSupport(true);
-                      }}
-                      className="w-full flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-600/50 animate-fadeInUp bg-gray-800/20 hover:bg-gray-800/30 transition-colors"
-                      style={{ animationDelay: "600ms" }}
-                    >
-                      <div className="p-2 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                        <HelpCircle className="h-5 w-5 text-gray-300" />
-                      </div>
-                      <span className="font-medium text-gray-200">
-                        Help & Support
-                      </span>
-                    </button>
-
-                  </div>
-                )}
-
-                {profileMenuItems.length > 0 && (
-                  <div className={`p-6 space-y-2 bg-gradient-to-b from-gray-900 to-black animate-fadeInUp ${isServiceProvider ? 'pt-4' : ''}`} style={{ animationDelay: "400ms" }}>
-                    {profileMenuItems.map((item, index) => {
-                      const IconComponent = item.icon;
-                      return (
-                        <a
-                          key={item.label}
-                          href={item.href}
-                          className="flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-gray-700/30 animate-fadeInUp hover:bg-gray-800/30 transition-colors relative"
-                          style={{ animationDelay: `${index * 50 + 500}ms` }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (item.onClick) {
-                              item.onClick();
-                            } else {
-                              setProfileOpen(false);
-                            }
-                          }}
-                        >
-                          <div className="p-2 bg-gray-800/30 rounded-lg border border-gray-700/30">
-                            <IconComponent className="h-5 w-5 text-gray-400" />
-                          </div>
-                          <span className="font-medium text-gray-300">
-                            {item.label}
-                          </span>
-                        </a>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="px-6 py-5 border-t border-gray-700/30 bg-gradient-to-b from-gray-900 to-black mt-auto animate-fadeInUp" style={{ animationDelay: "600ms" }}>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-4 p-3.5 rounded-xl text-red-400 w-full border border-red-700/30 cursor-pointer"
-                  >
-                    <div className="p-2 bg-red-700/20 rounded-lg border border-red-600/30">
-                      <LogOut className="h-5 w-5" />
-                    </div>
-                    <span className="font-medium">Log Out</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )
-      }
 
       {/* Help & Support Chat Modal for Service Providers */}
       {
         showProviderSupport && currentUser && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="relative w-full max-w-4xl h-[90vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
               {/* Header */}
-              <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
+              <div className="bg-linear-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <HelpCircle className="h-6 w-6" />
                   <div>
@@ -1121,10 +872,10 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
       {/* Help & Support Chat Modal for Users/Tourists */}
       {
         showUserSupport && currentUser && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="relative w-full max-w-4xl h-[90vh] bg-gray-900 rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
               {/* Header */}
-              <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
+              <div className="bg-linear-to-r from-emerald-600 to-emerald-700 text-white p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <HelpCircle className="h-6 w-6" />
                   <div>
@@ -1155,6 +906,16 @@ export default function Navbar({ user, onLogout, onLogin, onRegister }) {
           </div>
         )
       }
+
+      {/* User Profile Side Panel */}
+      <UserProfileSidePanel
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        userProfileData={userProfileData}
+        profileMenuItems={profileMenuItems}
+        handleLogout={handleLogout}
+        isServiceProvider={isServiceProvider}
+      />
 
       <style>{`
         @keyframes slideInRight {

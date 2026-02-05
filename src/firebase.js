@@ -19,8 +19,10 @@ import {
   arrayRemove
 } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getStorage } from 'firebase/storage'; // Re-enabled for profile images
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // Enabled for fallbacks
 
+
+// 🔥 Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyAXjQQ9BYX4upBJx_Ko5jTUq9nTCIDItSA",
   authDomain: "safarihub-a80bd.firebaseapp.com",
@@ -32,9 +34,39 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
 const db = getFirestore(app);
 const auth = getAuth(app);
-const storage = getStorage(app); // Initialize Firebase Storage
+const storage = getStorage(app);
+
+/**
+ * Upload file to Firebase Storage (Fallback when Supabase is not configured)
+ */
+export const uploadFileToFirebaseStorage = async (file, path) => {
+  try {
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return { url: downloadURL, error: null };
+  } catch (error) {
+    console.error('❌ Firebase Storage upload error:', error);
+    return { url: null, error: error.message };
+  }
+};
+
+/**
+ * Delete file from Firebase Storage
+ */
+export const deleteFileFromFirebaseStorage = async (path) => {
+  try {
+    const storageRef = ref(storage, path);
+    await deleteObject(storageRef);
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('❌ Firebase Storage delete error:', error);
+    return { success: false, error: error.message };
+  }
+};
 
 // ==================== ENHANCED ONLINE STATUS MANAGEMENT ====================
 

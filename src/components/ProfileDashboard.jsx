@@ -355,7 +355,7 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
 
       {/* Modern Header Section with Gradient */}
       <div className="relative bg-black pt-32 pb-24 px-4 sm:px-6 lg:px-8 rounded-b-[40px] overflow-visible shadow-2xl mb-20">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-teal-900 to-black opacity-95 rounded-b-[40px]"></div>
+        <div className="absolute inset-0 bg-linear-to-br from-emerald-900 via-teal-900 to-black opacity-95 rounded-b-[40px]"></div>
 
         {/* Decorative elements */}
         <div className="absolute top-20 left-10 w-64 h-64 bg-emerald-500 rounded-full mix-blend-overlay filter blur-3xl opacity-10 animate-blob"></div>
@@ -372,7 +372,7 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-800 to-teal-900 text-white">
+                <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-emerald-800 to-teal-900 text-white">
                   <User className="h-16 w-16 opacity-50" />
                 </div>
               )}
@@ -513,7 +513,7 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 group-hover:text-emerald-500 transition-colors">Phone Number</label>
                   {isEditing ? (
                     <div className="flex gap-3">
-                      <div className="relative flex-shrink-0">
+                      <div className="relative shrink-0">
                         <button
                           type="button"
                           onClick={() => setShowCountryDropdown(!showCountryDropdown)}
@@ -729,20 +729,12 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
                     <p className="text-emerald-700/70 text-xs font-medium">Full Access active</p>
                   </div>
                 </div>
-                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
-                  <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
-                    <Calendar className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="text-blue-900 font-bold text-lg">Active Savings</p>
-                    <p className="text-blue-700/70 text-xs font-medium">Check Wallet for details</p>
-                  </div>
-                </div>
+
               </div>
             </div>
 
             {/* Hint Box (Premium Gradient) */}
-            <div className="bg-gradient-to-br from-gray-900 to-black rounded-3xl shadow-xl p-8 text-white relative overflow-hidden group">
+            <div className="bg-linear-to-br from-gray-900 to-black rounded-3xl shadow-xl p-8 text-white relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500 rounded-full mix-blend-overlay filter blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
               <div className="absolute bottom-0 left-0 w-32 h-32 bg-teal-500 rounded-full mix-blend-overlay filter blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
 
@@ -764,7 +756,7 @@ export default function ProfileDashboard({ user, onLogout, onShowAuth }) {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}></div>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative z-10 animate-scale-up">
             <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Document?</h3>

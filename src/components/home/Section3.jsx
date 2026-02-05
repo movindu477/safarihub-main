@@ -1,9 +1,12 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 // Import map image from src/assets
 import mapImage from "../../assets/map-desktop-v2.png";
 
 export default function Section3() {
+  const navigate = useNavigate();
+
   // Wildlife locations with manual positioning (top, left, right, bottom in %)
   const locations = [
     { name: "Mannar", top: "24%", left: "23%" },
@@ -24,11 +27,34 @@ export default function Section3() {
     { name: "Horton Plains", top: "73%", left: "58%" },
     { name: "Lunugamvehera NP", top: "75%", right: "29%" },
     { name: "Udawalawe NP", top: "80%", left: "54%" },
-    // { name: "Yala NP", top: "80%", right: "12%" },
+    { name: "Yala NP", top: "78%", right: "22%" }, // Moved Yala NP to better location between Kumana and Lunugamvehera
     { name: "Kanneliya Reserve", top: "83%", left: "40%" },
     { name: "Bundala NP", top: "83%", right: "32%" },
     { name: "Kalametiya Bird Sanctuary", top: "90%", left: "56%" },
   ];
+
+  // Map destination names to their canonical IDs
+  const getDestinationId = (name) => {
+    const idMap = {
+      'Wilpattu NP': 'wilpattu-national-park',
+      'Yala NP': 'yala-national-park',
+      'Kumana NP': 'kumana-wildlife',
+      'Lunugamvehera NP': 'lunugamvehera',
+      'Sinharaja': 'sinharaja-forest-reserve',
+      'Horton Plains': 'horton-plains',
+      'Knuckles Forest Reserve': 'knuckles-forest-reserve',
+      'Kaudulla NP': 'kaudulla-national-park',
+      'Minneriya NP': 'minneriya-national-park',
+      'Wasgamuwa NP': 'wasgamuwa-national-park',
+      'Kalawewa NP': 'kalawewa-national-park',
+      'Udawalawe NP': 'udawalawe-national-park',
+      'Bundala NP': 'bundala-national-park',
+      'Pigeon Island': 'pigeon-island',
+      'Mirissa': 'mirissa-beach',
+      'Unawatuna': 'unawatuna-beach'
+    };
+    return idMap[name] || name.toLowerCase().replace(/\s+np$/i, '-national-park').replace(/\s+/g, '-');
+  };
 
   return (
     <section className="w-full bg-white text-black py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-12 xl:px-16">
@@ -104,6 +130,7 @@ export default function Section3() {
                     <div
                       key={index}
                       className="absolute group cursor-pointer z-10 hover:z-50"
+                      onClick={() => navigate(`/destination/${getDestinationId(location.name)}`)}
                       style={{
                         top: location.top,
                         left: location.left,

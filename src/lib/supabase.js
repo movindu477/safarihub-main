@@ -3,16 +3,21 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Supabase client for direct access (client-side)
 import { createClient } from '@supabase/supabase-js';
+import { uploadFileToFirebaseStorage } from '../firebase';
 
 // Initialize Supabase client with public anon key (safe for client-side)
 // IMPORTANT: Replace YOUR_ANON_KEY_HERE with your actual anon key from Supabase Dashboard → Settings → API
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://garmyrrkqsboyrgcfytm.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY_HERE'; // Get this from Supabase Dashboard
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseAnonKey) {
+  console.warn('⚠️ Supabase Anon Key is missing! Automatic fallback to Firebase Storage is enabled.');
+}
+
+const supabaseClient = createClient(supabaseUrl, supabaseAnonKey || 'MISSING_KEY');
 
 /**
- * Upload Document using client-side Supabase (works in production)
+ * Upload Document using client-side Supabase with Firebase Fallback
  * @param {File} file - Document file to upload
  * @param {string} userId - User ID
  * @param {string} fileName - Optional custom file name
@@ -24,7 +29,18 @@ export const uploadDocumentClientSide = async (file, userId, fileName = null) =>
       throw new Error('No file provided');
     }
 
-    // Generate file path
+    // FALLBACK: Use Firebase Storage if Supabase key is missing
+    if (!supabaseAnonKey || supabaseAnonKey === 'YOUR_ANON_KEY_HERE') {
+      console.log('🔄 Supabase key missing. Using Firebase Storage fallback...');
+      const timestamp = Date.now();
+      const sanitizedName = (fileName || file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const firebasePath = `users/${userId}/documents/${timestamp}_${sanitizedName}`;
+
+      const { url, error } = await uploadFileToFirebaseStorage(file, firebasePath);
+      return { url, path: firebasePath, error };
+    }
+
+    // Generate file path for Supabase
     const timestamp = Date.now();
     const sanitizedName = (fileName || file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `users/${userId}/documents/${timestamp}_${sanitizedName}`;
@@ -79,6 +95,17 @@ export const uploadProviderDocumentClientSide = async (file, userId, fileName = 
       throw new Error('No file provided');
     }
 
+    // FALLBACK: Use Firebase Storage if Supabase key is missing
+    if (!supabaseAnonKey || supabaseAnonKey === 'YOUR_ANON_KEY_HERE') {
+      console.log('🔄 Supabase key missing. Using Firebase Storage fallback for provider doc...');
+      const timestamp = Date.now();
+      const sanitizedName = (fileName || file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const firebasePath = `providers/${userId}/verify/${timestamp}_${sanitizedName}`;
+
+      const { url, error } = await uploadFileToFirebaseStorage(file, firebasePath);
+      return { url, path: firebasePath, error };
+    }
+
     // Generate file path
     const timestamp = Date.now();
     const sanitizedName = (fileName || file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -88,6 +115,73 @@ export const uploadProviderDocumentClientSide = async (file, userId, fileName = 
 
     // Upload to Supabase Storage - provider-documents bucket
     // Note: User created bucket as PROVIDER-DOCUMENTS (case sensitive)
+    const { data, error } = await supabaseClient.storage
+      .from('PROVIDER-DOCUMENTS')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('❌ Upload error:', error);
+      throw error;
+    }
+
+    console.log('✅ Upload successful:', data);
+
+    // Get public URL
+    const { data: urlData } = supabaseClient.storage
+      .from('PROVIDER-DOCUMENTS')
+      .getPublicUrl(filePath);
+
+    return {
+      url: urlData.publicUrl,
+      path: filePath,
+      error: null
+    };
+  } catch (error) {
+    console.error('❌ Upload failed:', error);
+    return {
+      url: null,
+      path: null,
+      error: error.message || 'Upload failed'
+    };
+  }
+};
+
+/**
+ * Upload Product Image using client-side Supabase
+ * @param {File} file - Image file to upload
+ * @param {string} userId - User ID
+ * @param {string} fileName - Optional custom file name
+ * @returns {Promise<{url: string, path: string, error: any}>}
+ */
+export const uploadProductImageClientSide = async (file, userId, fileName = null) => {
+  try {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    // FALLBACK: Use Firebase Storage if Supabase key is missing
+    if (!supabaseAnonKey || supabaseAnonKey === 'YOUR_ANON_KEY_HERE') {
+      console.log('🔄 Supabase key missing. Using Firebase Storage fallback for product image...');
+      const timestamp = Date.now();
+      const sanitizedName = (fileName || file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const firebasePath = `products/${userId}/${timestamp}_${sanitizedName}`;
+
+      const { url, error } = await uploadFileToFirebaseStorage(file, firebasePath);
+      return { url, path: firebasePath, error };
+    }
+
+    // Generate file path
+    const timestamp = Date.now();
+    const sanitizedName = (fileName || file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+    // Store in a 'products' subfolder to keep organized
+    const filePath = `products/${userId}/${timestamp}_${sanitizedName}`;
+
+    console.log('📤 Uploading product image to Supabase:', filePath);
+
+    // Upload to Supabase Storage - using PROVIDER-DOCUMENTS as it seems to be the active one
     const { data, error } = await supabaseClient.storage
       .from('PROVIDER-DOCUMENTS')
       .upload(filePath, file, {
@@ -142,6 +236,17 @@ export const uploadProfileImageClientSide = async (file, userId) => {
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       throw new Error('Image size must be less than 5MB');
+    }
+
+    // FALLBACK: Use Firebase Storage if Supabase key is missing
+    if (!supabaseAnonKey || supabaseAnonKey === 'YOUR_ANON_KEY_HERE') {
+      console.log('🔄 Supabase key missing. Using Firebase Storage fallback for profile image...');
+      const timestamp = Date.now();
+      const fileExtension = file.name.split('.').pop();
+      const firebasePath = `users/${userId}/profile/${timestamp}.${fileExtension}`;
+
+      const { url, error } = await uploadFileToFirebaseStorage(file, firebasePath);
+      return { url, path: firebasePath, error };
     }
 
     // Generate file path

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   MapPin,
@@ -23,7 +23,8 @@ import {
   AlertCircle,
   Calendar,
   Car,
-  UserCircle
+  UserCircle,
+  ShoppingBag
 } from 'lucide-react';
 import Navbar from '../home/Navbar';
 import Footer from '../home/Footer';
@@ -113,6 +114,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
   const [mapZoom, setMapZoom] = useState(12);
   const [jeepDrivers, setJeepDrivers] = useState([]);
   const [tourGuides, setTourGuides] = useState([]);
+  const [rentingStores, setRentingStores] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
 
   // Weather state
@@ -170,7 +172,6 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
           id: doc.id,
           ...doc.data()
         }));
-        setJeepDrivers(jeepDriversData);
 
         // Fetch Tour Guides
         const tourGuidesQuery = query(
@@ -184,7 +185,35 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
           id: doc.id,
           ...doc.data()
         }));
+
+        // Fetch Renting Stores (Filtered by Province)
+        let rentingStoresData = [];
+        if (destination.province) {
+          const rentingStoresQuery = query(
+            providersRef,
+            where('serviceType', '==', 'Renting Store'),
+            where('destinations', '==', destination.province),
+            limit(6)
+          );
+          const rentingStoresSnapshot = await getDocs(rentingStoresQuery);
+          rentingStoresData = rentingStoresSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        }
+
+        // Check for rating sort in URL
+        const queryParams = new URLSearchParams(window.location.search);
+        const shouldSortByRating = queryParams.get('sort') === 'rating';
+
+        if (shouldSortByRating) {
+          jeepDriversData.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+          tourGuidesData.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        }
+
+        setJeepDrivers(jeepDriversData);
         setTourGuides(tourGuidesData);
+        setRentingStores(rentingStoresData);
 
       } catch (error) {
         console.error('Error fetching service providers:', error);
@@ -303,7 +332,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
             backgroundImage: `url(${destination.backgroundImage})`,
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent"></div>
+          <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/30 to-transparent"></div>
         </div>
 
         {/* Back Button */}
@@ -345,14 +374,14 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                 <h3 className="text-xl font-semibold text-gray-900 mb-6">Quick Facts</h3>
                 <div className="space-y-4">
                   <div className="flex items-start">
-                    <MapPin className="h-5 w-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" />
+                    <MapPin className="h-5 w-5 text-gray-400 mt-0.5 mr-3 shrink-0" />
                     <div>
                       <p className="text-sm text-gray-500">Location</p>
                       <p className="font-medium text-gray-900">{destination.location}</p>
                     </div>
                   </div>
                   <div className="flex items-start">
-                    <Clock className="h-5 w-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" />
+                    <Clock className="h-5 w-5 text-gray-400 mt-0.5 mr-3 shrink-0" />
                     <div>
                       <p className="text-sm text-gray-500">Best Time to Visit</p>
                       <p className="font-medium text-gray-900">{destination.bestTimeToVisit}</p>
@@ -360,7 +389,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                   </div>
                   {destination.area && (
                     <div className="flex items-start">
-                      <Navigation className="h-5 w-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" />
+                      <Navigation className="h-5 w-5 text-gray-400 mt-0.5 mr-3 shrink-0" />
                       <div>
                         <p className="text-sm text-gray-500">Area</p>
                         <p className="font-medium text-gray-900">{destination.area}</p>
@@ -369,7 +398,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                   )}
                   {destination.established && (
                     <div className="flex items-start">
-                      <Calendar className="h-5 w-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" />
+                      <Calendar className="h-5 w-5 text-gray-400 mt-0.5 mr-3 shrink-0" />
                       <div>
                         <p className="text-sm text-gray-500">Established</p>
                         <p className="font-medium text-gray-900">{destination.established}</p>
@@ -567,7 +596,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                 <button
                   key={index}
                   onClick={() => setSelectedAnimal(index)}
-                  className={`relative flex-shrink-0 w-40 h-40 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${index === selectedAnimal
+                  className={`relative shrink-0 w-40 h-40 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${index === selectedAnimal
                     ? 'border-green-600 ring-2 ring-green-600 ring-offset-2'
                     : 'border-gray-300 hover:border-green-500'
                     }`}
@@ -652,7 +681,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
             {/* Location Info Card */}
             <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-xs">
               <div className="flex items-start">
-                <MapPin className="h-5 w-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" />
+                <MapPin className="h-5 w-5 text-green-600 mt-0.5 mr-3 shrink-0" />
                 <div>
                   <p className="font-semibold text-gray-900">{destination.name}</p>
                   <p className="text-sm text-gray-600">{destination.location}</p>
@@ -664,7 +693,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
       </section>
 
       {/* Jeep Drivers and Guides Section */}
-      <section className="py-20 md:py-24 bg-gradient-to-b from-gray-50 to-white">
+      <section className="py-20 md:py-24 bg-linear-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loadingProviders ? (
             <div className="text-center py-12">
@@ -703,7 +732,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                             alt={driver.fullName || 'Jeep Driver'}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                          <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent"></div>
                           <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg">
                             <Star className="h-4 w-4 text-amber-500 fill-current" />
                             <span className="text-sm font-semibold text-gray-900">
@@ -723,11 +752,13 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                             {driver.description || driver.bio || 'Experienced jeep driver'}
                           </p>
                           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                            <span className="text-lg font-bold text-green-600">
-                              {driver.currencyPreference === 'USD' ? '$' : 'LKR '}
-                              {driver.dailyRate || driver.hourlyRate || 'Contact'}
-                              {driver.dailyRate ? '/day' : driver.hourlyRate ? '/hr' : ''}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-500 font-medium">Starting from</span>
+                              <span className="text-lg font-bold text-green-600">
+                                {driver.currencyPreference === 'USD' ? '$' : 'LKR '}
+                                {(driver.priceHalfDayStandard || driver.priceHalfDay || driver.dailyRate || driver.hourlyRate || 0).toLocaleString()}
+                              </span>
+                            </div>
                             <button
                               className="text-green-600 hover:text-green-700 font-medium text-sm transition-colors"
                               onClick={(e) => {
@@ -783,7 +814,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                             alt={guide.fullName || guide.guideName || 'Tour Guide'}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                          <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent"></div>
                           <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg">
                             <Star className="h-4 w-4 text-amber-500 fill-current" />
                             <span className="text-sm font-semibold text-gray-900">
@@ -803,11 +834,13 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                             {guide.description || guide.bio || 'Experienced tour guide'}
                           </p>
                           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                            <span className="text-lg font-bold text-green-600">
-                              {guide.currencyPreference === 'USD' ? '$' : 'LKR '}
-                              {guide.dailyRate || guide.hourlyRate || 'Contact'}
-                              {guide.dailyRate ? '/day' : guide.hourlyRate ? '/hr' : ''}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-500 font-medium">Starting from</span>
+                              <span className="text-lg font-bold text-green-600">
+                                {guide.currencyPreference === 'USD' ? '$' : 'LKR '}
+                                {(guide.priceHalfDayStandard || guide.dailyRate || guide.hourlyRate || 0).toLocaleString()}
+                              </span>
+                            </div>
                             <button
                               className="text-green-600 hover:text-green-700 font-medium text-sm transition-colors"
                               onClick={(e) => {
@@ -842,14 +875,92 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                   </div>
                 </div>
               )}
+
+              {/* Renting Stores */}
+              {rentingStores.length > 0 && (
+                <div className="mt-16">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <ShoppingBag className="h-6 w-6 mr-2 text-green-600" />
+                    <span>Gear Rental Stores</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {rentingStores.map((store) => (
+                      <div
+                        key={store.id}
+                        className="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                        onClick={() => navigate(`/renting-profile/${store.id}`)}
+                      >
+                        <div className="relative h-48 overflow-hidden">
+                          <img
+                            src={store.profilePicture || store.imageUrl || '/api/placeholder/400/300'}
+                            alt={store.fullName || store.storeName || 'Renting Store'}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent"></div>
+                          <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg">
+                            <Star className="h-4 w-4 text-amber-500 fill-current" />
+                            <span className="text-sm font-semibold text-gray-900">
+                              {store.rating ? store.rating.toFixed(1) : '0.0'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          <h4 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-green-600 transition-colors">
+                            {store.fullName || store.storeName || 'Renting Store'}
+                          </h4>
+                          <div className="flex items-center text-sm text-gray-600 mb-3">
+                            <MapPin className="h-4 w-4 mr-1 text-gray-500" />
+                            <span>{store.destinations || store.province || 'Sri Lanka'}</span>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                            {store.description || store.bio || 'Quality gear for your adventure'}
+                          </p>
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                            <span className="text-lg font-bold text-green-600">
+                              Contact {store.contactPhone || store.phone || ''}
+                            </span>
+                            <button
+                              className="text-green-600 hover:text-green-700 font-medium text-sm transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/renting-profile/${store.id}`);
+                              }}
+                            >
+                              View Store →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-center mt-8">
+                    <button
+                      onClick={() => {
+                        navigate('/renting');
+                        // Scroll to renting section after navigation
+                        setTimeout(() => {
+                          const section = document.getElementById('renting-section');
+                          if (section) {
+                            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }, 100);
+                      }}
+                      className="inline-flex items-center text-green-600 hover:text-green-700 font-medium transition-colors"
+                    >
+                      View All Renting Stores
+                      <ArrowLeft className="ml-2 rotate-180" size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
       </section>
 
       {/* No providers found message */}
-      {!loadingProviders && jeepDrivers.length === 0 && tourGuides.length === 0 && (
-        <section className="py-20 md:py-24 bg-gradient-to-b from-gray-50 to-white">
+      {!loadingProviders && jeepDrivers.length === 0 && tourGuides.length === 0 && rentingStores.length === 0 && (
+        <section className="py-20 md:py-24 bg-linear-to-b from-gray-50 to-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center py-12">
               <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -857,7 +968,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                 No Service Providers Available
               </h3>
               <p className="text-gray-600 mb-6">
-                Currently, there are no registered jeep drivers or tour guides for this destination.
+                Currently, there are no registered service providers for this destination.
               </p>
               <div className="flex gap-4 justify-center">
                 <button
@@ -891,14 +1002,14 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
           </div>
 
           {loadingWeather ? (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
+            <div className="bg-linear-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                 <p className="ml-4 text-gray-600">Loading weather data...</p>
               </div>
             </div>
           ) : weatherError ? (
-            <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl border border-red-100 p-8 md:p-12">
+            <div className="bg-linear-to-br from-red-50 to-orange-50 rounded-2xl border border-red-100 p-8 md:p-12">
               <div className="flex items-center justify-center py-12">
                 <AlertCircle className="h-12 w-12 text-red-500 mr-4" />
                 <div>
@@ -908,7 +1019,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               </div>
             </div>
           ) : weather && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
+            <div className="bg-linear-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Current Weather Display */}
                 <div className="bg-white rounded-xl p-6 border border-gray-200">
@@ -991,7 +1102,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                       .filter((item, index) => index % 8 === 0) // Get one forecast per day (every 8th item = 24 hours)
                       .slice(0, 5) // Limit to 5 days
                       .map((day, index) => (
-                        <div key={index} className="bg-white rounded-lg border-2 border-gray-200 p-5 text-center hover:border-blue-300 transition-colors">
+                        <div key={index} className="bg-white rounded-lg border-2 border-gray-200 p-5 text-center">
                           <p className="font-semibold text-gray-900 text-sm mb-1">
                             {index === 0 ? 'Today' : formatDate(day.dt_txt)}
                           </p>
@@ -1030,7 +1141,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
               {destination.tips.map((tip, index) => (
                 <div key={index} className="bg-white rounded-lg border border-gray-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-                  <div className="bg-green-100 rounded-full p-2 flex-shrink-0">
+                  <div className="bg-green-100 rounded-full p-2 shrink-0">
                     <Lightbulb className="h-5 w-5 text-green-600" />
                   </div>
                   <p className="text-gray-700 leading-relaxed">{tip}</p>
@@ -1054,7 +1165,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {destination.lawEnforcement.map((rule, index) => (
                       <div key={index} className="bg-white rounded-lg border border-red-200 p-4 flex items-start gap-3">
-                        <div className="bg-red-100 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                        <div className="bg-red-100 rounded-full p-1.5 shrink-0 mt-0.5">
                           <AlertCircle className="h-4 w-4 text-red-600" />
                         </div>
                         <p className="text-sm text-gray-800 leading-relaxed">{rule}</p>

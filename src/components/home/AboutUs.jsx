@@ -17,7 +17,7 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 import ChatList from '../ChatList';
 import aboutback1 from '../../assets/aboutback1.avif';
-import destinations from '../../data/destinations';
+
 
 const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
@@ -41,16 +41,32 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch Service Providers count
+        // Fetch Service Providers
         const providersSnapshot = await getDocs(collection(db, 'serviceProviders'));
         const providersCount = providersSnapshot.size;
+
+        // Calculate Unique Destinations from Service Providers
+        const uniqueDestinations = new Set();
+        providersSnapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.destinations) {
+            if (Array.isArray(data.destinations)) {
+              data.destinations.forEach(dest => {
+                if (dest) uniqueDestinations.add(dest.trim());
+              });
+            } else if (typeof data.destinations === 'string') {
+              // Handle potential comma-separated strings or single values
+              data.destinations.split(',').forEach(dest => {
+                if (dest.trim()) uniqueDestinations.add(dest.trim());
+              });
+            }
+          }
+        });
+        const destinationsCount = uniqueDestinations.size;
 
         // Fetch Happy Customers (tourists) count
         const touristsSnapshot = await getDocs(collection(db, 'tourists'));
         const customersCount = touristsSnapshot.size;
-
-        // Count Destinations from destinations data
-        const destinationsCount = Object.keys(destinations).length;
 
         // Fetch Average Rating from reviews
         const reviewsSnapshot = await getDocs(collection(db, 'reviews'));
@@ -59,8 +75,10 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
 
         reviewsSnapshot.forEach((doc) => {
           const review = doc.data();
-          if (review.rating) {
-            totalRating += Number(review.rating);
+          // Ensure numeric conversion and check for valid rating
+          const rating = Number(review.rating);
+          if (!isNaN(rating) && rating > 0) {
+            totalRating += rating;
             reviewCount++;
           }
         });
@@ -96,12 +114,12 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
 
       } catch (error) {
         console.error('❌ Error fetching stats:', error);
-        // Keep loading state on error
+        // Fallback only on error
         setStats([
-          { number: "500+", label: "Service Providers" },
-          { number: "10K+", label: "Happy Customers" },
-          { number: "50+", label: "Destinations" },
-          { number: "4.8/5", label: "Average Rating" }
+          { number: "20+", label: "Service Providers" },
+          { number: "50+", label: "Happy Customers" },
+          { number: "10+", label: "Destinations" },
+          { number: "5.0/5", label: "Average Rating" }
         ]);
       }
     };
@@ -185,7 +203,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
             }}
           >
             {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30"></div>
+            <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/50 to-black/30"></div>
           </div>
         </div>
 
@@ -203,7 +221,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
           {/* Main Title */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-white leading-tight tracking-tight drop-shadow-2xl animate-fadeInUp" style={{ animationDelay: "0.2s" }}>
             Connecting You with <br className="hidden md:block" />
-            <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
               Nature's Wonders
             </span>
           </h1>
@@ -222,14 +240,14 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
       </section>
 
       {/* Mission Section */}
-      <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
+      <section className="py-20 bg-linear-to-b from-gray-50 to-white">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
                 Our Mission
               </h2>
-              <div className="w-24 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 mx-auto"></div>
+              <div className="w-24 h-1 bg-linear-to-r from-emerald-500 to-teal-500 mx-auto"></div>
             </div>
 
             <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 border border-gray-100">
@@ -258,16 +276,16 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Everything you need for the perfect Sri Lankan adventure
             </p>
-            <div className="w-24 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 mx-auto mt-4"></div>
+            <div className="w-24 h-1 bg-linear-to-r from-emerald-500 to-teal-500 mx-auto mt-4"></div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
               <div
                 key={index}
-                className="group bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-8 border border-emerald-100 hover:border-emerald-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2"
+                className="group bg-linear-to-br from-emerald-50 to-green-50 rounded-2xl p-8 border border-emerald-100 hover:border-emerald-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2"
               >
-                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-emerald-500/30">
+                <div className="w-16 h-16 bg-linear-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-emerald-500/30">
                   {feature.icon}
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">
@@ -283,7 +301,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
       </section>
 
       {/* Stats Section */}
-      <section className="py-20 bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 text-white">
+      <section className="py-20 bg-linear-to-br from-emerald-600 via-green-600 to-teal-600 text-white">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {stats.map((stat, index) => (
@@ -310,7 +328,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               The principles that guide everything we do
             </p>
-            <div className="w-24 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 mx-auto mt-4"></div>
+            <div className="w-24 h-1 bg-linear-to-r from-emerald-500 to-teal-500 mx-auto mt-4"></div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
@@ -319,7 +337,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
                 key={index}
                 className="bg-white rounded-xl p-6 border border-gray-200 hover:border-emerald-300 hover:shadow-lg transition-all duration-300"
               >
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center text-white mb-4">
+                <div className="w-12 h-12 bg-linear-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center text-white mb-4">
                   {value.icon}
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">
@@ -335,7 +353,7 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+      <section className="py-20 bg-linear-to-r from-emerald-600 to-teal-600 text-white">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-4xl md:text-5xl font-bold mb-6">

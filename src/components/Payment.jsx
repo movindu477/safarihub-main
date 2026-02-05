@@ -313,7 +313,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Loading state
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
           <Loader className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-green-500 mx-auto mb-3 sm:mb-4" />
           <p className="text-sm sm:text-base text-gray-600">Loading payment details...</p>
@@ -325,11 +325,11 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Error state
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
           <AlertCircle className="h-12 w-12 sm:h-16 sm:w-16 text-red-500 mx-auto mb-3 sm:mb-4" />
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Error</h2>
-          <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 break-words">{error}</p>
+          <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 wrap-break-word">{error}</p>
           <button
             onClick={() => navigate(-1)}
             className="bg-green-500 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-green-600 transition-colors cursor-pointer font-semibold text-sm sm:text-base w-full sm:w-auto"
@@ -344,7 +344,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
   // Payment confirmation modal
   if (showPaymentConfirmation) {
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
           <div className="mb-4 sm:mb-6">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
@@ -370,7 +370,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
   if (!booking) {
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center">
           <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
           <p className="text-sm sm:text-base text-gray-600">No booking found</p>
@@ -387,13 +387,13 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
         <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-5xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
           {/* Header */}
-          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
+          <div className="bg-linear-to-r from-green-500 to-green-600 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center shrink-0">
                   <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -403,7 +403,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
               </div>
               <button
                 onClick={() => navigate(-1)}
-                className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer flex-shrink-0 ml-2"
+                className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors cursor-pointer shrink-0 ml-2"
                 aria-label="Close"
               >
                 <X className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -419,7 +419,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                 {/* Booking Summary */}
                 <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200">
                   <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 shrink-0" />
                     <span>Booking Summary</span>
                   </h2>
 
@@ -427,7 +427,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                     {/* Service & Booking Info */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                       <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <User className="h-4 w-4 text-gray-400 shrink-0" />
                         <div>
                           <p className="text-gray-500 text-xs">Service Provider</p>
                           <p className="font-semibold text-gray-900">{booking.driverName || booking.guideName || 'N/A'}</p>
@@ -435,7 +435,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
-                        <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                        <Calendar className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
                         <div className="flex-1">
                           <p className="text-gray-500 text-xs mb-1">Selected Dates</p>
                           <div className="space-y-1">
@@ -464,7 +464,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                       </div>
                       {booking.nationalPark && (
                         <div className="flex items-start gap-2">
-                          <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <MapPin className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
                           <div>
                             <p className="text-gray-500 text-xs">National Park</p>
                             <p className="font-semibold text-gray-900">{booking.nationalPark}</p>
@@ -473,7 +473,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                       )}
                       {booking.safariType && (
                         <div className="flex items-start gap-2">
-                          <Camera className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <Camera className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
                           <div>
                             <p className="text-gray-500 text-xs">Safari Type</p>
                             <p className="font-semibold text-gray-900">{booking.safariType}</p>
@@ -659,7 +659,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
               {/* Right Column - Payment Summary */}
               <div className="lg:col-span-1 order-1 lg:order-2">
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-4 sm:p-5 lg:sticky lg:top-4">
+                <div className="bg-linear-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-4 sm:p-5 lg:sticky lg:top-4">
                   <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Payment Summary</h2>
 
                   <div className="space-y-2 text-xs sm:text-sm mb-4">
@@ -685,9 +685,35 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
 
                       // Calculate add-ons total
                       let addOnsTotal = 0;
-                      if (booking.needsBinoculars) addOnsTotal += 500;
-                      if (booking.needsChildSeat) addOnsTotal += 1000;
-                      if (booking.needsWater) addOnsTotal += 300;
+                      if (booking.needsBinoculars || booking.binocularsCount > 0) {
+                        addOnsTotal += (booking.binocularsCount || 1) * 500;
+                      }
+                      if (booking.needsChildSeat || booking.childSeatCount > 0) {
+                        addOnsTotal += (booking.childSeatCount || 1) * 1000;
+                      }
+                      if (booking.needsWater || booking.waterBottleCount > 0) {
+                        addOnsTotal += (booking.waterBottleCount || 1) * 300;
+                      }
+
+                      // Snacks total
+                      if (booking.needsSnacks) {
+                        const snackPrices = {
+                          'Biscuits': 200, 'Chips': 250, 'Fruits': 400, 'Sandwiches': 500,
+                          'Rice & Curry': 800, 'Fried Rice': 700, 'Noodles': 600, 'Soft Drinks': 150
+                        };
+
+                        if (booking.snackQuantities && Object.keys(booking.snackQuantities).length > 0) {
+                          Object.entries(booking.snackQuantities).forEach(([snack, count]) => {
+                            if (count > 0) {
+                              addOnsTotal += (snackPrices[snack] || 0) * count;
+                            }
+                          });
+                        } else if (booking.selectedSnacks) {
+                          booking.selectedSnacks.forEach(snack => {
+                            addOnsTotal += snackPrices[snack] || 0;
+                          });
+                        }
+                      }
 
                       // Calculate actual total (base + add-ons)
                       const calculatedTotal = (baseServiceCharge + addOnsTotal) || booking.totalPrice || 0;
@@ -737,28 +763,56 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                           )}
 
                           {/* Add-ons */}
-                          {(booking.needsBinoculars || booking.needsChildSeat || booking.needsWater) && (
+                          {(booking.needsBinoculars || booking.needsChildSeat || booking.needsWater || booking.needsSnacks) && (
                             <>
                               <div className="border-t border-gray-300 pt-2 mt-2"></div>
-                              <div className="text-xs font-semibold text-gray-700 mb-1">Add-ons</div>
-                              {booking.needsBinoculars && (
+                              <div className="text-xs font-semibold text-gray-700 mb-1">Add-ons & Extras</div>
+                              {(booking.needsBinoculars || (booking.binocularsCount > 0)) && (
                                 <div className="flex justify-between text-gray-600">
-                                  <span className="text-xs pl-2">Binoculars</span>
-                                  <span className="font-medium">+LKR 500</span>
+                                  <span className="text-xs pl-2">Binoculars {(booking.binocularsCount > 1) ? `(x${booking.binocularsCount})` : ''}</span>
+                                  <span className="font-medium">+LKR {((booking.binocularsCount || 1) * 500).toLocaleString()}</span>
                                 </div>
                               )}
-                              {booking.needsChildSeat && (
+                              {(booking.needsChildSeat || (booking.childSeatCount > 0)) && (
                                 <div className="flex justify-between text-gray-600">
-                                  <span className="text-xs pl-2">Child Seat</span>
-                                  <span className="font-medium">+LKR 1,000</span>
+                                  <span className="text-xs pl-2">Child Seat {(booking.childSeatCount > 1) ? `(x${booking.childSeatCount})` : ''}</span>
+                                  <span className="font-medium">+LKR {((booking.childSeatCount || 1) * 1000).toLocaleString()}</span>
                                 </div>
                               )}
-                              {booking.needsWater && (
+                              {(booking.needsWater || (booking.waterBottleCount > 0)) && (
                                 <div className="flex justify-between text-gray-600">
-                                  <span className="text-xs pl-2">Water Bottles</span>
-                                  <span className="font-medium">+LKR 300</span>
+                                  <span className="text-xs pl-2">Water Bottles {(booking.waterBottleCount > 1) ? `(x${booking.waterBottleCount})` : ''}</span>
+                                  <span className="font-medium">+LKR {((booking.waterBottleCount || 1) * 300).toLocaleString()}</span>
                                 </div>
                               )}
+                              {booking.needsSnacks && (booking.snackQuantities && Object.keys(booking.snackQuantities).length > 0 ? (
+                                Object.entries(booking.snackQuantities).map(([snack, count]) => {
+                                  if (count <= 0) return null;
+                                  const snackPrices = {
+                                    'Biscuits': 200, 'Chips': 250, 'Fruits': 400, 'Sandwiches': 500,
+                                    'Rice & Curry': 800, 'Fried Rice': 700, 'Noodles': 600, 'Soft Drinks': 150
+                                  };
+                                  return (
+                                    <div key={snack} className="flex justify-between text-gray-600">
+                                      <span className="text-xs pl-2">{snack} (x{count})</span>
+                                      <span className="font-medium">+LKR {(count * (snackPrices[snack] || 0)).toLocaleString()}</span>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                booking.selectedSnacks?.map(snack => {
+                                  const snackPrices = {
+                                    'Biscuits': 200, 'Chips': 250, 'Fruits': 400, 'Sandwiches': 500,
+                                    'Rice & Curry': 800, 'Fried Rice': 700, 'Noodles': 600, 'Soft Drinks': 150
+                                  };
+                                  return (
+                                    <div key={snack} className="flex justify-between text-gray-600">
+                                      <span className="text-xs pl-2">{snack}</span>
+                                      <span className="font-medium">+LKR {(snackPrices[snack] || 0).toLocaleString()}</span>
+                                    </div>
+                                  );
+                                })
+                              ))}
                               <div className="flex justify-between text-gray-700 pt-1 mt-1">
                                 <span className="text-xs font-semibold">Add-ons Subtotal</span>
                                 <span className="font-medium">LKR {addOnsTotal.toLocaleString()}</span>
@@ -787,7 +841,7 @@ export default function Payment({ user: propUser, onLogout, onShowAuth }) {
                     <button
                       onClick={handlePayment}
                       disabled={processing || isLocked}
-                      className={`w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-2.5 sm:py-3.5 rounded-lg text-sm sm:text-base font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl`}
+                      className={`w-full bg-linear-to-r from-green-500 to-green-600 text-white py-2.5 sm:py-3.5 rounded-lg text-sm sm:text-base font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl`}
                     >
                       {processing ? (
                         <>
@@ -859,7 +913,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
           const isCompleted = currentStep > step.number;
 
           return (
-            <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
+            <div key={step.number} className="flex items-start shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
               <div className="flex flex-col items-center w-full">
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border-2 transition-all ${isActive ? 'bg-green-500 border-green-500 text-white' :
                   isCompleted ? 'bg-green-100 border-green-500 text-green-600' :
@@ -892,7 +946,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
         {currentStep === 1 && (
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <User className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
+              <User className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 shrink-0" />
               <span>Personal Details</span>
             </h2>
 
@@ -1015,7 +1069,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
         {currentStep === 2 && (
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 shrink-0" />
               <span>Safari Booking Details</span>
             </h2>
 
@@ -1098,8 +1152,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
         {currentStep === 3 && (
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <Navigation className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
-              <span className="break-words">Pickup & Drop-off Information</span>
+              <Navigation className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 shrink-0" />
+              <span className="wrap-break-word">Pickup & Drop-off Information</span>
             </h2>
 
             <div className="space-y-3 sm:space-y-4">
@@ -1200,8 +1254,8 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
         {currentStep === 4 && (
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 flex-shrink-0" />
-              <span className="break-words">Additional Requests / Add-Ons</span>
+              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 shrink-0" />
+              <span className="wrap-break-word">Additional Requests / Add-Ons</span>
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
@@ -1217,7 +1271,7 @@ function BookingForm({ formData, setFormData, formErrors, currentStep, setCurren
                       type="checkbox"
                       checked={formData[key]}
                       onChange={(e) => updateFormData(key, e.target.checked)}
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 rounded focus:ring-green-500 flex-shrink-0"
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 rounded focus:ring-green-500 shrink-0"
                     />
                     <span className="text-xs sm:text-sm font-medium text-gray-700">{label}</span>
                   </div>

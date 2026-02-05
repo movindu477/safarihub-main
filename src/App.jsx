@@ -785,16 +785,12 @@ export const markNotificationAsRead = async (notificationId) => {
 // Booking Management - Works for both drivers and guides
 export const updateBookingStatus = async (bookingId, status, providerId, customerId, providerName, customerName) => {
   try {
-    // Get booking to check if it's a driver or guide booking
     const bookingDoc = await getDoc(doc(db, 'bookings', bookingId));
-    if (!bookingDoc.exists()) {
-      throw new Error('Booking not found');
-    }
+    if (!bookingDoc.exists()) throw new Error('Booking not found');
 
     const bookingData = bookingDoc.data();
     const isGuideBooking = !!bookingData.guideId;
     const serviceType = isGuideBooking ? 'guide' : 'driver';
-    const serviceProviderName = isGuideBooking ? 'guide' : 'driver';
 
     // Update booking status
     await updateDoc(doc(db, 'bookings', bookingId), {
@@ -804,9 +800,10 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
       ...(status === 'completed' && { completedAt: serverTimestamp() })
     });
 
-    // Create notification for customer based on status
     let statusMessage = '';
     let notificationTitle = '';
+    let providerMessage = '';
+    let providerTitle = '';
 
     if (status === 'accepted') {
       statusMessage = `Your booking with ${providerName} has been accepted!`;
@@ -814,28 +811,50 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
     } else if (status === 'declined') {
       statusMessage = `Your booking with ${providerName} has been declined.`;
       notificationTitle = 'Booking Declined';
+
+      // Message for provider when customer declines
+      providerMessage = `${customerName} has declined the booking. The dates have been released and are now available for other bookings.`;
+      providerTitle = 'Booking Declined by Customer';
     } else if (status === 'completed') {
       statusMessage = `Your trip with ${providerName} is completed! Please take a moment to review your experience.`;
       notificationTitle = 'Trip Completed - Review Your Experience';
     }
 
+    // Send notification to customer
     if (statusMessage) {
       await createNotification({
-        type: status === 'completed' ? 'review' : 'booking',
+        type: (status === 'completed') ? 'review' : (status === 'declined' ? 'decline_with_suggestion' : 'booking'),
         title: notificationTitle,
         message: statusMessage,
         recipientId: customerId,
         senderId: providerId,
         senderName: providerName,
         relatedId: bookingId,
-        bookingId: bookingId
+        bookingId: bookingId,
+        destinationId: bookingData.nationalPark || bookingData.destinationId || '',
+        serviceType: bookingData.serviceType
       });
     }
 
-    // Update availability calendar logic when booking is ACCEPTED
-    if (status === 'accepted') {
+    // Send notification to provider when customer declines
+    if (status === 'declined' && providerMessage) {
+      await createNotification({
+        type: 'booking',
+        title: providerTitle,
+        message: providerMessage,
+        recipientId: providerId,
+        senderId: customerId,
+        senderName: customerName,
+        relatedId: bookingId,
+        bookingId: bookingId,
+        destinationId: bookingData.nationalPark || bookingData.destinationId || '',
+        serviceType: bookingData.serviceType
+      });
+    }
+
+    // Update availability calendar logic
+    if (status === 'accepted' || status === 'declined' || status === 'cancelled') {
       try {
-        console.log('📅 Updating availability for accepted booking:', bookingId);
         const providerDocRef = doc(db, 'serviceProviders', providerId);
         const providerDoc = await getDoc(providerDocRef);
 
@@ -843,104 +862,49 @@ export const updateBookingStatus = async (bookingId, status, providerId, custome
           const providerData = providerDoc.data();
           const providerServiceType = providerData.serviceType;
 
-          // Determine target field
-          let targetField = 'availability'; // Default for guides
+          let targetField = 'availability';
           if (providerServiceType === 'Jeep Driver') {
             const vehicleType = bookingData.selectedVehicleType || '';
-            // Update the specific calendar based on vehicle type
-            if (vehicleType.includes('Luxury')) {
-              targetField = 'availabilityLuxury';
-            } else {
-              targetField = 'availabilityStandard';
-            }
+            if (vehicleType.includes('Luxury')) targetField = 'availabilityLuxury';
+            else targetField = 'availabilityStandard';
           }
 
           const currentAvailability = providerData[targetField] || {};
           const updatedAvailability = { ...currentAvailability };
           let datesProcessed = false;
 
-          // Process datesWithTypes (preferred)
-          if (bookingData.datesWithTypes && Array.isArray(bookingData.datesWithTypes) && bookingData.datesWithTypes.length > 0) {
-            bookingData.datesWithTypes.forEach(item => {
-              try {
-                // Handle item.date which might be a string (ISO) or Timestamp
-                let date;
-                if (item.date && typeof item.date.toDate === 'function') {
-                  date = item.date.toDate();
-                } else {
-                  date = new Date(item.date);
-                }
+          const datesToUnmark = (status === 'declined' || status === 'cancelled');
 
-                // Validate date
-                if (isNaN(date.getTime())) return;
+          const processDate = (dString) => {
+            try {
+              let date = (dString && typeof dString.toDate === 'function') ? dString.toDate() : new Date(dString);
+              if (isNaN(date.getTime())) return;
+              const dateKey = date.toISOString().split('T')[0];
 
-                const dateKey = date.toISOString().split('T')[0];
-                const type = (item.type || 'full-day').toLowerCase().trim();
-
-                const isFullDay = type === 'full-day' || type === 'full' || type === 'fullday';
-                const isHalfDay = type === 'half-day' || type === 'half' || type === 'halfday' || type === 'half day';
-
-                if (isFullDay) {
-                  updatedAvailability[dateKey] = 'busy';
-                  datesProcessed = true;
-                } else if (isHalfDay) {
-                  const currentStatus = updatedAvailability[dateKey];
-                  // If already half-day booked, mark as fully busy
-                  if (currentStatus === 'halfday' || currentStatus === 'halfday-morning' || currentStatus === 'halfday-evening') {
-                    updatedAvailability[dateKey] = 'busy';
-                  } else {
-                    updatedAvailability[dateKey] = 'halfday';
-                  }
-                  datesProcessed = true;
-                }
-              } catch (e) {
-                console.error('Error processing date for availability:', e);
+              if (datesToUnmark) {
+                delete updatedAvailability[dateKey];
+                datesProcessed = true;
+              } else if (status === 'accepted') {
+                updatedAvailability[dateKey] = 'busy';
+                datesProcessed = true;
               }
-            });
-          }
-          // Fallback to legacy selectedDates array
-          else if (bookingData.selectedDates && Array.isArray(bookingData.selectedDates)) {
-            bookingData.selectedDates.forEach(d => {
-              try {
-                let date;
-                if (d && typeof d.toDate === 'function') {
-                  date = d.toDate();
-                } else {
-                  date = new Date(d);
-                }
+            } catch (e) { }
+          };
 
-                if (!isNaN(date.getTime())) {
-                  const dateKey = date.toISOString().split('T')[0];
-                  updatedAvailability[dateKey] = 'busy';
-                  datesProcessed = true;
-                }
-              } catch (e) { }
-            });
-          }
+          if (bookingData.datesWithTypes) bookingData.datesWithTypes.forEach(item => processDate(item.date));
+          else if (bookingData.selectedDates) bookingData.selectedDates.forEach(d => processDate(d));
 
           if (datesProcessed) {
-            const updatePayload = {
+            await updateDoc(providerDocRef, {
               [targetField]: updatedAvailability,
+              availability: updatedAvailability,
               updatedAt: serverTimestamp()
-            };
-
-            // Sync legacy 'availability' field for backward compatibility/general view
-            // But only if we aren't using separated vehicle calendars or if we want to reflect total busyness
-            if (targetField !== 'availability') {
-              // For Jeep Drivers with split calendars, we might want to also update the main availability 
-              // if we want a unified view, but usually we keep them separate.
-              // However, the original code in Admin.jsx was syncing it, so we'll keep that behavior for safety.
-              // Logic: simply update the generic one too so it shows as busy in generic views.
-              updatePayload.availability = updatedAvailability;
-            }
-
-            await updateDoc(providerDocRef, updatePayload);
+            });
             console.log(`✅ Availability (${targetField}) updated for provider ${providerId}`);
           }
         }
       } catch (availError) {
-        console.error('❌ Error updating availability calendar:', availError);
-        // Don't throw error here, so we don't fail the booking update status
+        console.error('❌ Error updating availability:', availError);
       }
     }
 
@@ -1165,7 +1129,7 @@ const ChatModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-t-xl">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-linear-to-r from-yellow-400 to-yellow-500 text-white rounded-t-xl">
           <div className="flex items-center space-x-3">
             <div className="relative">
               <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
@@ -1355,14 +1319,14 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
       bookingQuery = query(
         collection(db, 'bookings'),
         where(providerField, '==', user.uid),
-        where('status', '==', 'accepted')
+        where('status', 'in', ['accepted', 'confirmed'])
       );
     } else {
       // For customers: query by customerId
       bookingQuery = query(
         collection(db, 'bookings'),
         where('customerId', '==', user.uid),
-        where('status', '==', 'accepted')
+        where('status', 'in', ['accepted', 'confirmed'])
       );
     }
 
@@ -1447,6 +1411,65 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
     return () => clearInterval(interval);
   }, [upcomingTrip]);
 
+  // Automated Trip Completion and Review Reminder System
+  useEffect(() => {
+    if (!user || user.role === 'provider') return;
+
+    const checkTripsForCompletion = async () => {
+      try {
+        const now = new Date();
+        // Query paid bookings for this customer
+        const bookingsQuery = query(
+          collection(db, 'bookings'),
+          where('customerId', '==', user.uid),
+          where('paymentStatus', '==', 'paid'),
+          where('status', 'in', ['accepted', 'confirmed'])
+        );
+
+        const snapshot = await getDocs(bookingsQuery);
+
+        for (const docSnapshot of snapshot.docs) {
+          const booking = { id: docSnapshot.id, ...docSnapshot.data() };
+
+          // Get latest booking date
+          let latestDate = null;
+          if (booking.datesWithTypes && booking.datesWithTypes.length > 0) {
+            const dates = booking.datesWithTypes.map(d => new Date(d.date));
+            latestDate = new Date(Math.max(...dates));
+          } else if (booking.selectedDates) {
+            const dates = Array.isArray(booking.selectedDates)
+              ? booking.selectedDates.map(d => new Date(d))
+              : [new Date(booking.selectedDates)];
+            latestDate = new Date(Math.max(...dates));
+          }
+
+          // If trip ended (at least 12 hours ago to be safe)
+          if (latestDate && (now.getTime() - latestDate.getTime()) > (12 * 60 * 60 * 1000)) {
+            console.log(`🎉 Trip ${booking.id} has ended. Marking as completed and requesting review...`);
+
+            // Mark as completed - this will automatically trigger the review notification via updateBookingStatus
+            await updateBookingStatus(
+              booking.id,
+              'completed',
+              booking.driverId || booking.guideId,
+              user.uid,
+              booking.driverName || booking.guideName || 'Service Provider',
+              user.displayName || 'Customer'
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error in Trip Completion System:', error);
+      }
+    };
+
+    // Run check on mount and then every hour
+    checkTripsForCompletion();
+    const interval = setInterval(checkTripsForCompletion, 3600000);
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showNotifications && !event.target.closest('.notification-container')) {
@@ -1479,63 +1502,19 @@ export const GlobalNotificationBell = ({ user, notifications, onNotificationClic
     }
   };
 
-  // Render logic: Show bell if user is provider OR (user is tourist AND it's mobile)
-  if (!user || (!isProvider && !isMobile)) return null;
+  // Render logic: Show bell for all logged-in users on all pages
+  if (!user) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 notification-container">
-      <div className="flex items-center gap-3">
-        {/* Digital Clock Countdown (appears to the left of bell when there's an upcoming trip) */}
-        {upcomingTrip && (
-          <div className="bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-2xl border-2 border-emerald-400/50 px-3 py-2">
-            <div className="flex items-center gap-2 mb-1">
-              <Calendar className="h-3 w-3 text-emerald-400" />
-              <span className="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">Trip Countdown</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Days */}
-              <div className="flex flex-col items-center">
-                <div className="bg-black/60 rounded px-2 py-1 min-w-[32px] border border-emerald-500/30">
-                  <span className="text-emerald-400 font-mono text-lg font-bold leading-none">
-                    {String(countdown.days).padStart(2, '0')}
-                  </span>
-                </div>
-                <span className="text-[9px] text-gray-400 mt-0.5 font-medium">DAYS</span>
-              </div>
+      <div className="flex flex-col items-end gap-3">
 
-              {/* Separator */}
-              <span className="text-emerald-400 text-lg font-bold mb-3">:</span>
-
-              {/* Hours */}
-              <div className="flex flex-col items-center">
-                <div className="bg-black/60 rounded px-2 py-1 min-w-[32px] border border-emerald-500/30">
-                  <span className="text-emerald-400 font-mono text-lg font-bold leading-none">
-                    {String(countdown.hours).padStart(2, '0')}
-                  </span>
-                </div>
-                <span className="text-[9px] text-gray-400 mt-0.5 font-medium">HRS</span>
-              </div>
-
-              {/* Separator */}
-              <span className="text-emerald-400 text-lg font-bold mb-3">:</span>
-
-              {/* Minutes */}
-              <div className="flex flex-col items-center">
-                <div className="bg-black/60 rounded px-2 py-1 min-w-[32px] border border-emerald-500/30">
-                  <span className="text-emerald-400 font-mono text-lg font-bold leading-none">
-                    {String(countdown.minutes).padStart(2, '0')}
-                  </span>
-                </div>
-                <span className="text-[9px] text-gray-400 mt-0.5 font-medium">MIN</span>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Notification Bell */}
         <div className="relative">
           {showNotifications && (
-            <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-96 overflow-hidden">
+            <div className="absolute bottom-full right-0 mb-3 w-80 sm:w-96 max-h-[500px] overflow-hidden z-50">
+
               <NotificationPanel
                 notifications={notifications}
                 onClose={() => setShowNotifications(false)}
@@ -2446,8 +2425,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
-        {/* Global Notification Bell - Only for Service Providers */}
-        {/* Global Notification Bell - Only for Service Providers */}
+        {/* Global Notification Bell - For All Users */}
         <ConditionalNotificationBell
           user={user}
           notifications={notifications}
@@ -2566,10 +2544,10 @@ const ConditionalNotificationBell = ({ user, notifications = [], onNotificationC
 // Booking Panel Wrapper to hide on specific pages
 const ConditionalBookingPanel = ({ user, notifications }) => {
   const location = useLocation();
-  const isProfilePage = location.pathname === '/profile';
+  const allowedPaths = ['/', '/about'];
 
-  // Hide on Admin Dashboard
-  if (isProfilePage || location.pathname.startsWith('/admin') || shouldHideGlobalUI(location.pathname)) return null;
+  // Only show on Home and About pages
+  if (!allowedPaths.includes(location.pathname)) return null;
 
   return (
     <BookingPanel
@@ -3595,9 +3573,9 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
               'bg-blue-500/20 border-blue-500/50 text-blue-200'
             }`}
         >
-          {toast.type === 'error' && <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-          {toast.type === 'success' && <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
-          {toast.type === 'info' && <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          {toast.type === 'error' && <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          {toast.type === 'success' && <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+          {toast.type === 'info' && <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
           <span className="text-sm font-medium">{toast.message}</span>
           <button onClick={() => removeToast(toast.id)} className="ml-2 hover:text-white"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
         </div>
@@ -3621,7 +3599,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         {/* Success Popup */}
         {showSuccessPopup && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-3xl p-8 shadow-2xl max-w-md w-full mx-4 animate-scaleIn border border-white/20">
+            <div className="bg-linear-to-br from-emerald-600 to-teal-700 text-white rounded-3xl p-8 shadow-2xl max-w-md w-full mx-4 animate-scaleIn border border-white/20">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center shadow-inner">
                   <CheckCircle className="w-8 h-8 text-white" />
@@ -3647,7 +3625,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                 alt="Login Background"
                 className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+              <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent"></div>
 
               {/* Image Overlay Content */}
               <div className="absolute bottom-0 left-0 w-full p-8 text-white">
@@ -3742,7 +3720,7 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
                   <button
                     type="submit"
                     disabled={busy}
-                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-500/20 transform hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm"
+                    className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-500/20 transform hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm"
                   >
                     {busy ? (
                       <div className="flex items-center justify-center gap-2">
@@ -3781,14 +3759,14 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       console.log('⏳ Waiting for role to sync with URL serviceType...');
       // Return a minimal loader while state syncs
       return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-linear-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
           <div className="text-white">Loading...</div>
         </div>
       );
     }
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
         {toastMarkup}
         <div className="w-full max-w-2xl">
           {/* Back Button - Now scrolls with content */}
@@ -3900,7 +3878,7 @@ const UserTypeSelection = ({ onSelect, logo, onBackToHome }) => (
           onClick={onBackToHome || (() => { })}
         />
       </div>
-      <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-teal-200 mb-2 tracking-tight">
+      <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-white via-emerald-200 to-teal-200 mb-2 tracking-tight">
         Join SafariHub
       </h2>
       <p className="text-gray-400 text-sm md:text-base font-light tracking-wide">
@@ -3965,7 +3943,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   const isTourist = role === 'tourist';
   const isJeepDriver = serviceType === "Jeep Driver";
   const isTourGuide = serviceType === "Tour Guide";
-  const isRenting = serviceType === "Renting";
+  const isRenting = serviceType === "Renting Store";
 
   // Reset ALL form fields when service type changes
   useEffect(() => {
@@ -4115,7 +4093,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   return (
     <div className="bg-gray-900/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl max-h-[85vh] overflow-y-auto relative custom-scrollbar animate-fadeIn">
       <div className="text-center mb-8">
-        <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-teal-200">
+        <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-white via-emerald-200 to-teal-200">
           {isTourist ? 'Tourist Registration' : 'Partner Registration'}
         </h2>
         <p className="text-gray-400 text-sm mt-2 tracking-wide font-light">
@@ -4200,7 +4178,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-white font-medium text-xs">
                   <User className="h-3 w-3 text-yellow-400" />
-                  {isRenting ? 'Store Name *' : 'Full Name *'}
+                  {isRenting ? 'Enter Renting Store Name *' : 'Full Name *'}
                 </label>
                 <input
                   type="text"
@@ -4213,7 +4191,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                   required
                   pattern="[A-Za-z\s]+"
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                  placeholder={isRenting ? "Enter your store name" : "Enter your full name"}
+                  placeholder={isRenting ? "Enter Renting Store Name" : "Enter your full name"}
                 />
               </div>
 
@@ -4296,7 +4274,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                 </label>
                 <div className="flex gap-2">
                   {/* Country Code Dropdown */}
-                  <div className="relative flex-shrink-0">
+                  <div className="relative shrink-0">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -4742,80 +4720,113 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       </p>
                     </div>
 
-                    {/* Years of Experience (Full Width) */}
-                    <div className="space-y-1">
-                      <label className="flex items-center gap-2 text-white font-medium text-xs">
-                        Years of Experience *
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.experience}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // Prevent 0 and ensure minimum is 1
-                          if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
-                            handlers.setExperience(value);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          // Prevent typing 0 as first digit
-                          if (e.key === '0' && e.target.value === '') {
-                            e.preventDefault();
-                          }
-                        }}
-                        required
-                        min="1"
-                        max="50"
-                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
-                        placeholder="Enter years of experience"
-                      />
-                    </div>
-
-                    {/* Languages Spoken */}
-                    <div className="space-y-1">
-                      <label className="flex items-center gap-2 text-white font-medium text-xs">
-                        Languages Spoken
-                      </label>
-                      <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                        {languages.map(language => (
-                          <div key={language} className="flex items-center mb-1">
-                            <input
-                              type="checkbox"
-                              id={`guide-lang-${language}`}
-                              checked={formData.languages?.includes(language) || false}
-                              onChange={(e) => handleMultiSelectChange('languages', language)}
-                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                            />
-                            <label htmlFor={`guide-lang-${language}`} className="text-white text-xs">
-                              {language}
-                            </label>
-                          </div>
-                        ))}
+                    {/* Province (For Renting Shops only) */}
+                    {isRenting && (
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-white font-medium text-xs">
+                          <MapPin className="h-3 w-3 text-yellow-400" />
+                          Province *
+                        </label>
+                        <select
+                          value={formData.destinations || ""}
+                          onChange={(e) => handlers.setDestinations(e.target.value)}
+                          required
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
+                        >
+                          <option value="">Select province</option>
+                          <option value="Western Province">Western Province</option>
+                          <option value="Central Province">Central Province</option>
+                          <option value="Southern Province">Southern Province</option>
+                          <option value="Northern Province">Northern Province</option>
+                          <option value="Eastern Province">Eastern Province</option>
+                          <option value="North Western Province">North Western Province</option>
+                          <option value="North Central Province">North Central Province</option>
+                          <option value="Uva Province">Uva Province</option>
+                          <option value="Sabaragamuwa Province">Sabaragamuwa Province</option>
+                        </select>
+                        <p className="text-gray-400 text-[10px] mt-1">
+                          Select the province where your store is located
+                        </p>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Areas of Expertise (Multi-select) */}
-                    <div className="space-y-1">
-                      <label className="flex items-center gap-2 text-white font-medium text-xs">
-                        Areas of Expertise
-                      </label>
-                      <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
-                        {areasOfExpertise.map(area => (
-                          <div key={area} className="flex items-center mb-1">
-                            <input
-                              type="checkbox"
-                              id={`area-${area}`}
-                              checked={formData.areasOfExpertise?.includes(area) || false}
-                              onChange={(e) => handleMultiSelectChange('areasOfExpertise', area)}
-                              className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
-                            />
-                            <label htmlFor={`area-${area}`} className="text-white text-xs">
-                              {area}
-                            </label>
+                    {/* Guide Specific Fields (Experience, Languages, Expertise) */}
+                    {isGuide && (
+                      <>
+                        {/* Years of Experience */}
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-2 text-white font-medium text-xs">
+                            Years of Experience *
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.experience}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 50)) {
+                                handlers.setExperience(value);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === '0' && e.target.value === '') {
+                                e.preventDefault();
+                              }
+                            }}
+                            required
+                            min="1"
+                            max="50"
+                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 text-xs"
+                            placeholder="Enter years of experience"
+                          />
+                        </div>
+
+                        {/* Languages Spoken */}
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-2 text-white font-medium text-xs">
+                            Languages Spoken
+                          </label>
+                          <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                            {languages.map(language => (
+                              <div key={language} className="flex items-center mb-1">
+                                <input
+                                  type="checkbox"
+                                  id={`guide-lang-${language}`}
+                                  checked={formData.languages?.includes(language) || false}
+                                  onChange={(e) => handleMultiSelectChange('languages', language)}
+                                  className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                                />
+                                <label htmlFor={`guide-lang-${language}`} className="text-white text-xs">
+                                  {language}
+                                </label>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        </div>
+
+                        {/* Areas of Expertise */}
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-2 text-white font-medium text-xs">
+                            Areas of Expertise
+                          </label>
+                          <div className="max-h-24 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/5">
+                            {areasOfExpertise.map(area => (
+                              <div key={area} className="flex items-center mb-1">
+                                <input
+                                  type="checkbox"
+                                  id={`area-${area}`}
+                                  checked={formData.areasOfExpertise?.includes(area) || false}
+                                  onChange={(e) => handleMultiSelectChange('areasOfExpertise', area)}
+                                  className="mr-2 h-3 w-3 text-yellow-400 focus:ring-yellow-400 border-gray-300 rounded"
+                                />
+                                <label htmlFor={`area-${area}`} className="text-white text-xs">
+                                  {area}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {/* Certifications (Multi-select) - Only shown for certified providers */}
                     {formData.certificationStatus === 'certified' && (
@@ -4927,35 +4938,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       </div>
                     )}
 
-                    {/* Province (For Renting Shops only) */}
-                    {isRenting && (
-                      <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-white font-medium text-xs">
-                          <MapPin className="h-3 w-3 text-yellow-400" />
-                          Province *
-                        </label>
-                        <select
-                          value={formData.destinations || ""}
-                          onChange={(e) => handlers.setDestinations(e.target.value)}
-                          required
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 text-xs"
-                        >
-                          <option value="">Select province</option>
-                          <option value="Western Province">Western Province</option>
-                          <option value="Central Province">Central Province</option>
-                          <option value="Southern Province">Southern Province</option>
-                          <option value="Northern Province">Northern Province</option>
-                          <option value="Eastern Province">Eastern Province</option>
-                          <option value="North Western Province">North Western Province</option>
-                          <option value="North Central Province">North Central Province</option>
-                          <option value="Uva Province">Uva Province</option>
-                          <option value="Sabaragamuwa Province">Sabaragamuwa Province</option>
-                        </select>
-                        <p className="text-gray-400 text-[10px] mt-1">
-                          Select the province where your store is located
-                        </p>
-                      </div>
-                    )}
+
 
                     {/* Years of Experience (Only for Jeep Driver - NOT for Renting) */}
                     {isJeepDriver && (
@@ -4988,8 +4971,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       </div>
                     )}
 
-                    {/* Languages Spoken (For Jeep Driver and Renting Stores) */}
-                    {(isJeepDriver || isRenting) && (
+                    {/* Languages Spoken (For Jeep Driver Only) */}
+                    {isJeepDriver && (
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Languages Spoken
@@ -5013,8 +4996,8 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
                       </div>
                     )}
 
-                    {/* Special Skills (For Jeep Driver and Renting Stores) */}
-                    {(isJeepDriver || isRenting) && (
+                    {/* Special Skills (For Jeep Driver Only) */}
+                    {isJeepDriver && (
                       <div className="space-y-1">
                         <label className="flex items-center gap-2 text-white font-medium text-xs">
                           Special Skills
@@ -5114,7 +5097,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
             <button
               type="submit"
               disabled={busy}
-              className="w-full group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full group relative overflow-hidden bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               <div className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"></div>
               <span className="relative flex items-center justify-center gap-2 text-base tracking-wide">

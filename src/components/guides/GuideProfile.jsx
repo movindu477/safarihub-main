@@ -54,8 +54,12 @@ import {
 // Initialize Firebase
 const db = getFirestore();
 
+// Import Supabase helper for document URLs
+import { getDocumentUrl } from '../../lib/supabase';
+
 // Import the fixed ReviewSection component
 import ReviewSection from "../ReviewSection";
+
 
 // Import Chat component
 import Chat from "../Chat";
@@ -78,7 +82,7 @@ import {
 } from "../../App";
 
 // Calendar Component for Date Selection with Availability Display
-const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType, onDateTypeChange, availabilityCalendar, availableDates, onDateDoubleClick }) => {
+const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType, onDateTypeChange, availabilityCalendar, availableDates, onDateDoubleClick, acceptedBookings = [] }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const getDaysInMonth = (date) => {
@@ -117,40 +121,120 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
 
   const getAvailabilityStatus = (date) => {
     if (!date) return null;
-
-    // Get year, month, day in local time to construct the key
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateKey = `${year}-${month}-${day}`;
 
-    // Priority 1: Check new availability calendar format (object)
+    // 1. Check explicit statuses in availability calendar
+    let manualUnavailableMorning = false;
+    let manualUnavailableEvening = false;
+    let manualUnavailableFull = false;
+
     if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
-      const status = availabilityCalendar[dateKey];
-      // Check for both legacy and new status strings
-      if (status && [
-        'busy',
-        'halfday',
-        'unavailable',
-        'halfday-morning',
-        'halfday-evening',
-        'unavailable-fullday',
-        'unavailable-halfday-morning',
-        'unavailable-halfday-evening'
-      ].includes(status)) {
-        return status;
+      const savedStatus = availabilityCalendar[dateKey];
+      if (savedStatus === 'busy' || savedStatus === 'unavailable' || savedStatus === 'unavailable-fullday') {
+        manualUnavailableFull = true;
+      } else if (savedStatus === 'unavailable-halfday-morning' || savedStatus === 'halfday-morning') {
+        manualUnavailableMorning = true;
+      } else if (savedStatus === 'unavailable-halfday-evening' || savedStatus === 'halfday-evening') {
+        manualUnavailableEvening = true;
       }
     }
 
-    // Default: Assume available (null)
-    // We removed the legacy availableDates fallback because empty arrays were marking all dates as unavailable.
+    if (manualUnavailableFull) return 'unavailable';
+
+    // 2. Track bookings
+    let bookedMorning = false;
+    let bookedEvening = false;
+    let bookedFullDay = false;
+
+    if (acceptedBookings && Array.isArray(acceptedBookings)) {
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      const checkTime = checkDate.getTime();
+
+      for (const booking of acceptedBookings) {
+        if (booking.datesWithTypes && Array.isArray(booking.datesWithTypes)) {
+          const match = booking.datesWithTypes.find(dt => {
+            const d = new Date(dt.date);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === checkTime;
+          });
+
+          if (match) {
+            if (match.type === 'half-day') {
+              if (match.time === 'evening' || (match.safariType && match.safariType.toLowerCase().includes('evening'))) {
+                bookedEvening = true;
+              } else {
+                bookedMorning = true;
+              }
+            } else {
+              bookedFullDay = true;
+            }
+          }
+        } else if (booking.selectedDates && Array.isArray(booking.selectedDates)) {
+          const match = booking.selectedDates.some(sd => {
+            const d = new Date(sd);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === checkTime;
+          });
+          if (match) bookedFullDay = true;
+        }
+      }
+    }
+
+    if (bookedFullDay) return 'busy';
+
+    // 3. Combine booking and manual availability logic
+    const morningOccupied = bookedMorning || manualUnavailableMorning;
+    const eveningOccupied = bookedEvening || manualUnavailableEvening;
+
+    if (morningOccupied && eveningOccupied) {
+      if (bookedMorning && bookedEvening) return 'busy';
+      if (bookedMorning && manualUnavailableEvening) return 'halfbooked-halfunavailable-morning';
+      if (bookedEvening && manualUnavailableMorning) return 'halfbooked-halfunavailable-evening';
+      return 'unavailable';
+    }
+
+    if (manualUnavailableFull) return 'unavailable';
+    if (bookedMorning) return 'halfday-morning';
+    if (bookedEvening) return 'halfday-evening';
+    if (manualUnavailableMorning) return 'unavailable-halfday-morning';
+    if (manualUnavailableEvening) return 'unavailable-halfday-evening';
+
     return null;
   };
 
   const isDatePast = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date < today;
+    if (!date) return false;
+
+    // Create date objects for comparison
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    // Get current time in Sri Lanka (UTC+5:30)
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const slTime = new Date(utc + (3600000 * 5.5));
+
+    // Create 'today' based on SL time
+    const slToday = new Date(slTime);
+    slToday.setHours(0, 0, 0, 0);
+
+    // Strict past check
+    if (checkDate < slToday) return true;
+
+    // "Today" check with deadline
+    if (checkDate.getTime() === slToday.getTime()) {
+      // If currently past 12:00 PM in SL, then today is "past" for booking
+      // This prevents bookings for the current day after 12 PM
+      if (slTime.getHours() >= 12) {
+        return true;
+      }
+    }
+
+    return false;
   };
 
   const getDateClassName = (date) => {
@@ -174,12 +258,12 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
       }
     }
 
-    if (status === 'busy' || status === 'unavailable' || status === 'unavailable-fullday') {
-      return `${baseClasses} bg-gray-100 text-gray-400 cursor-not-allowed border-2 border-dashed border-gray-200`;
+    if (status === 'busy' || status === 'unavailable' || status === 'unavailable-fullday' || status === 'halfbooked-halfunavailable-morning' || status === 'halfbooked-halfunavailable-evening') {
+      return `${baseClasses} bg-gray-600 text-white cursor-not-allowed shadow-sm`;
     }
 
-    if (status === 'halfday' || status === 'halfday-morning' || status === 'halfday-evening' || status === 'unavailable-halfday-morning' || status === 'unavailable-halfday-evening') {
-      return `${baseClasses} bg-yellow-50 text-yellow-700 border-2 border-yellow-200 hover:bg-yellow-100 font-bold`;
+    if (status && (status.includes('halfday') || status.includes('unavailable-halfday'))) {
+      return `${baseClasses} bg-orange-500 text-white hover:bg-orange-600 shadow-sm font-bold`;
     }
 
     if (isToday) {
@@ -205,6 +289,22 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
           <button onClick={() => navigateMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 group">
             <ArrowRight className="h-4 w-4 text-gray-600 group-hover:text-black" />
           </button>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="grid grid-cols-3 gap-2 mb-4 p-2 bg-gray-50 rounded-lg border border-gray-100">
+        <div className="flex items-center gap-2 text-[10px] sm:text-xs">
+          <div className="w-3 h-3 bg-emerald-50 border border-emerald-100 rounded"></div>
+          <span className="text-gray-600">Available</span>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] sm:text-xs">
+          <div className="w-3 h-3 bg-gray-600 rounded"></div>
+          <span className="text-gray-600">Unavailable</span>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] sm:text-xs">
+          <div className="w-3 h-3 bg-orange-500 rounded"></div>
+          <span className="text-gray-600">Partial</span>
         </div>
       </div>
 
@@ -243,6 +343,11 @@ const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType
               })()}
             >
               {day.getDate()}
+              {status && (status.includes('half') && !status.includes('halfbooked')) && (
+                <span className="absolute bottom-0.5 text-[8px] sm:text-[9px] leading-none font-bold text-white uppercase tracking-tighter">
+                  {status.includes('morning') ? 'PM' : 'AM'}
+                </span>
+              )}
             </button>
           );
         })}
@@ -694,6 +799,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
   // const [chatConversationId, setChatConversationId] = useState(null); // Removed - using Chat component instead
   const [chatOtherUser, setChatOtherUser] = useState(null);
   const [hasAcceptedBooking, setHasAcceptedBooking] = useState(false);
+  const [hasPaidBooking, setHasPaidBooking] = useState(false);
 
   // Package booking states
   const [packages, setPackages] = useState([]);
@@ -784,32 +890,113 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
   // Old scrollToBottom and messages useEffect removed - using Chat component instead
 
-  // Check for accepted bookings to enable messaging
+  // Check for accepted bookings to enable messaging and show on calendar
+  const [acceptedBookings, setAcceptedBookings] = useState([]);
+
   useEffect(() => {
-    const checkAcceptedBooking = async () => {
+    if (!guideId) return;
+
+    const fetchAcceptedBookings = async () => {
+      try {
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(
+          bookingsRef,
+          where('guideId', '==', guideId)
+        );
+        const snapshot = await getDocs(q);
+        const bookings = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (['accepted', 'confirmed', 'completed'].includes(data.status)) {
+            bookings.push({ id: doc.id, ...data });
+          }
+        });
+        console.log("Fetched Bookings for Guide Calendar:", bookings.length);
+        setAcceptedBookings(bookings);
+
+        // Check if current user has an accepted booking with this guide
+        if (currentUser) {
+          const userHasBooking = bookings.some(b => b.customerId === currentUser.uid);
+          setHasAcceptedBooking(userHasBooking);
+        }
+      } catch (error) {
+        console.error('Error fetching guide bookings:', error);
+      }
+    };
+
+    fetchAcceptedBookings();
+  }, [guideId, currentUser]);
+
+  // Check for paid booking for this specific guide to show contact info
+  useEffect(() => {
+    const checkPaidBooking = async () => {
       if (!currentUser || !guideId) {
+        setHasPaidBooking(false);
         setHasAcceptedBooking(false);
         return;
       }
 
       try {
         const bookingsRef = collection(db, 'bookings');
+
+        // Use a single query to get all bookings between this user and guide
         const q = query(
           bookingsRef,
-          where('customerId', '==', currentUser.uid),
-          where('guideId', '==', guideId),
-          where('status', 'in', ['accepted', 'confirmed', 'completed'])
+          where('guideId', '==', guideId)
         );
 
-        const snapshot = await getDocs(q);
-        setHasAcceptedBooking(!snapshot.empty);
+        const querySnapshot = await getDocs(q);
+        let hasPaid = false;
+        let hasAccepted = false;
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const isUserBooking = data.customerId === currentUser.uid ||
+            data.touristId === currentUser.uid ||
+            data.userId === currentUser.uid;
+
+          if (isUserBooking) {
+            if (data.paymentStatus === 'paid' || data.status === 'confirmed' || data.status === 'completed') {
+              hasPaid = true;
+            }
+            if (data.status === 'accepted' || data.status === 'confirmed' || data.status === 'completed') {
+              hasAccepted = true;
+            }
+          }
+        });
+
+        // Try alternative field name providerId if nothing found
+        if (!hasPaid && !hasAccepted) {
+          const q2 = query(
+            bookingsRef,
+            where('providerId', '==', guideId)
+          );
+          const querySnapshot2 = await getDocs(q2);
+          querySnapshot2.forEach((doc) => {
+            const data = doc.data();
+            const isUserBooking = data.customerId === currentUser.uid ||
+              data.touristId === currentUser.uid ||
+              data.userId === currentUser.uid;
+
+            if (isUserBooking) {
+              if (data.paymentStatus === 'paid' || data.status === 'confirmed' || data.status === 'completed') {
+                hasPaid = true;
+              }
+              if (data.status === 'accepted' || data.status === 'confirmed' || data.status === 'completed') {
+                hasAccepted = true;
+              }
+            }
+          });
+        }
+
+        setHasPaidBooking(hasPaid);
+        setHasAcceptedBooking(hasAccepted);
       } catch (error) {
-        console.error('Error checking for accepted bookings:', error);
-        setHasAcceptedBooking(false);
+        console.error('Error checking paid booking:', error);
       }
     };
 
-    checkAcceptedBooking();
+    checkPaidBooking();
   }, [currentUser, guideId]);
 
   // Track recently viewed when profile is loaded
@@ -982,6 +1169,35 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
 
             isCurrentUser: currentUser && currentUser.uid === guideId
           };
+
+          // Fetch certification documents if guide is certified
+          if (guideData.certificationStatus === 'certified') {
+            try {
+              // Guides use jeepDriverCertifications collection (same as others)
+              const certDocRef = doc(db, 'jeepDriverCertifications', guideId);
+              const certDocSnap = await getDoc(certDocRef);
+
+              if (certDocSnap.exists()) {
+                const certData = certDocSnap.data();
+                console.log('✅ Certification documents found:', certData);
+
+                if (certData.documents && Array.isArray(certData.documents)) {
+                  // Resolve URLs if needed
+                  const documentsWithUrls = await Promise.all(certData.documents.map(async (doc) => {
+                    if (doc.fileUrl) return doc; // URL already exists
+                    if (doc.supabasePath) {
+                      const { signedUrl } = await getDocumentUrl(doc.supabasePath);
+                      return { ...doc, fileUrl: signedUrl };
+                    }
+                    return doc;
+                  }));
+                  transformedGuide.certificationDocuments = documentsWithUrls;
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching certification documents:', err);
+            }
+          }
 
           // Debug: Log transformed pricing values
           console.log('💰 Transformed pricing values:', {
@@ -1761,7 +1977,17 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                       <Phone size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{guide.contactPhone}</span>
+                    {hasPaidBooking ? (
+                      <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{guide.contactPhone}</span>
+                    ) : (
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-0.5 italic text-nowrap">Phone Number</span>
+                        <div className="flex items-center gap-1.5 text-black">
+                          <Shield size={12} className="text-emerald-600 shrink-0" />
+                          <span className="text-xs sm:text-sm font-medium italic text-gray-400 truncate">Hidden until payment</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1770,7 +1996,17 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                     <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                       <Mail size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{guide.contactEmail}</span>
+                    {hasPaidBooking ? (
+                      <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{guide.contactEmail}</span>
+                    ) : (
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-0.5 italic text-nowrap">Email Address</span>
+                        <div className="flex items-center gap-1.5 text-black">
+                          <Shield size={12} className="text-emerald-600 shrink-0" />
+                          <span className="text-xs sm:text-sm font-medium italic text-gray-400 truncate">Hidden until payment</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2034,7 +2270,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                     href={doc.fileUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="shrink-0 text-blue-600 hover:text-blue-800 underline text-xs"
+                                    className="shrink-0 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors shadow-sm"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     View
@@ -2338,6 +2574,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                                 handleDateSelect(date);
                                 setDateTypeMenuDate(null);
                               }}
+                              acceptedBookings={acceptedBookings}
                             />
 
                             {/* Date Type Menu (Full Day / Half Day) - Smaller Size */}

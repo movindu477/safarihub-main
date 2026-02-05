@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   query,
   where,
+  updateDoc,
   getDocs
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -33,15 +34,6 @@ import {
   User,
   Car,
   DollarSign,
-  Calendar as CalendarIcon,
-  ThumbsUp,
-  ThumbsDown,
-  Edit,
-  Trash2,
-  Flag,
-  AlertCircle,
-  CheckCircle,
-  Navigation,
   Package,
   UserCircle,
   Globe,
@@ -57,6 +49,10 @@ import ReviewSection from "../ReviewSection";
 
 // Import Chat component
 import Chat from "../Chat";
+
+// Import Supabase helper for document URLs
+import { getDocumentUrl } from '../../lib/supabase';
+
 
 // Import rating update function
 import { updateRentalProviderRating } from "../../reviewservice";
@@ -78,881 +74,103 @@ import {
   GlobalNotificationBell,
 } from "../../App";
 
-// Calendar Component for Date Selection with Availability Display
-const DatePickerCalendar = ({ selectedDates, onDateSelect, selectedDatesWithType, onDateTypeChange, availabilityCalendar, availableDates }) => {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+// Product/Package Component for Renting
+const PackageCard = ({ pkg, isOwner }) => {
+  const [inStock, setInStock] = useState(pkg.available !== false);
+  const navigate = useNavigate();
 
-  const getDaysInMonth = (date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+  const toggleStock = async (e) => {
+    e.stopPropagation();
+    if (!isOwner) return;
 
-    const days = [];
-    // Add empty cells for days before the first day of the month
-    const startDay = firstDay.getDay();
-    for (let i = 0; i < startDay; i++) {
-      days.push(null);
-    }
-
-    // Add all days of the month
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      days.push(new Date(year, month, i));
-    }
-
-    return days;
-  };
-
-  const navigateMonth = (direction) => {
-    setCurrentMonth(prev => {
-      const newMonth = new Date(prev);
-      newMonth.setMonth(prev.getMonth() + direction);
-      return newMonth;
-    });
-  };
-
-  const getDateKey = (date) => {
-    if (!date) return null;
-    return date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-  };
-
-  const getAvailabilityStatus = (date) => {
-    if (!date) return null;
-    const dateKey = getDateKey(date);
-
-    // Check new availability calendar format (object)
-    if (availabilityCalendar && typeof availabilityCalendar === 'object' && !Array.isArray(availabilityCalendar)) {
-      const status = availabilityCalendar[dateKey];
-      // Return status if it exists, otherwise return null (which means available)
-      if (status && ['busy', 'halfday', 'unavailable'].includes(status)) {
-        return status;
-      }
-      // If no status marked, return null (available by default)
-      return null;
-    }
-
-    // Fallback to old availableDates array format
-    if (availableDates && Array.isArray(availableDates)) {
-      const dateString = date.toISOString().split('T')[0];
-      const isInArray = availableDates.some(availableDate => {
-        const availableDateString = new Date(availableDate).toISOString().split('T')[0];
-        return availableDateString === dateString;
+    try {
+      const db = getFirestore();
+      const pkgRef = doc(db, 'rentalProducts', pkg.id);
+      await updateDoc(pkgRef, {
+        available: !inStock
       });
-      return isInArray ? null : 'unavailable'; // If in array = available, if not = unavailable
-    }
-
-    // Default: no status means available
-    return null;
-  };
-
-  const isDateAvailable = (date) => {
-    const status = getAvailabilityStatus(date);
-    // Available if status is null/undefined or 'available' (not marked as busy/unavailable)
-    return status === null || status === 'available' || status === 'halfday';
-  };
-
-  const isDateSelected = (date) => {
-    if (!date) return false;
-    return selectedDates.some(selectedDate =>
-      selectedDate.toDateString() === date.toDateString()
-    );
-  };
-
-  const isDatePast = (date) => {
-    if (!date) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date < today;
-  };
-
-  const handleDateClick = (date) => {
-    if (!date || isDatePast(date)) return;
-    if (!isDateAvailable(date)) return; // Don't allow selection of unavailable dates
-    onDateSelect(date);
-  };
-
-  const getDateClassName = (date) => {
-    if (!date) return '';
-    const status = getAvailabilityStatus(date);
-    const selected = isDateSelected(date);
-    const isToday = date.toDateString() === new Date().toDateString();
-    const isPast = isDatePast(date);
-
-    const baseClasses = 'relative w-full h-8 sm:h-10 text-xs sm:text-sm rounded-lg transition-all duration-200 font-medium flex items-center justify-center cursor-pointer';
-
-    if (isPast) {
-      return `${baseClasses} bg-gray-800/50 text-gray-600 cursor-not-allowed`;
-    }
-
-    if (selected) {
-      return `${baseClasses} bg-black text-white ring-2 ring-yellow-400 shadow-lg`;
-    }
-
-    // Handle availability statuses
-    if (status === 'busy') {
-      return `${baseClasses} bg-red-500 text-white hover:bg-red-600`;
-    } else if (status === 'halfday') {
-      return `${baseClasses} bg-yellow-500 text-white hover:bg-yellow-600`;
-    } else if (status === 'unavailable') {
-      return `${baseClasses} bg-gray-600 text-white cursor-not-allowed opacity-75`;
-    } else {
-      // No status or null means available (green)
-      return `${baseClasses} ${isToday ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300' : 'bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30'}`;
+      setInStock(!inStock);
+    } catch (error) {
+      console.error("Error updating stock status:", error);
     }
   };
-
-  const days = getDaysInMonth(currentMonth);
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   return (
-    <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/40 rounded-xl p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={() => navigateMonth(-1)}
-          className="p-2 rounded-lg bg-gray-800/50 hover:bg-gray-700 text-white transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <h3 className="text-base sm:text-lg font-semibold text-white">
-          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-        </h3>
-        <button
-          onClick={() => navigateMonth(1)}
-          className="p-2 rounded-lg bg-gray-800/50 hover:bg-gray-700 text-white transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5 rotate-180" />
-        </button>
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col h-full">
+      {/* Product Image */}
+      <div className="relative h-48 bg-gray-100 overflow-hidden">
+        {pkg.images && pkg.images.length > 0 ? (
+          <img
+            src={pkg.images[0]}
+            alt={pkg.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-400">
+            <Package size={48} />
+          </div>
+        )}
+        <div className="absolute top-3 right-3">
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm ${inStock
+            ? 'bg-emerald-500 text-white'
+            : 'bg-red-500 text-white'
+            }`}>
+            {inStock ? 'In Stock' : 'Out of Stock'}
+          </span>
+        </div>
+        {pkg.category && (
+          <div className="absolute top-3 left-3">
+            <span className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full text-white text-xs font-medium">
+              {pkg.category}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Legend */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2 bg-gray-800/30 rounded-lg border border-gray-700/40">
-        <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-green-500/20 border border-green-500/30 rounded"></div>
-          <span className="text-gray-300">Available</span>
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-600 transition-colors line-clamp-2">
+            {pkg.title}
+          </h3>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span className="text-gray-300">Busy</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-          <span className="text-gray-300">Half Day</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <div className="w-3 h-3 bg-gray-600 rounded"></div>
-          <span className="text-gray-300">Unavailable</span>
-        </div>
-      </div>
 
-      {/* Day Headers */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="text-center text-xs font-medium text-gray-400 py-2">
-            {day}
+        {(pkg.brand || pkg.model) && (
+          <p className="text-xs text-gray-500 mb-3 font-medium">
+            {pkg.brand} {pkg.model && `• ${pkg.model}`}
+          </p>
+        )}
+
+        <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-3 flex-1">
+          {pkg.description}
+        </p>
+
+        {!isOwner && (
+          <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded-lg flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-blue-600 shrink-0" />
+            <p className="text-xs text-blue-700 font-medium leading-tight">
+              Contact service provider to rent this product
+            </p>
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* Calendar Days */}
-      <div className="grid grid-cols-7 gap-1">
-        {days.map((day, index) => {
-          if (!day) {
-            return <div key={`empty-${index}`} className="h-8 sm:h-10"></div>;
-          }
+        <div className="pt-4 border-t border-gray-100 mt-auto">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Price per day</p>
+              <p className="text-xl font-black text-gray-900">
+                LKR {(pkg.pricePerDay || 0).toLocaleString()} <span className="text-xs font-normal text-gray-500">/day</span>
+              </p>
+            </div>
 
-          const dateKey = getDateKey(day);
-          const status = getAvailabilityStatus(day);
-          const isPast = isDatePast(day);
-          const isAvailable = isDateAvailable(day);
-
-          return (
-            <button
-              key={dateKey || `day-${index}`}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!isPast && isAvailable) {
-                  handleDateClick(day);
-                }
-              }}
-              disabled={!isAvailable || isPast}
-              className={getDateClassName(day)}
-              title={(() => {
-                if (isPast) return 'Past date';
-                if (status === 'busy') return 'Busy - Not available';
-                if (status === 'halfday') return 'Half day available';
-                if (status === 'unavailable') return 'Unavailable';
-                return 'Available - Click to select';
-              })()}
-            >
-              {day.getDate()}
-            </button>
-          );
-        })}
-      </div>
-
-      {selectedDates.length > 0 && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
-          <h4 className="font-bold text-black mb-3">Selected Dates:</h4>
-          <div className="space-y-2">
-            {selectedDates.map((date, index) => {
-              const dateString = date.toDateString();
-              const dateType = selectedDatesWithType?.[dateString] || 'full-day';
-              return (
-                <div key={index} className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-200">
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-700">
-                      {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                    </span>
-                    <span className="ml-2 text-xs text-black font-semibold">
-                      ({dateType === 'half-day' ? 'Half Day' : 'Full Day'})
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
-                      }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
-                        ? 'bg-black text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600'
-                        }`}
-                    >
-                      Half Day
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
-                      }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
-                        ? 'bg-black text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600'
-                        }`}
-                    >
-                      Full Day
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {isOwner && (
+              <button
+                onClick={toggleStock}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                Change Status
+              </button>
+            )}
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Booking Form Modal Component
-const BookingFormModal = ({
-  isOpen,
-  onClose,
-  formData,
-  setFormData,
-  formErrors,
-  setFormErrors,
-  currentStep,
-  setCurrentStep,
-  onSubmit,
-  provider,
-  selectedDates,
-  selectedDatesWithType,
-  onDateTypeChange
-}) => {
-  // Emergency Contact step removed - form submits from Additional Requests
-  const steps = [
-    { number: 1, title: 'Personal', shortTitle: 'Personal', icon: User },
-    { number: 2, title: 'Safari Details', shortTitle: 'Safari', icon: Calendar },
-    { number: 3, title: 'Pickup & Drop-off', shortTitle: 'Pickup', icon: Navigation },
-    { number: 4, title: 'Additional Requests', shortTitle: 'Add-ons', icon: Package }
-  ];
-
-  const updateFormData = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleNext = () => {
-    if (currentStep < steps.length) {
-      // Clear errors when moving to next step
-      setFormErrors({});
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentStep > 1) {
-      // Clear errors when moving to previous step
-      setFormErrors({});
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const validateStep = () => {
-    const errors = {};
-
-    if (currentStep === 1) {
-      if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
-      if (!formData.email.trim()) errors.email = 'Email is required';
-      if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-      if (!formData.country.trim()) errors.country = 'Country is required';
-      if (!formData.numberOfPassengers || formData.numberOfPassengers < 1 || formData.numberOfPassengers > 6) {
-        errors.numberOfPassengers = 'Number of passengers must be between 1 and 6';
-      }
-    } else if (currentStep === 2) {
-      if (!formData.nationalPark.trim()) errors.nationalPark = 'National park is required';
-      if (!formData.safariType) errors.safariType = 'Safari type is required';
-    } else if (currentStep === 3) {
-      if (formData.needsHotelPickup) {
-        if (!formData.hotelName.trim()) errors.hotelName = 'Hotel name is required';
-        if (!formData.hotelAddress.trim()) errors.hotelAddress = 'Hotel address is required';
-      } else {
-        if (!formData.pickupLocation.trim()) errors.pickupLocation = 'Pickup location is required';
-        if (!formData.dropoffLocation.trim()) errors.dropoffLocation = 'Drop-off location is required';
-      }
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-4xl w-full my-2 sm:my-8 max-h-[98vh] sm:max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-black to-gray-900 rounded-t-lg sm:rounded-t-2xl p-3 sm:p-6 text-white sticky top-0 z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-base sm:text-xl font-bold truncate">Booking Details</h1>
-                <p className="text-gray-300 text-xs sm:text-sm hidden sm:block">Complete your booking information</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 sm:p-2 rounded-lg cursor-pointer flex-shrink-0 ml-2"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5 sm:h-6 sm:w-6" />
-            </button>
-          </div>
-        </div>
-
-        {/* Step Indicator */}
-        <div className="p-4 sm:p-6 border-b border-gray-200">
-          <div className="flex items-start justify-between overflow-x-auto pb-2">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
-              const isActive = currentStep === step.number;
-              const isCompleted = currentStep > step.number;
-
-              return (
-                <div key={step.number} className="flex items-start flex-shrink-0" style={{ width: 'calc(16.666% - 8px)' }}>
-                  <div className="flex flex-col items-center w-full">
-                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 ${isActive ? 'bg-black border-black text-white' :
-                      isCompleted ? 'bg-gray-100 border-black text-black' :
-                        'bg-gray-100 border-gray-300 text-gray-400'
-                      }`}>
-                      {isCompleted ? (
-                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                      ) : (
-                        <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                      )}
-                    </div>
-                    <span className={`mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight ${isActive ? 'text-black' : 'text-gray-500'
-                      }`}>
-                      <span className="hidden sm:inline">{step.title}</span>
-                      <span className="sm:hidden">{step.shortTitle}</span>
-                    </span>
-                  </div>
-                  {index < steps.length - 1 && (
-                    <div className={`hidden sm:block h-0.5 w-full mx-1 sm:mx-2 -mt-4 sm:-mt-6 ${isCompleted ? 'bg-black' : 'bg-gray-200'
-                      }`} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Form Content - I'll use the same form fields from Payment.jsx but in a more compact modal format */}
-        <div className="p-4 sm:p-6">
-          {/* Step 1: Personal Details */}
-          {currentStep === 1 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="h-5 w-5 text-black" />
-                Personal Details
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="fullName"
-                    id="fullName"
-                    value={formData.fullName}
-                    onChange={(e) => updateFormData('fullName', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                    placeholder="Enter your full name"
-                  />
-                  {formErrors.fullName && <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    id="email"
-                    value={formData.email}
-                    onChange={(e) => updateFormData('email', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                    placeholder="your.email@example.com"
-                  />
-                  {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => {
-                      let value = e.target.value.replace(/[^0-9+]/g, '');
-
-                      // Format: +94 XX XXX XXXX
-                      if (value.startsWith('+94')) {
-                        // Remove +94 prefix for processing
-                        const digits = value.slice(3);
-                        // Limit to 9 digits after +94
-                        const limitedDigits = digits.slice(0, 9);
-                        // Format with spaces: +94 XX XXX XXXX
-                        let formatted = '+94';
-                        if (limitedDigits.length > 0) {
-                          formatted += ' ' + limitedDigits.slice(0, 2);
-                        }
-                        if (limitedDigits.length > 2) {
-                          formatted += ' ' + limitedDigits.slice(2, 5);
-                        }
-                        if (limitedDigits.length > 5) {
-                          formatted += ' ' + limitedDigits.slice(5, 9);
-                        }
-                        value = formatted;
-                      } else if (value.startsWith('0')) {
-                        // If starts with 0, convert to +94
-                        const digits = value.slice(1);
-                        const limitedDigits = digits.slice(0, 9);
-                        let formatted = '+94';
-                        if (limitedDigits.length > 0) {
-                          formatted += ' ' + limitedDigits.slice(0, 2);
-                        }
-                        if (limitedDigits.length > 2) {
-                          formatted += ' ' + limitedDigits.slice(2, 5);
-                        }
-                        if (limitedDigits.length > 5) {
-                          formatted += ' ' + limitedDigits.slice(5, 9);
-                        }
-                        value = formatted;
-                      }
-
-                      updateFormData('phone', value);
-                    }}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                    placeholder="+94 77 123 4567"
-                  />
-                  {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Country of Residence <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="country"
-                    id="country"
-                    value={formData.country}
-                    onChange={(e) => updateFormData('country', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                    placeholder="e.g., United States"
-                  />
-                  {formErrors.country && <p className="text-red-500 text-xs mt-1">{formErrors.country}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Number of Passengers <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="numberOfPassengers"
-                    id="numberOfPassengers"
-                    min="1"
-                    max="6"
-                    value={formData.numberOfPassengers}
-                    onChange={(e) => {
-                      const inputValue = e.target.value;
-                      // Allow empty string while typing
-                      if (inputValue === '') {
-                        updateFormData('numberOfPassengers', '');
-                        return;
-                      }
-                      const numValue = parseInt(inputValue);
-                      // Only allow numbers between 1 and 6
-                      if (!isNaN(numValue) && numValue >= 1 && numValue <= 6) {
-                        updateFormData('numberOfPassengers', numValue);
-                      } else if (numValue > 6) {
-                        updateFormData('numberOfPassengers', 6);
-                      } else if (numValue < 1 && inputValue !== '') {
-                        updateFormData('numberOfPassengers', 1);
-                      }
-                    }}
-                    onBlur={(e) => {
-                      // Ensure value is between 1-6 on blur
-                      const value = parseInt(e.target.value) || 1;
-                      const clampedValue = Math.min(Math.max(value, 1), 6);
-                      updateFormData('numberOfPassengers', clampedValue);
-                    }}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.numberOfPassengers ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                  />
-                  {formErrors.numberOfPassengers && <p className="text-red-500 text-xs mt-1">{formErrors.numberOfPassengers}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Special Assistance (Optional)
-                  </label>
-                  <textarea
-                    value={formData.specialAssistance}
-                    onChange={(e) => updateFormData('specialAssistance', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-                    rows="3"
-                    placeholder="Any special requirements"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Safari Booking Details */}
-          {currentStep === 2 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-black" />
-                Safari Booking Details
-              </h2>
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    National Park <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="nationalPark"
-                    id="nationalPark"
-                    value={formData.nationalPark}
-                    onChange={(e) => updateFormData('nationalPark', e.target.value)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 bg-gray-50 appearance-none pr-10 ${formErrors.nationalPark ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                      }`}
-                    disabled={!!(provider?.destinations && provider.destinations.length > 0)}
-                  >
-                    <option value={formData.nationalPark}>{formData.nationalPark || 'Select National Park'}</option>
-                  </select>
-                  {formErrors.nationalPark && <p className="text-red-500 text-xs mt-1">{formErrors.nationalPark}</p>}
-                  {formData.nationalPark && (
-                    <p className="text-xs text-gray-600 mt-1">
-                      Park Ticket: LKR {getParkTicketPrice(formData.nationalPark).toLocaleString()} per person
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Selected Dates with Half Day/Full Day and Safari Type */}
-              {selectedDates.length > 0 && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h3 className="font-semibold text-gray-900 mb-3">Selected Dates & Type:</h3>
-                  <div className="space-y-3">
-                    {selectedDates.map((date, index) => {
-                      const dateString = date.toDateString();
-                      const dateType = selectedDatesWithType[dateString] || 'full-day';
-                      const dateSafariType = formData.dateSafariTypes?.[dateString] || 'Morning Safari';
-                      return (
-                        <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700">
-                              {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                            </span>
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onDateTypeChange) onDateTypeChange(dateString, 'half-day');
-                                }}
-                                className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'half-day'
-                                  ? 'bg-black text-white shadow-md'
-                                  : 'bg-gray-100 text-gray-600'
-                                  }`}
-                              >
-                                Half Day
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onDateTypeChange) onDateTypeChange(dateString, 'full-day');
-                                }}
-                                className={`px-3 py-1 rounded-md text-xs font-medium ${dateType === 'full-day'
-                                  ? 'bg-black text-white shadow-md'
-                                  : 'bg-gray-100 text-gray-600'
-                                  }`}
-                              >
-                                Full Day
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Safari Type Dropdown - Shows for both Half Day and Full Day */}
-                          <div className="mt-2">
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Safari Type:</label>
-                            <select
-                              value={dateSafariType}
-                              onChange={(e) => {
-                                const newSafariTypes = { ...(formData.dateSafariTypes || {}), [dateString]: e.target.value };
-                                updateFormData('dateSafariTypes', newSafariTypes);
-                              }}
-                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-                            >
-                              <option value="Morning Safari">Morning Safari</option>
-                              <option value="Evening Safari">Evening Safari</option>
-                            </select>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 3: Pickup & Drop-off - Similar structure, abbreviated for space */}
-          {currentStep === 3 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Navigation className="h-5 w-5 text-black" />
-                Pickup & Drop-off Information
-              </h2>
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.needsHotelPickup}
-                    onChange={(e) => updateFormData('needsHotelPickup', e.target.checked)}
-                    className="w-5 h-5 text-black rounded focus:ring-black"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Do you need hotel pickup?</span>
-                </label>
-                {formData.needsHotelPickup && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Hotel Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="hotelName"
-                        id="hotelName"
-                        value={formData.hotelName}
-                        onChange={(e) => updateFormData('hotelName', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                          }`}
-                      />
-                      {formErrors.hotelName && <p className="text-red-500 text-xs mt-1">{formErrors.hotelName}</p>}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Hotel Address <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="hotelAddress"
-                        id="hotelAddress"
-                        value={formData.hotelAddress}
-                        onChange={(e) => updateFormData('hotelAddress', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.hotelAddress ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                          }`}
-                      />
-                      {formErrors.hotelAddress && <p className="text-red-500 text-xs mt-1">{formErrors.hotelAddress}</p>}
-                    </div>
-                  </div>
-                )}
-                {!formData.needsHotelPickup && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Pickup Location <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="pickupLocation"
-                        id="pickupLocation"
-                        value={formData.pickupLocation}
-                        onChange={(e) => updateFormData('pickupLocation', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.pickupLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                          }`}
-                      />
-                      {formErrors.pickupLocation && <p className="text-red-500 text-xs mt-1">{formErrors.pickupLocation}</p>}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Drop-off Location <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="dropoffLocation"
-                        id="dropoffLocation"
-                        value={formData.dropoffLocation}
-                        onChange={(e) => updateFormData('dropoffLocation', e.target.value)}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dropoffLocation ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-black'
-                          }`}
-                      />
-                      {formErrors.dropoffLocation && <p className="text-red-500 text-xs mt-1">{formErrors.dropoffLocation}</p>}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Additional Requests - Abbreviated */}
-          {currentStep === 4 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Package className="h-5 w-5 text-black" />
-                Additional Requests / Add-Ons
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {[
-                  { key: 'needsBinoculars', label: 'Binoculars', price: 500 },
-                  { key: 'needsChildSeat', label: 'Child Seat', price: 1000 },
-                  { key: 'needsWater', label: 'Water Bottles', price: 300 },
-                  { key: 'needsSnacks', label: 'Snacks / Meals', price: 0 }
-                ].map(({ key, label, price }) => (
-                  <label key={key} className="flex items-center justify-between cursor-pointer p-3 border border-gray-300 rounded-none">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData[key]}
-                        onChange={(e) => updateFormData(key, e.target.checked)}
-                        className="w-5 h-5 text-black rounded focus:ring-black"
-                      />
-                      <span className="text-sm font-medium text-gray-700">{label}</span>
-                    </div>
-                    {price > 0 && (
-                      <span className="text-sm font-semibold text-black">+LKR {price.toLocaleString()}</span>
-                    )}
-                  </label>
-                ))}
-              </div>
-              {formData.needsSnacks && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Available Snacks & Meals:</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { name: 'Biscuits', price: 200 },
-                      { name: 'Chips', price: 250 },
-                      { name: 'Fruits', price: 400 },
-                      { name: 'Sandwiches', price: 500 },
-                      { name: 'Rice & Curry', price: 800 },
-                      { name: 'Fried Rice', price: 700 },
-                      { name: 'Noodles', price: 600 },
-                      { name: 'Soft Drinks', price: 150 }
-                    ].map(({ name, price }) => (
-                      <label key={name} className="flex items-center justify-between cursor-pointer p-2 bg-white rounded border border-gray-200">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={formData.selectedSnacks?.includes(name) || false}
-                            onChange={(e) => {
-                              const currentSnacks = formData.selectedSnacks || [];
-                              const newSnacks = e.target.checked
-                                ? [...currentSnacks, name]
-                                : currentSnacks.filter(s => s !== name);
-                              updateFormData('selectedSnacks', newSnacks);
-                            }}
-                            className="w-4 h-4 text-emerald-500 rounded focus:ring-black"
-                          />
-                          <span className="text-xs text-gray-700">{name}</span>
-                        </div>
-                        <span className="text-xs font-semibold text-black">+LKR {price}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Navigation Buttons */}
-        <div className="p-4 sm:p-6 border-t border-gray-200 flex justify-between items-center gap-3">
-          <button
-            onClick={handlePrevious}
-            disabled={currentStep === 1}
-            className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none"
-          >
-            Previous
-          </button>
-
-          {currentStep < steps.length ? (
-            <button
-              onClick={() => {
-                if (validateStep()) {
-                  handleNext();
-                }
-              }}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-black text-white rounded-lg font-medium flex-1 sm:flex-none hover:bg-gray-800 transition-colors"
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              onClick={async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('🔵 Confirm Booking button clicked');
-                if (validateStep()) {
-                  console.log('✅ Step validation passed, calling onSubmit');
-                  try {
-                    await onSubmit();
-                  } catch (error) {
-                    console.error('❌ Error in onSubmit:', error);
-                    alert('An error occurred. Please try again.');
-                  }
-                } else {
-                  console.warn('⚠️ Step validation failed');
-                }
-              }}
-              className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-black text-white rounded-none font-medium flex-1 sm:flex-none cursor-pointer hover:bg-gray-800 transition-colors"
-            >
-              Confirm Booking
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -961,20 +179,7 @@ const BookingFormModal = ({
 
 // Old ChatModal component removed - using Chat component instead
 
-// Park ticket prices
-const parkTicketPrices = {
-  'Yala National Park': 5000,
-  'Wilpattu National Park': 4500,
-  'Udawalawe National Park': 4000,
-  'Minneriya National Park': 3500,
-  'Kaudulla National Park': 3500,
-  'Bundala National Park': 3000,
-  'Kumana National Park': 3000
-};
 
-const getParkTicketPrice = (parkName) => {
-  return parkTicketPrices[parkName] || 0;
-};
 
 const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificationClick, onMarkAsRead }) => {
   const location = useLocation();
@@ -986,52 +191,13 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
-  // Old chat state removed - using Chat component instead
-  // const [message, setMessage] = useState("");
-  // const [messages, setMessages] = useState([]);
-  // const [sending, setSending] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState("");
-  // const [conversationId, setConversationId] = useState(null);
-  const [selectedDates, setSelectedDates] = useState([]);
-  const [selectedDatesWithType, setSelectedDatesWithType] = useState({}); // {dateString: 'half-day' | 'full-day'}
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessageData, setSuccessMessageData] = useState(null);
-  const [isBooking, setIsBooking] = useState(false);
-  const [showBookingForm, setShowBookingForm] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formErrors, setFormErrors] = useState({});
-  const [bookingFormData, setBookingFormData] = useState({
-    // Personal Details
-    fullName: '',
-    email: '',
-    phone: '',
-    country: '',
-    numberOfPassengers: 1,
-    specialAssistance: '',
-    // Safari Booking Details
-    nationalPark: '',
-    safariType: 'Morning Safari',
-    // Pickup & Drop-off
-    pickupLocation: '',
-    hotelName: '',
-    hotelAddress: '',
-    roomNumber: '',
-    dropoffLocation: '',
-    needsHotelPickup: true,
-    // Additional Requests
-    needsBinoculars: false,
-    needsChildSeat: false,
-    needsWater: false,
-    needsSnacks: false,
-    selectedSnacks: [],
-    dateSafariTypes: {}
-  });
-
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [chatConversationId, setChatConversationId] = useState(null);
   const [chatOtherUser, setChatOtherUser] = useState(null);
-  const [hasAcceptedBooking, setHasAcceptedBooking] = useState(false);
+  const [packages, setPackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
+
 
   const searchParams = new URLSearchParams(location.search);
   const providerId = paramProviderId || searchParams.get('providerId'); // Use providerId from URL params, fallback to query params
@@ -1057,21 +223,15 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
     };
   }, []);
 
-  // Reset state when providerId changes (navigating to different provider or going back)
+  // Reset state when providerId changes
   useEffect(() => {
-    // Reset component state when providerId changes or is cleared
     setError("");
     setActiveTab("overview");
-    // setMessage("");
-    // setMessages([]);
-    // setConversationId(null);
-    setSelectedDates([]);
     setIsChatModalOpen(false);
-    setChatConversationId(null);
     setChatOtherUser(null);
   }, [providerId]);
 
-  // Track recently viewed when profile is loaded
+  // Track recently viewed
   useEffect(() => {
     if (providerId && currentUser && provider) {
       trackActivity(currentUser.uid, 'view', providerId, 'renting-shop', {
@@ -1082,13 +242,10 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
     }
   }, [providerId, currentUser, provider]);
 
-  // Old scrollToBottom and messages useEffect removed - using Chat component instead
-
   // Handle opening chat from URL parameter
   useEffect(() => {
     if (openChat === 'true' && providerId && currentUser && provider) {
       setActiveTab('chat');
-      // Open chat modal instead of initializing old conversation
       setChatOtherUser({
         id: provider.id,
         name: provider.fullName || 'provider',
@@ -1099,662 +256,40 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
     }
   }, [openChat, providerId, currentUser, provider]);
 
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-
-    try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      const now = new Date();
-      const diff = now.getTime() - date.getTime();
-
-      if (diff < 60000) return 'Just now';
-      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-
-      return date.toLocaleDateString();
-    } catch (error) {
-      return 'Recently';
-    }
-  };
-
-  const handleDateSelect = (date) => {
-    setSelectedDates(prev => {
-      const isSelected = prev.some(selectedDate =>
-        selectedDate.toDateString() === date.toDateString()
-      );
-
-      if (isSelected) {
-        // Remove date and its type
-        const newTypes = { ...selectedDatesWithType };
-        delete newTypes[date.toDateString()];
-        setSelectedDatesWithType(newTypes);
-        return prev.filter(selectedDate =>
-          selectedDate.toDateString() !== date.toDateString()
-        );
-      } else {
-        // Add date with default 'full-day'
-        setSelectedDatesWithType(prev => ({
-          ...prev,
-          [date.toDateString()]: 'full-day'
+  // Fetch packages subcollection
+  useEffect(() => {
+    const fetchPackageData = async () => {
+      if (!providerId) return;
+      setLoadingPackages(true);
+      try {
+        const pkgRef = collection(db, 'rentalProducts');
+        const q = query(pkgRef, where('providerId', '==', providerId));
+        const pkgSnap = await getDocs(q);
+        const pkgs = pkgSnap.docs.map(doc => ({
+          id: doc.id,
+          providerId,
+          ...doc.data()
         }));
-        return [...prev, date].sort((a, b) => a - b);
+        setPackages(pkgs);
+      } catch (err) {
+        console.error("Error fetching packages:", err);
+      } finally {
+        setLoadingPackages(false);
       }
-    });
-  };
-
-  const handleDateTypeChange = (dateString, type) => {
-    setSelectedDatesWithType(prev => ({
-      ...prev,
-      [dateString]: type
-    }));
-  };
-
-  // Calculate total price based on selected dates and their types (half-day vs full-day) + add-ons
-  const calculateTotalPrice = () => {
-    if (!provider || selectedDates.length === 0) return 0;
-
-    // Calculate base price from dates
-    const dailyPrice = provider.pricePerDay || 0;
-    let total = 0;
-    selectedDates.forEach(date => {
-      const dateString = date.toDateString();
-      const dateType = selectedDatesWithType[dateString] || 'full-day';
-      total += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
-    });
-
-    // Add add-ons prices
-    if (bookingFormData.needsBinoculars) total += 500;
-    if (bookingFormData.needsChildSeat) total += 1000;
-    if (bookingFormData.needsWater) total += 300;
-
-    // Add snacks prices
-    if (bookingFormData.needsSnacks && bookingFormData.selectedSnacks) {
-      const snackPrices = {
-        'Biscuits': 200,
-        'Chips': 250,
-        'Fruits': 400,
-        'Sandwiches': 500,
-        'Rice & Curry': 800,
-        'Fried Rice': 700,
-        'Noodles': 600,
-        'Soft Drinks': 150
-      };
-      bookingFormData.selectedSnacks.forEach(snack => {
-        total += snackPrices[snack] || 0;
-      });
-    }
-
-    return total;
-  };
-
-  // Validate booking form and return errors with step mapping
-  const validateBookingForm = () => {
-    const errors = {};
-
-    // Helper function to safely trim strings
-    const safeTrim = (value) => {
-      return value && typeof value === 'string' ? value.trim() : '';
     };
 
-    // Step 1: Personal Details
-    if (!safeTrim(bookingFormData.fullName)) errors.fullName = 'Full name is required';
-    if (!safeTrim(bookingFormData.email)) errors.email = 'Email is required';
-    if (!safeTrim(bookingFormData.phone)) errors.phone = 'Phone number is required';
-    if (!safeTrim(bookingFormData.country)) errors.country = 'Country is required';
-    if (!bookingFormData.numberOfPassengers || bookingFormData.numberOfPassengers < 1 || bookingFormData.numberOfPassengers > 6) {
-      errors.numberOfPassengers = 'Number of passengers must be between 1 and 6';
-    }
+    fetchPackageData();
+  }, [providerId]);
 
-    // Step 2: Safari Details
-    if (!safeTrim(bookingFormData.nationalPark)) errors.nationalPark = 'National park is required';
-    if (!bookingFormData.safariType) errors.safariType = 'Safari type is required';
-
-    // Step 3: Pickup & Drop-off
-    if (bookingFormData.needsHotelPickup) {
-      if (!safeTrim(bookingFormData.hotelName)) errors.hotelName = 'Hotel name is required';
-      if (!safeTrim(bookingFormData.hotelAddress)) errors.hotelAddress = 'Hotel address is required';
-    } else {
-      if (!safeTrim(bookingFormData.pickupLocation)) errors.pickupLocation = 'Pickup location is required';
-      if (!safeTrim(bookingFormData.dropoffLocation)) errors.dropoffLocation = 'Drop-off location is required';
-    }
-
-    setFormErrors(errors);
-    return { isValid: Object.keys(errors).length === 0, errors };
-  };
-
-  // Map field names to their step numbers
-  const getStepForField = (fieldName) => {
-    const stepMap = {
-      fullName: 1, email: 1, phone: 1, country: 1, numberOfPassengers: 1,
-      nationalPark: 2, safariType: 2,
-      hotelName: 3, hotelAddress: 3, pickupLocation: 3, dropoffLocation: 3
-    };
-    return stepMap[fieldName] || 1;
-  };
-
-  const handleBookingFormSubmit = async () => {
-    console.log('🔵 handleBookingFormSubmit called');
-
-    // Validate the entire form (step validation is already done in the button click handler)
-    const validation = validateBookingForm();
-    if (!validation.isValid) {
-      console.warn('⚠️ Full form validation failed', validation.errors);
-
-      // Find the first error and navigate to that step
-      const firstErrorField = Object.keys(validation.errors)[0];
-      if (firstErrorField) {
-        const targetStep = getStepForField(firstErrorField);
-        setCurrentStep(targetStep);
-
-        // Scroll to the error field after a brief delay
-        setTimeout(() => {
-          // Try multiple selectors to find the error field
-          const selectors = [
-            `[name="${firstErrorField}"]`,
-            `#${firstErrorField}`,
-            `input[id*="${firstErrorField}"]`,
-            `textarea[id*="${firstErrorField}"]`,
-            `select[id*="${firstErrorField}"]`
-          ];
-
-          let errorElement = null;
-          for (const selector of selectors) {
-            errorElement = document.querySelector(selector);
-            if (errorElement) break;
-          }
-
-          if (errorElement) {
-            errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setTimeout(() => {
-              errorElement.focus();
-              // Highlight the field
-              errorElement.style.border = '2px solid red';
-              setTimeout(() => {
-                errorElement.style.border = '';
-              }, 2000);
-            }, 100);
-          }
-        }, 300);
-
-        // Show which field is missing
-        const fieldLabel = firstErrorField.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-        alert(`Please fill in: ${fieldLabel}\n\nNavigating to the required field...`);
-      } else {
-        alert('Please fill in all required fields correctly.');
-      }
-      return;
-    }
-
-    console.log('✅ Validation passed, proceeding with booking...');
-
-    // Don't close the form immediately - let handleBooking handle it after success
-    // This ensures the success message shows properly
-    try {
-      await handleBooking();
-    } catch (error) {
-      console.error('❌ Error in handleBooking:', error);
-      alert('An error occurred while processing your booking. Please try again.');
-    }
-  };
-
-  const handleBooking = async () => {
-    // Prevent double-clicks
-    if (isBooking) {
-      console.warn('⚠️ Booking already in progress, ignoring click');
-      return;
-    }
-
-    console.log('🔵 handleBooking called');
-    console.log('🔵 Current state:', {
-      selectedDates: selectedDates.length,
-      currentUser: !!currentUser,
-      provider: !!provider,
-      providerId: provider?.id,
-      isBooking: isBooking
-    });
-
-    if (selectedDates.length === 0) {
-      console.warn('⚠️ No dates selected');
-      alert('Please select at least one date for your booking. Go back to the "Book Now" tab to select dates.');
-      setIsBooking(false);
-      return;
-    }
-
-    if (!currentUser) {
-      console.warn('⚠️ No current user');
-      alert('Please login to make a booking.');
-      return;
-    }
-
-    if (!provider) {
-      console.warn('⚠️ No provider data');
-      alert('provider information not available.');
-      return;
-    }
-
-    // Verify provider has a valid ID
-    if (!provider.id) {
-      console.error('❌ provider ID is missing:', provider);
-      alert('provider information is incomplete. Please try again.');
-      return;
-    }
-
-    console.log('✅ All pre-checks passed, starting booking process...');
-    setIsBooking(true);
-
-    try {
-      // Get the authenticated user directly from Firebase Auth
-      // This ensures we have the most up-to-date auth state
-      const authUser = auth.currentUser;
-
-      console.log('🔐 Auth check:', {
-        authUser: !!authUser,
-        authUserUid: authUser?.uid,
-        authUserEmail: authUser?.email,
-        currentUser: !!currentUser,
-        currentUserUid: currentUser?.uid
-      });
-
-      if (!authUser) {
-        console.error('❌ No authenticated user found');
-        alert('Please login to make a booking. No authenticated user found.');
-        return;
-      }
-
-      // Verify we have a valid user ID
-      if (!authUser.uid) {
-        console.error('❌ No user ID found in auth user');
-        alert('Authentication error. Please try logging in again.');
-        return;
-      }
-
-      // Verify user is logged in as tourist (optional check, but helpful for debugging)
-      try {
-        const touristDoc = await getDoc(doc(db, 'tourists', authUser.uid));
-        if (!touristDoc.exists()) {
-          console.warn('⚠️ User is not in tourists collection. They might be a provider.');
-        } else {
-          console.log('✅ User confirmed as tourist');
-        }
-      } catch (roleCheckError) {
-        console.warn('⚠️ Could not verify user role:', roleCheckError);
-      }
-
-      // Calculate total price based on half-day/full-day
-      let totalPrice = 0;
-      selectedDates.forEach(date => {
-        const dateString = date.toDateString();
-        const dateType = selectedDatesWithType[dateString] || 'full-day';
-        const dailyPrice = provider.pricePerDay || 0;
-        totalPrice += dateType === 'half-day' ? dailyPrice * 0.6 : dailyPrice;
-      });
-
-      const datesString = selectedDates.map(d => {
-        const dateType = selectedDatesWithType[d.toDateString()] || 'full-day';
-        return `${d.toLocaleDateString()} (${dateType === 'half-day' ? 'Half Day' : 'Full Day'})`;
-      }).join(', ');
-
-      const datesWithTypes = selectedDates.map(d => {
-        const dateString = d.toDateString();
-        const dateType = selectedDatesWithType[dateString] || 'full-day';
-        const safariType = bookingFormData.dateSafariTypes?.[dateString] || bookingFormData.safariType || 'Morning Safari';
-        return {
-          date: d.toISOString(),
-          type: dateType,
-          safariType: safariType
-        };
-      });
-
-      // Get provider email from provider data (could be contactEmail, email, or from auth)
-      const driverEmail = provider.contactEmail || provider.email || '';
-
-      // Validate provider ID before proceeding
-      const providerIdString = String(provider.id || '');
-      if (!providerIdString || providerIdString === 'undefined' || providerIdString === 'null' || providerIdString.trim() === '') {
-        console.error('❌ Invalid provider ID:', provider.id);
-        alert('Invalid provider information. Please refresh the page and try again.');
-        return;
-      }
-
-      // Create booking in Firestore with all form data
-      // Ensure all fields match Firestore rules requirements exactly
-      const bookingData = {
-        providerId: providerIdString, // Must be a string
-        driverName: provider.fullName || provider.driverName || 'provider',
-        driverEmail: driverEmail, // Store provider email in booking
-        customerId: authUser.uid, // MUST match request.auth.uid
-        customerName: bookingFormData.fullName || authUser.displayName || 'Customer',
-        customerEmail: bookingFormData.email || authUser.email || '',
-        selectedDates: selectedDates.map(d => d.toISOString()), // Must be an array
-        datesWithTypes: datesWithTypes, // Array of {date, type}
-        datesString: datesString,
-        totalPrice: Number(totalPrice.toFixed(2)), // Must be a number
-        pricePerDay: Number(provider.pricePerDay || 0),
-        numberOfDays: Number(selectedDates.length),
-        serviceType: provider.serviceType || 'Jeep provider',
-        status: 'pending',
-        // Include all booking form data
-        ...bookingFormData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      // Log booking data for debugging
-      console.log('📝 Creating booking with data:', {
-        authUid: authUser.uid,
-        authUserEmail: authUser.email,
-        customerId: bookingData.customerId,
-        customerIdMatch: authUser.uid === bookingData.customerId,
-        providerId: bookingData.providerId,
-        providerIdType: typeof bookingData.providerId,
-        providerIdIsString: typeof bookingData.providerId === 'string',
-        providerIdLength: String(bookingData.providerId).length,
-        selectedDates: bookingData.selectedDates,
-        selectedDatesType: Array.isArray(bookingData.selectedDates) ? 'array' : typeof bookingData.selectedDates,
-        selectedDatesIsArray: Array.isArray(bookingData.selectedDates),
-        selectedDatesLength: bookingData.selectedDates.length,
-        totalPrice: bookingData.totalPrice,
-        totalPriceType: typeof bookingData.totalPrice,
-        totalPriceIsNumber: typeof bookingData.totalPrice === 'number',
-        fullBookingData: bookingData
-      });
-
-      // Create the booking document in Firestore 'bookings' collection
-      // This is the critical operation - if this fails, the whole booking fails
-      console.log('🔐 Pre-booking validation:', {
-        authUserExists: !!authUser,
-        authUserUid: authUser?.uid,
-        authUserEmail: authUser?.email,
-        customerId: bookingData.customerId,
-        customerIdMatch: authUser?.uid === bookingData.customerId,
-        providerId: bookingData.providerId,
-        providerIdType: typeof bookingData.providerId,
-        selectedDatesCount: bookingData.selectedDates.length,
-        selectedDatesIsArray: Array.isArray(bookingData.selectedDates),
-        totalPrice: bookingData.totalPrice,
-        totalPriceType: typeof bookingData.totalPrice,
-        allFieldsPresent: {
-          customerId: !!bookingData.customerId,
-          providerId: !!bookingData.providerId,
-          selectedDates: !!bookingData.selectedDates,
-          totalPrice: bookingData.totalPrice !== null && bookingData.totalPrice !== undefined
-        }
-      });
-
-      // Double-check data types before sending
-      const validatedBookingData = {
-        ...bookingData,
-        providerId: String(bookingData.providerId), // Ensure it's a string
-        selectedDates: Array.isArray(bookingData.selectedDates) ? bookingData.selectedDates : [],
-        totalPrice: Number(bookingData.totalPrice) // Ensure it's a number
-      };
-
-      console.log('✅ Validated booking data:', validatedBookingData);
-
-      const bookingRef = collection(db, 'bookings');
-      let bookingId;
-
-      // Store bookingData in outer scope for error handling
-      const finalBookingData = validatedBookingData;
-
-      try {
-        console.log('🚀 Attempting to create booking in Firestore...');
-        console.log('🚀 Data being sent:', {
-          customerId: finalBookingData.customerId,
-          providerId: finalBookingData.providerId,
-          selectedDates: finalBookingData.selectedDates,
-          selectedDatesLength: finalBookingData.selectedDates.length,
-          totalPrice: finalBookingData.totalPrice,
-          authUid: authUser.uid,
-          match: authUser.uid === finalBookingData.customerId,
-          fullData: JSON.stringify(finalBookingData, null, 2)
-        });
-
-        // Final validation before sending
-        if (authUser.uid !== finalBookingData.customerId) {
-          throw new Error('Customer ID mismatch! Auth UID: ' + authUser.uid + ', Customer ID: ' + finalBookingData.customerId);
-        }
-
-        console.log('✅ Validation passed, creating document...');
-        const bookingDoc = await addDoc(bookingRef, finalBookingData);
-        bookingId = bookingDoc.id;
-
-        console.log('✅ Booking created successfully with ID:', bookingId);
-        console.log('📦 Booking stored in Firestore:', {
-          collection: 'bookings',
-          documentId: bookingId,
-          customerId: finalBookingData.customerId,
-          providerId: finalBookingData.providerId,
-          totalPrice: finalBookingData.totalPrice,
-          numberOfDays: finalBookingData.numberOfDays
-        });
-      } catch (bookingError) {
-        console.error('❌ CRITICAL: Failed to create booking document:', bookingError);
-        console.error('❌ Booking error details:', {
-          code: bookingError.code,
-          message: bookingError.message,
-          stack: bookingError.stack,
-          dataSent: {
-            customerId: finalBookingData.customerId,
-            providerId: finalBookingData.providerId,
-            selectedDatesLength: finalBookingData.selectedDates.length,
-            totalPrice: finalBookingData.totalPrice
-          }
-        });
-        throw bookingError; // Re-throw to be caught by outer catch block
-      }
-
-      // Also create a confirmation record in a 'confirmations' subcollection for better tracking
-      try {
-        const confirmationRef = collection(db, 'confirmations');
-        const confirmationData = {
-          bookingId: bookingId,
-          ...bookingData,
-          confirmationStatus: 'pending',
-          confirmedAt: serverTimestamp(),
-          confirmationType: 'booking_request'
-        };
-        const confirmationDoc = await addDoc(confirmationRef, confirmationData);
-        console.log('✅ Confirmation record created with ID:', confirmationDoc.id);
-      } catch (confirmationError) {
-        console.warn('⚠️ Could not create confirmation record (non-critical):', confirmationError);
-        // Don't fail the booking if confirmation record fails
-      }
-
-      // Create comprehensive notification for provider with all booking details
-      // Wrap in try-catch so notification failure doesn't break the booking
-      try {
-        // Create detailed message with all booking information
-        const notificationMessage = `New booking from ${bookingFormData.fullName || authUser.displayName || 'Customer'}:
-        
-📅 Dates: ${datesString}
-👥 Passengers: ${bookingFormData.numberOfPassengers}
-📍 Park: ${bookingFormData.nationalPark}
-🚗 Safari: ${bookingFormData.safariType}
-💰 Total: LKR ${totalPrice.toLocaleString()}
-
-📞 Contact: ${bookingFormData.phone}
-📧 Email: ${bookingFormData.email}
-🌍 Country: ${bookingFormData.country}
-
-🚗 Vehicle: ${bookingFormData.jeepType}
-🗣️ Language: ${bookingFormData.driverLanguage}
-📍 Pickup: ${bookingFormData.pickupLocation}
-📍 Drop-off: ${bookingFormData.dropoffLocation}${bookingFormData.needsHotelPickup ? `\n🏨 Hotel: ${bookingFormData.hotelName}, ${bookingFormData.hotelAddress}` : ''}
-
-📝 Special Requests: ${bookingFormData.specialAssistance || 'None'}`;
-
-        const notificationData = {
-          type: 'booking',
-          title: 'New Booking Request',
-          message: notificationMessage,
-          recipientId: provider.id, // provider's user ID (from serviceProviders collection)
-          senderId: authUser.uid, // Tourist's user ID
-          senderName: bookingFormData.fullName || authUser.displayName || 'Customer', // Tourist's name
-          senderEmail: bookingFormData.email || authUser.email || '', // Tourist's email
-          driverEmail: driverEmail, // provider's email stored in booking
-          relatedId: bookingId,
-          bookingId: bookingId,
-          bookingData: {
-            ...bookingFormData,
-            dates: datesString, // Formatted dates string for display
-            selectedDates: selectedDates.map(d => d.toISOString()), // ISO date strings
-            datesWithTypes: datesWithTypes,
-            numberOfDays: selectedDates.length,
-            totalPrice: totalPrice,
-            customerName: bookingFormData.fullName || authUser.displayName || 'Customer',
-            customerEmail: bookingFormData.email || authUser.email || '',
-            providerId: provider.id,
-            driverName: provider.fullName || provider.driverName || 'provider',
-            driverEmail: driverEmail,
-            pricePerDay: provider.pricePerDay || 0,
-            status: 'pending'
-          }
-        };
-
-        const notificationId = await createNotification(notificationData);
-        console.log('✅ Notification created for provider:', {
-          notificationId: notificationId,
-          recipientId: provider.id,
-          bookingId: bookingId
-        });
-      } catch (notificationError) {
-        console.warn('⚠️ Could not create notification (non-critical):', notificationError);
-        // Don't fail the booking if notification fails - booking is already created
-      }
-
-      // Show success animation with booking ID
-      console.log('✅ Setting success message data:', {
-        driverName: provider.fullName,
-        dates: datesString,
-        totalPrice: totalPrice,
-        numberOfDays: selectedDates.length,
-        bookingId: bookingId
-      });
-
-      const datesWithTypesAndSafari = selectedDates.map(d => {
-        const dateString = d.toDateString();
-        const dateType = selectedDatesWithType[dateString] || 'full-day';
-        const safariType = bookingFormData.dateSafariTypes?.[dateString] || bookingFormData.safariType || 'Morning Safari';
-        return {
-          date: d.toISOString(),
-          type: dateType,
-          safariType: safariType
-        };
-      });
-
-      setSuccessMessageData({
-        driverName: provider.fullName,
-        dates: datesString,
-        datesWithTypes: datesWithTypesAndSafari,
-        totalPrice: totalPrice,
-        numberOfDays: selectedDates.length,
-        numberOfPassengers: bookingFormData.numberOfPassengers,
-        nationalPark: bookingFormData.nationalPark,
-        bookingId: bookingId
-      });
-
-      console.log('✅ Setting showSuccessMessage to true');
-
-      // Close booking form first
-      setShowBookingForm(false);
-      setCurrentStep(1);
-
-      // Then show success message after a brief delay to ensure form is closed
-      setTimeout(() => {
-        setShowSuccessMessage(true);
-        console.log('✅ Success message should now be visible');
-      }, 100);
-      // Reset selected dates and form
-      setSelectedDates([]);
-      setSelectedDatesWithType({});
-      setBookingFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-        country: '',
-        numberOfPassengers: 1,
-        specialAssistance: '',
-        nationalPark: '',
-        safariType: 'Morning Safari',
-        preferredTime: '',
-        duration: '',
-        pickupLocation: '',
-        hotelName: '',
-        hotelAddress: '',
-        dropoffLocation: '',
-        needsHotelPickup: true,
-        needsBinoculars: false,
-        needsChildSeat: false,
-        needsWater: false,
-        needsSnacks: false,
-        selectedSnacks: [],
-        dateSafariTypes: {}
-      });
-      setIsBooking(false);
-
-      // Don't auto-redirect - wait for user to click "Got it!" button
-
-    } catch (error) {
-      setIsBooking(false);
-      console.error('❌ Error creating booking:', error);
-      console.error('❌ Error code:', error.code);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
-      console.error('❌ Full error:', JSON.stringify(error, null, 2));
-
-      // Hide any success message that might have been shown
-      setShowSuccessMessage(false);
-      setSuccessMessageData(null);
-
-      // Re-open the booking form so user can try again
-      setShowBookingForm(true);
-
-      let errorMessage = 'Failed to create booking. ';
-
-      // Get auth user for error details
-      const authUserForError = auth.currentUser;
-
-      if (error.code === 'permission-denied') {
-        console.error('❌ Permission denied details:', {
-          authUser: authUserForError?.uid,
-          authUserEmail: authUserForError?.email,
-          errorCode: error.code,
-          errorMessage: error.message
-        });
-        errorMessage = 'Unable to complete your booking request.\n\nThis may be due to:\n• Your session may have expired\n• Database permissions need to be updated\n\nPlease try:\n1. Log out and log back in\n2. Wait a few moments and try again\n\nIf the problem continues, please contact support.';
-      } else if (error.code === 'unavailable') {
-        errorMessage = 'Unable to connect to the server.\n\nPlease check your internet connection and try again.';
-      } else if (error.code === 'failed-precondition') {
-        errorMessage = 'The booking system is temporarily unavailable.\n\nPlease refresh the page and try again in a few moments.';
-      } else if (error.message && !error.message.includes('localhost')) {
-        // Only show error message if it doesn't contain localhost
-        const cleanMessage = error.message.replace(/localhost:\d+/g, '').trim();
-        if (cleanMessage) {
-          errorMessage = `Booking failed: ${cleanMessage}`;
-        } else {
-          errorMessage = 'An unexpected error occurred while processing your booking.\n\nPlease try again. If the problem persists, please contact support.';
-        }
-      } else {
-        errorMessage = 'An unexpected error occurred while processing your booking.\n\nPlease try again. If the problem persists, please contact support.';
-      }
-
-      alert(errorMessage);
-    }
-  };
-
-  const [userTouristData, setUserTouristData] = useState(null);
-
+  // User role and auth tracking
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
-
         try {
           const touristDoc = await getDoc(doc(db, 'tourists', user.uid));
           if (touristDoc.exists()) {
             setUserRole('tourist');
-            setUserTouristData(touristDoc.data());
           } else {
             const providerDoc = await getDoc(doc(db, 'serviceProviders', user.uid));
             if (providerDoc.exists()) {
@@ -1767,28 +302,23 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
       } else {
         setCurrentUser(null);
         setUserRole('');
-        setUserTouristData(null);
       }
     });
 
     return () => unsubscribeAuth();
   }, []);
 
-  // Auto-fill booking form data when form opens
-  useEffect(() => {
-    if (showBookingForm && currentUser && userTouristData) {
-      setBookingFormData(prev => ({
-        ...prev,
-        fullName: prev.fullName || currentUser.displayName || userTouristData.fullName || userTouristData.name || '',
-        email: prev.email || currentUser.email || userTouristData.email || '',
-        phone: prev.phone || userTouristData.phone || userTouristData.phoneNumber || '',
-        country: prev.country || userTouristData.country || userTouristData.location || '',
-        // Auto-fill national park from provider's first destination
-        nationalPark: prev.nationalPark || (provider?.destinations && provider.destinations.length > 0 ? provider.destinations[0] : ''),
-        // Equipment Type is auto-filled from provider's Equipment Type (display only, not editable)
-      }));
-    }
-  }, [showBookingForm, currentUser, userTouristData, provider]);
+
+
+
+
+
+
+
+
+
+
+
 
   useEffect(() => {
     const fetchDriverData = async () => {
@@ -1809,7 +339,8 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
 
         if (driverDoc.exists()) {
           const driverData = driverDoc.data();
-          setProvider({
+
+          const providerInfo = {
             id: driverDoc.id,
             ...driverData,
             // Ensure availability is an object, not array
@@ -1817,7 +348,38 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
               ? driverData.availability
               : {}, // Object mapping dates to status
             availableDates: driverData.availableDates || [] // Keep for backward compatibility
-          });
+          };
+
+          // Fetch certification documents if provider is certified
+          if (driverData.certificationStatus === 'certified') {
+            try {
+              // Renting stores use jeepDriverCertifications collection (same as drivers)
+              const certDocRef = doc(db, 'jeepDriverCertifications', providerId);
+              const certDocSnap = await getDoc(certDocRef);
+
+              if (certDocSnap.exists()) {
+                const certData = certDocSnap.data();
+                console.log('✅ Certification documents found:', certData);
+
+                if (certData.documents && Array.isArray(certData.documents)) {
+                  // Resolve URLs if needed
+                  const documentsWithUrls = await Promise.all(certData.documents.map(async (doc) => {
+                    if (doc.fileUrl) return doc; // URL already exists
+                    if (doc.supabasePath) {
+                      const { signedUrl } = await getDocumentUrl(doc.supabasePath);
+                      return { ...doc, fileUrl: signedUrl };
+                    }
+                    return doc;
+                  }));
+                  providerInfo.certificationDocuments = documentsWithUrls;
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching certification documents:', err);
+            }
+          }
+
+          setProvider(providerInfo);
         } else {
           setError("provider not found");
         }
@@ -1833,6 +395,8 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
       fetchDriverData();
     }
   }, [providerId]);
+
+  // No longer fetching bookings as calendar is removed
 
   // Old conversation initialization removed - using Chat component instead
   // const initializeConversation = async () => {
@@ -1973,14 +537,14 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
 
   if (error || !provider) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-white via-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">provider Not Found</h2>
           <p className="text-gray-600 mb-4">{error || "The provider you're looking for doesn't exist."}</p>
           <button
             onClick={() => navigate(-1)}
-            className="bg-gradient-to-r from-black to-gray-800 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:from-gray-800 hover:to-gray-700 transition-colors"
+            className="bg-linear-to-r from-black to-gray-800 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:from-gray-800 hover:to-gray-700 transition-colors"
           >
             Go Back
           </button>
@@ -1991,87 +555,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
 
   return (
     <div className="min-h-screen lg:h-screen bg-gray-50 flex flex-col lg:overflow-hidden lg:max-h-screen">
-      {/* Booking Success Message */}
-      {showSuccessMessage && successMessageData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-10 h-10 text-black" />
-                </div>
-              </div>
-
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                Booking Successful!
-              </h2>
-              <p className="text-gray-600 mb-2">
-                Your booking request has been successfully submitted.
-              </p>
-              <p className="text-sm text-black font-semibold mb-6">
-                Please wait for the service provider's acceptance.
-              </p>
-              {successMessageData.bookingId && (
-                <p className="text-xs text-gray-500 mb-4">
-                  Booking ID: {successMessageData.bookingId.substring(0, 8)}...
-                </p>
-              )}
-
-              {/* Booking Details */}
-              <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left space-y-3">
-                <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">provider:</span>
-                  <span className="text-gray-900 font-semibold block">{successMessageData.driverName}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">Dates:</span>
-                  <div className="space-y-1">
-                    {successMessageData.datesWithTypes && Object.entries(successMessageData.datesWithTypes).map(([dateStr, dateInfo], idx) => (
-                      <div key={idx} className="text-gray-900 font-semibold text-sm">
-                        {new Date(dateInfo.date).toLocaleDateString()} - {dateInfo.type === 'half-day' ? 'Half Day' : 'Full Day'} {dateInfo.safariType ? `(${dateInfo.safariType})` : ''}
-                      </div>
-                    ))}
-                    {!successMessageData.datesWithTypes && (
-                      <span className="text-gray-900 font-semibold block">{successMessageData.dates}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">Number of Passengers:</span>
-                  <span className="text-gray-900 font-semibold block">{successMessageData.numberOfPassengers || successMessageData.numberOfDays} {successMessageData.numberOfPassengers === 1 ? 'passenger' : 'passengers'}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-gray-600 font-medium block">National Park:</span>
-                  <span className="text-gray-900 font-semibold block">{successMessageData.nationalPark}</span>
-                </div>
-                <div className="space-y-1 border-t border-gray-200 pt-2 mt-2">
-                  <span className="text-gray-600 font-bold block">Total:</span>
-                  <span className="text-black font-bold text-lg block">LKR {successMessageData.totalPrice.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <button
-                onClick={() => {
-                  setShowSuccessMessage(false);
-                  setSuccessMessageData(null);
-                  // Ensure we're on the correct route
-                  if (providerId) {
-                    navigate(`/jeepprofile?providerId=${providerId}`, { replace: true });
-                  } else if (provider?.id) {
-                    navigate(`/jeepprofile?providerId=${provider.id}`, { replace: true });
-                  } else {
-                    navigate('/provider', { replace: true });
-                  }
-                }}
-                className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold shadow-lg hover:bg-gray-800 transition-colors"
-              >
-                Got it!
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Booking Success Message Removed */}
 
       {isChatModalOpen && chatOtherUser && currentUser && (
         <Chat
@@ -2086,21 +570,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
         />
       )}
 
-      <BookingFormModal
-        isOpen={showBookingForm}
-        onClose={() => setShowBookingForm(false)}
-        formData={bookingFormData}
-        setFormData={setBookingFormData}
-        formErrors={formErrors}
-        setFormErrors={setFormErrors}
-        currentStep={currentStep}
-        setCurrentStep={setCurrentStep}
-        onSubmit={handleBookingFormSubmit}
-        provider={provider}
-        selectedDates={selectedDates}
-        selectedDatesWithType={selectedDatesWithType}
-        onDateTypeChange={handleDateTypeChange}
-      />
+      {/* Booking Form Modal Removed */}
 
       <GlobalNotificationBell
         user={currentUser}
@@ -2110,22 +580,22 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
       />
 
 
-      <div className="bg-gradient-to-r from-black via-gray-900 to-black border-b border-gray-700 shadow-lg">
+      <div className="bg-linear-to-r from-black via-gray-900 to-black border-b border-gray-700 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-5 md:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-18 md:h-20">
             <div className="flex items-center">
               <button
                 onClick={() => {
-                  // Navigate back to jeep listing page
-                  navigate('/provider');
-                  // The scroll will be handled by JeepSection2 component
+                  // Navigate back to renting listing page
+                  navigate('/renting');
+                  // The scroll will be handled by RentingSection2 component
                 }}
                 className="flex items-center text-white mr-3 sm:mr-4 md:mr-6 font-medium hover:text-gray-300 transition-colors touch-manipulation"
               >
                 <ArrowLeft size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 mr-2 sm:mr-2.5" />
                 <span className="text-sm sm:text-base md:text-lg">Back</span>
               </button>
-              <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-white">Jeep provider Profile</h1>
+              <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-white">Renting Store Profile</h1>
             </div>
           </div>
         </div>
@@ -2135,7 +605,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
         <div className="w-full lg:flex-1 lg:overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6 lg:gap-8 px-4 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-5 md:py-6">
           {/* Sidebar */}
           <div className="lg:col-span-1 flex flex-col min-h-0">
-            <div className="bg-gradient-to-b from-white to-gray-50 border-2 border-gray-300 rounded-lg p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col lg:h-full shadow-xl lg:overflow-y-auto">
+            <div className="bg-linear-to-b from-white to-gray-50 border-2 border-gray-300 rounded-lg p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col lg:h-full shadow-xl lg:overflow-y-auto">
               {/* Profile Header */}
               <div className="text-center mb-2 sm:mb-3 md:mb-4">
                 <img
@@ -2166,28 +636,28 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
               <div className="space-y-2 sm:space-y-2.5 md:space-y-3 mb-2 sm:mb-3 md:mb-4 flex-1">
                 {provider.contactPhone && (
                   <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
+                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 shrink-0">
                       <Phone size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{provider.contactPhone}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black wrap-break-word">{provider.contactPhone}</span>
                   </div>
                 )}
 
                 {provider.contactEmail && (
                   <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
+                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 shrink-0">
                       <Mail size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{provider.contactEmail}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black wrap-break-word">{provider.contactEmail}</span>
                   </div>
                 )}
 
                 {provider.location && (
                   <div className="flex items-center text-black p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
+                    <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 shrink-0">
                       <MapPin size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                     </div>
-                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black break-words">{provider.location}</span>
+                    <span className="font-semibold text-xs sm:text-sm md:text-base text-black wrap-break-word">{provider.location}</span>
                   </div>
                 )}
               </div>
@@ -2201,7 +671,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                         onShowAuth('login');
                       }
                     }}
-                    className="w-full bg-gradient-to-r from-black to-gray-800 text-white py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 rounded-lg font-semibold text-xs sm:text-sm md:text-base shadow-lg hover:from-gray-800 hover:to-gray-700 transition-all touch-manipulation min-h-[40px]"
+                    className="w-full bg-linear-to-r from-black to-gray-800 text-white py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 rounded-lg font-semibold text-xs sm:text-sm md:text-base shadow-lg hover:from-gray-800 hover:to-gray-700 transition-all touch-manipulation min-h-[40px]"
                   >
                     Login to Book or Message
                   </button>
@@ -2213,8 +683,8 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
           {/* Main Content */}
           <div className="lg:col-span-2 flex flex-col min-h-0">
             {/* Tabs */}
-            <div className="bg-gradient-to-b from-white to-gray-50 rounded-lg shadow-2xl border-2 border-gray-300 overflow-hidden flex flex-col lg:flex-1 min-h-0 w-full">
-              <div className="border-b border-gray-300 bg-gradient-to-r from-gray-100 to-white">
+            <div className="bg-linear-to-b from-white to-gray-50 rounded-lg shadow-2xl border-2 border-gray-300 overflow-hidden flex flex-col lg:flex-1 min-h-0 w-full">
+              <div className="border-b border-gray-300 bg-linear-to-r from-gray-100 to-white">
                 <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('overview')}
@@ -2236,47 +706,30 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     <span className="sm:hidden">Rev</span>
                     {provider.totalReviews > 0 && ` (${provider.totalReviews})`}
                   </button>
-                  {currentUser && userRole === 'tourist' && (
+                  {currentUser && (
                     <button
-                      onClick={() => setActiveTab('booking')}
-                      className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'booking'
+                      onClick={() => setActiveTab('packages')}
+                      className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'packages'
                         ? 'border-black text-black bg-white'
                         : 'border-transparent text-gray-600 hover:text-black'
                         }`}
                     >
-                      <CalendarIcon size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 inline mr-1.5 sm:mr-2 md:mr-2.5" />
-                      <span className="hidden sm:inline">Book Now</span>
-                      <span className="sm:hidden">Book</span>
-                    </button>
-                  )}
-                  {currentUser && hasAcceptedBooking && (
-                    <button
-                      onClick={() => {
-                        setActiveTab('chat');
-                        if (currentUser && provider) {
-                          handleOpenChatModal();
-                        }
-                      }}
-                      className={`py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 lg:px-6 text-center border-b-2 font-semibold text-xs sm:text-sm md:text-base whitespace-nowrap relative touch-manipulation min-h-[40px] flex items-center justify-center ${activeTab === 'chat'
-                        ? 'border-black text-black bg-white'
-                        : 'border-transparent text-gray-600 hover:text-black'
-                        }`}
-                    >
-                      <span className="hidden sm:inline">Messages</span>
-                      <span className="sm:hidden">Msg</span>
-                    </button>
+                      <Package size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5 inline mr-1.5 sm:mr-2 md:mr-2.5" />
+                      <span className="hidden sm:inline">Products</span>
+                      <span className="sm:hidden">Prods</span>
+                    </button> // Messages tab removed
                   )}
                 </nav>
               </div>
 
               {/* Tab Content */}
-              <div className="p-2.5 sm:p-3 md:p-4 lg:p-5 lg:overflow-hidden lg:flex-1 bg-gradient-to-b from-white to-gray-50 text-black">
+              <div className="p-2.5 sm:p-3 md:p-4 lg:p-5 lg:overflow-hidden lg:flex-1 bg-linear-to-b from-white to-gray-50 text-black">
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <div className="space-y-2 sm:space-y-2.5 md:space-y-3 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
                     {/* Experience */}
                     <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                      <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 flex-shrink-0">
+                      <div className="p-1.5 sm:p-2 md:p-2.5 bg-black rounded-lg mr-2 sm:mr-2.5 md:mr-3 shrink-0">
                         <Clock className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -2301,7 +754,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     {provider.equipmentType && (
                       <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <h3 className="font-bold text-black mb-1 flex items-center text-xs sm:text-sm md:text-base">
-                          <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                          <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                             <Car className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                           </div>
                           Equipment Type
@@ -2311,10 +764,10 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     )}
 
                     {/* Pricing */}
-                    {provider.pricePerDay && (
+                    {(provider.pricePerDay > 0) && (
                       <div className="p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <h3 className="font-bold text-black mb-2 sm:mb-2.5 flex items-center text-xs sm:text-sm md:text-base">
-                          <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                          <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                             <DollarSign className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                           </div>
                           Rates
@@ -2326,7 +779,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                               <span className="text-black font-bold text-xs sm:text-sm block">Full Day Safari:</span>
                               <p className="text-xs text-gray-600 mt-0.5">Full day safari tours</p>
                             </div>
-                            <div className="text-right flex-shrink-0">
+                            <div className="text-right shrink-0">
                               <span className="text-sm sm:text-base md:text-lg font-black text-black">
                                 LKR {provider.pricePerDay.toLocaleString()}
                               </span>
@@ -2339,7 +792,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                               <span className="text-black font-bold text-xs sm:text-sm block">Half Day Safari:</span>
                               <p className="text-xs text-gray-600 mt-0.5">Half day safari tours</p>
                             </div>
-                            <div className="text-right flex-shrink-0">
+                            <div className="text-right shrink-0">
                               <span className="text-sm sm:text-base md:text-lg font-black text-black">
                                 LKR {Math.round(provider.pricePerDay * 0.6).toLocaleString()}
                               </span>
@@ -2352,7 +805,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                                 <span className="text-black font-bold text-xs sm:text-sm block">Price per hour:</span>
                                 <p className="text-xs text-gray-600 mt-0.5">Hourly rate</p>
                               </div>
-                              <div className="text-right flex-shrink-0">
+                              <div className="text-right shrink-0">
                                 <span className="text-xs sm:text-sm md:text-base font-black text-black">
                                   LKR {provider.pricePerHour.toLocaleString()}
                                 </span>
@@ -2367,7 +820,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     {/* Languages */}
                     {provider.languages && provider.languages.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Languages className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -2389,7 +842,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     {/* Destinations */}
                     {provider.destinations && provider.destinations.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -2409,9 +862,42 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     )}
 
                     {/* Certifications */}
-                    {provider.certifications && provider.certifications.length > 0 && (
+                    {(provider.certificationStatus === 'certified' && provider.certificationDocuments && provider.certificationDocuments.length > 0) ? (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
+                          <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-black mb-1.5 text-xs sm:text-sm md:text-base">Certifications</h3>
+                          <div className="space-y-1.5">
+                            {provider.certificationDocuments.map((doc, index) => (
+                              <div
+                                key={index}
+                                className="bg-gray-100 text-black px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm border border-gray-300 flex items-center justify-between gap-2"
+                              >
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <FileText size={14} className="text-gray-600 shrink-0" />
+                                  <span className="font-semibold truncate">{doc.certificationName || 'Certification'}</span>
+                                </div>
+                                {doc.fileUrl && (
+                                  <a
+                                    href={doc.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="shrink-0 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors shadow-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    View
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (provider.certifications && provider.certifications.length > 0 && (
+                      <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -2428,12 +914,12 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                           </div>
                         </div>
                       </div>
-                    )}
+                    ))}
 
                     {/* Special Skills */}
                     {provider.specialSkills && provider.specialSkills.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
-                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 flex-shrink-0">
+                        <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Shield className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -2459,6 +945,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                   <div className="lg:h-full lg:overflow-y-auto">
                     <ReviewSection
                       providerId={providerId}
+                      providerType="renting"
                       currentUser={currentUser}
                       userRole={userRole}
                       onReviewAdded={handleReviewAdded}
@@ -2466,162 +953,41 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                   </div>
                 )}
 
-                {/* Booking Tab */}
-                {activeTab === 'booking' && currentUser && userRole === 'tourist' && (
-                  <div className="space-y-2.5 sm:space-y-3 md:space-y-4 lg:h-full lg:overflow-y-auto pr-1 sm:pr-2">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      {/* Calendar */}
-                      <div className="min-h-0">
-                        <h3 className="font-semibold text-black mb-2 sm:mb-3 md:mb-4 text-xs sm:text-sm md:text-base">Select Your Dates</h3>
-                        <div className="overflow-y-auto max-h-[300px] sm:max-h-[350px] md:max-h-[400px]">
-                          <DatePickerCalendar
-                            selectedDates={selectedDates}
-                            onDateSelect={handleDateSelect}
-                            selectedDatesWithType={selectedDatesWithType}
-                            availabilityCalendar={provider?.availabilityCalendar}
-                            availableDates={provider?.availableDates}
-                            onDateTypeChange={handleDateTypeChange}
-                          />
-                        </div>
+                {/* Products/Packages Tab */}
+                {activeTab === 'packages' && (
+                  <div className="lg:h-full lg:overflow-y-auto">
+                    {loadingPackages ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="w-10 h-10 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
                       </div>
-
-                      {/* Booking Summary */}
-                      <div className="space-y-2.5 sm:space-y-3 md:space-y-4 min-h-0">
-                        <div className="bg-white border border-gray-300 rounded-lg p-2.5 sm:p-3 md:p-4">
-                          <h3 className="font-semibold text-black mb-2 sm:mb-3 text-xs sm:text-sm md:text-base">Booking Summary</h3>
-
-                          {selectedDates.length === 0 ? (
-                            <p className="text-gray-600 text-center py-3 sm:py-4 text-xs sm:text-sm">
-                              Select dates to see booking details
-                            </p>
-                          ) : (
-                            <div className="space-y-2 sm:space-y-3">
-                              <div className="flex justify-between items-center">
-                                <span className="text-gray-700 text-xs sm:text-sm">Selected dates:</span>
-                                <span className="font-medium text-black text-xs sm:text-sm">{selectedDates.length} day(s)</span>
-                              </div>
-
-                              {/* Show breakdown of dates and their types */}
-                              <div className="space-y-1.5 sm:space-y-2 bg-gray-50 p-2 sm:p-2.5 rounded-lg border border-gray-300 max-h-[150px] sm:max-h-[180px] md:max-h-[200px] overflow-y-auto">
-                                {selectedDates.map((date, index) => {
-                                  const dateString = date.toDateString();
-                                  const dateType = selectedDatesWithType[dateString] || 'full-day';
-                                  const dayPrice = dateType === 'half-day' ? (provider.pricePerDay || 0) * 0.6 : (provider.pricePerDay || 0);
-                                  return (
-                                    <div key={index} className="flex justify-between items-center text-xs">
-                                      <span className="text-gray-700 flex-1 min-w-0 pr-2">
-                                        {date.toLocaleDateString()} ({dateType === 'half-day' ? 'Half Day' : 'Full Day'})
-                                      </span>
-                                      <span className="font-medium text-black flex-shrink-0">
-                                        LKR {dayPrice.toLocaleString()}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              <div className="flex justify-between items-center">
-                                <span className="text-gray-700 text-xs sm:text-sm">Price per day:</span>
-                                <span className="font-medium text-black text-xs sm:text-sm">LKR {provider.pricePerDay?.toLocaleString() || '0'}</span>
-                              </div>
-
-                              <div className="border-t border-gray-300 pt-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-sm sm:text-base md:text-lg font-semibold text-black">Total:</span>
-                                  <span className="text-lg sm:text-xl md:text-2xl font-bold text-black">
-                                    LKR {calculateTotalPrice().toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  if (selectedDates.length === 0) {
-                                    alert('Please select at least one date for your booking.');
-                                    return;
-                                  }
-                                  if (!currentUser) {
-                                    alert('Please login to make a booking.');
-                                    return;
-                                  }
-                                  setShowBookingForm(true);
-                                }}
-                                className="w-full bg-black text-white py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 rounded-lg font-medium mt-2 sm:mt-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs sm:text-sm md:text-base hover:bg-gray-800 transition-colors"
-                                disabled={selectedDates.length === 0}
-                              >
-                                {selectedDates.length === 0 ? (
-                                  'Select Dates First'
-                                ) : (
-                                  'Continue to Booking Details'
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* provider Info */}
-                        <div className="bg-white border border-gray-300 rounded-lg p-2.5 sm:p-3 md:p-4">
-                          <h3 className="font-semibold text-black mb-1.5 sm:mb-2 text-xs sm:text-sm md:text-base">provider Information</h3>
-                          <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
-                            You'll be booking with {provider.fullName}, an experienced {provider.serviceType} with {provider.experienceYears || 0} years of experience.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Chat Tab - Opens Chat Modal */}
-                {activeTab === 'chat' && (
-                  <div className="min-h-[300px] lg:h-full flex flex-col items-center justify-center p-4 sm:p-6 md:p-8">
-                    {currentUser ? (
-                      <div className="text-center">
-                        <MessageCircle size={48} className="sm:w-16 sm:h-16 md:w-20 md:h-20 mx-auto mb-3 sm:mb-4 text-black" />
-                        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-black mb-2">
-                          Chat with {provider.fullName}
-                        </h3>
-                        <p className="text-gray-700 text-xs sm:text-sm md:text-base mb-4 sm:mb-6">
-                          Click the button below to open the chat window
-                        </p>
-                        <button
-                          onClick={handleOpenChatModal}
-                          className="bg-black text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg font-medium flex items-center gap-2 mx-auto text-xs sm:text-sm md:text-base hover:bg-gray-800 transition-colors"
-                        >
-                          <MessageCircle size={16} className="sm:w-5 sm:h-5" />
-                          Open Chat
-                        </button>
+                    ) : packages.length === 0 ? (
+                      <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                        <Package size={48} className="mx-auto text-gray-300 mb-4" />
+                        <h3 className="text-lg font-bold text-gray-900">No products available</h3>
+                        <p className="text-gray-500">This provider hasn't listed any products yet.</p>
                       </div>
                     ) : (
-                      <div className="text-center py-6 sm:py-8">
-                        <MessageCircle size={40} className="sm:w-12 sm:h-12 md:w-14 md:h-14 mx-auto mb-3 sm:mb-4 text-gray-400" />
-                        <h3 className="text-sm sm:text-base md:text-lg font-semibold text-black mb-2">
-                          Login to Message
-                        </h3>
-                        <p className="text-gray-700 text-xs sm:text-sm mb-4">
-                          Please login to start a conversation with {provider.fullName}
-                        </p>
-                        <button
-                          onClick={() => {
-                            if (onShowAuth) {
-                              onShowAuth('login');
-                            }
-                          }}
-                          className="bg-black text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm hover:bg-gray-800 transition-colors"
-                        >
-                          Login Now
-                        </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-1">
+                        {packages.map(pkg => (
+                          <PackageCard
+                            key={pkg.id}
+                            pkg={pkg}
+                            isOwner={currentUser?.uid === providerId}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
                 )}
+
               </div>
+
             </div>
           </div>
         </div>
       </div>
     </div>
+
   );
 };
 

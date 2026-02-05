@@ -271,47 +271,41 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
     }
 
     if (acceptedInfo) {
-      // Differentiate Half/Full for accepted bookings
       const isFullyBookedByBookings = !!acceptedInfo.isFullDay || (acceptedInfo.bookedMorning && acceptedInfo.bookedEvening);
       if (!isFullyBookedByBookings && (acceptedInfo.bookedMorning || acceptedInfo.bookedEvening)) {
         const bookedTime = acceptedInfo.bookedEvening ? 'evening' : 'morning';
         const otherHalf = bookedTime === 'morning' ? 'evening' : 'morning';
 
-        // Check if the OTHER half is marked unavailable manually
         const isManuallyUnavailable =
           (otherHalf === 'evening' && status === 'unavailable-halfday-evening') ||
           (otherHalf === 'morning' && status === 'unavailable-halfday-morning');
 
         if (isManuallyUnavailable) {
-          // Mixed State: Full occupied (Half Booked / Half Manual Unavail) -> Orange
+          // Fully occupied (Half Booked / Half Manual) -> Orange (Mixed)
           return `${baseClasses} bg-orange-600 text-white cursor-pointer border-2 border-blue-400 font-bold shadow-sm hover:bg-orange-700`;
         }
 
-        // Yellow for Half Day Booked, with blue border (Available for edit of other half)
-        return `${baseClasses} bg-yellow-500 text-white cursor-pointer border-2 border-blue-400 font-bold shadow-sm hover:bg-yellow-600`;
+        // Partially booked -> Orange
+        return `${baseClasses} bg-orange-500 text-white cursor-pointer border-2 border-blue-400 font-bold shadow-sm hover:bg-orange-600`;
       } else {
-        // Red for Full Day, with blue border (Blocked)
-        return `${baseClasses} bg-red-600/90 text-white cursor-not-allowed border-2 border-blue-400 font-bold shadow-sm`;
+        // Red for Fully Booked
+        return `${baseClasses} bg-red-600 text-white cursor-not-allowed border-2 border-blue-400 font-bold shadow-sm`;
       }
     }
 
-    // Handle different statuses
     switch (status) {
       case 'unavailable-fullday':
+      case 'unavailable':
         return `${baseClasses} bg-gray-600 text-white hover:bg-gray-700 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
-      // ... other cases match existing but ensure correct mapping ...
       case 'unavailable-halfday-morning':
       case 'unavailable-halfday-evening':
-        return `${baseClasses} bg-gray-500 text-white hover:bg-gray-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
+        return `${baseClasses} bg-orange-500 text-white hover:bg-orange-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
       case 'available-fullday':
+      case 'available':
         return `${baseClasses} bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
       case 'available-halfday-morning':
       case 'available-halfday-evening':
         return `${baseClasses} bg-emerald-500 text-white hover:bg-emerald-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
-      case 'busy':
-      case 'halfday':
-      case 'unavailable':
-        return `${baseClasses} bg-red-500 text-white hover:bg-red-600 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
       default:
         return `${baseClasses} bg-transparent text-gray-400 border border-gray-600/30 hover:bg-gray-700/20 hover:border-gray-500/40 cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`;
     }
@@ -502,34 +496,29 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
           })}
         </div>
 
-        {/* Legend - Show in both view and edit modes */}
         <div className="mt-4 p-3 bg-gray-800/30 rounded-lg border border-gray-700/40">
           <p className="text-xs text-gray-300 mb-2 font-semibold">Legend:</p>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded"></div>
-              <span className="text-gray-300">Full Day Booked</span>
+              <div className="w-3 h-3 bg-red-600 border border-blue-400 rounded"></div>
+              <span className="text-gray-300">Booked (Full Day)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-              <span className="text-gray-300">Half Day Booked (Edit Other Half)</span>
+              <div className="w-3 h-3 bg-orange-600 border border-blue-400 rounded"></div>
+              <span className="text-gray-300">Mixed Occupied (Booked/Manual)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-orange-600 rounded"></div>
-              <span className="text-gray-300">Half Booked / Half Unavailable</span>
+              <div className="w-3 h-3 bg-orange-500 rounded"></div>
+              <span className="text-gray-300">Partial (Booked or Manual)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-600 border-2 border-blue-400 rounded"></div>
-              <span className="text-gray-300">Accepted Booking</span>
+              <div className="w-3 h-3 bg-gray-600 rounded"></div>
+              <span className="text-gray-300">Unavailable (Manual Full Day)</span>
             </div>
-            {!readOnly && (
-              <>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-600 rounded"></div>
-                  <span className="text-gray-300">Unavailable</span>
-                </div>
-              </>
-            )}
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 border-2 border-blue-400 rounded"></div>
+              <span className="text-gray-300">Has Accepted Booking</span>
+            </div>
           </div>
         </div>
       </div>
@@ -615,8 +604,8 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                             handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'available' : 'unavailable-halfday-morning');
                           }}
                           className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning'
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                              : 'bg-gray-600 hover:bg-gray-700 text-white'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : 'bg-gray-600 hover:bg-gray-700 text-white'
                             }`}
                         >
                           {getAvailabilityStatus(popupDate) === 'unavailable-halfday-morning' ? 'Mark Morning Available' : 'Mark Morning Unavailable'}
@@ -631,8 +620,8 @@ const AvailabilityCalendar = ({ availability = {}, onChange, readOnly = false, a
                             handleStatusSelect(getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'available' : 'unavailable-halfday-evening');
                           }}
                           className={`w-full px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening'
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                              : 'bg-gray-600 hover:bg-gray-700 text-white'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : 'bg-gray-600 hover:bg-gray-700 text-white'
                             }`}
                         >
                           {getAvailabilityStatus(popupDate) === 'unavailable-halfday-evening' ? 'Mark Evening Available' : 'Mark Evening Unavailable'}

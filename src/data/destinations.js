@@ -38,6 +38,7 @@ const destinations = {
   'yala-national-park': {
     id: 'yala-national-park',
     name: 'Yala National Park',
+    province: 'Southern Province',
     description: 'Home to the highest density of leopards in the world. Experience thrilling jeep safaris and witness diverse wildlife in their natural habitat.',
     fullDescription: `Yala National Park is one of Sri Lanka's premier wildlife destinations, spanning over 979 square kilometers. It's world-renowned for having the highest density of leopards globally, making it a hotspot for wildlife enthusiasts and photographers.
 
@@ -236,6 +237,7 @@ Best visited during the dry season (February to June), the park provides excelle
   'wilpattu-national-park': {
     id: 'wilpattu-national-park',
     name: 'Wilpattu National Park',
+    province: 'North Western Province',
     description: "Sri Lanka's largest national park known for its natural lakes and rich biodiversity.",
     fullDescription: `Wilpattu National Park is Sri Lanka's largest and one of its oldest national parks, covering approximately 1,317 square kilometers. The name "Wilpattu" translates to "Land of Lakes," referring to the unique feature of about 50 natural lakes (villu) scattered throughout the park.
 
@@ -274,6 +276,7 @@ This pristine wilderness is characterized by dense forests, open grasslands, and
   'mirissa-beach': {
     id: 'mirissa-beach',
     name: 'Mirissa Beach',
+    province: 'Southern Province',
     description: 'Famous for its golden sands, whale watching opportunities, and vibrant nightlife.',
     fullDescription: `Mirissa is a small town on the south coast of Sri Lanka, located in the Matara District. It's one of the country's most popular beach destinations, known for its stunning golden sands, turquoise waters, and laid-back atmosphere.
 
@@ -311,6 +314,7 @@ The beach is famous for being one of the best whale watching destinations in the
   'unawatuna-beach': {
     id: 'unawatuna-beach',
     name: 'Unawatuna Beach',
+    province: 'Southern Province',
     description: 'A beautiful crescent-shaped bay with calm turquoise waters.',
     fullDescription: 'A beautiful crescent-shaped bay with calm turquoise waters. Ideal for snorkeling, diving, and enjoying spectacular sunsets in a tropical paradise.',
     location: 'Southern Province, Sri Lanka',
@@ -341,6 +345,7 @@ The beach is famous for being one of the best whale watching destinations in the
   'horton-plains': {
     id: 'horton-plains',
     name: 'Horton Plains',
+    province: 'Central Province',
     description: 'A beautiful highland plateau offering breathtaking views and unique camping experiences.',
     fullDescription: 'A beautiful highland plateau offering breathtaking views and unique camping experiences. Perfect for hiking and witnessing World\'s End viewpoint.',
     location: 'Central Province, Sri Lanka',
@@ -371,6 +376,7 @@ The beach is famous for being one of the best whale watching destinations in the
   'knuckles-mountain-range': {
     id: 'knuckles-mountain-range',
     name: 'Knuckles Mountain Range',
+    province: 'Central Province',
     description: 'A UNESCO World Heritage site with diverse ecosystems.',
     fullDescription: 'A UNESCO World Heritage site with diverse ecosystems. Ideal for adventure camping, trekking, and exploring pristine mountain landscapes.',
     location: 'Central Province, Sri Lanka',
@@ -401,6 +407,7 @@ The beach is famous for being one of the best whale watching destinations in the
   'lunugamvehera': {
     id: 'lunugamvehera',
     name: 'Lunugamvehera',
+    province: 'Southern Province',
     description: 'An important elephant corridor connecting Yala and Uda Walawe national parks.',
     fullDescription: 'An important elephant corridor connecting Yala and Uda Walawe national parks. Home to elephants, deer, and various bird species in a dry zone habitat.',
     location: 'Southern Province, Sri Lanka',
@@ -431,6 +438,7 @@ The beach is famous for being one of the best whale watching destinations in the
   'kumana-wildlife': {
     id: 'kumana-wildlife',
     name: 'Kumana Wildlife',
+    province: 'Eastern Province',
     description: 'Famous for its bird sanctuary and mangrove swamps.',
     fullDescription: 'Famous for its bird sanctuary and mangrove swamps. A paradise for birdwatchers with over 200 species including migratory birds during nesting season.',
     location: 'Eastern Province, Sri Lanka',
@@ -461,6 +469,7 @@ The beach is famous for being one of the best whale watching destinations in the
   'sinharaja-forest-reserve': {
     id: 'sinharaja-forest-reserve',
     name: 'Sinharaja Forest Reserve',
+    province: 'Sabaragamuwa Province',
     description: 'A UNESCO World Heritage site and biodiversity hotspot.',
     fullDescription: 'A UNESCO World Heritage site and biodiversity hotspot. Home to numerous endemic species, rare birds, and lush tropical rainforest vegetation.',
     location: 'Sabaragamuwa & Southern Provinces, Sri Lanka',
@@ -491,6 +500,7 @@ The beach is famous for being one of the best whale watching destinations in the
   'knuckles-forest-reserve': {
     id: 'knuckles-forest-reserve',
     name: 'Knuckles Forest Reserve',
+    province: 'Central Province',
     description: 'Part of the Knuckles Mountain Range with montane forests.',
     fullDescription: 'Part of the Knuckles Mountain Range with montane forests, waterfalls, and diverse flora and fauna. Perfect for eco-tourism and nature photography.',
     location: 'Central Province, Sri Lanka',

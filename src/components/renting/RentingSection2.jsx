@@ -68,51 +68,51 @@ const RentingSection2 = ({ currentUser }) => {
   // Real-time data listener for rental providers
   useEffect(() => {
     console.log('🔔 Setting up real-time data listener for rental providers...');
-    
+
     const serviceProvidersRef = collection(db, 'serviceProviders');
     const rentingQuery = query(
       serviceProvidersRef,
-      where('serviceType', '==', 'Renting'),
+      where('serviceType', 'in', ['Renting', 'Renting Store']),
       limit(50)
     );
 
     const unsubscribe = onSnapshot(rentingQuery, (snapshot) => {
       console.log('🔄 Real-time rental providers data update received');
-      
+
       const updatedProviders = [];
-      
+
       snapshot.forEach((doc) => {
         const providerData = doc.data();
         const providerId = doc.id;
-        
+
         // Only include Renting service providers
-        if (providerData.serviceType === 'Renting') {
+        if (providerData.serviceType === 'Renting' || providerData.serviceType === 'Renting Store') {
           updatedProviders.push({
             id: providerId,
             providerName: providerData.fullName || providerData.providerName || 'Equipment Rental',
             imageUrl: providerData.profilePicture || providerData.imageUrl || '',
             location: providerData.location || providerData.baseLocation || 'Sri Lanka',
-            
-            rating: typeof providerData.rating === 'number' ? providerData.rating : 
-                   typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
+
+            rating: typeof providerData.rating === 'number' ? providerData.rating :
+              typeof providerData.rating === 'string' ? parseFloat(providerData.rating) || 0 : 0,
             totalReviews: providerData.totalReviews || 0,
             pricePerDay: providerData.pricePerDay || providerData.price || providerData.dailyRate || 0,
             experience: providerData.experienceYears || providerData.experience || 0,
-            
+
             equipmentType: providerData.equipmentType || providerData.vehicleType || 'Camera Equipment',
             equipmentCategories: Array.isArray(providerData.equipmentCategories) ? providerData.equipmentCategories :
-                               providerData.equipmentType ? [providerData.equipmentType] : 
-                               ['Camera Equipment'],
+              providerData.equipmentType ? [providerData.equipmentType] :
+                ['Camera Equipment'],
             availableEquipment: Array.isArray(providerData.availableEquipment) ? providerData.availableEquipment : [],
-            
-            destinations: Array.isArray(providerData.destinations) ? providerData.destinations : 
-                         providerData.destinations ? [providerData.destinations] : 
-                         ['Multiple Locations'],
-            
+
+            destinations: Array.isArray(providerData.destinations) ? providerData.destinations :
+              providerData.destinations ? [providerData.destinations] :
+                ['Multiple Locations'],
+
             contactPhone: providerData.contactPhone || providerData.phone || providerData.phoneNumber || 'Not provided',
             contactEmail: providerData.contactEmail || providerData.email || '',
             description: providerData.description || providerData.bio || 'Premium camera and adventure gear rental',
-            
+
             isCurrentUser: currentUser && currentUser.uid === providerId,
             availability: providerData.availability !== false,
             online: providerData.online || false,
@@ -122,10 +122,10 @@ const RentingSection2 = ({ currentUser }) => {
       });
 
       console.log(`📷 Real-time data: ${updatedProviders.length} rental providers`);
-      
+
       setRentalProviders(updatedProviders);
       setFilteredProviders(updatedProviders);
-      
+
       if (loading) {
         setLoading(false);
       }
@@ -152,7 +152,7 @@ const RentingSection2 = ({ currentUser }) => {
       try {
         const { getDoc, doc } = await import('firebase/firestore');
         const touristDoc = await getDoc(doc(db, 'tourists', currentUser.uid));
-        
+
         if (touristDoc.exists()) {
           const touristData = touristDoc.data();
           const favorites = touristData.favorites || [];
@@ -170,13 +170,13 @@ const RentingSection2 = ({ currentUser }) => {
   // Filter logic
   useEffect(() => {
     console.log('🔄 Applying filters...', filters);
-    
+
     let filtered = [...rentalProviders];
 
     // Rating filter
     if (filters.rating) {
       const minRating = parseInt(filters.rating);
-      filtered = filtered.filter(provider => 
+      filtered = filtered.filter(provider =>
         (provider.rating || 0) >= minRating
       );
     }
@@ -192,19 +192,19 @@ const RentingSection2 = ({ currentUser }) => {
 
     // Equipment type filter
     if (filters.equipmentType) {
-      filtered = filtered.filter(provider => 
-        provider.equipmentCategories?.some(cat => 
+      filtered = filtered.filter(provider =>
+        provider.equipmentCategories?.some(cat =>
           cat.toLowerCase().includes(filters.equipmentType.toLowerCase())
-        ) || 
+        ) ||
         provider.equipmentType?.toLowerCase().includes(filters.equipmentType.toLowerCase())
       );
     }
 
     // Location filter
     if (filters.location) {
-      filtered = filtered.filter(provider => 
+      filtered = filtered.filter(provider =>
         provider.location?.toLowerCase().includes(filters.location.toLowerCase()) ||
-        provider.destinations?.some(dest => 
+        provider.destinations?.some(dest =>
           dest.toLowerCase().includes(filters.location.toLowerCase())
         )
       );
@@ -229,7 +229,7 @@ const RentingSection2 = ({ currentUser }) => {
 
   const handleFavoriteToggle = async (providerId, e) => {
     e.stopPropagation();
-    
+
     if (!currentUser) {
       alert('Please login to add favorites');
       return;
@@ -278,7 +278,7 @@ const RentingSection2 = ({ currentUser }) => {
 
   if (loading) {
     return (
-      <div id="renting-section" className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+      <div id="renting-section" className="min-h-screen bg-linear-to-b from-gray-50 to-white py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center py-20">
             <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -291,7 +291,7 @@ const RentingSection2 = ({ currentUser }) => {
 
   if (error) {
     return (
-      <div id="renting-section" className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+      <div id="renting-section" className="min-h-screen bg-linear-to-b from-gray-50 to-white py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center py-20">
             <p className="text-red-600 font-medium">{error}</p>
@@ -302,7 +302,7 @@ const RentingSection2 = ({ currentUser }) => {
   }
 
   return (
-    <section id="renting-section" className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+    <section id="renting-section" className="min-h-screen bg-linear-to-b from-gray-50 to-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
@@ -327,7 +327,7 @@ const RentingSection2 = ({ currentUser }) => {
             <Package className="h-5 w-5 text-green-600" />
             Filter Equipment
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Rating Filter */}
             <div>
@@ -422,7 +422,7 @@ const RentingSection2 = ({ currentUser }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProviders.map((provider) => {
               const isFavorite = userFavorites.includes(provider.id);
-              
+
               return (
                 <div
                   key={provider.id}
@@ -431,7 +431,7 @@ const RentingSection2 = ({ currentUser }) => {
                   className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-200 cursor-pointer transform hover:scale-105 group"
                 >
                   {/* Provider Image */}
-                  <div className="relative h-48 bg-gradient-to-br from-green-400 to-green-600 overflow-hidden">
+                  <div className="relative h-48 bg-linear-to-br from-green-400 to-green-600 overflow-hidden">
                     {provider.imageUrl ? (
                       <img
                         src={provider.imageUrl}
@@ -443,7 +443,7 @@ const RentingSection2 = ({ currentUser }) => {
                         <Camera className="h-20 w-20 text-white opacity-50" />
                       </div>
                     )}
-                    
+
                     {/* Featured Badge */}
                     {provider.featured && (
                       <div className="absolute top-2 left-2 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
@@ -456,11 +456,10 @@ const RentingSection2 = ({ currentUser }) => {
                     {currentUser && (
                       <button
                         onClick={(e) => handleFavoriteToggle(provider.id, e)}
-                        className={`absolute top-2 right-2 p-2 rounded-full transition-colors ${
-                          isFavorite 
-                            ? 'bg-red-500 text-white' 
-                            : 'bg-white/80 text-gray-600 hover:bg-red-500 hover:text-white'
-                        }`}
+                        className={`absolute top-2 right-2 p-2 rounded-full transition-colors ${isFavorite
+                          ? 'bg-red-500 text-white'
+                          : 'bg-white/80 text-gray-600 hover:bg-red-500 hover:text-white'
+                          }`}
                         title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                       >
                         <MessageCircle className="h-5 w-5" />
@@ -488,11 +487,10 @@ const RentingSection2 = ({ currentUser }) => {
                         {[...Array(5)].map((_, i) => (
                           <Star
                             key={i}
-                            className={`h-4 w-4 ${
-                              i < Math.round(provider.rating || 0)
-                                ? 'text-yellow-400 fill-current'
-                                : 'text-gray-300'
-                            }`}
+                            className={`h-4 w-4 ${i < Math.round(provider.rating || 0)
+                              ? 'text-yellow-400 fill-current'
+                              : 'text-gray-300'
+                              }`}
                           />
                         ))}
                       </div>
@@ -518,15 +516,9 @@ const RentingSection2 = ({ currentUser }) => {
                       {provider.description}
                     </p>
 
-                    {/* Price */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <div>
-                        <span className="text-2xl font-bold text-green-600">
-                          LKR {provider.pricePerDay?.toLocaleString() || 'N/A'}
-                        </span>
-                        <span className="text-sm text-gray-500 ml-1">/day</span>
-                      </div>
-                      <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
+                    {/* Button */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <button className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
                         View Details
                       </button>
                     </div>
