@@ -24,6 +24,7 @@ import GuideHero from './guidehero.jsx';
 import GuideSection2 from './GuideSection2.jsx';
 import Footer from '../home/Footer.jsx';
 import ChatList from '../ChatList';
+import BookingPanel from '../BookingPanel';
 
 // Firebase imports
 import {
@@ -448,7 +449,9 @@ export default function GuideApp({ user, onLogin, onRegister, onLogout, onShowAu
           onClose={() => setShowChatList(false)}
         />
       )}
-      <GuideHero />
+      <GuideHero>
+        <BookingPanel user={user} notifications={notifications} />
+      </GuideHero>
       <div className="h-1 bg-black"></div>
 
       <GuideSection2

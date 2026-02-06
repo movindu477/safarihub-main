@@ -6,7 +6,7 @@ import desti2 from "../../assets/desti2.avif";
 import desti3 from "../../assets/desti3.avif";
 import desti4 from "../../assets/desti4.avif";
 
-export default function DestinationHero() {
+export default function DestinationHero({ children }) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Slides data
@@ -116,6 +116,15 @@ export default function DestinationHero() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Booking Panel Container - Absolute Positioned */}
+      <div className="hidden sm:block absolute z-30 top-0 right-0 w-full h-full pointer-events-none">
+        <div className="w-full h-full relative">
+          <div className="pointer-events-auto">
+            {children}
           </div>
         </div>
       </div>

@@ -1186,7 +1186,7 @@ const GuideProfile = ({ user, onLogout, onShowAuth, notifications, onNotificatio
                   const documentsWithUrls = await Promise.all(certData.documents.map(async (doc) => {
                     if (doc.fileUrl) return doc; // URL already exists
                     if (doc.supabasePath) {
-                      const { signedUrl } = await getDocumentUrl(doc.supabasePath);
+                      const signedUrl = await getDocumentUrl(doc.supabasePath);
                       return { ...doc, fileUrl: signedUrl };
                     }
                     return doc;

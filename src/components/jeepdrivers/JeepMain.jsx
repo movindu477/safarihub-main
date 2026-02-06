@@ -8,6 +8,7 @@ import JeepHero from "./JeepHero";
 import JeepSection2 from "./JeepSection2";
 import Footer from "../home/Footer";
 import ChatList from "../ChatList";
+import BookingPanel from "../BookingPanel";
 
 // Import Firebase functions
 import {
@@ -441,7 +442,9 @@ export default function JeepMain({ user, onLogin, onRegister, onLogout, onShowAu
           onClose={() => setShowChatList(false)}
         />
       )}
-      <JeepHero />
+      <JeepHero>
+        <BookingPanel user={user} notifications={notifications} />
+      </JeepHero>
       <div className="h-1 bg-black"></div>
 
       <JeepSection2

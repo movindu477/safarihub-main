@@ -3,7 +3,7 @@ import jeep1 from "../../assets/jeepori3.avif";
 import jeep2 from "../../assets/jeep.avif";
 import jeep3 from "../../assets/jeepori2.jpg";
 
-export default function JeepHero() {
+export default function JeepHero({ children }) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Slideshow data with jeep-specific content
@@ -107,6 +107,15 @@ export default function JeepHero() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Booking Panel Container - Absolute Positioned */}
+      <div className="hidden sm:block absolute z-30 top-0 right-0 w-full h-full pointer-events-none">
+        <div className="w-full h-full relative">
+          <div className="pointer-events-auto">
+            {children}
           </div>
         </div>
       </div>

@@ -1,29 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc, 
-  updateDoc, 
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  updateDoc,
   serverTimestamp,
   getDoc,
   getDocs,
   orderBy
 } from 'firebase/firestore';
-import { 
-  Package, 
-  Calendar, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  DollarSign, 
-  User, 
-  Mail, 
-  Phone, 
-  FileText, 
+import {
+  Package,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  Clock,
+  DollarSign,
+  User,
+  Mail,
+  Phone,
+  FileText,
   Eye,
   Shield,
   AlertTriangle,
@@ -59,7 +59,7 @@ const ManageRentals = () => {
 
     const rentalsRef = collection(db, 'rentals');
     const q = query(
-      rentalsRef, 
+      rentalsRef,
       where('providerId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
@@ -83,7 +83,7 @@ const ManageRentals = () => {
   const handleUpdateStatus = async (rentalId, newStatus, rental) => {
     try {
       const rentalRef = doc(db, 'rentals', rentalId);
-      
+
       if (newStatus === 'accepted') {
         // Calculate total cost based on rental days
         const startDate = new Date(rental.startDate);
@@ -103,7 +103,7 @@ const ManageRentals = () => {
       } else if (newStatus === 'declined') {
         // Find alternative shops with same product
         await findAlternativeShops(rental);
-        
+
         await updateDoc(rentalRef, {
           status: newStatus,
           declinedAt: serverTimestamp(),
@@ -143,7 +143,7 @@ const ManageRentals = () => {
 
       for (const productDoc of productsSnapshot.docs) {
         const productData = productDoc.data();
-        
+
         // Get provider details
         const providerDoc = await getDoc(doc(db, 'serviceProviders', productData.providerId));
         if (providerDoc.exists()) {
@@ -163,7 +163,7 @@ const ManageRentals = () => {
 
       // Sort by rating
       alternatives.sort((a, b) => (b.provider.rating || 0) - (a.provider.rating || 0));
-      
+
       // Store alternatives in the rental document
       const rentalRef = doc(db, 'rentals', rental.id);
       await updateDoc(rentalRef, {
@@ -185,8 +185,8 @@ const ManageRentals = () => {
 
   const viewDocument = async (documentPath) => {
     try {
-      const { signedUrl, error } = await getDocumentUrl(documentPath);
-      if (error) {
+      const signedUrl = await getDocumentUrl(documentPath);
+      if (!signedUrl) {
         setMessage({ type: 'error', text: 'Failed to load document' });
         return;
       }
@@ -277,11 +277,10 @@ const ManageRentals = () => {
 
         {/* Message Display */}
         {message.text && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
-            message.type === 'success' 
-              ? 'bg-emerald-900/20 border border-emerald-700 text-emerald-300' 
+          <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${message.type === 'success'
+              ? 'bg-emerald-900/20 border border-emerald-700 text-emerald-300'
               : 'bg-red-900/20 border border-red-700 text-red-300'
-          }`}>
+            }`}>
             {message.type === 'success' ? (
               <CheckCircle className="h-5 w-5" />
             ) : (
@@ -302,11 +301,10 @@ const ManageRentals = () => {
             <button
               key={tab.id}
               onClick={() => setSelectedTab(tab.id)}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                selectedTab === tab.id
+              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${selectedTab === tab.id
                   ? 'bg-emerald-600 text-white'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
+                }`}
             >
               {tab.label} ({tab.count})
             </button>

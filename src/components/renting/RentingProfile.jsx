@@ -343,6 +343,20 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
           const providerInfo = {
             id: driverDoc.id,
             ...driverData,
+            // Ensure array fields are actually arrays to prevent .map() crashes
+            destinations: Array.isArray(driverData.destinations)
+              ? driverData.destinations
+              : (driverData.destinations ? [driverData.destinations] : []),
+            languages: Array.isArray(driverData.languages)
+              ? driverData.languages
+              : (driverData.languages ? [driverData.languages] : []),
+            certifications: Array.isArray(driverData.certifications)
+              ? driverData.certifications
+              : (driverData.certifications ? [driverData.certifications] : []),
+            specialSkills: Array.isArray(driverData.specialSkills)
+              ? driverData.specialSkills
+              : (driverData.specialSkills ? [driverData.specialSkills] : []),
+
             // Ensure availability is an object, not array
             availabilityCalendar: (driverData.availability && typeof driverData.availability === 'object' && !Array.isArray(driverData.availability))
               ? driverData.availability
@@ -366,7 +380,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                   const documentsWithUrls = await Promise.all(certData.documents.map(async (doc) => {
                     if (doc.fileUrl) return doc; // URL already exists
                     if (doc.supabasePath) {
-                      const { signedUrl } = await getDocumentUrl(doc.supabasePath);
+                      const signedUrl = await getDocumentUrl(doc.supabasePath);
                       return { ...doc, fileUrl: signedUrl };
                     }
                     return doc;
@@ -818,7 +832,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     )}
 
                     {/* Languages */}
-                    {provider.languages && provider.languages.length > 0 && (
+                    {Array.isArray(provider.languages) && provider.languages.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Languages className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -840,7 +854,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     )}
 
                     {/* Destinations */}
-                    {provider.destinations && provider.destinations.length > 0 && (
+                    {Array.isArray(provider.destinations) && provider.destinations.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <MapPin className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -862,7 +876,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     )}
 
                     {/* Certifications */}
-                    {(provider.certificationStatus === 'certified' && provider.certificationDocuments && provider.certificationDocuments.length > 0) ? (
+                    {(provider.certificationStatus === 'certified' && Array.isArray(provider.certificationDocuments) && provider.certificationDocuments.length > 0) ? (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -895,7 +909,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                           </div>
                         </div>
                       </div>
-                    ) : (provider.certifications && provider.certifications.length > 0 && (
+                    ) : (Array.isArray(provider.certifications) && provider.certifications.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Award className="text-white" size={14} style={{ width: '14px', height: '14px' }} />
@@ -917,7 +931,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     ))}
 
                     {/* Special Skills */}
-                    {provider.specialSkills && provider.specialSkills.length > 0 && (
+                    {Array.isArray(provider.specialSkills) && provider.specialSkills.length > 0 && (
                       <div className="flex items-start p-2 sm:p-2.5 md:p-3 rounded-lg bg-white border border-gray-300">
                         <div className="p-1.5 sm:p-2 bg-black rounded-lg mr-2 sm:mr-2.5 shrink-0">
                           <Shield className="text-white" size={14} style={{ width: '14px', height: '14px' }} />

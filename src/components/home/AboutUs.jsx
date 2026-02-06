@@ -16,6 +16,7 @@ import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import ChatList from '../ChatList';
+import BookingPanel from '../BookingPanel';
 import aboutback1 from '../../assets/aboutback1.avif';
 
 
@@ -231,6 +232,15 @@ const AboutUs = ({ user, onLogout, onShowAuth, notifications, onNotificationClic
             Your trusted gateway to authentic wildlife safaris, expert local guides,
             and unforgettable adventures across Sri Lanka's pristine landscapes.
           </p>
+        </div>
+
+        {/* Booking Panel Container - Absolute Positioned */}
+        <div className="hidden sm:block absolute z-30 top-0 right-0 w-full h-full pointer-events-none">
+          <div className="w-full h-full relative">
+            <div className="pointer-events-auto">
+              <BookingPanel user={user} notifications={notifications} />
+            </div>
+          </div>
         </div>
 
         {/* Slide Indicator (decorative) */}

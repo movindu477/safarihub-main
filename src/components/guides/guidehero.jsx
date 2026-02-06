@@ -1,7 +1,7 @@
 import React from "react";
 import guideImage from "../../assets/guideori.jpg";
 
-export default function GuideHero() {
+export default function GuideHero({ children }) {
   return (
     <section className="relative w-full h-[100dvh] overflow-hidden bg-black">
       {/* Background Image - Desktop */}
@@ -55,6 +55,15 @@ export default function GuideHero() {
                 that transform your journey into an unforgettable adventure.
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Booking Panel Container - Absolute Positioned */}
+      <div className="hidden sm:block absolute z-30 top-0 right-0 w-full h-full pointer-events-none">
+        <div className="w-full h-full relative">
+          <div className="pointer-events-auto">
+            {children}
           </div>
         </div>
       </div>

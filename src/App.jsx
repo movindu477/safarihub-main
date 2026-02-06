@@ -28,6 +28,8 @@ import {
 } from "firebase/firestore";
 // Supabase Storage imports (replacing Firebase Storage)
 import { uploadProfileImage, uploadDocument, uploadProviderDocumentClientSide } from "./lib/supabase";
+// Test Supabase connection on app load
+import "./test-supabase";
 import { Eye, EyeOff, Mail, Lock, User, MapPin, Phone, Globe, Camera, ChevronLeft, ChevronDown, Bell, X, Send, Check, CheckCheck, MessageCircle, ArrowUp, Calendar, Briefcase, CheckCircle } from "lucide-react";
 
 // Import images from src/assets
@@ -1720,7 +1722,9 @@ const HomePage = ({ user, onLogout, onShowAuth, notifications, onNotificationCli
 
       {/* Home Content with All Sections */}
       <div className="pt-0 space-y-0">
-        <Section1 />
+        <Section1>
+          <BookingPanel user={user} notifications={notifications} />
+        </Section1>
         <Section3 />
         <Section4 />
         <Section5 />
@@ -2433,13 +2437,7 @@ function App() {
           onMarkAsRead={handleMarkAsRead}
         />
 
-        {/* Global Booking Panel - Only for Tourists (replaces bell) */}
-        {user && (
-          <ConditionalBookingPanel
-            user={user}
-            notifications={notifications}
-          />
-        )}
+
 
       </Router>
     </AuthProvider>
@@ -2542,20 +2540,7 @@ const ConditionalNotificationBell = ({ user, notifications = [], onNotificationC
 };
 
 // Booking Panel Wrapper to hide on specific pages
-const ConditionalBookingPanel = ({ user, notifications }) => {
-  const location = useLocation();
-  const allowedPaths = ['/', '/about'];
 
-  // Only show on Home and About pages
-  if (!allowedPaths.includes(location.pathname)) return null;
-
-  return (
-    <BookingPanel
-      user={user}
-      notifications={notifications}
-    />
-  );
-};
 
 // Authentication Wrapper Component - Handles URL params
 function AuthenticationWrapper({ onAuthSuccess, returnToPath, initialScreen = "login", onBackToHome }) {
@@ -3002,11 +2987,98 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
       console.log("Creating user with email:", email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
+      const isGuide = serviceType === "Tour Guide";
+      const isJeepDriver = serviceType === "Jeep Driver";
+      const isRenting = serviceType === "Renting" || serviceType === "Renting Store";
 
       console.log("✅ User created with UID:", uid);
 
-      // Format phone number for storage: countryCode + phone (e.g., +9407432090367)
+      // 1. Upload Profile Picture Synchronously
+      let photoURL = "";
+      if (profileFile) {
+        try {
+          console.log("📸 Uploading profile picture to Supabase Storage...");
+          const { url, error } = await uploadProfileImage(profileFile, uid);
+          if (error) throw new Error(error);
+          photoURL = url;
+          console.log("✅ Profile image uploaded:", photoURL);
+        } catch (uploadError) {
+          console.error("❌ Profile image upload failed:", uploadError);
+          addToast("Profile image upload failed, but account creation continuing...", "warning");
+        }
+      }
+
+      // 2. Upload Certification/Verification Documents Synchronously
+      const certDocuments = [];
+      const certUrls = {};
+      const uploadErrors = [];
+
+      if (role === 'provider') {
+        const filesToUpload = isGuide ? verificationDocumentFiles : certificationFiles;
+
+        if (Object.keys(filesToUpload).length > 0) {
+          console.log("📄 Uploading certification documents...");
+          console.log("📋 Files to upload:", Object.keys(filesToUpload));
+
+          for (const [certName, file] of Object.entries(filesToUpload)) {
+            try {
+              console.log(`⏳ Uploading ${certName}...`);
+              const { url, path, error } = await uploadProviderDocumentClientSide(file, uid, file.name);
+
+              if (error) {
+                console.error(`❌ Upload error for ${certName}:`, error);
+                uploadErrors.push(`${certName}: ${error}`);
+                throw new Error(error);
+              }
+
+              if (!url || !path) {
+                const errMsg = `Upload failed - no URL or path returned for ${certName}`;
+                console.error(`❌ ${errMsg}`);
+                uploadErrors.push(errMsg);
+                throw new Error(errMsg);
+              }
+
+              const docObj = {
+                certificationName: certName,
+                fileName: file.name,
+                fileUrl: url,
+                supabasePath: path,
+                fileSize: file.size,
+                fileType: file.type || 'application/octet-stream',
+                uploadedAt: new Date().toISOString(),
+                documentId: `${uid}_${Date.now()}_${certName.replace(/\s+/g, '_')}`,
+                uploadStatus: 'uploaded'
+              };
+              certDocuments.push(docObj);
+              certUrls[certName] = url;
+              console.log(`✅ Successfully uploaded document: ${certName}`, { url, path });
+            } catch (err) {
+              console.error(`❌ Failed to upload ${certName}:`, err);
+              uploadErrors.push(`${certName}: ${err.message}`);
+              // Continue with other uploads but track the error
+            }
+          }
+
+          // Check if we have upload errors for required documents
+          if (uploadErrors.length > 0) {
+            console.error('❌ Document upload errors:', uploadErrors);
+            setBusy(false);
+            setMsg(`Document upload failed: ${uploadErrors.join(', ')}`);
+            addToast(`Failed to upload documents: ${uploadErrors[0]}`, 'error');
+            return; // Stop registration if documents fail to upload
+          }
+
+          console.log(`✅ All documents uploaded successfully. Total: ${certDocuments.length}`);
+        }
+      }
+
+      // 3. Prepare User Data
       const formattedPhone = phone ? `${phoneCountryCode}${phone}` : "";
+      const parsePrice = (price) => {
+        if (!price) return 0;
+        const cleanPrice = String(price).replace(/,/g, '');
+        return parseInt(cleanPrice) || 0;
+      };
 
       let userData = {
         uid,
@@ -3014,22 +3086,19 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
         fullName: fullName.trim(),
         phone: formattedPhone,
         address: address?.trim() || "",
-        profilePicture: "",
+        profilePicture: photoURL,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         role: role,
       };
 
-      let collectionName = "";
+      let collectionName = role === "tourist" ? "tourists" : "serviceProviders";
 
       if (role === "tourist") {
-        collectionName = "tourists";
-        // Handle custom language if "other" was selected
         let finalLanguage = language || "english";
         if (language?.startsWith('other:')) {
           finalLanguage = language.replace('other:', '').trim() || "english";
         }
-
         userData = {
           ...userData,
           country: country?.trim() || "",
@@ -3038,372 +3107,114 @@ function Authentication({ onAuthSuccess, returnToPath, initialScreen = "login", 
           favorites: [],
         };
       } else {
-        collectionName = "serviceProviders";
-
-        // Helper function to parse price with commas (e.g., "25,000" -> 25000)
-        const parsePrice = (price) => {
-          if (!price) return 0;
-          // Remove commas and parse as integer
-          const cleanPrice = String(price).replace(/,/g, '');
-          return parseInt(cleanPrice) || 0;
-        };
-
         // Base provider data
         userData = {
           ...userData,
           location: locationBase?.trim() || "",
-          experienceYears: (serviceType === "Renting") ? 0 : (experience ? parseInt(experience) : 0),
+          experienceYears: isRenting ? 0 : (experience ? parseInt(experience) : 0),
           serviceType: serviceType || "Jeep Driver",
-          certificationStatus: certificationStatus || "non-certified", // 'certified' or 'non-certified'
-          // Certification approval fields (only for certified providers)
-          certificationApproved: false, // Admin must approve
+          certificationStatus: certificationStatus || "non-certified",
+          certificationApproved: false,
           certificationRejected: false,
-          certificationApprovedBy: null,
-          certificationApprovedAt: null,
-          certificationApprovedByName: null,
-          certificationRejectedBy: null,
-          certificationRejectedAt: null,
-          certificationRejectedByName: null,
-          certificationRejectionReason: null,
-          vehicleTypes: vehicleTypes || [], // Array of selected vehicle types
+          vehicleTypes: vehicleTypes || [],
           pricePerDay: pricePerDay ? parsePrice(pricePerDay) : 0,
-          // Separate prices for different vehicle types
-          priceFullDayStandard: priceFullDayStandard ? parsePrice(priceFullDayStandard) : 0,
-          priceHalfDayStandard: priceHalfDayStandard ? parsePrice(priceHalfDayStandard) : 0,
-          priceFullDayLuxury: priceFullDayLuxury ? parsePrice(priceFullDayLuxury) : 0,
-          priceHalfDayLuxury: priceHalfDayLuxury ? parsePrice(priceHalfDayLuxury) : 0,
+          priceFullDayStandard: parsePrice(priceFullDayStandard),
+          priceHalfDayStandard: parsePrice(priceHalfDayStandard),
+          priceFullDayLuxury: parsePrice(priceFullDayLuxury),
+          priceHalfDayLuxury: parsePrice(priceHalfDayLuxury),
           rating: 0,
           totalRatings: 0,
-          availability: true,
+          // availability field removed - will be managed via calendar system
           contactEmail: email,
           contactPhone: formattedPhone,
+          destinations: destinations ? [destinations] : [],
+          languages: languages || [],
+          certifications: certifications || [],
+          certificationUrls: certUrls,
+          certificationDocuments: certDocuments
         };
 
-        // Service type specific data
-        if (serviceType === "Tour Guide") {
-          // Convert single destination to array format for Firestore compatibility
-          const destinationsArray = destinations ? [destinations] : [];
-
-          // Parse pricing - Remove commas and convert to numbers
-          const parsePrice = (priceString) => {
-            if (!priceString) return 0;
-            return parseInt(String(priceString).replace(/,/g, '')) || 0;
-          };
-
+        if (isGuide) {
           userData = {
             ...userData,
-            destinations: destinationsArray,
             specialQualifications: specialQualifications || [],
             areasOfExpertise: areasOfExpertise || [],
-            certifications: certifications || [],
-            verificationDocuments: verificationDocuments || [],
-            verificationDocumentUrls: {},
-            priceFullDayStandard: parsePrice(priceFullDayStandard),
-            priceHalfDayStandard: parsePrice(priceHalfDayStandard),
             hourlyRate: hourlyRate ? parseInt(hourlyRate) : 0,
             dailyRate: dailyRate ? parseInt(dailyRate) : 0,
             fullDayPrice: parsePrice(priceFullDayStandard),
             halfDayPrice: parsePrice(priceHalfDayStandard),
             specialPackageRates: specialPackageRates || "",
             currencyPreference: currencyPreference || "LKR",
-            languages: languages || [],
-            availability: availableDates || {},
             description: description?.trim() || "",
-            featured: false,
-          };
-        } else if (serviceType === "Renting") {
-          const destinationsArray = destinations ? [destinations] : [];
-          userData = {
-            ...userData,
-            destinations: destinationsArray,
-            province: destinations || "",
-            languages: languages || [],
-            specialSkills: specialSkills || [],
-            certifications: certifications || [],
-            certificationUrls: {},
-            availability: availableDates || {},
-            description: description?.trim() || "",
-            featured: false,
+            verificationDocumentUrls: certUrls, // for backward compatibility
           };
         } else {
-          const destinationsArray = destinations ? [destinations] : [];
           userData = {
             ...userData,
-            destinations: destinationsArray,
-            languages: languages || [],
             specialSkills: specialSkills || [],
-            certifications: certifications || [],
-            certificationUrls: {},
-            availability: availableDates || {},
             description: description?.trim() || "",
-            featured: false,
           };
         }
       }
 
-      // 📄 Upload Certification Files (if any)
-      if (role === 'provider' && collectionName === 'serviceProviders' && Object.keys(certificationFiles).length > 0) {
-        console.log("📄 Uploading certification files...");
-        const certUrls = {};
+      // 4. Ensure user is authenticated and get fresh token
+      console.log("🔐 Refreshing authentication token...");
+      try {
+        await userCredential.user.reload();
+        const idToken = await userCredential.user.getIdToken(true); // Force refresh
+        console.log("✅ Auth token refreshed, token length:", idToken?.length || 0);
+      } catch (tokenError) {
+        console.error("⚠️ Token refresh failed, continuing anyway:", tokenError);
+      }
 
-        for (const [certName, file] of Object.entries(certificationFiles)) {
-          try {
-            // Use the new provider upload function
-            // Filename format: {uid}_{timestamp}_{cleanName}
-            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-            const { url, error } = await uploadProviderDocumentClientSide(file, uid, `${certName.replace(/\s+/g, '_')}_${cleanName}`);
+      // 5. Save User Data to Firestore
+      console.log("💾 Saving user data to Firestore...");
+      console.log("📋 Collection:", collectionName);
+      console.log("📋 UID:", uid);
+      console.log("📋 User data keys:", Object.keys(userData));
 
-            if (error) {
-              console.error(`❌ Failed to upload certification ${certName}:`, error);
-              continue;
-            }
+      try {
+        await setDoc(doc(db, collectionName, uid), userData);
+        console.log("✅ User data saved to Firestore successfully");
+      } catch (firestoreError) {
+        console.error("❌ Firestore save error:", {
+          code: firestoreError.code,
+          message: firestoreError.message,
+          collection: collectionName,
+          uid: uid
+        });
+        throw firestoreError;
+      }
 
-            if (url) {
-              console.log(`✅ Uploaded ${certName}:`, url);
-              certUrls[certName] = url;
-            }
-          } catch (uploadErr) {
-            console.error(`❌ Error uploading ${certName}:`, uploadErr);
-          }
-        }
+      // 6. Save Certification Data to separate collection
+      if (role === 'provider' && certDocuments.length > 0) {
+        const certCollection = isGuide ? 'guideCertifications' : 'jeepDriverCertifications';
+        console.log(`💾 Saving ${certDocuments.length} documents to ${certCollection}...`);
 
-        // Add to userData
-        userData.certificationUrls = certUrls;
-
-        // Also map to verificationDocumentUrls if it's a Tour Guide (just in case they are treated similarly)
-        if (serviceType === "Tour Guide") {
-          userData.verificationDocumentUrls = { ...userData.verificationDocumentUrls, ...certUrls };
+        try {
+          await setDoc(doc(db, certCollection, uid), {
+            providerId: uid,
+            documents: certDocuments,
+            updatedAt: serverTimestamp()
+          });
+          console.log("✅ Certification documents saved to Firestore");
+        } catch (certError) {
+          console.error("❌ Certification save error:", certError);
+          // Don't throw - certifications can be added later
         }
       }
 
-      console.log("Saving user data to collection:", collectionName);
-      console.log("User data:", userData);
-
-      await setDoc(doc(db, collectionName, uid), userData);
-      console.log("✅ User data saved to Firestore successfully!");
-
+      // 7. Update Firebase Auth Profile
+      console.log("👤 Updating Firebase Auth profile...");
       await updateProfile(userCredential.user, {
-        displayName: fullName
+        displayName: fullName,
+        photoURL: photoURL
       });
 
-      if (profileFile) {
-        (async () => {
-          try {
-            console.log("📸 Uploading profile picture to Supabase Storage...");
-            const { url: photoURL, error } = await uploadProfileImage(profileFile, uid);
-
-            if (error) {
-              console.error("❌ Profile image upload failed:", error);
-              return;
-            }
-
-            if (!photoURL) {
-              console.error("❌ Profile image upload returned no URL");
-              return;
-            }
-
-            console.log("✅ Profile image uploaded to Supabase, URL:", photoURL);
-
-            await setDoc(doc(db, collectionName, uid), {
-              profilePicture: photoURL,
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-
-            try {
-              await updateProfile(userCredential.user, {
-                displayName: fullName,
-                photoURL: photoURL
-              });
-            } catch (authError) {
-              console.warn("⚠️ Could not update Firebase Auth photoURL:", authError);
-            }
-          } catch (uploadError) {
-            console.error("❌ Profile image upload failed:", uploadError);
-          }
-        })();
-      }
-
+      console.log("✅ Registration process complete!");
       addToast("Account created successfully! Redirecting to login...", "success");
       setBusy(false);
 
-      // Upload certification files in background
-      if ((serviceType === "Jeep Driver" || serviceType === "Renting") && Object.keys(certificationFiles).length > 0) {
-        setTimeout(async () => {
-          try {
-            console.log("📄 Starting background upload of certification files for Jeep Driver...");
-            const documents = [];
-            let uploadedCount = 0;
-
-            for (const [certName, file] of Object.entries(certificationFiles)) {
-              try {
-                const ext = file.name.split(".").pop();
-                const timestamp = Date.now();
-                const fileName = `${uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-
-                const { url: fileURL, error, path } = await uploadProviderDocumentClientSide(file, uid, fileName);
-
-                if (error) {
-                  documents.push({
-                    certificationName: certName,
-                    fileName: fileName,
-                    fileUrl: null,
-                    fileSize: file.size,
-                    fileType: file.type || `application/${ext}`,
-                    uploadedAt: new Date(),
-                    documentId: `${uid}_${timestamp}`,
-                    supabasePath: null,
-                    uploadStatus: 'failed',
-                    uploadError: error.message || 'Upload failed'
-                  });
-                  continue;
-                }
-
-                if (path) {
-                  documents.push({
-                    certificationName: certName,
-                    fileName: fileName,
-                    fileUrl: fileURL || null,
-                    fileSize: file.size,
-                    fileType: file.type || `application/${ext}`,
-                    uploadedAt: new Date(),
-                    documentId: `${uid}_${timestamp}`,
-                    supabasePath: path,
-                    uploadStatus: 'uploaded'
-                  });
-                  uploadedCount++;
-                }
-              } catch (fileError) {
-                console.error(`❌ Failed to upload certification ${certName}:`, fileError);
-                documents.push({
-                  certificationName: certName,
-                  fileName: `${uid}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-                  fileUrl: null,
-                  fileSize: file.size,
-                  fileType: file.type || `application/${file.name.split('.').pop()}`,
-                  uploadedAt: new Date(),
-                  documentId: `${uid}_${Date.now()}`,
-                  supabasePath: null,
-                  uploadStatus: 'failed',
-                  uploadError: fileError.message || 'Upload failed'
-                });
-              }
-            }
-
-            if (documents.length > 0) {
-              const userCertDocRef = doc(db, 'jeepDriverCertifications', uid);
-              const existingDoc = await getDoc(userCertDocRef);
-
-              if (existingDoc.exists()) {
-                const existingData = existingDoc.data();
-                const allDocuments = [...(existingData.documents || []), ...documents];
-                await setDoc(userCertDocRef, {
-                  providerId: uid,
-                  documents: allDocuments,
-                  updatedAt: serverTimestamp()
-                }, { merge: true });
-              } else {
-                await setDoc(userCertDocRef, {
-                  providerId: uid,
-                  documents: documents,
-                  createdAt: serverTimestamp(),
-                  updatedAt: serverTimestamp()
-                });
-              }
-            }
-          } catch (uploadError) {
-            console.error("❌ Certification files upload failed:", uploadError);
-          }
-        }, 500);
-      }
-
-      if (serviceType === "Tour Guide" && Object.keys(verificationDocumentFiles).length > 0) {
-        setTimeout(async () => {
-          try {
-            console.log("📄 Starting background upload of verification document files for Tour Guide...");
-            const documents = [];
-            let uploadedCount = 0;
-
-            for (const [docName, file] of Object.entries(verificationDocumentFiles)) {
-              try {
-                const ext = file.name.split(".").pop();
-                const timestamp = Date.now();
-                const fileName = `${uid}_${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-
-                const { url: fileURL, error, path } = await uploadProviderDocumentClientSide(file, uid, fileName);
-
-                if (error) {
-                  documents.push({
-                    certificationName: docName,
-                    fileName: fileName,
-                    fileUrl: null,
-                    fileSize: file.size,
-                    fileType: file.type || `application/${ext}`,
-                    uploadedAt: new Date(),
-                    documentId: `${uid}_${timestamp}`,
-                    supabasePath: null,
-                    uploadStatus: 'failed',
-                    uploadError: error.message || 'Upload failed'
-                  });
-                  continue;
-                }
-
-                if (path) {
-                  documents.push({
-                    certificationName: docName,
-                    fileName: fileName,
-                    fileUrl: fileURL || null,
-                    fileSize: file.size,
-                    fileType: file.type || `application/${ext}`,
-                    uploadedAt: new Date(),
-                    documentId: `${uid}_${timestamp}`,
-                    supabasePath: path,
-                    uploadStatus: 'uploaded'
-                  });
-                  uploadedCount++;
-                }
-              } catch (fileError) {
-                console.error(`❌ Failed to upload verification document ${docName}:`, fileError);
-                documents.push({
-                  certificationName: docName,
-                  fileName: `${uid}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-                  fileUrl: null,
-                  fileSize: file.size,
-                  fileType: file.type || `application/${file.name.split('.').pop()}`,
-                  uploadedAt: new Date(),
-                  documentId: `${uid}_${Date.now()}`,
-                  supabasePath: null,
-                  uploadStatus: 'failed',
-                  uploadError: fileError.message || 'Upload failed'
-                });
-              }
-            }
-
-            if (documents.length > 0) {
-              const userCertDocRef = doc(db, 'guideCertifications', uid);
-              const existingDoc = await getDoc(userCertDocRef);
-
-              if (existingDoc.exists()) {
-                const existingData = existingDoc.data();
-                const allDocuments = [...(existingData.documents || []), ...documents];
-                await setDoc(userCertDocRef, {
-                  providerId: uid,
-                  documents: allDocuments,
-                  updatedAt: serverTimestamp()
-                }, { merge: true });
-              } else {
-                await setDoc(userCertDocRef, {
-                  providerId: uid,
-                  documents: documents,
-                  createdAt: serverTimestamp(),
-                  updatedAt: serverTimestamp()
-                });
-              }
-            }
-          } catch (uploadError) {
-            console.error("❌ Verification document files upload failed:", uploadError);
-          }
-        }, 500);
-      }
 
       setTimeout(() => {
         signOut(auth);
@@ -3943,6 +3754,7 @@ const RegistrationForm = ({ role, serviceType, formData, handlers, profilePrevie
   const isTourist = role === 'tourist';
   const isJeepDriver = serviceType === "Jeep Driver";
   const isTourGuide = serviceType === "Tour Guide";
+  const isGuide = serviceType === "Tour Guide";
   const isRenting = serviceType === "Renting Store";
 
   // Reset ALL form fields when service type changes

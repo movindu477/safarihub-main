@@ -7,6 +7,7 @@ import Navbar from '../home/Navbar'
 import Destination2 from './DestinationSection2'
 import Footer from '../home/Footer'
 import ChatList from '../ChatList'
+import BookingPanel from '../BookingPanel'
 
 // Firebase - use correct relative path to go up two levels to src
 import { auth, db } from '../../firebase'
@@ -207,7 +208,9 @@ function DestinationApp({ user: propUser, onLogout, onShowAuth, notifications = 
             onClose={() => setShowChatList(false)}
           />
         )}
-        <DestinationHero />
+        <DestinationHero>
+          <BookingPanel user={user} notifications={notifications} />
+        </DestinationHero>
         <Destination2 />
         <Footer />
       </main>

@@ -6,6 +6,7 @@ import RentingHero from "./RentingHero";
 import RentingSection2 from "./RentingSection2";
 import Footer from "../home/Footer";
 import ChatList from "../ChatList";
+import BookingPanel from "../BookingPanel";
 
 // Import shared notification bell from App.jsx
 import { GlobalNotificationBell } from '../../App';
@@ -65,7 +66,9 @@ export default function RentingMain({ user, onLogout, onShowAuth, notifications 
       )}
 
       {/* Hero Section */}
-      <RentingHero />
+      <RentingHero>
+        <BookingPanel user={user} notifications={notifications} />
+      </RentingHero>
 
       {/* Rental Providers Section */}
       <RentingSection2 currentUser={currentUser} />

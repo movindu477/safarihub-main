@@ -480,10 +480,10 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <Navbar user={user} onLogout={onLogout} onLogin={onShowAuth} onRegister={onShowAuth} />
 
-      <div className="flex-1 pt-32 pb-10 px-4">
-        <div className="max-w-7xl mx-auto">
+      <div className="flex-1 pt-24 pb-8 px-4">
+        <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="mb-6 flex items-center gap-4">
+          <div className="mb-5 flex items-center gap-3">
             <button
               onClick={() => navigate('/')}
               className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
@@ -495,7 +495,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
           </div>
 
           {/* Filter Buttons */}
-          <div className="mb-6 flex flex-wrap gap-2">
+          <div className="mb-5 flex flex-wrap gap-2">
             <button
               onClick={() => setBookingFilter('all')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${bookingFilter === 'all'
@@ -562,7 +562,7 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
           </div>
 
           {/* Bookings List */}
-          <div className="bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
+          <div className="bg-gray-800 rounded-xl shadow-lg p-5 border border-gray-700">
             {loading ? (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
@@ -632,9 +632,9 @@ export default function TouristBookings({ user, onLogout, onShowAuth }) {
                         setSelectedBooking(booking);
                         setShowBookingDetails(true);
                       }}
-                      className="rounded-lg p-4 border cursor-pointer transition-colors hover:bg-gray-700 bg-gray-700/50 border-gray-600"
+                      className="rounded-lg p-3 border cursor-pointer transition-colors hover:bg-gray-700 bg-gray-700/50 border-gray-600"
                     >
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <h3 className="text-lg font-semibold text-white">

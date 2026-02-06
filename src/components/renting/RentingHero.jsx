@@ -1,7 +1,7 @@
 import React from "react";
 import cameraImage from "../../assets/camera.avif";
 
-export default function RentingHero() {
+export default function RentingHero({ children }) {
   return (
     <section className="relative w-full h-screen overflow-hidden">
       {/* Background Image - Static */}
@@ -42,6 +42,15 @@ export default function RentingHero() {
                 High-quality cameras and equipment for your perfect shot.
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Booking Panel Container - Absolute Positioned */}
+      <div className="hidden sm:block absolute z-30 top-0 right-0 w-full h-full pointer-events-none">
+        <div className="w-full h-full relative">
+          <div className="pointer-events-auto">
+            {children}
           </div>
         </div>
       </div>

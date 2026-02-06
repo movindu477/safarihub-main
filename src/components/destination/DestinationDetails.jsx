@@ -29,6 +29,7 @@ import {
 import Navbar from '../home/Navbar';
 import Footer from '../home/Footer';
 import ChatList from '../ChatList';
+import BookingPanel from '../BookingPanel';
 import { GlobalNotificationBell } from '../../App';
 import { getFirestore, collection, query, where, getDocs, limit } from 'firebase/firestore';
 
@@ -284,18 +285,7 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
     setMapZoom((prev) => Math.max(prev - 1, 8));
   };
 
-  const getWeatherIcon = (weatherMain) => {
-    switch (weatherMain) {
-      case 'Clear':
-        return <Sun className="h-6 w-6 text-amber-500" />;
-      case 'Clouds':
-        return <Cloud className="h-6 w-6 text-gray-400" />;
-      case 'Rain':
-        return <CloudRain className="h-6 w-6 text-gray-500" />;
-      default:
-        return <Cloud className="h-6 w-6 text-gray-400" />;
-    }
-  };
+
 
   const [showChatList, setShowChatList] = useState(false);
 
@@ -352,6 +342,8 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
             {destination.description}
           </p>
         </div>
+
+
       </section>
 
       {/* About Section */}
@@ -450,173 +442,174 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
           </div>
         </div>
       </section>
-
       {/* Animal Gallery Section - NEW DESIGN */}
-      {destination.animals && destination.animals.length > 0 && (
-        <section className="py-20 md:py-24 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 tracking-tight">
-                Wildlife & Animals
-              </h2>
-              <p className="text-base text-gray-600 max-w-xl mx-auto">
-                Discover the amazing wildlife that calls this destination home
-              </p>
-            </div>
-
-            {/* Main Container - Selected Animal Image and Details */}
-            <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 mb-8">
-              {/* LEFT SIDE - Main Selected Animal Image */}
-              <div className="flex-1 relative rounded-2xl overflow-hidden border-2 border-green-600 shadow-lg group">
-                <img
-                  src={destination.animals[selectedAnimal].image}
-                  alt={destination.animals[selectedAnimal].name}
-                  className="w-full h-full object-cover min-h-[400px] lg:min-h-[600px] transition-transform duration-700 group-hover:scale-105"
-                />
-
-                {/* Navigation Arrows */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePreviousAnimal();
-                  }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-3 rounded-full backdrop-blur-sm transition-all hover:scale-110 opacity-0 group-hover:opacity-100 focus:opacity-100"
-                  aria-label="Previous Animal"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNextAnimal();
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-3 rounded-full backdrop-blur-sm transition-all hover:scale-110 opacity-0 group-hover:opacity-100 focus:opacity-100"
-                  aria-label="Next Animal"
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </button>
+      {
+        destination.animals && destination.animals.length > 0 && (
+          <section className="py-20 md:py-24 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12">
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 tracking-tight">
+                  Wildlife & Animals
+                </h2>
+                <p className="text-base text-gray-600 max-w-xl mx-auto">
+                  Discover the amazing wildlife that calls this destination home
+                </p>
               </div>
 
-              {/* RIGHT SIDE - Animal Details Panel */}
-              <div className="flex-1 bg-white rounded-2xl shadow-lg border border-gray-200 p-4 md:p-6 flex flex-col">
-                <div className="space-y-3">
-                  {/* Animal Name */}
-                  <div>
-                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-                      {destination.animals[selectedAnimal].name}
-                    </h3>
-                    <p className="text-sm text-gray-600 leading-snug">
-                      {destination.animals[selectedAnimal].description}
-                    </p>
-                  </div>
+              {/* Main Container - Selected Animal Image and Details */}
+              <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 mb-8">
+                {/* LEFT SIDE - Main Selected Animal Image */}
+                <div className="flex-1 relative rounded-2xl overflow-hidden border-2 border-green-600 shadow-lg group">
+                  <img
+                    src={destination.animals[selectedAnimal].image}
+                    alt={destination.animals[selectedAnimal].name}
+                    className="w-full h-full object-cover min-h-[400px] lg:min-h-[600px] transition-transform duration-700 group-hover:scale-105"
+                  />
 
-                  {/* Scientific and Sinhala Names */}
-                  {(destination.animals[selectedAnimal].scientificName || destination.animals[selectedAnimal].sinhalaName) && (
-                    <div className="grid grid-cols-2 gap-3 py-2 border-y border-gray-200">
-                      {destination.animals[selectedAnimal].scientificName && (
-                        <div>
-                          <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-0.5">Scientific</p>
-                          <p className="text-xs font-medium text-gray-900 italic">
-                            {destination.animals[selectedAnimal].scientificName}
-                          </p>
-                        </div>
-                      )}
-                      {destination.animals[selectedAnimal].sinhalaName && (
-                        <div>
-                          <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-0.5">Sinhala</p>
-                          <p className="text-sm font-medium text-gray-900">
-                            {destination.animals[selectedAnimal].sinhalaName}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Navigation Arrows */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePreviousAnimal();
+                    }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-3 rounded-full backdrop-blur-sm transition-all hover:scale-110 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    aria-label="Previous Animal"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
 
-                  {/* Habitat */}
-                  {destination.animals[selectedAnimal].habitat && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNextAnimal();
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/60 text-white p-3 rounded-full backdrop-blur-sm transition-all hover:scale-110 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    aria-label="Next Animal"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* RIGHT SIDE - Animal Details Panel */}
+                <div className="flex-1 bg-white rounded-2xl shadow-lg border border-gray-200 p-4 md:p-6 flex flex-col">
+                  <div className="space-y-3">
+                    {/* Animal Name */}
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-1">Habitat</p>
-                      <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">
-                        {destination.animals[selectedAnimal].habitat}
+                      <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+                        {destination.animals[selectedAnimal].name}
+                      </h3>
+                      <p className="text-sm text-gray-600 leading-snug">
+                        {destination.animals[selectedAnimal].description}
                       </p>
                     </div>
-                  )}
 
-                  {/* Population Estimate */}
-                  {destination.animals[selectedAnimal].populationEstimate && (
-                    <div className="bg-green-50 rounded-lg p-3">
-                      <p className="text-xs uppercase tracking-wide text-green-700 font-semibold mb-0.5">Population</p>
-                      <p className="text-2xl font-bold text-green-600 mb-1">
-                        {destination.animals[selectedAnimal].populationEstimate}
-                      </p>
-                      {destination.animals[selectedAnimal].abundance && (
-                        <p className="text-xs text-gray-600 leading-snug line-clamp-2">
-                          {destination.animals[selectedAnimal].abundance}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                    {/* Scientific and Sinhala Names */}
+                    {(destination.animals[selectedAnimal].scientificName || destination.animals[selectedAnimal].sinhalaName) && (
+                      <div className="grid grid-cols-2 gap-3 py-2 border-y border-gray-200">
+                        {destination.animals[selectedAnimal].scientificName && (
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-0.5">Scientific</p>
+                            <p className="text-xs font-medium text-gray-900 italic">
+                              {destination.animals[selectedAnimal].scientificName}
+                            </p>
+                          </div>
+                        )}
+                        {destination.animals[selectedAnimal].sinhalaName && (
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-0.5">Sinhala</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {destination.animals[selectedAnimal].sinhalaName}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Photography Tips */}
-                  {destination.animals[selectedAnimal].photographyTips && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Camera className="h-4 w-4 text-amber-600" />
-                        <p className="text-xs uppercase tracking-wide text-amber-700 font-semibold">
-                          Photo Tips
+                    {/* Habitat */}
+                    {destination.animals[selectedAnimal].habitat && (
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-green-600 font-semibold mb-1">Habitat</p>
+                        <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">
+                          {destination.animals[selectedAnimal].habitat}
                         </p>
                       </div>
-                      <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">
-                        {destination.animals[selectedAnimal].photographyTips}
-                      </p>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Learn More Button */}
-                  {destination.id === 'yala-national-park' && destination.animals[selectedAnimal].name === 'Sri Lankan Leopard' && (
-                    <div>
-                      <a
-                        href="https://yalaleoparddiary.com/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium text-xs hover:bg-green-700 transition-colors"
-                      >
-                        Learn More About Sri Lankan Leopards
-                      </a>
-                    </div>
-                  )}
+                    {/* Population Estimate */}
+                    {destination.animals[selectedAnimal].populationEstimate && (
+                      <div className="bg-green-50 rounded-lg p-3">
+                        <p className="text-xs uppercase tracking-wide text-green-700 font-semibold mb-0.5">Population</p>
+                        <p className="text-2xl font-bold text-green-600 mb-1">
+                          {destination.animals[selectedAnimal].populationEstimate}
+                        </p>
+                        {destination.animals[selectedAnimal].abundance && (
+                          <p className="text-xs text-gray-600 leading-snug line-clamp-2">
+                            {destination.animals[selectedAnimal].abundance}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Photography Tips */}
+                    {destination.animals[selectedAnimal].photographyTips && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Camera className="h-4 w-4 text-amber-600" />
+                          <p className="text-xs uppercase tracking-wide text-amber-700 font-semibold">
+                            Photo Tips
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">
+                          {destination.animals[selectedAnimal].photographyTips}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Learn More Button */}
+                    {destination.id === 'yala-national-park' && destination.animals[selectedAnimal].name === 'Sri Lankan Leopard' && (
+                      <div>
+                        <a
+                          href="https://yalaleoparddiary.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium text-xs hover:bg-green-700 transition-colors"
+                        >
+                          Learn More About Sri Lankan Leopards
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Animal Thumbnails - Horizontal Line Below */}
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
-              {destination.animals.map((animal, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedAnimal(index)}
-                  className={`relative shrink-0 w-40 h-40 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${index === selectedAnimal
-                    ? 'border-green-600 ring-2 ring-green-600 ring-offset-2'
-                    : 'border-gray-300 hover:border-green-500'
-                    }`}
-                >
-                  <img
-                    src={animal.image}
-                    alt={animal.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className={`absolute inset-0 transition-colors ${index === selectedAnimal ? 'bg-green-600/20' : 'bg-black/30 hover:bg-black/20'
-                    }`}></div>
-                  <p className="absolute bottom-2 left-2 right-2 text-white text-xs font-medium text-center bg-black/60 backdrop-blur-sm rounded px-2 py-1.5">
-                    {animal.name}
-                  </p>
-                </button>
-              ))}
+              {/* Animal Thumbnails - Horizontal Line Below */}
+              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
+                {destination.animals.map((animal, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedAnimal(index)}
+                    className={`relative shrink-0 w-40 h-40 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${index === selectedAnimal
+                      ? 'border-green-600 ring-2 ring-green-600 ring-offset-2'
+                      : 'border-gray-300 hover:border-green-500'
+                      }`}
+                  >
+                    <img
+                      src={animal.image}
+                      alt={animal.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className={`absolute inset-0 transition-colors ${index === selectedAnimal ? 'bg-green-600/20' : 'bg-black/30 hover:bg-black/20'
+                      }`}></div>
+                    <p className="absolute bottom-2 left-2 right-2 text-white text-xs font-medium text-center bg-black/60 backdrop-blur-sm rounded px-2 py-1.5">
+                      {animal.name}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )
+      }
 
       {/* Interactive Map Section */}
       <section className="py-20 md:py-24 bg-white">
@@ -959,37 +952,38 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
       </section>
 
       {/* No providers found message */}
-      {!loadingProviders && jeepDrivers.length === 0 && tourGuides.length === 0 && rentingStores.length === 0 && (
-        <section className="py-20 md:py-24 bg-linear-to-b from-gray-50 to-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center py-12">
-              <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                No Service Providers Available
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Currently, there are no registered service providers for this destination.
-              </p>
-              <div className="flex gap-4 justify-center">
-                <button
-                  onClick={() => navigate('/jeep')}
-                  className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                >
-                  Browse All Jeep Drivers
-                </button>
-                <button
-                  onClick={() => navigate('/guide')}
-                  className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                >
-                  Browse All Tour Guides
-                </button>
+      {
+        !loadingProviders && jeepDrivers.length === 0 && tourGuides.length === 0 && rentingStores.length === 0 && (
+          <section className="py-20 md:py-24 bg-linear-to-b from-gray-50 to-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center py-12">
+                <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No Service Providers Available
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Currently, there are no registered service providers for this destination.
+                </p>
+                <div className="flex gap-4 justify-center">
+                  <button
+                    onClick={() => navigate('/jeep')}
+                    className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    Browse All Jeep Drivers
+                  </button>
+                  <button
+                    onClick={() => navigate('/guide')}
+                    className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    Browse All Tour Guides
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )
+      }
 
-      {/* Weather Section */}
       <section className="py-20 md:py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -1002,14 +996,14 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
           </div>
 
           {loadingWeather ? (
-            <div className="bg-linear-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                 <p className="ml-4 text-gray-600">Loading weather data...</p>
               </div>
             </div>
           ) : weatherError ? (
-            <div className="bg-linear-to-br from-red-50 to-orange-50 rounded-2xl border border-red-100 p-8 md:p-12">
+            <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl border border-red-100 p-8 md:p-12">
               <div className="flex items-center justify-center py-12">
                 <AlertCircle className="h-12 w-12 text-red-500 mr-4" />
                 <div>
@@ -1019,74 +1013,97 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               </div>
             </div>
           ) : weather && (
-            <div className="bg-linear-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8 md:p-12 shadow-sm">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Current Weather Display */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Current Conditions</h3>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-4">
-                      {getWeatherIcon(weather.weather?.[0]?.main, 16)}
+                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                    <Cloud className="h-5 w-5 text-blue-500 mr-2" />
+                    Current Conditions
+                  </h3>
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-6">
+                      <div className="p-4 bg-blue-50 rounded-2xl">
+                        {getWeatherIcon(weather.weather?.[0]?.main, 48)}
+                      </div>
                       <div>
-                        <p className="text-4xl font-bold text-gray-900">
+                        <p className="text-5xl font-black text-gray-900">
                           {Math.round(weather.main?.temp || 0)}°C
                         </p>
-                        <p className="text-gray-600 capitalize">
+                        <p className="text-lg text-gray-600 capitalize font-medium mt-1">
                           {weather.weather?.[0]?.description || 'N/A'}
                         </p>
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <Droplet className="h-5 w-5 text-blue-500" />
+                  <div className="grid grid-cols-2 gap-6 pt-6 border-t border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-50 rounded-lg">
+                        <Droplet className="h-5 w-5 text-blue-500" />
+                      </div>
                       <div>
-                        <p className="text-xs text-gray-500">Humidity</p>
-                        <p className="font-semibold text-gray-900">{weather.main?.humidity || 0}%</p>
+                        <p className="text-xs text-gray-500 font-medium">Humidity</p>
+                        <p className="font-bold text-gray-900">{weather.main?.humidity || 0}%</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Wind className="h-5 w-5 text-gray-500" />
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <Wind className="h-5 w-5 text-gray-500" />
+                      </div>
                       <div>
-                        <p className="text-xs text-gray-500">Wind Speed</p>
-                        <p className="font-semibold text-gray-900">
+                        <p className="text-xs text-gray-500 font-medium">Wind Speed</p>
+                        <p className="font-bold text-gray-900">
                           {weather.wind?.speed ? `${weather.wind.speed.toFixed(1)} m/s` : 'N/A'}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Thermometer className="h-5 w-5 text-red-500" />
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-red-50 rounded-lg">
+                        <Thermometer className="h-5 w-5 text-red-500" />
+                      </div>
                       <div>
-                        <p className="text-xs text-gray-500">Feels Like</p>
-                        <p className="font-semibold text-gray-900">
+                        <p className="text-xs text-gray-500 font-medium">Feels Like</p>
+                        <p className="font-bold text-gray-900">
                           {Math.round(weather.main?.feels_like || 0)}°C
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Cloud className="h-5 w-5 text-gray-400" />
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-50 rounded-lg">
+                        <Cloud className="h-5 w-5 text-indigo-400" />
+                      </div>
                       <div>
-                        <p className="text-xs text-gray-500">Cloudiness</p>
-                        <p className="font-semibold text-gray-900">{weather.clouds?.all || 0}%</p>
+                        <p className="text-xs text-gray-500 font-medium">Cloudiness</p>
+                        <p className="font-bold text-gray-900">{weather.clouds?.all || 0}%</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Best Time to Visit */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Best Time to Visit</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
+                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                    <Star className="h-5 w-5 text-yellow-500 mr-2" />
+                    When to Visit
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4 p-4 bg-green-50 rounded-xl border border-green-100">
+                      <Calendar className="h-6 w-6 text-green-600 mt-1 shrink-0" />
                       <div>
-                        <p className="font-medium text-gray-900">{destination.bestTimeToVisit}</p>
-                        <p className="text-sm text-gray-600">Ideal weather conditions during this period</p>
+                        <p className="text-sm text-green-800 font-bold uppercase tracking-wider mb-1">Peak Season</p>
+                        <p className="text-lg font-bold text-gray-900">{destination.bestTimeToVisit}</p>
+                        <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                          Ideal weather conditions with minimal rainfall and maximum animal sightings.
+                        </p>
                       </div>
                     </div>
-                    <div className="pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">
-                        Check seasonal weather patterns and plan your visit accordingly for the best experience.
+                    <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100/50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Navigation className="h-4 w-4 text-blue-600" />
+                        <p className="text-sm font-bold text-blue-800">Travel Advice</p>
+                      </div>
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        Always check the local forecast before your trip. Early morning and late afternoon are generally best for wildlife photography.
                       </p>
                     </div>
                   </div>
@@ -1094,29 +1111,66 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
               </div>
 
               {/* 5-Day Forecast */}
-              {forecast && forecast.list && (
-                <div className="mt-8 pt-8 border-t border-blue-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-6">5-Day Forecast</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    {forecast.list
-                      .filter((item, index) => index % 8 === 0) // Get one forecast per day (every 8th item = 24 hours)
-                      .slice(0, 5) // Limit to 5 days
-                      .map((day, index) => (
-                        <div key={index} className="bg-white rounded-lg border-2 border-gray-200 p-5 text-center">
-                          <p className="font-semibold text-gray-900 text-sm mb-1">
-                            {index === 0 ? 'Today' : formatDate(day.dt_txt)}
+              {forecast?.list && (
+                <div className="mt-10 pt-10 border-t border-blue-200/60">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-2xl font-bold text-gray-900">5-Day Forecast</h3>
+                    <p className="text-sm text-gray-500 font-medium">Noon estimations</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                    {(() => {
+                      const dailyForecasts = [];
+                      const seenDates = new Set();
+
+                      forecast.list.forEach(item => {
+                        const date = new Date(item.dt_txt);
+                        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        const hour = date.getHours();
+
+                        if (hour >= 11 && hour <= 13 && !seenDates.has(dateStr) && dailyForecasts.length < 5) {
+                          seenDates.add(dateStr);
+                          dailyForecasts.push({
+                            date: dateStr,
+                            dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
+                            temp: Math.round(item.main.temp),
+                            weather: item.weather[0].main,
+                            description: item.weather[0].description
+                          });
+                        }
+                      });
+
+                      // If no noon data (rare), fallback to 1 per 24h
+                      if (dailyForecasts.length === 0) {
+                        forecast.list.filter((_, i) => i % 8 === 0).slice(0, 5).forEach(item => {
+                          const date = new Date(item.dt_txt);
+                          dailyForecasts.push({
+                            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
+                            temp: Math.round(item.main.temp),
+                            weather: item.weather[0].main,
+                            description: item.weather[0].description
+                          });
+                        });
+                      }
+
+                      return dailyForecasts.map((day, index) => (
+                        <div key={index} className="bg-white rounded-2xl border border-gray-200 p-6 text-center shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
+                          <p className="font-bold text-gray-900 text-sm mb-1">
+                            {index === 0 ? 'Today' : day.dayName}
                           </p>
-                          <div className="flex justify-center mb-4">
-                            {getWeatherIcon(day.weather?.[0]?.main, 8)}
+                          <p className="text-xs text-gray-500 mb-4">{day.date}</p>
+                          <div className="flex justify-center mb-4 p-3 bg-gray-50 rounded-xl">
+                            {getWeatherIcon(day.weather, 32)}
                           </div>
-                          <p className="text-2xl font-semibold text-gray-900 mb-1">
-                            {Math.round(day.main?.temp || 0)}°C
+                          <p className="text-3xl font-black text-gray-900 mb-1">
+                            {day.temp}°C
                           </p>
-                          <p className="text-xs text-gray-500 capitalize">
-                            {day.weather?.[0]?.description || 'N/A'}
+                          <p className="text-xs text-gray-600 capitalize font-medium">
+                            {day.description}
                           </p>
                         </div>
-                      ))}
+                      ));
+                    })()}
                   </div>
                 </div>
               )}
@@ -1126,67 +1180,69 @@ export default function DestinationDetails({ user, onLogout, onShowAuth, notific
       </section>
 
       {/* Tips Section */}
-      {destination.tips && destination.tips.length > 0 && (
-        <section className="py-20 md:py-24 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 tracking-tight">
-                Travel Tips
-              </h2>
-              <p className="text-base text-gray-600 max-w-xl mx-auto">
-                Essential tips to make the most of your visit
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              {destination.tips.map((tip, index) => (
-                <div key={index} className="bg-white rounded-lg border border-gray-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-                  <div className="bg-green-100 rounded-full p-2 shrink-0">
-                    <Lightbulb className="h-5 w-5 text-green-600" />
-                  </div>
-                  <p className="text-gray-700 leading-relaxed">{tip}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Law Enforcement Section */}
-            {destination.lawEnforcement && destination.lawEnforcement.length > 0 && (
-              <div className="mt-12">
-                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 md:p-8">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="bg-red-600 rounded-full p-3">
-                      <AlertCircle className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900">Park Rules & Law Enforcement</h3>
-                      <p className="text-sm text-gray-600 mt-1">Strictly enforced for safety and conservation</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {destination.lawEnforcement.map((rule, index) => (
-                      <div key={index} className="bg-white rounded-lg border border-red-200 p-4 flex items-start gap-3">
-                        <div className="bg-red-100 rounded-full p-1.5 shrink-0 mt-0.5">
-                          <AlertCircle className="h-4 w-4 text-red-600" />
-                        </div>
-                        <p className="text-sm text-gray-800 leading-relaxed">{rule}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-6 p-4 bg-red-100 rounded-lg">
-                    <p className="text-sm text-red-900 font-medium">
-                      Violation of park rules may result in fines, expulsion from the park, or legal action.
-                      These regulations are in place to protect both wildlife and visitors.
-                    </p>
-                  </div>
-                </div>
+      {
+        destination.tips && destination.tips.length > 0 && (
+          <section className="py-20 md:py-24 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12">
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 tracking-tight">
+                  Travel Tips
+                </h2>
+                <p className="text-base text-gray-600 max-w-xl mx-auto">
+                  Essential tips to make the most of your visit
+                </p>
               </div>
-            )}
-          </div>
-        </section>
-      )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                {destination.tips.map((tip, index) => (
+                  <div key={index} className="bg-white rounded-lg border border-gray-200 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
+                    <div className="bg-green-100 rounded-full p-2 shrink-0">
+                      <Lightbulb className="h-5 w-5 text-green-600" />
+                    </div>
+                    <p className="text-gray-700 leading-relaxed">{tip}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Law Enforcement Section */}
+              {destination.lawEnforcement && destination.lawEnforcement.length > 0 && (
+                <div className="mt-12">
+                  <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 md:p-8">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="bg-red-600 rounded-full p-3">
+                        <AlertCircle className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-gray-900">Park Rules & Law Enforcement</h3>
+                        <p className="text-sm text-gray-600 mt-1">Strictly enforced for safety and conservation</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {destination.lawEnforcement.map((rule, index) => (
+                        <div key={index} className="bg-white rounded-lg border border-red-200 p-4 flex items-start gap-3">
+                          <div className="bg-red-100 rounded-full p-1.5 shrink-0 mt-0.5">
+                            <AlertCircle className="h-4 w-4 text-red-600" />
+                          </div>
+                          <p className="text-sm text-gray-800 leading-relaxed">{rule}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-6 p-4 bg-red-100 rounded-lg">
+                      <p className="text-sm text-red-900 font-medium">
+                        Violation of park rules may result in fines, expulsion from the park, or legal action.
+                        These regulations are in place to protect both wildlife and visitors.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )
+      }
 
       <Footer />
-    </div>
+    </div >
   );
 }
 

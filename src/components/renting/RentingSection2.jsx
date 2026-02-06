@@ -1,9 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, limit, getDoc, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Star, MapPin, Clock, Camera, ShoppingBag, Package, CheckCircle } from 'lucide-react';
+import { Star, MapPin, Clock, Package, Shield, Users } from 'lucide-react';
+
+// Profile Image Component with proper error handling
+const ProfileImage = ({ provider, className }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+  };
+
+  if (!provider.imageUrl || imageError) {
+    return (
+      <div className={`flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300 ${className || 'w-full h-full'}`}>
+        <div className="text-center">
+          <div className="w-20 h-20 bg-gray-400 rounded-full flex items-center justify-center mx-auto mb-2">
+            <span className="text-3xl">🏬</span>
+          </div>
+          <p className="text-sm font-medium text-gray-600">No Photo</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative ${className || 'w-full h-full'}`}>
+      {!imageLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-500"></div>
+        </div>
+      )}
+      <img
+        src={provider.imageUrl}
+        alt={provider.providerName}
+        className={`${className || 'w-full h-full object-cover'} ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+        loading="lazy"
+      />
+    </div>
+  );
+};
 
 const RentingSection2 = ({ currentUser }) => {
   const [rentalProviders, setRentalProviders] = useState([]);
@@ -13,7 +58,6 @@ const RentingSection2 = ({ currentUser }) => {
   const [favoriteMessage, setFavoriteMessage] = useState(null);
   const [userFavorites, setUserFavorites] = useState([]);
   const navigate = useNavigate();
-  const auth = getAuth();
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -117,6 +161,9 @@ const RentingSection2 = ({ currentUser }) => {
             availability: providerData.availability !== false,
             online: providerData.online || false,
             featured: providerData.featured || false,
+            certificationStatus: providerData.certificationStatus || 'uncertified',
+            certifiedAt: providerData.certifiedAt || null,
+            certifiedBy: providerData.certifiedBy || null,
           });
         }
       });
@@ -150,7 +197,6 @@ const RentingSection2 = ({ currentUser }) => {
 
     const fetchUserFavorites = async () => {
       try {
-        const { getDoc, doc } = await import('firebase/firestore');
         const touristDoc = await getDoc(doc(db, 'tourists', currentUser.uid));
 
         if (touristDoc.exists()) {
@@ -236,7 +282,6 @@ const RentingSection2 = ({ currentUser }) => {
     }
 
     try {
-      const { getDoc, doc, updateDoc, arrayUnion, arrayRemove } = await import('firebase/firestore');
       const touristDocRef = doc(db, 'tourists', currentUser.uid);
       const touristDoc = await getDoc(touristDocRef);
 
@@ -302,40 +347,58 @@ const RentingSection2 = ({ currentUser }) => {
   }
 
   return (
-    <section id="renting-section" className="min-h-screen bg-linear-to-b from-gray-50 to-white py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div id="renting-section" className="min-h-screen bg-gray-50/50">
+      <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-gray-900 mb-4">
-            Equipment <span className="text-green-600">Rental Providers</span>
-          </h2>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4 tracking-tight">Professional <span className="text-green-600">Rental Stores</span></h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Browse premium camera and adventure gear rental locations across Sri Lanka
+            Discover premium camera, camping, and adventure gear rental locations across Sri Lanka.
           </p>
         </div>
 
-        {/* Favorite Message */}
+        {/* Favorite Message Overlay */}
         {favoriteMessage && (
-          <div className="fixed top-24 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fadeIn">
-            {favoriteMessage}
-          </div>
+          <>
+            <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+              <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fadeIn">
+                <p className="font-medium">{favoriteMessage}</p>
+              </div>
+            </div>
+            <style>{`
+              @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+              }
+              .animate-fadeIn {
+                animation: fadeIn 0.3s ease-out;
+              }
+            `}</style>
+          </>
         )}
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Package className="h-5 w-5 text-green-600" />
-            Filter Equipment
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Rating Filter */}
+        <div className="bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-gray-100 p-6 mb-10">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Min Rating</label>
+              <h2 className="text-2xl font-bold text-gray-900">Filter Gear</h2>
+              <p className="text-gray-500 text-sm mt-1">Find the perfect equipment for your journey</p>
+            </div>
+            <button
+              onClick={() => setFilters({ rating: '', priceRange: '', equipmentType: '', location: '' })}
+              className="px-6 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium shadow-lg shadow-green-500/30"
+            >
+              Clear All Filters
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Rating</label>
               <select
                 value={filters.rating}
                 onChange={(e) => setFilters({ ...filters, rating: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               >
                 <option value="">All Ratings</option>
                 {filterOptions.ratings.map(option => (
@@ -344,13 +407,12 @@ const RentingSection2 = ({ currentUser }) => {
               </select>
             </div>
 
-            {/* Price Range Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Price Range</label>
               <select
                 value={filters.priceRange}
                 onChange={(e) => setFilters({ ...filters, priceRange: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               >
                 <option value="">All Prices</option>
                 {filterOptions.priceRanges.map(option => (
@@ -359,13 +421,12 @@ const RentingSection2 = ({ currentUser }) => {
               </select>
             </div>
 
-            {/* Equipment Type Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Equipment Type</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Equipment Type</label>
               <select
                 value={filters.equipmentType}
                 onChange={(e) => setFilters({ ...filters, equipmentType: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               >
                 <option value="">All Equipment</option>
                 {filterOptions.equipmentTypes.map(type => (
@@ -374,13 +435,12 @@ const RentingSection2 = ({ currentUser }) => {
               </select>
             </div>
 
-            {/* Location Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
               <select
                 value={filters.location}
                 onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               >
                 <option value="">All Locations</option>
                 {filterOptions.locations.map(location => (
@@ -389,147 +449,236 @@ const RentingSection2 = ({ currentUser }) => {
               </select>
             </div>
           </div>
-
-          {/* Clear Filters */}
-          {(filters.rating || filters.priceRange || filters.equipmentType || filters.location) && (
-            <div className="mt-4">
-              <button
-                onClick={() => setFilters({ rating: '', priceRange: '', equipmentType: '', location: '' })}
-                className="text-sm text-green-600 hover:text-green-700 font-medium"
-              >
-                Clear all filters
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* Results Count */}
-        <div className="mb-6">
-          <p className="text-gray-600">
-            {filteredProviders.length} {filteredProviders.length === 1 ? 'provider' : 'providers'} available
-            {filteredProviders.length !== rentalProviders.length && ` (filtered from ${rentalProviders.length})`}
+        {/* Results Info */}
+        <div className="mb-6 flex items-center justify-between">
+          <p className="text-gray-500 font-medium">
+            Showing {filteredProviders.length} providers
           </p>
         </div>
 
-        {/* Rental Providers Grid */}
-        {filteredProviders.length === 0 ? (
-          <div className="text-center py-20">
-            <Camera className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-xl text-gray-600 mb-2">No rental providers found</p>
-            <p className="text-gray-500">Try adjusting your filters or check back later</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProviders.map((provider) => {
-              const isFavorite = userFavorites.includes(provider.id);
-
-              return (
-                <div
-                  key={provider.id}
-                  id={`rental-card-${provider.id}`}
-                  onClick={() => handleProviderClick(provider.id)}
-                  className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-200 cursor-pointer transform hover:scale-105 group"
-                >
-                  {/* Provider Image */}
-                  <div className="relative h-48 bg-linear-to-br from-green-400 to-green-600 overflow-hidden">
-                    {provider.imageUrl ? (
-                      <img
-                        src={provider.imageUrl}
-                        alt={provider.providerName}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Camera className="h-20 w-20 text-white opacity-50" />
-                      </div>
-                    )}
-
-                    {/* Featured Badge */}
-                    {provider.featured && (
-                      <div className="absolute top-2 left-2 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-current" />
-                        Featured
-                      </div>
-                    )}
-
-                    {/* Favorite Button */}
-                    {currentUser && (
-                      <button
-                        onClick={(e) => handleFavoriteToggle(provider.id, e)}
-                        className={`absolute top-2 right-2 p-2 rounded-full transition-colors ${isFavorite
-                          ? 'bg-red-500 text-white'
-                          : 'bg-white/80 text-gray-600 hover:bg-red-500 hover:text-white'
-                          }`}
-                        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                      >
-                        <MessageCircle className="h-5 w-5" />
-                      </button>
-                    )}
-
-                    {/* Online Status */}
-                    {provider.online && (
-                      <div className="absolute bottom-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                        Online
-                      </div>
-                    )}
+        {/* Rental Providers Grid Sections */}
+        {filteredProviders.length > 0 ? (
+          <div className="space-y-16">
+            {/* Certified Section */}
+            <div>
+              <div className="mb-8 flex items-center justify-between bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="bg-green-100 p-3 rounded-2xl">
+                    <Shield className="h-8 w-8 text-green-600" />
                   </div>
-
-                  {/* Provider Info */}
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-green-600 transition-colors">
-                      {provider.providerName}
-                    </h3>
-
-                    {/* Rating */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${i < Math.round(provider.rating || 0)
-                              ? 'text-yellow-400 fill-current'
-                              : 'text-gray-300'
-                              }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        {provider.rating.toFixed(1)} ({provider.totalReviews} reviews)
-                      </span>
-                    </div>
-
-                    {/* Location */}
-                    <div className="flex items-center gap-2 text-gray-600 mb-3">
-                      <MapPin className="h-4 w-4" />
-                      <span className="text-sm">{provider.location}</span>
-                    </div>
-
-                    {/* Equipment Type */}
-                    <div className="flex items-center gap-2 text-gray-600 mb-3">
-                      <Camera className="h-4 w-4" />
-                      <span className="text-sm">{provider.equipmentType || 'Camera Equipment'}</span>
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {provider.description}
-                    </p>
-
-                    {/* Button */}
-                    <div className="pt-4 border-t border-gray-200">
-                      <button className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
-                        View Details
-                      </button>
-                    </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight text-shadow-sm">Certified Stores</h2>
+                    <p className="text-sm text-gray-500 font-medium mt-1">Verified for quality and reliability</p>
                   </div>
                 </div>
-              );
-            })}
+                <div className="hidden sm:block">
+                  <span className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-gray-200">
+                    {filteredProviders.filter(p => p.certificationStatus === 'certified').length} Verified
+                  </span>
+                </div>
+              </div>
+
+              {filteredProviders.filter(p => p.certificationStatus === 'certified').length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                  {filteredProviders
+                    .filter(p => p.certificationStatus === 'certified')
+                    .map((provider) => (
+                      <div
+                        key={provider.id}
+                        id={`rental-card-${provider.id}`}
+                        className="group relative h-[420px] bg-white rounded-[32px] shadow-xl shadow-gray-100/50 overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-500"
+                        onClick={() => handleProviderClick(provider.id)}
+                      >
+                        {/* Background Image */}
+                        <div className="absolute inset-0 h-full w-full">
+                          <ProfileImage provider={provider} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+                        </div>
+
+                        {/* Top Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                          <div className="bg-white/90 backdrop-blur-md text-green-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm flex items-center gap-1.5">
+                            <Shield className="h-3.5 w-3.5" />
+                            CERTIFIED
+                          </div>
+                          {provider.experience > 0 && (
+                            <div className="bg-black/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                              {provider.experience}+ Years
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Content Box */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl p-6 rounded-t-[48px] transform transition-transform duration-500 translate-y-[88px] group-hover:translate-y-0">
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="text-xl font-bold text-gray-900 truncate pr-2">
+                                {provider.providerName}
+                              </h3>
+                              <Shield className="h-5 w-5 text-green-500 fill-green-500 flex-shrink-0" />
+                            </div>
+                            <p className="text-sm text-gray-500 font-medium">{provider.equipmentType || 'Rental Store'}</p>
+                          </div>
+
+                          <div className="flex items-center gap-6 mb-6">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-gray-400 font-bold" />
+                              <span className="text-sm font-bold text-gray-900">{provider.totalReviews || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                              <span className="text-sm font-bold text-gray-900">{(provider.rating || 0) === 0 ? 'New' : provider.rating.toFixed(1)}</span>
+                            </div>
+                          </div>
+
+                          {/* Hidden Hover Details */}
+                          <div className="space-y-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-75">
+                            <div className="space-y-2 py-2 border-t border-gray-100">
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <MapPin className="h-4 w-4" />
+                                <span className="truncate font-medium">{provider.location}</span>
+                              </div>
+                            </div>
+                            {currentUser && !provider.isCurrentUser && (
+                              <button
+                                onClick={(e) => handleFavoriteToggle(provider.id, e)}
+                                className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${userFavorites.includes(provider.id)
+                                  ? 'bg-gray-100 text-gray-900'
+                                  : 'bg-gray-900 text-white hover:bg-black'
+                                  }`}
+                              >
+                                {userFavorites.includes(provider.id) ? 'Saved' : 'Add to Favorites'}
+                                <span className="text-lg leading-none">{userFavorites.includes(provider.id) ? '♥' : '+'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="bg-white p-12 rounded-[32px] text-center border-2 border-dashed border-gray-200">
+                  <Shield className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 font-medium">No certified stores found in this category.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Pending Section */}
+            <div>
+              <div className="mb-8 flex items-center justify-between bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="bg-yellow-100 p-3 rounded-2xl">
+                    <Clock className="h-8 w-8 text-yellow-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Pending Verification</h2>
+                    <p className="text-sm text-gray-500 font-medium mt-1">Stores currently under admin review</p>
+                  </div>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="bg-yellow-500 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-yellow-200">
+                    {filteredProviders.filter(p => p.certificationStatus !== 'certified').length} Waiting
+                  </span>
+                </div>
+              </div>
+
+              {filteredProviders.filter(p => p.certificationStatus !== 'certified').length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                  {filteredProviders
+                    .filter(p => p.certificationStatus !== 'certified')
+                    .map((provider) => (
+                      <div
+                        key={provider.id}
+                        id={`rental-card-${provider.id}`}
+                        className="group relative h-[420px] bg-white rounded-[32px] shadow-xl shadow-gray-100/50 overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-500"
+                        onClick={() => handleProviderClick(provider.id)}
+                      >
+                        {/* Background Image */}
+                        <div className="absolute inset-0 h-full w-full">
+                          <ProfileImage provider={provider} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+                        </div>
+
+                        {/* Top Badges */}
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                          <div className="bg-white/90 backdrop-blur-md text-yellow-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5" />
+                            PENDING
+                          </div>
+                          {provider.experience > 0 && (
+                            <div className="bg-black/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                              {provider.experience}+ Years
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Content Box */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl p-6 rounded-t-[48px] transform transition-transform duration-500 translate-y-[88px] group-hover:translate-y-0">
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="text-xl font-bold text-gray-900 truncate pr-2">
+                                {provider.providerName}
+                              </h3>
+                            </div>
+                            <p className="text-sm text-gray-500 font-medium">{provider.equipmentType || 'Rental Store'}</p>
+                          </div>
+
+                          <div className="flex items-center gap-6 mb-6">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-gray-400 font-bold" />
+                              <span className="text-sm font-bold text-gray-900">{provider.totalReviews || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                              <span className="text-sm font-bold text-gray-900">{(provider.rating || 0) === 0 ? 'New' : provider.rating.toFixed(1)}</span>
+                            </div>
+                          </div>
+
+                          {/* Hidden Hover Details */}
+                          <div className="space-y-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-75">
+                            <div className="space-y-2 py-2 border-t border-gray-100">
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <MapPin className="h-4 w-4" />
+                                <span className="truncate font-medium">{provider.location}</span>
+                              </div>
+                            </div>
+                            {currentUser && !provider.isCurrentUser && (
+                              <button
+                                onClick={(e) => handleFavoriteToggle(provider.id, e)}
+                                className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${userFavorites.includes(provider.id)
+                                  ? 'bg-gray-100 text-gray-900'
+                                  : 'bg-gray-900 text-white hover:bg-black'
+                                  }`}
+                              >
+                                {userFavorites.includes(provider.id) ? 'Saved' : 'Add to Favorites'}
+                                <span className="text-lg leading-none">{userFavorites.includes(provider.id) ? '♥' : '+'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="bg-white p-12 rounded-[32px] text-center border-2 border-dashed border-gray-200">
+                  <Clock className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 font-medium">No pending stores at the moment.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-20 bg-white rounded-[32px] shadow-lg border border-gray-100">
+            <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-xl text-gray-600 mb-2 font-bold">No rental stores found</p>
+            <p className="text-gray-500">Try adjusting your filters or check back later.</p>
           </div>
         )}
       </div>
-    </section>
+    </div>
   );
 };
 

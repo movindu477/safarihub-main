@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 // Supabase Storage imports (replacing Firebase Storage)
-import { uploadProfileImage, uploadDocument, deleteDocument, getDocumentUrl, uploadDocumentClientSide, deleteDocumentClientSide, uploadProviderDocumentClientSide } from '../lib/supabase';
+import { uploadProfileImage, uploadDocument, getDocumentUrl, uploadDocumentClientSide, deleteDocumentClientSide, uploadProviderDocumentClientSide } from '../lib/supabase';
 import { User, Save, Upload, CheckCircle, AlertCircle, MapPin, Phone, Globe, Calendar, Award, Car, DollarSign, FileText, Languages, Check, X, Bell, Package, TrendingUp, TrendingDown, Wallet, CreditCard, ChevronDown } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Navbar from './home/Navbar';
@@ -1897,7 +1897,7 @@ const Admin = ({ user, onLogout, onShowAuth, notifications = [], onNotificationC
                                     onClick={async () => {
                                       const path = cert.supabasePath || cert.fileUrl;
                                       if (!path) return;
-                                      const { signedUrl } = await getDocumentUrl(path);
+                                      const signedUrl = await getDocumentUrl(path);
                                       if (signedUrl) window.open(signedUrl, '_blank');
                                     }}
                                     className="p-1 hover:bg-emerald-500/20 hover:text-emerald-400 rounded text-gray-500 transition-colors"

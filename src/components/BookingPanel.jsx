@@ -348,15 +348,6 @@ const BookingPanel = ({ user, notifications = [] }) => {
     return `${formatDate(dates[0])} - ${formatDate(dates[dates.length - 1])}`;
   };
 
-  // Hide panel on destination details pages and guide profile pages
-  if (location.pathname.startsWith('/destination/') || location.pathname.startsWith('/guide-profile/')) {
-    return null;
-  }
-
-  if (!user) {
-    return null;
-  }
-
   // Handle booking status update (for service providers)
   const handleBookingStatusUpdate = async (bookingId, status) => {
     if (!user || !user.uid) return;
@@ -389,26 +380,23 @@ const BookingPanel = ({ user, notifications = [] }) => {
     }
   };
 
-  // Hide panel completely on mobile devices, if user is a restricted provider, or on profile pages
-  const isOnProfilePage = location.pathname.includes('/guide-profile/') || location.pathname.includes('/jeep-profile/') || location.pathname.includes('/renting-profile/');
-
-  // Allow Jeep Drivers and Tour Guides to see the panel
-  const isAllowedProvider = userRole === 'provider' && ['Jeep Driver', 'Tour Guide'].includes(serviceType);
-
   // Hide if:
   // 1. Mobile
   // 2. No user or role still loading
-  // 3. Is provider BUT NOT an allowed provider (Jeep Driver/Tour Guide)
-  // 4. Is on a profile page
-  if (isMobile || !user || roleLoading || (userRole === 'provider' && !isAllowedProvider) || isOnProfilePage) {
+  const isOnProfilePage = location.pathname.includes('/guide-profile/') ||
+    location.pathname.includes('/jeep-profile/') ||
+    location.pathname.includes('/renting-profile/') ||
+    location.pathname.includes('/destination/');
+
+  if (isMobile || !user || roleLoading || isOnProfilePage) {
     return null;
   }
 
-  // Calculate unread notifications (moved here to avoid unnecessary calculation if hidden)
+  // Calculate unread notifications
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="fixed top-1/2 -translate-y-1/2 right-6 z-30 flex flex-col gap-4 pointer-events-none">
+    <div className="absolute top-1/2 -translate-y-1/2 right-4 sm:right-6 md:right-8 lg:right-12 z-30 flex flex-col gap-4 pointer-events-none">
       <div
         className="w-80 h-[50vh] rounded-2xl overflow-hidden shadow-2xl backdrop-blur-xl bg-black/40 border border-white/10 flex flex-col pointer-events-auto"
       >

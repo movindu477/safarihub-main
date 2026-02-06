@@ -375,7 +375,7 @@ const AdminPanel = () => {
       setViewingDocument(document.type || 'doc');
       let viewUrl = document.url || document.fileUrl || document.downloadURL;
       if (!viewUrl && document.path) {
-        const { signedUrl } = await getDocumentUrl(document.path, 3600);
+        const signedUrl = await getDocumentUrl(document.path, 3600);
         viewUrl = signedUrl;
       }
       if (viewUrl) window.open(viewUrl, '_blank');
