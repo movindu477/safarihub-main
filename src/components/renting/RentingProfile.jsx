@@ -687,7 +687,7 @@ const RentingProfile = ({ user, onLogout, onShowAuth, notifications, onNotificat
                     }}
                     className="w-full bg-linear-to-r from-black to-gray-800 text-white py-2 sm:py-2.5 md:py-3 px-3 sm:px-4 md:px-5 rounded-lg font-semibold text-xs sm:text-sm md:text-base shadow-lg hover:from-gray-800 hover:to-gray-700 transition-all touch-manipulation min-h-[40px]"
                   >
-                    Login to Book or Message
+                    Login to see products
                   </button>
                 )}
               </div>
